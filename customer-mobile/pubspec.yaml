@@ -1,0 +1,27 @@
+name: customer_mobile
+description: A premium modern mobile travel application named TripKita.
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.5
+  google_fonts: ^6.1.0
+  intl: ^0.18.1
+  qr_flutter: ^4.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    # Set up assets for destination photography and logo if needed
+    - assets/images/

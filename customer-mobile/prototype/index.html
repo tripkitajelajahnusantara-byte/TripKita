@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TripKita Mobile App Prototype</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Info -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-box">
+                    <i class="fa-solid fa-globe logo-icon"></i>
+                </div>
+                <div>
+                    <h1>TripKita</h1>
+                    <p class="tagline">Premium Mobile App Prototype</p>
+                </div>
+            </div>
+
+            <div class="card design-tokens">
+                <h3><i class="fa-solid fa-palette"></i> Sistem Desain</h3>
+                <ul>
+                    <li><span class="token-color teal"></span> <strong>Primary:</strong> Teal (#0F8B8D)</li>
+                    <li><span class="token-color white"></span> <strong>Background:</strong> Pure White</li>
+                    <li><span class="token-color gray"></span> <strong>Inactive:</strong> Dark Gray (#6B7280)</li>
+                    <li><i class="fa-solid fa-circle-nodes"></i> <strong>Sistem Grid:</strong> 8px Grid</li>
+                    <li><i class="fa-solid fa-square-full"></i> <strong>Border Radius:</strong> 20px – 24px</li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles"></i> <strong>Efek:</strong> Glassmorphism & Soft Shadows</li>
+                </ul>
+            </div>
+
+            <div class="card screen-controls">
+                <h3><i class="fa-solid fa-mobile-screen"></i> Pilih Layar</h3>
+                <div class="btn-group">
+                    <button class="btn-screen active" data-target="screen-home">1. Beranda</button>
+                    <button class="btn-screen" data-target="screen-list">2. Daftar Trip</button>
+                    <button class="btn-screen" data-target="screen-detail">3. Detail Trip</button>
+                    <button class="btn-screen" data-target="screen-booking">4. Form Booking</button>
+                    <button class="btn-screen" data-target="screen-payment">5. Pembayaran</button>
+                </div>
+            </div>
+
+            <div class="card flutter-info">
+                <h3><i class="fa-brands fa-flutter"></i> Flutter Ready</h3>
+                <p>Kode UI ini sepenuhnya siap untuk diimplementasikan ke Flutter. Source code terpisah dan model database GORM tersedia di folder:</p>
+                <code>customer-mobile/lib/</code>
+            </div>
+            
+            <div class="sidebar-footer">
+                <p>&copy; 2026 TripKita Team. All rights reserved.</p>
+            </div>
+        </div>
+
+        <!-- Phone Simulator Frame -->
+        <div class="simulator-wrapper">
+            <div class="phone-frame">
+                <!-- Speaker / Notch -->
+                <div class="phone-notch">
+                    <div class="camera"></div>
+                    <div class="speaker"></div>
+                </div>
+
+                <!-- Screen Viewport -->
+                <div class="viewport" id="viewport">
+                    
+                    <!-- SCREEN 1: HOME (BERANDA) -->
+                    <div class="screen active" id="screen-home">
+                        <!-- Hero Section -->
+                        <div class="hero-section" style="background-image: url('https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600');">
+                            <div class="hero-overlay"></div>
+                            
+                            <!-- Header Bar -->
+                            <div class="screen-header">
+                                <div class="header-logo">
+                                    <i class="fa-solid fa-globe logo-small-icon"></i>
+                                    <span>TripKita</span>
+                                </div>
+                                <div class="header-actions">
+                                    <div class="action-badge-wrapper">
+                                        <i class="fa-regular fa-bell"></i>
+                                        <span class="badge">3</span>
+                                    </div>
+                                    <div class="action-badge-wrapper">
+                                        <i class="fa-regular fa-comment-dots"></i>
+                                        <span class="badge">2</span>
+                                    </div>
+                                    <button class="btn-login"><i class="fa-regular fa-user"></i> Masuk</button>
+                                </div>
+                            </div>
+
+                            <!-- Tagline -->
+                            <div class="hero-content">
+                                <h2>Temukan perjalanan terbaik untukmu ✨</h2>
+                                <p>Jelajahi destinasi impian dan ciptakan momen tak terlupakan bersama TripKita.</p>
+                            </div>
+                        </div>
+
+                        <!-- Floating Search Widget -->
+                        <div class="search-widget-container">
+                            <div class="search-widget glass">
+                                <div class="search-row">
+                                    <div class="search-col" id="search-dest-trigger">
+                                        <i class="fa-solid fa-location-dot"></i>
+                                        <div>
+                                            <label>Destinasi</label>
+                                            <span id="txt-home-dest">Raja Ampat, Papua</span>
+                                        </div>
+                                    </div>
+                                    <div class="divider-y"></div>
+                                    <div class="search-col" id="search-date-trigger">
+                                        <i class="fa-regular fa-calendar-days"></i>
+                                        <div>
+                                            <label>Tanggal</label>
+                                            <span id="txt-home-date">28 Mei 2024</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr class="divider-x">
+                                <div class="search-row">
+                                    <div class="search-col" id="search-guests-trigger">
+                                        <i class="fa-solid fa-users"></i>
+                                        <div>
+                                            <label>Jumlah Peserta</label>
+                                            <span id="txt-home-guests">1 Orang</span>
+                                        </div>
+                                    </div>
+                                    <div class="divider-y"></div>
+                                    <div class="search-col" id="search-type-trigger">
+                                        <i class="fa-solid fa-tags"></i>
+                                        <div>
+                                            <label>Tipe Trip</label>
+                                            <span id="txt-home-type">Semua Tipe</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="btn-search" id="btn-search-trips">
+                                    <i class="fa-solid fa-magnifying-glass"></i> Cari Trip
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Categories Shortcuts -->
+                        <div class="section-title-row">
+                            <h3>Kategori Trip</h3>
+                            <a href="#" class="btn-view-all">Lihat Semua <i class="fa-solid fa-chevron-right"></i></a>
+                        </div>
+                        <div class="categories-shortcuts">
+                            <div class="shortcut-item" data-category="Open Trip">
+                                <div class="icon-wrap bg-teal-light"><i class="fa-solid fa-users-group"></i></div>
+                                <span>Open Trip</span>
+                            </div>
+                            <div class="shortcut-item" data-category="Private Trip">
+                                <div class="icon-wrap bg-blue-light"><i class="fa-solid fa-door-closed"></i></div>
+                                <span>Private Trip</span>
+                            </div>
+                            <div class="shortcut-item" data-category="Honeymoon">
+                                <div class="icon-wrap bg-pink-light"><i class="fa-solid fa-heart"></i></div>
+                                <span>Honeymoon</span>
+                            </div>
+                            <div class="shortcut-item" data-category="Family">
+                                <div class="icon-wrap bg-green-light"><i class="fa-solid fa-people-roof"></i></div>
+                                <span>Family</span>
+                            </div>
+                            <div class="shortcut-item" data-category="Corporate">
+                                <div class="icon-wrap bg-purple-light"><i class="fa-solid fa-briefcase"></i></div>
+                                <span>Corporate</span>
+                            </div>
+                        </div>
+
+                        <!-- Popular Trips (Horizontal Cards) -->
+                        <div class="section-title-row">
+                            <h3>Trip Populer</h3>
+                            <a href="#" class="btn-view-all" id="btn-view-all-popular">Lihat Semua <i class="fa-solid fa-chevron-right"></i></a>
+                        </div>
+                        <div class="horizontal-scroll" id="popular-trips-scroll">
+                            <!-- Cards populated dynamically by app.js -->
+                        </div>
+
+                        <!-- Special Promo Banner -->
+                        <div class="promo-banner-container">
+                            <div class="promo-banner">
+                                <div class="promo-info">
+                                    <span class="promo-tag">Promo Spesial</span>
+                                    <h4>Diskon Hingga 15% OFF</h4>
+                                    <p>Periode promo: 1 - 31 Mei 2024</p>
+                                </div>
+                                <div class="promo-plane">
+                                    <i class="fa-solid fa-plane-departure"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recommendations Section -->
+                        <div class="section-title-row">
+                            <h3>Rekomendasi Untuk Kamu</h3>
+                            <a href="#" class="btn-view-all">Lihat Semua <i class="fa-solid fa-chevron-right"></i></a>
+                        </div>
+                        <div class="recommendations-grid" id="recommendations-grid">
+                            <!-- Grid populated dynamically by app.js -->
+                        </div>
+                        
+                        <div class="scroll-spacing"></div>
+                    </div>
+
+                    <!-- SCREEN 2: TRIP LIST -->
+                    <div class="screen" id="screen-list">
+                        <!-- Top Search Bar Header -->
+                        <div class="list-header">
+                            <button class="btn-back" id="btn-list-back"><i class="fa-solid fa-arrow-left"></i></button>
+                            <div class="search-input-wrap">
+                                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                <input type="text" placeholder="Cari destinasi atau trip..." id="txt-list-search">
+                            </div>
+                            <button class="btn-filter-icon" id="btn-list-filter"><i class="fa-solid fa-sliders"></i></button>
+                            <div class="action-badge-wrapper header-bell">
+                                <i class="fa-regular fa-bell"></i>
+                                <span class="badge">3</span>
+                            </div>
+                        </div>
+
+                        <!-- Filters & Sorting Options -->
+                        <div class="list-filters-bar">
+                            <div class="category-chips" id="category-chips-list">
+                                <button class="chip active" data-category="Semua"><i class="fa-solid fa-grid-2"></i> Semua</button>
+                                <button class="chip" data-category="Open Trip"><i class="fa-solid fa-users-group"></i> Open Trip</button>
+                                <button class="chip" data-category="Family"><i class="fa-solid fa-people-roof"></i> Family</button>
+                                <button class="chip" data-category="Honeymoon"><i class="fa-solid fa-heart"></i> Honeymoon</button>
+                                <button class="chip" data-category="Private Trip"><i class="fa-solid fa-door-closed"></i> Private Trip</button>
+                            </div>
+                            <div class="sorting-row">
+                                <span id="lbl-result-count">Menampilkan 4 Paket Trip</span>
+                                <div class="dropdown-sort">
+                                    <span id="selected-sort-label">Terpopuler</span> <i class="fa-solid fa-chevron-down"></i>
+                                    <div class="dropdown-sort-content">
+                                        <div class="sort-option active" data-sort="Terpopuler">Terpopuler</div>
+                                        <div class="sort-option" data-sort="Harga Terendah">Harga Terendah</div>
+                                        <div class="sort-option" data-sort="Harga Tertinggi">Harga Tertinggi</div>
+                                        <div class="sort-option" data-sort="Rating Tertinggi">Rating Tertinggi</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Vertically Scrollable List of Trip Cards -->
+                        <div class="vertical-list" id="trips-vertical-list">
+                            <!-- Populated dynamically by app.js -->
+                        </div>
+
+                        <div class="scroll-spacing"></div>
+                    </div>
+
+                    <!-- SCREEN 3: TRIP DETAIL -->
+                    <div class="screen" id="screen-detail">
+                        <!-- Image Carousel Area -->
+                        <div class="detail-carousel-container">
+                            <!-- Overlay buttons -->
+                            <div class="carousel-overlay-header">
+                                <button class="btn-back-circle" id="btn-detail-back"><i class="fa-solid fa-arrow-left"></i></button>
+                                <div class="header-right-actions">
+                                    <button class="btn-action-circle"><i class="fa-solid fa-share-nodes"></i></button>
+                                    <button class="btn-action-circle btn-wishlist-toggle"><i class="fa-regular fa-heart"></i></button>
+                                </div>
+                            </div>
+                            <!-- Image Display -->
+                            <div class="carousel-images" id="detail-carousel-images">
+                                <img src="" alt="Raja Ampat" id="detail-active-img">
+                            </div>
+                            <!-- Pagination indicators -->
+                            <div class="carousel-pagination-badge" id="carousel-indicator">1 / 4</div>
+                            <div class="carousel-dots" id="carousel-dots-list">
+                                <span class="dot active"></span>
+                                <span class="dot"></span>
+                                <span class="dot"></span>
+                                <span class="dot"></span>
+                            </div>
+                        </div>
+
+                        <!-- Details Section -->
+                        <div class="detail-content">
+                            <span class="badge-type" id="detail-package-badge">OPEN TRIP</span>
+                            <h2 id="detail-package-title">Open Trip Raja Ampat</h2>
+                            
+                            <div class="meta-row">
+                                <div class="meta-item">
+                                    <i class="fa-solid fa-location-dot"></i>
+                                    <span id="detail-package-location">Raja Ampat, Papua</span>
+                                </div>
+                                <div class="meta-item">
+                                    <i class="fa-solid fa-star text-amber"></i>
+                                    <strong id="detail-package-rating">4.8</strong>
+                                    <span id="detail-package-reviews">(120 ulasan)</span>
+                                </div>
+                            </div>
+
+                            <div class="meta-row mt-8">
+                                <div class="meta-item">
+                                    <i class="fa-solid fa-user-check"></i>
+                                    <strong>1.2K+</strong> &nbsp;sudah bergabung
+                                </div>
+                            </div>
+
+                            <!-- Summary Info Cards (Grid) -->
+                            <div class="summary-cards-grid">
+                                <div class="summary-card">
+                                    <i class="fa-regular fa-clock"></i>
+                                    <span class="lbl">Durasi</span>
+                                    <span class="val" id="detail-summary-duration">4H 3M</span>
+                                </div>
+                                <div class="summary-card">
+                                    <i class="fa-regular fa-compass"></i>
+                                    <span class="lbl">Tipe Trip</span>
+                                    <span class="val" id="detail-summary-type">Open Trip</span>
+                                </div>
+                                <div class="summary-card">
+                                    <i class="fa-regular fa-user"></i>
+                                    <span class="lbl">Min. Peserta</span>
+                                    <span class="val" id="detail-summary-min">4 Orang</span>
+                                </div>
+                                <div class="summary-card">
+                                    <i class="fa-solid fa-chair"></i>
+                                    <span class="lbl">Seat Sisa</span>
+                                    <span class="val" id="detail-summary-seats">12 Seat</span>
+                                </div>
+                            </div>
+
+                            <!-- Tabs Bar -->
+                            <div class="tabs-nav-bar">
+                                <button class="tab-btn active" data-tab="tab-desc">Deskripsi</button>
+                                <button class="tab-btn" data-tab="tab-itinerary">Itinerary</button>
+                                <button class="tab-btn" data-tab="tab-facilities">Fasilitas</button>
+                                <button class="tab-btn" data-tab="tab-include">Include</button>
+                                <button class="tab-btn" data-tab="tab-exclude">Exclude</button>
+                                <button class="tab-btn" data-tab="tab-meeting">Meeting Point</button>
+                            </div>
+
+                            <!-- Tab Contents Container -->
+                            <div class="tab-contents-wrapper">
+                                <div class="tab-pane active" id="tab-desc">
+                                    <h4>Tentang Perjalanan</h4>
+                                    <p id="detail-desc-text">Jelajahi keindahan surga tersembunyi di Raja Ampat. Nikmati laut biru jernih, gugusan pulau karst yang memukau, dan pengalaman snorkeling tak terlupakan bersama trip open trip seru ini!</p>
+                                </div>
+                                <div class="tab-pane" id="tab-itinerary">
+                                    <h4>Itinerary Perjalanan</h4>
+                                    <ul class="itinerary-list" id="detail-itinerary-list">
+                                        <!-- Populated dynamically -->
+                                    </ul>
+                                </div>
+                                <div class="tab-pane" id="tab-facilities">
+                                    <h4>Fasilitas Trip</h4>
+                                    <div class="chips-grid" id="detail-facilities-list">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                                <div class="tab-pane" id="tab-include">
+                                    <h4>Termasuk (Include)</h4>
+                                    <ul class="check-list" id="detail-include-list">
+                                        <!-- Populated dynamically -->
+                                    </ul>
+                                </div>
+                                <div class="tab-pane" id="tab-exclude">
+                                    <h4>Tidak Termasuk (Exclude)</h4>
+                                    <ul class="cross-list" id="detail-exclude-list">
+                                        <!-- Populated dynamically -->
+                                    </ul>
+                                </div>
+                                <div class="tab-pane" id="tab-meeting">
+                                    <h4>Titik Kumpul</h4>
+                                    <div class="meeting-point-box">
+                                        <i class="fa-solid fa-flag flag-icon"></i>
+                                        <div>
+                                            <strong id="detail-meeting-title">Bandara Sorong</strong>
+                                            <p>Detail lokasi penjemputan dan nomor kontak koordinator lapangan akan dikirimkan 2 hari sebelum keberangkatan via WhatsApp.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Gallery highlights -->
+                            <h3 class="gallery-title">Highlight Destinasi</h3>
+                            <div class="horizontal-gallery" id="detail-gallery-list">
+                                <!-- Populated dynamically -->
+                            </div>
+
+                            <!-- Schedule Selection Grid -->
+                            <div class="section-header-row mt-24">
+                                <h3>Pilih Tanggal Keberangkatan</h3>
+                                <span class="seat-badge green-text"><i class="fa-solid fa-circle"></i> Tersedia 12 Seat</span>
+                            </div>
+                            <div class="horizontal-scroll dates-scroll" id="detail-schedule-list">
+                                <!-- Dates populated dynamically -->
+                            </div>
+
+                            <!-- Participant Selector Widget -->
+                            <div class="participant-selector-card mt-24">
+                                <div class="sel-info">
+                                    <h4>Jumlah Peserta</h4>
+                                    <p>Minimal 4 orang, maksimal 16 orang</p>
+                                </div>
+                                <div class="sel-controls">
+                                    <button class="btn-circle" id="btn-detail-guest-minus"><i class="fa-solid fa-minus"></i></button>
+                                    <span id="detail-guest-count">2 Orang</span>
+                                    <button class="btn-circle" id="btn-detail-guest-plus"><i class="fa-solid fa-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="scroll-spacing-large"></div>
+
+                        <!-- Sticky bottom booking action -->
+                        <div class="detail-bottom-bar">
+                            <div class="price-summary">
+                                <span class="lbl">Total Harga</span>
+                                <span class="val text-teal" id="detail-bottom-price">Rp 5.500.000</span>
+                                <span class="sub">Termasuk pajak & biaya</span>
+                            </div>
+                            <button class="btn-booking-action" id="btn-book-now">Booking Sekarang</button>
+                        </div>
+                    </div>
+
+                    <!-- SCREEN 4: BOOKING FORM -->
+                    <div class="screen" id="screen-booking">
+                        <!-- Top Navbar -->
+                        <div class="simple-header">
+                            <button class="btn-back" id="btn-booking-back"><i class="fa-solid fa-arrow-left"></i></button>
+                            <h3>Booking</h3>
+                            <div class="spacing-r"></div>
+                        </div>
+
+                        <!-- Mini Package Info -->
+                        <div class="mini-package-card">
+                            <img src="" id="booking-pkg-img" alt="Package Image">
+                            <div class="card-info">
+                                <span class="badge-type" id="booking-pkg-badge">OPEN TRIP</span>
+                                <h4 id="booking-pkg-title">Open Trip Raja Ampat</h4>
+                                <div class="meta">
+                                    <span id="booking-pkg-location"><i class="fa-solid fa-location-dot"></i> Raja Ampat</span>
+                                    <span><i class="fa-solid fa-star text-amber"></i> <strong id="booking-pkg-rating">4.8</strong></span>
+                                    <span id="booking-pkg-duration"><i class="fa-regular fa-clock"></i> 4H 3M</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Participants selector on form -->
+                        <div class="container-white mt-12 p-16">
+                            <div class="flex-between">
+                                <div>
+                                    <h4 class="form-title">Jumlah Peserta</h4>
+                                    <p class="form-subtitle">Pilih jumlah peserta yang akan ikut trip</p>
+                                </div>
+                                <div class="sel-controls scale-down">
+                                    <button class="btn-circle" id="btn-form-guest-minus"><i class="fa-solid fa-minus"></i></button>
+                                    <span id="form-guest-count">4 Orang</span>
+                                    <button class="btn-circle" id="btn-form-guest-plus"><i class="fa-solid fa-plus"></i></button>
+                                </div>
+                            </div>
+                            <div class="info-alert mt-12">
+                                <i class="fa-solid fa-circle-info text-teal"></i>
+                                <span>Minimal 4 orang, maksimal 16 orang</span>
+                            </div>
+                        </div>
+
+                        <!-- Passenger Forms lists -->
+                        <div class="section-title-row mt-16">
+                            <h3>Data Peserta</h3>
+                            <button class="btn-text-action" id="btn-autofill"><i class="fa-solid fa-bolt"></i> Auto Fill</button>
+                        </div>
+
+                        <div class="accordion-forms-list" id="passenger-forms-container">
+                            <!-- Accordion fields dynamically generated by app.js -->
+                        </div>
+
+                        <!-- Booking pricing breakdown summary -->
+                        <div class="pricing-breakdown-card mt-16">
+                            <div class="card-head">
+                                <i class="fa-solid fa-clipboard-list text-teal"></i>
+                                <h4>Ringkasan Booking</h4>
+                            </div>
+                            <hr class="card-divider">
+                            <div class="breakdown-row">
+                                <span>Tanggal Trip</span>
+                                <strong id="summary-trip-date">28 Mei 2024</strong>
+                            </div>
+                            <div class="breakdown-row mt-8">
+                                <span>Jumlah Peserta</span>
+                                <strong id="summary-guests-count">4 Orang</strong>
+                            </div>
+                            <div class="breakdown-row mt-8">
+                                <span>Harga Per Orang</span>
+                                <strong id="summary-unit-price">Rp 2.750.000</strong>
+                            </div>
+                            <hr class="card-divider">
+                            <div class="breakdown-total">
+                                <span>Total Harga</span>
+                                <strong class="text-teal" id="summary-total-price">Rp 11.000.000</strong>
+                            </div>
+                        </div>
+
+                        <div class="scroll-spacing-large"></div>
+
+                        <!-- Booking bottom bar -->
+                        <div class="detail-bottom-bar">
+                            <div class="price-summary">
+                                <span class="lbl">Total Pembayaran</span>
+                                <span class="val text-teal" id="booking-bottom-price">Rp 11.000.000</span>
+                                <span class="sub">Termasuk pajak & biaya</span>
+                            </div>
+                            <button class="btn-booking-action" id="btn-submit-booking">
+                                Lanjut Pembayaran <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- SCREEN 5: PAYMENT -->
+                    <div class="screen" id="screen-payment">
+                        <!-- Header -->
+                        <div class="simple-header">
+                            <button class="btn-back" id="btn-payment-back"><i class="fa-solid fa-arrow-left"></i></button>
+                            <h3>Pembayaran</h3>
+                            <div class="spacing-r"></div>
+                        </div>
+
+                        <!-- Progress Bar indicator -->
+                        <div class="progress-stepper">
+                            <div class="step finished">
+                                <div class="circle"><i class="fa-solid fa-check"></i></div>
+                                <span>Booking</span>
+                            </div>
+                            <div class="step-line active"></div>
+                            <div class="step active">
+                                <div class="circle"></div>
+                                <span>Pembayaran</span>
+                            </div>
+                            <div class="step-line"></div>
+                            <div class="step">
+                                <div class="circle"></div>
+                                <span>Verifikasi</span>
+                            </div>
+                            <div class="step-line"></div>
+                            <div class="step">
+                                <div class="circle"></div>
+                                <span>Selesai</span>
+                            </div>
+                        </div>
+
+                        <!-- Payment Countdown and Booking Code -->
+                        <div class="payment-timer-card mt-12">
+                            <div class="timer-top-row">
+                                <div class="col-timer">
+                                    <span>Batas Akhir Pembayaran</span>
+                                    <h3 id="countdown-timer">23:59:59</h3>
+                                </div>
+                                <div class="col-code">
+                                    <span>Kode Booking</span>
+                                    <h4 id="payment-booking-code">TK-2824-1891</h4>
+                                </div>
+                            </div>
+                            <hr class="card-divider">
+                            <div class="flex-between">
+                                <span class="lbl-payment">Total Pembayaran</span>
+                                <span class="val-payment text-teal" id="payment-total-price">Rp 11.000.000</span>
+                            </div>
+                        </div>
+
+                        <!-- Payment methods tab switcher -->
+                        <div class="payment-method-tabs mt-16">
+                            <button class="pay-tab active" data-paytab="tab-qris">QRIS</button>
+                            <button class="pay-tab" data-paytab="tab-va">Virtual Account</button>
+                            <button class="pay-tab" data-paytab="tab-wallet">E-Wallet</button>
+                        </div>
+
+                        <!-- Tabs Contents -->
+                        <div class="pay-tab-contents mt-16">
+                            
+                            <!-- QRIS TAB -->
+                            <div class="pay-pane active" id="tab-qris">
+                                <div class="qris-box">
+                                    <div class="qris-header">
+                                        <span class="qris-logo">QRIS</span>
+                                        <span class="gpn-logo">GPN</span>
+                                    </div>
+                                    
+                                    <!-- QR Code Generator -->
+                                    <div class="qr-code-wrapper">
+                                        <div class="qr-box">
+                                            <!-- Simulated SVG/Canvas QR Pattern generated dynamically in app.js -->
+                                            <canvas id="qris-canvas" width="180" height="180"></canvas>
+                                        </div>
+                                    </div>
+                                    
+                                    <p class="qr-instructions">Scan QR di atas menggunakan aplikasi perbankan atau e-wallet Anda.</p>
+                                </div>
+                            </div>
+
+                            <!-- VIRTUAL ACCOUNT TAB -->
+                            <div class="pay-pane" id="tab-va">
+                                <div class="bank-list">
+                                    <!-- BCA -->
+                                    <div class="bank-va-item">
+                                        <div class="bank-logo-wrap"><i class="fa-solid fa-building-columns text-blue"></i></div>
+                                        <div class="va-details">
+                                            <strong>Bank Central Asia (BCA)</strong>
+                                            <div class="va-num-row">
+                                                <span class="va-num">8033202418919001</span>
+                                                <button class="btn-copy" onclick="navigator.clipboard.writeText('8033202418919001'); alert('Salin VA BCA Berhasil!');"><i class="fa-regular fa-copy"></i> Salin</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Mandiri -->
+                                    <div class="bank-va-item mt-12">
+                                        <div class="bank-logo-wrap"><i class="fa-solid fa-building-columns text-amber"></i></div>
+                                        <div class="va-details">
+                                            <strong>Bank Mandiri</strong>
+                                            <div class="va-num-row">
+                                                <span class="va-num">8902202418918224</span>
+                                                <button class="btn-copy" onclick="navigator.clipboard.writeText('8902202418918224'); alert('Salin VA Mandiri Berhasil!');"><i class="fa-regular fa-copy"></i> Salin</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- BNI -->
+                                    <div class="bank-va-item mt-12">
+                                        <div class="bank-logo-wrap"><i class="fa-solid fa-building-columns text-orange"></i></div>
+                                        <div class="va-details">
+                                            <strong>Bank Negara Indonesia (BNI)</strong>
+                                            <div class="va-num-row">
+                                                <span class="va-num">8271202418917833</span>
+                                                <button class="btn-copy" onclick="navigator.clipboard.writeText('8271202418917833'); alert('Salin VA BNI Berhasil!');"><i class="fa-regular fa-copy"></i> Salin</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- E-WALLET TAB -->
+                            <div class="pay-pane" id="tab-wallet">
+                                <div class="wallet-list">
+                                    <!-- GoPay -->
+                                    <div class="wallet-item">
+                                        <div class="wallet-info">
+                                            <div class="wallet-logo-wrap"><i class="fa-solid fa-wallet text-teal"></i></div>
+                                            <strong>GoPay</strong>
+                                        </div>
+                                        <button class="btn-pay-app">Buka Aplikasi</button>
+                                    </div>
+                                    <!-- OVO -->
+                                    <div class="wallet-item mt-12">
+                                        <div class="wallet-info">
+                                            <div class="wallet-logo-wrap"><i class="fa-solid fa-wallet text-purple"></i></div>
+                                            <strong>OVO</strong>
+                                        </div>
+                                        <button class="btn-pay-app">Buka Aplikasi</button>
+                                    </div>
+                                    <!-- ShopeePay -->
+                                    <div class="wallet-item mt-12">
+                                        <div class="wallet-info">
+                                            <div class="wallet-logo-wrap"><i class="fa-solid fa-wallet text-orange"></i></div>
+                                            <strong>ShopeePay</strong>
+                                        </div>
+                                        <button class="btn-pay-app">Buka Aplikasi</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Instructions Accordion lists -->
+                        <div class="instructions-accordion mt-20">
+                            <h3>Petunjuk Pembayaran</h3>
+                            
+                            <div class="accordion-item active">
+                                <div class="accordion-header">
+                                    <span>Langkah 1: Buka aplikasi E-Wallet atau M-Banking</span>
+                                    <i class="fa-solid fa-chevron-up"></i>
+                                </div>
+                                <div class="accordion-body">
+                                    <p>Pastikan saldo mencukupi dan cari menu transfer / scan QR di aplikasi perbankan atau e-wallet Anda.</p>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <span>Langkah 2: Arahkan kamera ke QR Code</span>
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </div>
+                                <div class="accordion-body">
+                                    <p>Posisikan QR code TripKita di dalam kotak pemindai di aplikasi pembayaran Anda.</p>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <span>Langkah 3: Konfirmasi dan Bayar</span>
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </div>
+                                <div class="accordion-body">
+                                    <p>Masukkan PIN transaksi di aplikasi perbankan atau e-wallet Anda dan tunggu status pembayaran berhasil di halaman ini.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Security Badges -->
+                        <div class="security-card mt-20">
+                            <i class="fa-solid fa-shield-halved text-green"></i>
+                            <p>Pembayaran Anda dilindungi dengan enkripsi SSL 256-bit aman dan bersertifikat OJK.</p>
+                        </div>
+
+                        <!-- Help shortcut -->
+                        <div class="help-links-row mt-16">
+                            <a href="#" class="help-btn"><i class="fa-regular fa-question-circle"></i> Bantuan</a>
+                            <a href="#" class="help-btn text-teal"><i class="fa-solid fa-headset"></i> Hubungi CS TripKita</a>
+                        </div>
+
+                        <div class="scroll-spacing-large"></div>
+
+                        <!-- Bottom verification notification -->
+                        <div class="payment-bottom-status-bar">
+                            <div class="spinner"></div>
+                            <span>Menunggu pembayaran... Sistem mendeteksi otomatis.</span>
+                        </div>
+                    </div>
+
+                    <!-- SCREEN 6: PAYMENT VERIFICATION (NEW) -->
+                    <div class="screen" id="screen-payment-verify">
+                        <div class="app-header">
+                            <h3>Verifikasi Pembayaran</h3>
+                        </div>
+                        <div class="screen-content p-20">
+                            <!-- Pending state -->
+                            <div id="verify-pending-state" class="verify-card text-center">
+                                <div class="spinner-large" style="margin: 30px auto 0 auto;"></div>
+                                <h3 class="mt-20">Mengecek Pembayaran Anda</h3>
+                                <p class="text-gray mt-8">Sistem sedang mendeteksi transaksi transfer Anda. Silakan pilih hasil simulasi di bawah ini untuk menguji sistem.</p>
+                                
+                                <div class="sim-controls mt-24">
+                                    <button class="btn-primary bg-green" id="btn-sim-success">Simulasi Berhasil <i class="fa-solid fa-circle-check"></i></button>
+                                    <button class="btn-primary bg-red mt-12" id="btn-sim-fail">Simulasi Gagal <i class="fa-solid fa-circle-xmark"></i></button>
+                                </div>
+                            </div>
+                            
+                            <!-- Success state -->
+                            <div id="verify-success-state" class="verify-card text-center d-none">
+                                <div class="icon-success-wrap" style="color: #10b981; font-size: 56px;"><i class="fa-solid fa-circle-check"></i></div>
+                                <h2 class="text-teal mt-16">Pembayaran Berhasil!</h2>
+                                <p class="text-gray mt-8">E-voucher dan tiket Anda telah diterbitkan. Silakan cek detail perjalanan Anda.</p>
+                                
+                                <div class="ticket-summary-card mt-20" style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px;">
+                                    <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span>Kode Booking</span><strong id="verify-code-val">TK-2824-9988</strong></div>
+                                    <hr class="card-divider" style="margin: 8px 0; border: none; border-top: 1px solid #f3f4f6;">
+                                    <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span>Nama Trip</span><strong id="verify-trip-val">Open Trip Raja Ampat</strong></div>
+                                    <hr class="card-divider" style="margin: 8px 0; border: none; border-top: 1px solid #f3f4f6;">
+                                    <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span>Jumlah Pax</span><strong id="verify-pax-val">2 Pax</strong></div>
+                                    <hr class="card-divider" style="margin: 8px 0; border: none; border-top: 1px solid #f3f4f6;">
+                                    <div class="summary-row" style="display: flex; justify-content: space-between;"><span>Total Bayar</span><strong id="verify-price-val">Rp 5.500.000</strong></div>
+                                </div>
+                                
+                                <button class="btn-primary mt-24" id="btn-verify-to-detail" style="width: 100%;">Lihat Detail Booking & E-Tiket</button>
+                                <button class="btn-secondary mt-12" id="btn-verify-to-list" style="width: 100%;">Ke Booking Saya</button>
+                            </div>
+                            
+                            <!-- Fail state -->
+                            <div id="verify-fail-state" class="verify-card text-center d-none">
+                                <div class="icon-fail-wrap" style="color: #ef4444; font-size: 56px;"><i class="fa-solid fa-circle-xmark"></i></div>
+                                <h2 class="text-red mt-16">Pembayaran Gagal!</h2>
+                                <p class="text-gray mt-8">Waktu pembayaran Anda habis (Expired). Silakan lakukan pemesanan ulang.</p>
+                                
+                                <div class="ticket-summary-card mt-20" style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px;">
+                                    <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span>Status</span><strong class="text-red">Expired</strong></div>
+                                    <hr class="card-divider" style="margin: 8px 0; border: none; border-top: 1px solid #f3f4f6;">
+                                    <div class="summary-row" style="display: flex; justify-content: space-between;"><span>Kode Booking</span><strong id="verify-code-fail-val">TK-2824-1122</strong></div>
+                                </div>
+                                
+                                <button class="btn-primary bg-dark mt-24" id="btn-verify-fail-back" style="width: 100%;">Kembali ke Pembayaran</button>
+                                <button class="btn-secondary mt-12" id="btn-verify-fail-home" style="width: 100%;">Kembali ke Beranda</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SCREEN 7: BOOKING LIST (NEW) -->
+                    <div class="screen" id="screen-booking-list">
+                        <div class="app-header">
+                            <h3>Booking Saya</h3>
+                        </div>
+                        
+                        <!-- Filter chips -->
+                        <div class="booking-filters" style="display: flex; padding: 12px 16px; background: white; border-bottom: 1px solid #f3f4f6; overflow-x: auto; gap: 8px;">
+                            <span class="filter-chip active" data-filter="Semua" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; background: #0f8b8d; color: white; font-weight: bold; cursor: pointer; white-space: nowrap;">Semua</span>
+                            <span class="filter-chip" data-filter="Berhasil" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; background: #f3f4f6; color: #4b5563; cursor: pointer; white-space: nowrap;">Berhasil</span>
+                            <span class="filter-chip" data-filter="Menunggu" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; background: #f3f4f6; color: #4b5563; cursor: pointer; white-space: nowrap;">Menunggu</span>
+                            <span class="filter-chip" data-filter="Gagal" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; background: #f3f4f6; color: #4b5563; cursor: pointer; white-space: nowrap;">Gagal / Batal</span>
+                        </div>
+                        
+                        <div class="screen-content p-20" id="booking-list-container" style="padding: 20px; overflow-y: auto; height: calc(100% - 105px);">
+                            <!-- Populated dynamically by JS -->
+                        </div>
+                    </div>
+
+                    <!-- SCREEN 8: BOOKING DETAIL (NEW) -->
+                    <div class="screen" id="screen-booking-detail">
+                        <div class="app-header header-with-back" style="display: flex; justify-content: space-between; align-items: center;">
+                            <button class="btn-back" id="btn-booking-detail-back" style="background: none; border: none; font-size: 16px; padding: 8px;"><i class="fa-solid fa-arrow-left"></i></button>
+                            <h3>Detail Booking</h3>
+                            <div style="width: 32px;"></div> <!-- balance -->
+                        </div>
+                        
+                        <!-- Status Banner -->
+                        <div class="status-banner" id="detail-status-banner" style="background: #0f8b8d; color: white; padding: 12px 20px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-circle-check"></i> <span id="detail-status-text">Booking Berhasil & Terkonfirmasi</span>
+                        </div>
+                        
+                        <div class="screen-content p-20" style="padding: 20px; overflow-y: auto; height: calc(100% - 85px);">
+                            <!-- Countdown Card -->
+                            <div class="countdown-banner-card mt-12" id="detail-countdown-card" style="background: linear-gradient(135deg, #0f8b8d, #14a0a3); color: white; border-radius: 16px; padding: 16px; display: flex; align-items: center; gap: 14px;">
+                                <i class="fa-regular fa-clock" style="font-size: 24px; opacity: 0.8;"></i>
+                                <div>
+                                    <label style="font-size: 10px; opacity: 0.7; display: block; text-transform: uppercase; letter-spacing: 0.5px;">Keberangkatan</label>
+                                    <span id="detail-countdown-val" style="font-weight: bold; font-size: 16px;">H-5 Hari 6 Jam</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Ticket Card -->
+                            <div class="voucher-card mt-16" id="detail-ticket-card" style="background: white; border: 1px solid #e5e7eb; border-radius: 20px; overflow: hidden;">
+                                <div class="voucher-header" style="padding: 16px;">
+                                    <span style="font-size: 10px; font-weight: 800; color: #0f8b8d; letter-spacing: 1px;">E-VOUCHER TRIPKITA</span>
+                                    <h4 id="detail-trip-title" style="margin-top: 6px; font-size: 15px; color: #1f2937;">Open Trip Raja Ampat</h4>
+                                    <p class="loc" style="font-size: 11px; color: #6b7280; margin-top: 4px;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> <span id="detail-trip-dest">Raja Ampat, Papua</span></p>
+                                </div>
+                                <hr class="divider-dashed" style="border: none; border-top: 1px dashed #d1d5db; margin: 0;">
+                                <div class="voucher-body" style="padding: 16px; display: flex; justify-content: space-between;">
+                                    <div class="voucher-info-col" style="flex: 1;">
+                                        <div class="info-item">
+                                            <label style="font-size: 9px; color: #9ca3af; display: block;">Tanggal</label>
+                                            <strong id="detail-trip-date" style="font-size: 12px; color: #374151;">28 Mei 2024</strong>
+                                        </div>
+                                        <div class="info-item mt-12">
+                                            <label style="font-size: 9px; color: #9ca3af; display: block;">Meeting Point</label>
+                                            <strong id="detail-trip-meeting" style="font-size: 12px; color: #374151; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">Bandara Domine Eduard Osok, Sorong</strong>
+                                        </div>
+                                        <div class="info-item mt-12">
+                                            <label style="font-size: 9px; color: #9ca3af; display: block;">Tamu</label>
+                                            <strong id="detail-trip-pax" style="font-size: 12px; color: #374151;">2 Pax</strong>
+                                        </div>
+                                    </div>
+                                    <div class="voucher-qr-col" style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                        <canvas id="detail-ticket-qr" width="80" height="80" style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: white;"></canvas>
+                                        <span style="font-size: 8px; color: #9ca3af; font-weight: bold;">Scan to Board</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Failed explanation card -->
+                            <div class="failure-detail-card mt-16 d-none" id="detail-failure-card" style="background: #fef2f2; border: 1px solid #fee2e2; border-radius: 16px; padding: 16px;">
+                                <div class="fail-header" style="color: #dc2626; font-weight: bold; font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-circle-exclamation"></i> <strong>Pembayaran Gagal / Expired</strong></div>
+                                <p class="mt-8" style="font-size: 11px; color: #b91c1c; line-height: 1.4;">Batas waktu transfer 24 jam terlampaui tanpa adanya konfirmasi pembayaran. Booking ini telah dibatalkan secara otomatis.</p>
+                                <div class="fail-actions mt-16" style="display: flex; gap: 8px;">
+                                    <button class="btn-primary bg-teal btn-sm" id="btn-detail-rebook" style="flex: 1; padding: 8px; font-size: 11px;">Cari Trip Lain</button>
+                                    <button class="btn-secondary btn-sm" id="btn-detail-contact-cs" style="flex: 1; padding: 8px; font-size: 11px;">Hubungi CS</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Pending payment card -->
+                            <div class="pending-detail-card mt-16 d-none" id="detail-pending-card" style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 16px; padding: 16px;">
+                                <div class="pending-header" style="color: #d97706; font-weight: bold; font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-hourglass-half"></i> <strong>Menunggu Pembayaran</strong></div>
+                                <p class="mt-8" style="font-size: 11px; color: #b45309; line-height: 1.4;">Segera selesaikan pembayaran Anda sebelum batas waktu habis agar tiket e-voucher dapat diterbitkan.</p>
+                                <button class="btn-primary mt-12 btn-sm" id="btn-detail-pay-now" style="width: 100%; padding: 10px; font-size: 12px;">Bayar Sekarang</button>
+                            </div>
+                            
+                            <!-- Itinerary Card -->
+                            <div class="itinerary-timeline-card mt-20" id="detail-itinerary-card" style="background: white; border: 1px solid #e5e7eb; border-radius: 20px; padding: 16px;">
+                                <h3 style="font-size: 13px; color: #1f2937;">Itinerary (Rencana Perjalanan)</h3>
+                                <div class="timeline mt-16" id="detail-timeline-container" style="display: flex; flex-direction: column; gap: 12px;">
+                                    <!-- populated dynamically -->
+                                </div>
+                            </div>
+                            
+                            <!-- Trip info details -->
+                            <div class="trip-specs-card mt-20" id="detail-specs-card" style="background: white; border: 1px solid #e5e7eb; border-radius: 20px; padding: 16px;">
+                                <h3 style="font-size: 13px; color: #1f2937;">Informasi Perjalanan</h3>
+                                <div class="spec-row mt-12" style="display: flex; align-items: center; gap: 10px; font-size: 11px;">
+                                    <i class="fa-regular fa-clock text-teal" style="font-size: 14px; width: 16px;"></i>
+                                    <div><label style="color: #9ca3af; font-size: 9px; display: block;">Durasi</label><span id="detail-spec-duration" style="font-weight: bold; color: #374151;">4 Hari 3 Malam</span></div>
+                                </div>
+                                <div class="spec-row mt-12" style="display: flex; align-items: center; gap: 10px; font-size: 11px;">
+                                    <i class="fa-solid fa-ship text-teal" style="font-size: 14px; width: 16px;"></i>
+                                    <div><label style="color: #9ca3af; font-size: 9px; display: block;">Tipe Trip</label><span id="detail-spec-type" style="font-weight: bold; color: #374151;">Open Trip</span></div>
+                                </div>
+                                <div class="spec-row mt-12" style="display: flex; align-items: center; gap: 10px; font-size: 11px;">
+                                    <i class="fa-solid fa-suitcase text-teal" style="font-size: 14px; width: 16px;"></i>
+                                    <div><label style="color: #9ca3af; font-size: 9px; display: block;">Fasilitas Utama</label><span id="detail-spec-facilities" style="font-weight: bold; color: #374151;">Resort, Boat, Pemandu</span></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Participants Card -->
+                            <div class="participants-list-card mt-20" id="detail-participants-card" style="background: white; border: 1px solid #e5e7eb; border-radius: 20px; padding: 16px;">
+                                <h3 style="font-size: 13px; color: #1f2937;">Daftar Peserta Wisata</h3>
+                                <div class="participants-list mt-12" id="detail-participants-container" style="display: flex; flex-direction: column; gap: 8px;">
+                                    <!-- populated dynamically -->
+                                </div>
+                            </div>
+                            
+                            <!-- Booking summary mini (for failed/pending) -->
+                            <div class="summary-mini-card mt-20" id="detail-summary-mini-card" style="background: white; border: 1px solid #e5e7eb; border-radius: 20px; padding: 16px;">
+                                <h3 style="font-size: 13px; color: #1f2937;">Rincian Transaksi</h3>
+                                <div class="mini-row mt-12" style="display: flex; justify-content: space-between; font-size: 11px;"><span>Paket Trip</span><span id="mini-val-title" style="font-weight: bold;">Open Trip Raja Ampat</span></div>
+                                <div class="mini-row mt-8" style="display: flex; justify-content: space-between; font-size: 11px;"><span>Tanggal</span><span id="mini-val-date" style="font-weight: bold;">28 Mei 2024</span></div>
+                                <div class="mini-row mt-8" style="display: flex; justify-content: space-between; font-size: 11px;"><span>Jumlah Pax</span><span id="mini-val-pax" style="font-weight: bold;">1 Pax</span></div>
+                                <div class="mini-row mt-8" style="display: flex; justify-content: space-between; font-size: 11px;"><span>Total Transaksi</span><strong class="text-teal" id="mini-val-price">Rp 2.750.000</strong></div>
+                            </div>
+                            
+                            <div class="scroll-spacing-large" style="height: 60px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- SCREEN 9: CHAT / PESAN (NEW) -->
+                    <div class="screen" id="screen-chat">
+                        <div id="chat-inbox-view" style="height: 100%;">
+                            <div class="app-header">
+                                <h3>Pesan Masuk</h3>
+                            </div>
+                            
+                            <!-- Search box -->
+                            <div class="p-16" style="padding: 16px;">
+                                <div class="search-box-wrap" style="position: relative; display: flex; align-items: center; background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 0 12px;">
+                                    <i class="fa-solid fa-magnifying-glass" style="color: #9ca3af; font-size: 14px;"></i>
+                                    <input type="text" placeholder="Cari pesan atau provider..." style="border: none; background: none; padding: 12px 8px; width: 100%; font-size: 12px;">
+                                </div>
+                            </div>
+                            
+                            <div class="chat-list-container" id="chat-inbox-list" style="overflow-y: auto; height: calc(100% - 130px);">
+                                <!-- Populated dynamically by JS -->
+                            </div>
+                        </div>
+                        
+                        <div id="chat-room-view" class="d-none" style="height: 100%; display: flex; flex-direction: column;">
+                            <div class="app-header header-with-back" style="display: flex; align-items: center; justify-content: space-between;">
+                                <button class="btn-back" id="btn-chat-room-back" style="background: none; border: none; font-size: 16px; padding: 8px;"><i class="fa-solid fa-arrow-left"></i></button>
+                                <div class="header-user-info" style="display: flex; align-items: center; gap: 8px;">
+                                    <img src="" id="chat-room-avatar" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+                                    <div>
+                                        <h4 id="chat-room-name" style="font-size: 13px; color: #1f2937;">TripKita Support</h4>
+                                        <span class="status-online" style="color: #10b981; font-size: 9px; display: block; font-weight: 500;">Online</span>
+                                    </div>
+                                </div>
+                                <div class="header-room-actions" style="font-size: 16px; color: #4b5563; padding: 8px;">
+                                    <i class="fa-solid fa-phone"></i>
+                                </div>
+                            </div>
+                            
+                            <!-- Messages scrollable area -->
+                            <div class="chat-messages-viewport" id="chat-messages-container" style="flex: 1; overflow-y: auto; padding: 16px; background: #f3f4f6; display: flex; flex-direction: column; gap: 10px;">
+                                <!-- populated dynamically -->
+                            </div>
+                            
+                            <!-- Message Input bar -->
+                            <div class="chat-input-bar" style="background: white; border-top: 1px solid #e5e7eb; padding: 10px 16px; display: flex; align-items: center; gap: 8px;">
+                                <div class="input-inner" style="flex: 1; display: flex; align-items: center; background: #f3f4f6; border-radius: 20px; padding: 0 12px; gap: 8px;">
+                                    <i class="fa-regular fa-face-smile" style="color: #6b7280;"></i>
+                                    <input type="text" placeholder="Tulis pesan..." id="txt-chat-message" style="border: none; background: none; padding: 10px 0; width: 100%; font-size: 12px;">
+                                    <i class="fa-solid fa-paperclip" style="color: #6b7280;"></i>
+                                </div>
+                                <button class="btn-send-chat" id="btn-send-message" style="background: #0f8b8d; border: none; color: white; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;"><i class="fa-solid fa-paper-plane" style="font-size: 12px;"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SCREEN 10: USER PROFILE (NEW) -->
+                    <div class="screen" id="screen-profile">
+                        <div class="app-header">
+                            <h3>Profil Saya</h3>
+                        </div>
+                        <div class="screen-content" style="overflow-y: auto; height: calc(100% - 50px);">
+                            <!-- Profile main card -->
+                            <div class="profile-main-info p-20 bg-white" style="background: white; padding: 24px; text-align: center; border-bottom: 1px solid #f3f4f6;">
+                                <div class="avatar-wrap" style="position: relative; display: inline-block;">
+                                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300" alt="Avatar" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;">
+                                    <div class="cam-badge" style="position: absolute; bottom: 0; right: 0; background: #0f8b8d; color: white; font-size: 9px; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-camera"></i></div>
+                                </div>
+                                <h3 class="mt-12 text-center" style="margin-top: 12px; font-size: 16px;">Budi Santoso</h3>
+                                <p class="text-gray text-center mt-4" style="font-size: 11px; color: #9ca3af; margin-top: 4px;">budi.santoso@gmail.com • +62 812-3456-7890</p>
+                            </div>
+                            
+                            <!-- Wallet summary bar -->
+                            <div class="profile-wallet-row mt-16 p-16" style="background: white; margin: 16px 20px 0 20px; border: 1px solid #e5e7eb; border-radius: 16px; display: flex; justify-content: space-around; padding: 14px;">
+                                <div class="wallet-col" style="display: flex; align-items: center; gap: 8px;">
+                                    <i class="fa-solid fa-wallet text-teal" style="color: #0f8b8d; font-size: 18px;"></i>
+                                    <div>
+                                        <label style="font-size: 8px; color: #9ca3af; display: block; text-transform: uppercase;">TripPay Saldo</label>
+                                        <strong style="font-size: 12px; color: #1f2937;">Rp 1.500.000</strong>
+                                    </div>
+                                </div>
+                                <div class="divider-y-small" style="width: 1px; height: 24px; background: #e5e7eb;"></div>
+                                <div class="wallet-col" style="display: flex; align-items: center; gap: 8px;">
+                                    <i class="fa-solid fa-star text-amber" style="color: #fbbf24; font-size: 18px;"></i>
+                                    <div>
+                                        <label style="font-size: 8px; color: #9ca3af; display: block; text-transform: uppercase;">TripPoints</label>
+                                        <strong style="font-size: 12px; color: #1f2937;">3.200 pts</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Menu options -->
+                            <div class="profile-options-section mt-24 p-20" style="padding: 20px 20px 0 20px;">
+                                <h4 style="font-size: 12px; color: #1f2937; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;">Pengaturan Akun</h4>
+                                <div class="menu-item-row mt-12" style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; margin-top: 8px;">
+                                    <i class="fa-regular fa-user text-teal" style="color: #0f8b8d; font-size: 16px; width: 16px;"></i>
+                                    <div style="flex: 1; display: flex; flex-direction: column;">
+                                        <strong style="font-size: 12px; color: #374151;">Edit Profil</strong>
+                                        <span style="font-size: 9px; color: #9ca3af; margin-top: 2px;">Ubah nama, email, dan nomor HP</span>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right chevron" style="color: #9ca3af; font-size: 12px;"></i>
+                                </div>
+                                <div class="menu-item-row mt-8" style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; margin-top: 8px;">
+                                    <i class="fa-solid fa-credit-card text-teal" style="color: #0f8b8d; font-size: 16px; width: 16px;"></i>
+                                    <div style="flex: 1; display: flex; flex-direction: column;">
+                                        <strong style="font-size: 12px; color: #374151;">Metode Pembayaran</strong>
+                                        <span style="font-size: 9px; color: #9ca3af; margin-top: 2px;">Rekening bank & kartu kredit tersimpan</span>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right chevron" style="color: #9ca3af; font-size: 12px;"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="profile-options-section mt-16 p-20" style="padding: 16px 20px 0 20px;">
+                                <h4 style="font-size: 12px; color: #1f2937; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;">Dukungan & Informasi</h4>
+                                <div class="menu-item-row mt-12" id="profile-btn-help" style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; margin-top: 8px;">
+                                    <i class="fa-regular fa-circle-question text-teal" style="color: #0f8b8d; font-size: 16px; width: 16px;"></i>
+                                    <div style="flex: 1; display: flex; flex-direction: column;">
+                                        <strong style="font-size: 12px; color: #374151;">Pusat Bantuan & CS</strong>
+                                        <span style="font-size: 9px; color: #9ca3af; margin-top: 2px;">FAQ dan layanan customer support</span>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right chevron" style="color: #9ca3af; font-size: 12px;"></i>
+                                </div>
+                            </div>
+                            
+                            <!-- Logout -->
+                            <div class="p-20 mt-16" style="padding: 20px;">
+                                <button class="btn-logout-sim" id="btn-profile-logout" style="width: 100%; border: 1px solid #fee2e2; background: white; color: #ef4444; border-radius: 12px; padding: 12px; font-weight: bold; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;"><i class="fa-solid fa-right-from-bracket"></i> Keluar Akun</button>
+                            </div>
+                            
+                            <div class="scroll-spacing-large" style="height: 60px;"></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Bottom Navigation Bar Widget (Persistent & Identical across views) -->
+                <div class="bottom-nav-bar" id="phone-bottom-nav">
+                    <div class="nav-item active" data-screen="screen-home">
+                        <i class="fa-solid fa-house"></i>
+                        <span>Beranda</span>
+                    </div>
+                    <div class="nav-item" data-screen="screen-list">
+                        <i class="fa-solid fa-compass"></i>
+                        <span>Trip</span>
+                    </div>
+                    <div class="nav-item" data-screen="screen-booking-list">
+                        <i class="fa-solid fa-briefcase"></i>
+                        <span>Booking</span>
+                    </div>
+                    <div class="nav-item" data-screen="screen-chat">
+                        <div class="icon-badge-wrapper">
+                            <i class="fa-regular fa-comment-dots"></i>
+                            <span class="badge" id="chat-badge-count">2</span>
+                        </div>
+                        <span>Pesan</span>
+                    </div>
+                    <div class="nav-item" data-screen="screen-profile">
+                        <i class="fa-regular fa-user"></i>
+                        <span>Profile</span>
+                    </div>
+                </div>
+
+                <!-- Home bar/Indicator -->
+                <div class="phone-home-indicator"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script file -->
+    <script src="app.js"></script>
+</body>
+</html>
