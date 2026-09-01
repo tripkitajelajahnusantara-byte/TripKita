@@ -6,7 +6,8 @@ import {
   CalendarDays, 
   User, 
   Plus, 
-  LogOut 
+  LogOut,
+  Wallet
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -17,6 +18,7 @@ export const Sidebar: React.FC = () => {
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
     { id: 'kelola-paket', label: 'Kelola Paket', icon: <Package size={18} /> },
     { id: 'booking', label: 'Booking', icon: <CalendarDays size={18} /> },
+    { id: 'keuangan-provider', label: 'Keuangan & Saldo', icon: <Wallet size={18} /> },
     { id: 'profil-provider', label: 'Profil Provider', icon: <User size={18} /> },
   ] as const;
 

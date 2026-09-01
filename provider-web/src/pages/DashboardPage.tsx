@@ -65,11 +65,13 @@ export const DashboardPage: React.FC = () => {
             location: pkg.destination.split(',').pop()?.trim() || pkg.destination,
             rating: pkg.rating || 5.0,
             bookings: pkg.quotaUsed || 0,
-            img: pkg.destination.toLowerCase().includes('bali') 
-              ? 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=80&q=80'
-              : pkg.destination.toLowerCase().includes('komodo')
-              ? 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=80&q=80'
-              : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=80&q=80',
+            img: pkg.name.toLowerCase().includes('bromo')
+              ? 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=80&q=80'
+              : pkg.name.toLowerCase().includes('baduy')
+              ? 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=80&q=80'
+              : pkg.name.toLowerCase().includes('bandung')
+              ? 'https://images.unsplash.com/photo-1584810359583-96fc3448beaa?auto=format&fit=crop&w=80&q=80'
+              : 'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?auto=format&fit=crop&w=80&q=80',
           }));
         setPopularPackages(sortedPackages);
       } catch (err) {

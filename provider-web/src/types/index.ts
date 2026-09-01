@@ -8,11 +8,23 @@ export type Route =
   | 'booking' 
   | 'profil-provider' 
   | 'tambah-paket'
-  | 'admin-dashboard';
+  | 'admin-dashboard'
+  | 'paket-detail'
+  | 'customer-checkout'
+  | 'riwayat-booking'
+  | 'customer-register'
+  | 'provider-login'
+  | 'provider-register'
+  | 'partner-landing'
+  | 'cari-trip'
+  | 'keuangan-provider'
+  | 'customer-confirmation';
 
 export interface Booking {
   id: string;
   dbId?: number;
+  customerId?: number;
+  bookingCode?: string;
   customerName: string;
   customerInitial: string;
   package: string;
@@ -22,7 +34,7 @@ export interface Booking {
   dpAmount?: string;
   paymentMethod?: string;
   paymentUrl?: string;
-  status: 'PENDING_PAYMENT' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED';
+  status: 'PENDING_PAYMENT' | 'WAITING_CONFIRMATION' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED';
 }
 
 export interface PopularPackage {

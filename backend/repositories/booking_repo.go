@@ -12,7 +12,10 @@ type BookingRepository interface {
 	FindByIDAndProvider(id uint, providerID uint) (*models.Booking, error)
 	FindByID(id uint) (*models.Booking, error)
 	FindByXenditInvoiceID(invoiceID string) (*models.Booking, error)
+	FindByBookingCode(code string) (*models.Booking, error)
 	FindAllRefunds() ([]models.Booking, error)
+	FindAllByCustomer(customerID uint) ([]models.Booking, error)
+	FindAll() ([]models.Booking, error)
 	Update(booking *models.Booking) error
 	CountByProvider(providerID uint) (int64, error)
 	CountByStatusAndProvider(status string, providerID uint) (int64, error)
@@ -29,6 +32,12 @@ func NewBookingRepository(db *gorm.DB) BookingRepository {
 
 func (r *bookingRepository) Create(booking *models.Booking) error {
 	return r.db.Create(booking).Error
+}
+
+func (r *bookingRepository) FindAll() ([]models.Booking, error) {
+	var bookings []models.Booking
+	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).Order("id desc").Find(&bookings).Error
+	return bookings, err
 }
 
 func (r *bookingRepository) FindAllByProvider(providerID uint) ([]models.Booking, error) {
@@ -58,6 +67,15 @@ func (r *bookingRepository) FindByID(id uint) (*models.Booking, error) {
 func (r *bookingRepository) FindByXenditInvoiceID(invoiceID string) (*models.Booking, error) {
 	var booking models.Booking
 	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).Where("xendit_invoice_id = ?", invoiceID).First(&booking).Error
+	if err != nil {
+		return nil, err
+	}
+	return &booking, nil
+}
+
+func (r *bookingRepository) FindByBookingCode(code string) (*models.Booking, error) {
+	var booking models.Booking
+	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).Where("booking_code = ?", code).First(&booking).Error
 	if err != nil {
 		return nil, err
 	}
@@ -94,4 +112,10 @@ func (r *bookingRepository) SumRevenueByProvider(providerID uint) (int64, error)
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&total).Error
 	return total, err
+}
+
+func (r *bookingRepository) FindAllByCustomer(customerID uint) ([]models.Booking, error) {
+	var bookings []models.Booking
+	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).Where("customer_id = ?", customerID).Order("id desc").Find(&bookings).Error
+	return bookings, err
 }

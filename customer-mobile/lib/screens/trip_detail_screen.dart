@@ -508,28 +508,30 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
                       const Text('Termasuk pajak & biaya layanan', style: TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
                     ],
                   ),
-                  ElevatedButton(
-                    onPressed: () {
-                      // Navigate to Booking Screen (Index 6)
-                      widget.onNavigate(6, arguments: {
-                        'package': package,
-                        'participants': participantCount,
-                        'selectedDate': selectedDepartureDate,
-                        'totalPrice': totalPrice,
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F8B8D),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                  SizedBox(
+                    width: 180,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        widget.onNavigate(6, arguments: {
+                          'package': package,
+                          'participants': participantCount,
+                          'selectedDate': selectedDepartureDate,
+                          'totalPrice': totalPrice,
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F8B8D),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
                       ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'Booking Sekarang',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      child: const Text(
+                        'Booking Sekarang',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
                     ),
                   ),
                 ],

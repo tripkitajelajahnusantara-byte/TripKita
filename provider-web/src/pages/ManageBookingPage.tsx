@@ -279,24 +279,28 @@ export const ManageBookingPage: React.FC = () => {
                       <span className={`status-pill`} style={{
                         backgroundColor: 
                           b.status === 'PENDING_PAYMENT' ? '#fef3c7' :
-                          b.status === 'PAID' ? '#dbeafe' :
+                          b.status === 'WAITING_CONFIRMATION' ? '#e0f2fe' :
+                          b.status === 'PAID' ? '#dcfce7' :
                           b.status === 'CONFIRMED' ? '#d1fae5' :
                           b.status === 'COMPLETED' ? '#ecfdf5' :
                           b.status === 'REFUND_REQUIRED' ? '#fee2e2' : '#f1f5f9',
                         color:
                           b.status === 'PENDING_PAYMENT' ? '#d97706' :
-                          b.status === 'PAID' ? '#2563eb' :
+                          b.status === 'WAITING_CONFIRMATION' ? '#0369a1' :
+                          b.status === 'PAID' ? '#15803d' :
                           b.status === 'CONFIRMED' ? '#059669' :
                           b.status === 'COMPLETED' ? '#047857' :
                           b.status === 'REFUND_REQUIRED' ? '#dc2626' : '#475569',
                       }}>
                         {b.status === 'PENDING_PAYMENT' ? 'Belum Bayar' :
-                         b.status === 'PAID' ? 'Perlu Konfirmasi' :
+                         b.status === 'WAITING_CONFIRMATION' ? 'Menunggu Verifikasi Admin' :
+                         b.status === 'PAID' ? 'Lunas (Perlu Konfirmasi)' :
                          b.status === 'CONFIRMED' ? 'Dikonfirmasi' :
                          b.status === 'COMPLETED' ? 'Selesai' :
                          b.status === 'CANCELLED_BY_CUSTOMER' ? 'Batal (Cust)' :
                          b.status === 'CANCELLED_BY_PROVIDER' ? 'Batal (Mitra)' :
-                         b.status === 'REFUND_REQUIRED' ? 'Butuh Refund' : 'Refund Selesai'}
+                         b.status === 'REFUND_REQUIRED' ? 'Butuh Refund' :
+                         b.status === 'REFUNDED' ? 'Refund Selesai' : b.status}
                       </span>
                     </td>
                     <td>

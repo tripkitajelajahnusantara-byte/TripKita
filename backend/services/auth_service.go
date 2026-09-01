@@ -14,6 +14,7 @@ import (
 
 type AuthService interface {
 	Register(req *models.RegisterRequest) (*models.Provider, error)
+	RegisterCustomer(req *models.RegisterCustomerRequest) (*models.Provider, error)
 	Login(req *models.LoginRequest) (*models.LoginResponse, error)
 	GetProfile(providerID uint) (*models.Provider, error)
 	UpdateProfile(providerID uint, req *models.UpdateProfileRequest) (*models.Provider, error)
@@ -81,6 +82,37 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 	return provider, nil
 }
 
+func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*models.Provider, error) {
+	// Check if email already exists
+	existing, _ := s.repo.FindByEmail(req.Email)
+	if existing != nil {
+		return nil, errors.New("email is already registered")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	customer := &models.Provider{
+		PicName:      req.Name,
+		BusinessName: req.Name, // Default name as business name
+		Email:        req.Email,
+		PasswordHash: string(hashedPassword),
+		WhatsApp:     req.WhatsApp,
+		Role:         "CUSTOMER",
+		Status:       "APPROVED",
+		IsVerified:   true,
+	}
+
+	err = s.repo.Create(customer)
+	if err != nil {
+		return nil, err
+	}
+
+	return customer, nil
+}
+
 func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, error) {
 	provider, err := s.repo.FindByEmail(req.Email)
 	if err != nil {
@@ -103,11 +135,11 @@ func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 		return nil, errors.New("akun Anda belum aktif")
 	}
 
-	// Generate JWT Token
+	// Generate JWT Token (30 days persistent login)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"provider_id": provider.ID,
 		"role":        provider.Role,
-		"exp":         time.Now().Add(time.Hour * 72).Unix(), // 3 days
+		"exp":         time.Now().Add(time.Hour * 24 * 30).Unix(), // 30 days
 	})
 
 	tokenString, err := token.SignedString([]byte(s.cfg.JWTSecret))

@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*.exe
+.env
+*.env
+backend/.env
+backend/uploads/*
+!backend/uploads/.gitkeep

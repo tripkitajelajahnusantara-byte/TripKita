@@ -220,8 +220,20 @@ export const LoginPage: React.FC = () => {
 
               {/* Register Prompt */}
               <p className="register-prompt-text">
-                Belum punya akun? <span onClick={() => navigateTo('daftar')} className="register-link">Daftar gratis sekarang</span>
+                Belum punya akun Provider? <span onClick={() => navigateTo('provider-register')} className="register-link">Daftar Mitra gratis sekarang</span>
               </p>
+
+              <div style={{ marginTop: '16px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '12.5px', color: '#475569' }}>
+                  Bukan Mitra Provider?{' '}
+                </span>
+                <span 
+                  onClick={() => navigateTo('masuk')} 
+                  style={{ color: '#007bff', fontWeight: 700, cursor: 'pointer', fontSize: '12.5px', textDecoration: 'underline' }}
+                >
+                  Masuk sebagai Customer / Traveler
+                </span>
+              </div>
             </form>
           </div>
         </div>

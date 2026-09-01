@@ -10,6 +10,7 @@ class ChatConversation {
   final String time;
   final int unreadCount;
   final bool isVerified;
+  final bool isGroup;
   final List<Map<String, dynamic>> messages;
 
   ChatConversation({
@@ -19,6 +20,7 @@ class ChatConversation {
     required this.time,
     required this.unreadCount,
     this.isVerified = false,
+    this.isGroup = false,
     required this.messages,
   });
 }
@@ -40,6 +42,22 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   // Predefined mock chats
   final List<ChatConversation> chats = [
+    ChatConversation(
+      name: '👥 Group Chat: Open Trip Raja Ampat',
+      avatarUrl: 'https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=100',
+      lastMessage: 'Capt. Herman: Salam kenal semuanya! Jangan lupa bawa sunscreen.',
+      time: '14:32',
+      unreadCount: 1,
+      isVerified: true,
+      isGroup: true,
+      messages: [
+        {'isSender': false, 'senderName': 'System', 'text': 'Selamat bergabung di Group Chat Trip Raja Ampat! Pembayaran Anda telah LUNAS.', 'time': '14:00'},
+        {'isSender': false, 'senderName': 'Capt. Herman', 'text': 'Halo semua traveler! Saya Herman, tour guide kalian.', 'time': '14:15'},
+        {'isSender': false, 'senderName': 'Rina Wijaya', 'text': 'Penjemputan di bandara Sorong jam berapa mas?', 'time': '14:20'},
+        {'isSender': false, 'senderName': 'Capt. Herman', 'text': 'Penjemputan jam 08:30 WIT di Bandara Sorong ya.', 'time': '14:25'},
+        {'isSender': false, 'senderName': 'Capt. Herman', 'text': 'Salam kenal semuanya! Jangan lupa bawa sunscreen.', 'time': '14:32'},
+      ],
+    ),
     ChatConversation(
       name: 'TripKita Support',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',

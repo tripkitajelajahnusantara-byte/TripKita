@@ -41,7 +41,7 @@ func (ctrl *OAuthController) RedirectToGoogle(c *gin.Context) {
 			return
 		}
 
-		tokenString, err := ctrl.generateJWT(provider.ID)
+		tokenString, err := ctrl.generateJWT(provider.ID, provider.Role)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate mock token: " + err.Error()})
 			return
@@ -143,17 +143,19 @@ func (ctrl *OAuthController) GoogleCallback(c *gin.Context) {
 	result := ctrl.db.Where("email = ?", googleProfile.Email).First(&provider)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
-			// Register a new provider auto-filled with Google details
+			// Register a new customer auto-filled with Google details
 			provider = models.Provider{
 				BusinessName:        googleProfile.Name,
-				BusinessCategory:     "tour",
-				OperationalProvince: "Provinsi Belum Diatur",
-				OperationalCity:     "Kota Belum Diatur",
-				Description:          "Penyedia Wisata yang mendaftar melalui Google OAuth.",
+				BusinessCategory:     "customer",
+				OperationalProvince: "Indonesia",
+				OperationalCity:     "Indonesia",
+				Description:          "Customer mendaftar melalui Google OAuth.",
 				DocumentUploaded: false,
 				PicName:          googleProfile.Name,
 				Email:            googleProfile.Email,
-				WhatsApp:         "+62 000 000 000",
+				WhatsApp:         "",
+				Role:             "CUSTOMER",
+				Status:           "APPROVED",
 				IsVerified:       true, // Google accounts verified
 			}
 			if err := ctrl.db.Create(&provider).Error; err != nil {
@@ -164,10 +166,17 @@ func (ctrl *OAuthController) GoogleCallback(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + result.Error.Error()})
 			return
 		}
+	} else {
+		// If user already exists but role is not CUSTOMER (e.g. from initial OAuth test), update role to CUSTOMER
+		if provider.Role != "CUSTOMER" && provider.Role != "ADMIN" {
+			ctrl.db.Model(&provider).Updates(map[string]interface{}{"role": "CUSTOMER", "status": "APPROVED"})
+			provider.Role = "CUSTOMER"
+			provider.Status = "APPROVED"
+		}
 	}
 
 	// 4. Generate JWT
-	tokenString, err := ctrl.generateJWT(provider.ID)
+	tokenString, err := ctrl.generateJWT(provider.ID, provider.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate session token"})
 		return
@@ -178,10 +187,11 @@ func (ctrl *OAuthController) GoogleCallback(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 }
 
-func (ctrl *OAuthController) generateJWT(providerID uint) (string, error) {
+func (ctrl *OAuthController) generateJWT(providerID uint, role string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"provider_id": providerID,
-		"exp":         time.Now().Add(time.Hour * 72).Unix(), // 3 days
+		"role":        role,
+		"exp":         time.Now().Add(time.Hour * 24 * 30).Unix(), // 30 days persistent login
 	})
 	return token.SignedString([]byte(ctrl.cfg.JWTSecret))
 }

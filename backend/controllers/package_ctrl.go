@@ -56,6 +56,16 @@ func (ctrl *PackageController) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, packages)
 }
 
+func (ctrl *PackageController) GetAllPublic(c *gin.Context) {
+	packages, err := ctrl.service.GetAllPublic()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, packages)
+}
+
 func (ctrl *PackageController) GetByID(c *gin.Context) {
 	providerID, exists := c.Get("provider_id")
 	if !exists {

@@ -23,6 +23,28 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedParticipants = 1;
   String _selectedCategory = 'Semua Tipe';
 
+  // 38 Provinsi Indonesia
+  final List<String> indonesiaProvinces = [
+    'Aceh', 'Sumatera Utara', 'Sumatera Barat', 'Riau', 'Kepulauan Riau', 
+    'Jambi', 'Sumatera Selatan', 'Bangka Belitung', 'Bengkulu', 'Lampung',
+    'DKI Jakarta', 'Jawa Barat', 'Banten', 'Jawa Tengah', 'DI Yogyakarta', 'Jawa Timur',
+    'Bali', 'Nusa Tenggara Barat (NTB)', 'Nusa Tenggara Timur (NTT)',
+    'Kalimantan Barat', 'Kalimantan Tengah', 'Kalimantan Selatan', 'Kalimantan Timur', 'Kalimantan Utara',
+    'Sulawesi Utara', 'Gorontalo', 'Sulawesi Tengah', 'Sulawesi Barat', 'Sulawesi Selatan', 'Sulawesi Tenggara',
+    'Maluku', 'Maluku Utara',
+    'Papua', 'Papua Barat', 'Papua Barat Daya', 'Papua Tengah', 'Papua Pegunungan', 'Papua Selatan'
+  ];
+
+  // Synced Kategori Trip (6 Kategori Resmi)
+  final List<Map<String, dynamic>> tripCategories = [
+    {'name': 'City Tour', 'fullName': 'City Tour', 'icon': Icons.location_city},
+    {'name': 'Diving', 'fullName': 'Diving & Snorkeling', 'icon': Icons.water},
+    {'name': 'Budaya', 'fullName': 'Wisata Budaya & Sejarah', 'icon': Icons.museum},
+    {'name': 'Pantai', 'fullName': 'Pantai', 'icon': Icons.beach_access},
+    {'name': 'Gunung', 'fullName': 'Gunung', 'icon': Icons.landscape},
+    {'name': 'Keluarga', 'fullName': 'Keluarga Santai', 'icon': Icons.groups},
+  ];
+
   // Realistic mock data matching backend schema and references
   final List<TripPackage> popularTrips = [
     TripPackage(
@@ -200,13 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               badgeCount: 3,
                               onPressed: () {},
                             ),
-                            const SizedBox(width: 12),
-                            // Chat Icon with Badge
-                            _buildIconButton(
-                              icon: Icons.chat_bubble_outline,
-                              badgeCount: 2,
-                              onPressed: () {},
-                            ),
+
                             const SizedBox(width: 12),
                             // Profile Login Button
                             ElevatedButton.icon(

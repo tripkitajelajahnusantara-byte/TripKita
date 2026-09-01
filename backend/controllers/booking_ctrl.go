@@ -36,6 +36,32 @@ func (ctrl *BookingController) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, bookings)
 }
 
+func (ctrl *BookingController) GetCustomerBookings(c *gin.Context) {
+	customerID, exists := c.Get("provider_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	bookings, err := ctrl.service.GetCustomerBookings(customerID.(uint))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, bookings)
+}
+
+func (ctrl *BookingController) GetPublicStatus(c *gin.Context) {
+	code := c.Param("code")
+	booking, err := ctrl.service.GetBookingByCode(code)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Booking not found"})
+		return
+	}
+	c.JSON(http.StatusOK, booking)
+}
+
 func (ctrl *BookingController) UpdateStatus(c *gin.Context) {
 	providerID, exists := c.Get("provider_id")
 	if !exists {
@@ -68,10 +94,12 @@ func (ctrl *BookingController) UpdateStatus(c *gin.Context) {
 func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 	var req struct {
 		PackageID       uint      `json:"packageId" binding:"required"`
+		CustomerID      *uint     `json:"customerId"`
 		CustomerName    string    `json:"customerName" binding:"required"`
 		CustomerInitial string    `json:"customerInitial"`
 		Guests          int       `json:"guests" binding:"required,gt=0"`
 		TripDate        time.Time `json:"tripDate" binding:"required"`
+		PaymentMethod   string    `json:"paymentMethod"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -80,10 +108,12 @@ func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 
 	booking := &models.Booking{
 		PackageID:       req.PackageID,
+		CustomerID:      req.CustomerID,
 		CustomerName:    req.CustomerName,
 		CustomerInitial: req.CustomerInitial,
 		Guests:          req.Guests,
 		TripDate:        req.TripDate,
+		PaymentMethod:   req.PaymentMethod,
 	}
 
 	if booking.CustomerInitial == "" && len(booking.CustomerName) > 0 {
@@ -343,7 +373,7 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 				</div>
 			</div>
 
-			<form id="payment-form" action="/api/public/xendit-mock-checkout/%d/pay" method="POST">
+			<form id="payment-form" action="/api/v1/public/xendit-mock-checkout/%d/pay" method="POST">
 				<input type="hidden" name="status" id="payment-status" value="PAID">
 				<input type="hidden" name="payment_method" id="selected-method" value="QRIS">
 				
@@ -451,4 +481,55 @@ func (ctrl *BookingController) CompleteRefund(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Refund completed"})
+}
+
+func (ctrl *BookingController) UploadPaymentProof(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		return
+	}
+
+	var req struct {
+		PaymentProof string `json:"paymentProof" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	booking, err := ctrl.service.UploadPaymentProof(uint(id), req.PaymentProof)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, booking)
+}
+
+func (ctrl *BookingController) AdminListBookings(c *gin.Context) {
+	bookings, err := ctrl.service.AdminGetAllBookings()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, bookings)
+}
+
+func (ctrl *BookingController) AdminConfirmPayment(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		return
+	}
+
+	booking, err := ctrl.service.AdminConfirmPayment(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, booking)
 }

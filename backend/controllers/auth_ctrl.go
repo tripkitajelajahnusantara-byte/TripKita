@@ -42,6 +42,22 @@ func (ctrl *AuthController) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Registration successful", "provider": provider})
 }
 
+func (ctrl *AuthController) RegisterCustomer(c *gin.Context) {
+	var req models.RegisterCustomerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	customer, err := ctrl.service.RegisterCustomer(&req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Customer registration successful", "customer": customer})
+}
+
 func (ctrl *AuthController) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

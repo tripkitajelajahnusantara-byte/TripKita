@@ -8,7 +8,7 @@ import 'package:customer_mobile/screens/payment_screen.dart';
 import 'package:customer_mobile/screens/booking_list_screen.dart';
 import 'package:customer_mobile/screens/booking_detail_screen.dart';
 import 'package:customer_mobile/screens/payment_verification_screen.dart';
-import 'package:customer_mobile/screens/chat_list_screen.dart';
+// import 'package:customer_mobile/screens/chat_list_screen.dart';
 import 'package:customer_mobile/screens/profile_screen.dart';
 
 
@@ -95,7 +95,7 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
           arguments: _navigationArguments,
         );
       case 3:
-        return ChatListScreen(
+        return ProfileScreen(
           onNavigate: _navigateToScreen,
           arguments: _navigationArguments,
         );

@@ -18,15 +18,42 @@ import {
 
 import { request } from '../utils/api';
 
+export const INDONESIA_PROVINCES = [
+  "Aceh", "Sumatera Utara", "Sumatera Barat", "Riau", "Kepulauan Riau", 
+  "Jambi", "Sumatera Selatan", "Bangka Belitung", "Bengkulu", "Lampung",
+  "DKI Jakarta", "Jawa Barat", "Banten", "Jawa Tengah", "DI Yogyakarta", "Jawa Timur",
+  "Bali", "Nusa Tenggara Barat (NTB)", "Nusa Tenggara Timur (NTT)",
+  "Kalimantan Barat", "Kalimantan Tengah", "Kalimantan Selatan", "Kalimantan Timur", "Kalimantan Utara",
+  "Sulawesi Utara", "Gorontalo", "Sulawesi Tengah", "Sulawesi Barat", "Sulawesi Selatan", "Sulawesi Tenggara",
+  "Maluku", "Maluku Utara",
+  "Papua", "Papua Barat", "Papua Barat Daya", "Papua Tengah", "Papua Pegunungan", "Papua Selatan"
+];
+
+export const CATEGORIES = [
+  "City Tour",
+  "Diving & Snorkeling",
+  "Wisata Budaya & Sejarah",
+  "Pantai",
+  "Gunung",
+  "Keluarga Santai"
+];
+
+export const TRIP_TYPES = [
+  "Open Trip",
+  "Private Trip",
+  "Custom Trip"
+];
+
 export const AddPackagePage: React.FC = () => {
   const { navigateTo, editingPackageId } = useNavigation();
   const [activeStep, setActiveStep] = useState<'info' | 'itinerary' | 'facilities' | 'pricing' | 'photos'>('info');
 
   // Form states
   const [packageName, setPackageName] = useState('');
-  const [category, setCategory] = useState('diving');
+  const [category, setCategory] = useState('City Tour');
+  const [tripType, setTripType] = useState('Open Trip');
   const [duration, setDuration] = useState('5');
-  const [location, setLocation] = useState('');
+  const [location, setLocation] = useState('DKI Jakarta');
   const [meetPoint, setMeetPoint] = useState('');
   const [description, setDescription] = useState('');
   const [minGuests, setMinGuests] = useState('2');
@@ -35,10 +62,41 @@ export const AddPackagePage: React.FC = () => {
   const [maxAge, setMaxAge] = useState('65');
 
   // New fields mapping to backend
+  const todayStr = new Date().toISOString().split('T')[0];
   const [price, setPrice] = useState('');
-  const [quotaMax, setQuotaMax] = useState('');
+  const [quotaMin, setQuotaMin] = useState('14');
+  const [quotaMax, setQuotaMax] = useState('15');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [schedule, setSchedule] = useState('');
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+
+  const handleStartDateChange = (val: string) => {
+    setStartDate(val);
+    if (val) {
+      const durNum = parseInt(duration, 10) || 1;
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        d.setDate(d.getDate() + Math.max(0, durNum - 1));
+        const calculatedEnd = d.toISOString().split('T')[0];
+        setEndDate(calculatedEnd);
+        setSchedule(`${val} s/d ${calculatedEnd} (${durNum} Hari)`);
+      }
+    }
+  };
+
+  React.useEffect(() => {
+    if (startDate) {
+      const durNum = parseInt(duration, 10) || 1;
+      const d = new Date(startDate);
+      if (!isNaN(d.getTime())) {
+        d.setDate(d.getDate() + Math.max(0, durNum - 1));
+        const calculatedEnd = d.toISOString().split('T')[0];
+        setEndDate(calculatedEnd);
+        setSchedule(`${startDate} s/d ${calculatedEnd} (${durNum} Hari)`);
+      }
+    }
+  }, [duration]);
 
   // Itinerary states
   const [itineraries, setItineraries] = useState<{ day: number; activities: { time: string; title: string }[] }[]>([
@@ -178,42 +236,78 @@ export const AddPackagePage: React.FC = () => {
   };
 
   const handleSubmit = async (status: 'draft' | 'publish') => {
+    const qMin = parseInt(quotaMin, 10);
+    const qMax = parseInt(quotaMax, 10);
+    const minG = parseInt(minGuests, 10);
+    const maxG = parseInt(maxGuests, 10);
+
     if (status === 'publish') {
       if (!packageName.trim()) {
-        alert('Nama paket harus diisi');
+        alert('⚠️ Nama paket wisata harus diisi!');
         return;
       }
       if (!location.trim()) {
-        alert('Lokasi destinasi harus diisi');
+        alert('⚠️ Lokasi destinasi harus diisi!');
         return;
       }
       if (!price || parseInt(price, 10) <= 0) {
-        alert('Harga harus berupa angka lebih dari 0');
+        alert('⚠️ Harga per orang harus berupa angka lebih dari 0!');
         return;
       }
-      if (!quotaMax || parseInt(quotaMax, 10) <= 0) {
-        alert('Kuota maksimal harus berupa angka lebih dari 0');
+      if (isNaN(qMin) || qMin < 1) {
+        alert('⚠️ Kuota minimal harus diisi dan minimal 1 peserta!');
         return;
       }
-      if (!schedule.trim()) {
-        alert('Jadwal keberangkatan harus diisi');
+      if (isNaN(qMax) || qMax <= 0) {
+        alert('⚠️ Kuota maksimal harus lebih besar dari 0 (contoh: 15)!');
+        return;
+      }
+      if (qMax < qMin) {
+        alert(`⚠️ Kuota maksimal (${qMax}) tidak boleh lebih kecil dari kuota minimal (${qMin})! Silakan naikkan kuota maksimal atau sesuaikan kuota minimal.`);
+        return;
+      }
+      if (isNaN(minG) || minG < 1) {
+        alert('⚠️ Minimum peserta per pemesanan minimal 1 orang!');
+        return;
+      }
+      if (isNaN(maxG) || maxG < minG) {
+        alert(`⚠️ Maksimum peserta per pemesanan (${maxG}) tidak boleh lebih kecil dari minimum peserta (${minG})!`);
+        return;
+      }
+      if (maxG > qMax) {
+        alert(`⚠️ Maksimum peserta per pemesanan (${maxG}) tidak boleh melebihi kuota maksimal paket (${qMax})!`);
+        return;
+      }
+      if (!startDate || !endDate) {
+        alert('⚠️ Jadwal tanggal mulai dan tanggal selesai keberangkatan harus diisi!');
+        return;
+      }
+      if (startDate < todayStr) {
+        alert('⚠️ Tanggal mulai keberangkatan tidak boleh memilih tanggal yang sudah lewat dari hari ini!');
         return;
       }
     } else {
       if (!packageName.trim()) {
-        alert('Nama paket harus diisi untuk menyimpan draf');
+        alert('⚠️ Nama paket harus diisi untuk menyimpan draf');
         return;
       }
     }
 
     try {
       const dbStatus = status === 'draft' ? 'Draft' : 'Aktif';
+      const finalSchedule = schedule.trim() || (startDate && endDate ? `${startDate} s/d ${endDate} (${duration} Hari)` : 'Jadwal Fleksibel');
+
       const payload = {
         name: packageName,
         destination: location,
+        category: category,
+        tripType: tripType,
         price: parseInt(price, 10) || 0,
-        quotaMax: parseInt(quotaMax, 10) || 0,
-        schedule: schedule,
+        quotaMin: qMin,
+        quotaMax: qMax,
+        startDate: startDate,
+        endDate: endDate,
+        schedule: finalSchedule,
         status: dbStatus,
       };
 
@@ -308,14 +402,21 @@ export const AddPackagePage: React.FC = () => {
                   />
                 </div>
 
-                <div className="input-row-2">
+                <div className="input-row-3">
                   <div className="input-group">
                     <label>Kategori *</label>
                     <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                      <option value="diving">Diving & Snorkeling</option>
-                      <option value="hiking">Hiking & Trekking</option>
-                      <option value="culture">Wisata Budaya & Sejarah</option>
-                      <option value="relax">Keluarga & Santai</option>
+                      {CATEGORIES.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group">
+                    <label>Tipe Trip *</label>
+                    <select value={tripType} onChange={(e) => setTripType(e.target.value)}>
+                      {TRIP_TYPES.map(tt => (
+                        <option key={tt} value={tt}>{tt}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="input-group">
@@ -333,16 +434,18 @@ export const AddPackagePage: React.FC = () => {
                 </div>
 
                 <div className="input-group">
-                  <label>Lokasi Destinasi *</label>
+                  <label>Lokasi Destinasi (Provinsi) *</label>
                   <div className="input-with-icon">
                     <MapPin size={16} className="field-icon" />
-                    <input 
-                      type="text" 
+                    <select 
                       value={location} 
                       onChange={(e) => setLocation(e.target.value)}
-                      placeholder="Contoh: Raja Ampat, Papua Barat"
                       className="input-indent"
-                    />
+                    >
+                      {INDONESIA_PROVINCES.map(prov => (
+                        <option key={prov} value={prov}>{prov}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -505,55 +608,134 @@ export const AddPackagePage: React.FC = () => {
                 <h3>Jadwal & Harga</h3>
                 <p className="section-subtitle">Lengkapi detail harga, kuota, jadwal keberangkatan, dan batas peserta</p>
                 
-                <div className="input-row-2">
+                <div className="input-row-3">
                   <div className="input-group">
                     <label>Harga per Orang *</label>
                     <input 
                       type="number" 
+                      min="1"
                       value={price} 
                       onChange={(e) => setPrice(e.target.value)}
                       placeholder="Contoh: 1200000"
                     />
                   </div>
                   <div className="input-group">
+                    <label>Kuota Minimal (Min. 1) *</label>
+                    <input 
+                      type="number" 
+                      min="1"
+                      value={quotaMin} 
+                      onChange={(e) => setQuotaMin(e.target.value)}
+                      placeholder="Contoh: 14"
+                    />
+                    {parseInt(quotaMin, 10) < 1 && (
+                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                        ⚠️ Kuota minimal harus lebih besar dari 0 (minimal 1)
+                      </span>
+                    )}
+                  </div>
+                  <div className="input-group">
                     <label>Kuota Maksimal *</label>
                     <input 
                       type="number" 
+                      min={quotaMin || "1"}
                       value={quotaMax} 
                       onChange={(e) => setQuotaMax(e.target.value)}
                       placeholder="Contoh: 15"
                     />
+                    {parseInt(quotaMax, 10) <= 0 ? (
+                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                        ⚠️ Kuota maksimal tidak boleh 0 atau minus
+                      </span>
+                    ) : parseInt(quotaMax, 10) < parseInt(quotaMin, 10) ? (
+                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                        ⚠️ Kuota maksimal ({quotaMax}) harus &gt;= kuota minimal ({quotaMin})
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
                 <div className="input-group">
-                  <label>Jadwal Keberangkatan *</label>
+                  <label>Jadwal Keberangkatan (Durasi {duration} Hari) *</label>
+                  <div className="input-range-row">
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '2px', display: 'block' }}>Tanggal Mulai (Min. Hari Ini)</label>
+                      <input 
+                        type="date" 
+                        min={todayStr}
+                        value={startDate} 
+                        onChange={(e) => handleStartDateChange(e.target.value)}
+                      />
+                    </div>
+                    <span style={{ alignSelf: 'flex-end', marginBottom: '8px' }}>s/d</span>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '2px', display: 'block' }}>Tanggal Selesai (Otomatis {duration} Hari)</label>
+                      <input 
+                        type="date" 
+                        min={startDate || todayStr}
+                        value={endDate} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEndDate(val);
+                          if (startDate && val) {
+                            setSchedule(`${startDate} s/d ${val}`);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {startDate && startDate < todayStr && (
+                    <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                      ⚠️ Tanggal mulai tidak boleh tanggal yang sudah lewat dari hari ini
+                    </span>
+                  )}
+                </div>
+
+                <div className="input-group">
+                  <label>Keterangan Jadwal Tambahan</label>
                   <input 
                     type="text" 
                     value={schedule} 
                     onChange={(e) => setSchedule(e.target.value)}
-                    placeholder="Contoh: Setiap Jumat atau Setiap Hari"
+                    placeholder="Contoh: 2026-08-01 s/d 2026-08-05 (5 Hari)"
                   />
                 </div>
 
                 <div className="input-row-2">
                   <div className="input-group">
-                    <label>Minimum Peserta</label>
+                    <label>Minimum Peserta (per Booking)</label>
                     <input 
                       type="number" 
+                      min="1"
                       value={minGuests} 
                       onChange={(e) => setMinGuests(e.target.value)}
                       placeholder="2"
                     />
+                    {parseInt(minGuests, 10) < 1 && (
+                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                        ⚠️ Minimum peserta per pemesanan minimal 1
+                      </span>
+                    )}
                   </div>
                   <div className="input-group">
-                    <label>Maksimum Peserta</label>
+                    <label>Maksimum Peserta (per Booking)</label>
                     <input 
                       type="number" 
+                      min={minGuests || "1"}
+                      max={quotaMax || undefined}
                       value={maxGuests} 
                       onChange={(e) => setMaxGuests(e.target.value)}
                       placeholder="12"
                     />
+                    {parseInt(maxGuests, 10) < parseInt(minGuests, 10) ? (
+                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                        ⚠️ Maksimum peserta ({maxGuests}) harus &gt;= minimum peserta ({minGuests})
+                      </span>
+                    ) : parseInt(quotaMax, 10) > 0 && parseInt(maxGuests, 10) > parseInt(quotaMax, 10) ? (
+                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                        ⚠️ Maksimum peserta per booking ({maxGuests}) tidak boleh melebihi kuota maksimal ({quotaMax})
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 

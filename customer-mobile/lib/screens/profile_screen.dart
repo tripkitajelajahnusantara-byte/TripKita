@@ -92,7 +92,9 @@ class ProfileScreen extends StatelessWidget {
                     title: 'Pusat Bantuan',
                     subtitle: 'FAQ dan panduan penggunaan aplikasi',
                     onTap: () {
-                      widget.onNavigate(3); // Navigate to chat support
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Pusat Bantuan akan segera hadir')),
+                      );
                     },
                   ),
                   _buildProfileMenuItem(

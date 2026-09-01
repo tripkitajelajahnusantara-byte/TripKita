@@ -45,7 +45,7 @@ interface ProviderProfile {
   email: string;
   whatsapp: string;
   isVerified: boolean;
-  role: 'ADMIN' | 'PROVIDER';
+  role: 'ADMIN' | 'PROVIDER' | 'CUSTOMER';
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   verificationNotes?: string;
 
@@ -99,11 +99,28 @@ interface NavigationContextType {
   setProviderProfile: (profile: ProviderProfile | null) => void;
   login: (email: string, password: string) => Promise<void>;
   registerProvider: () => Promise<void>;
+  registerCustomer: (name: string, email: string, password: string, whatsapp: string) => Promise<void>;
   updateProfile: (fields: Partial<ProviderProfile>) => Promise<void>;
   logout: () => void;
   loadingProfile: boolean;
   editingPackageId: string | null;
   setEditingPackageId: (id: string | null) => void;
+  selectedPackageForDetail: any;
+  setSelectedPackageForDetail: (pkg: any) => void;
+  selectedBookingForInvoice: any;
+  setSelectedBookingForInvoice: (booking: any) => void;
+  searchParams: { destination: string; date: string; type: string; category: string };
+  setSearchParams: React.Dispatch<React.SetStateAction<{ destination: string; date: string; type: string; category: string }>>;
+  bookingFormData: {
+    pemesan: { nama: string; email: string; whatsapp: string };
+    peserta: Array<{ nama: string; hp: string; gender: string }>;
+    selectedAddOns?: Array<{ id: string; name: string; price: number }>;
+  } | null;
+  setBookingFormData: React.Dispatch<React.SetStateAction<{
+    pemesan: { nama: string; email: string; whatsapp: string };
+    peserta: Array<{ nama: string; hp: string; gender: string }>;
+    selectedAddOns?: Array<{ id: string; name: string; price: number }>;
+  } | null>>;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -115,6 +132,19 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
+  const [selectedPackageForDetail, setSelectedPackageForDetail] = useState<any>(null);
+  const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<any>(null);
+  const [searchParams, setSearchParams] = useState({
+    destination: '',
+    date: '',
+    type: 'Semua Tipe',
+    category: 'Semua Kategori'
+  });
+  const [bookingFormData, setBookingFormData] = useState<{
+    pemesan: { nama: string; email: string; whatsapp: string };
+    peserta: Array<{ nama: string; hp: string; gender: string }>;
+    selectedAddOns?: Array<{ id: string; name: string; price: number }>;
+  } | null>(null);
   const [registerData, setRegisterData] = useState<RegisterData>({
     businessName: '',
     businessCategory: '',
@@ -143,9 +173,11 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       const data = await request('/provider/profile');
       setProviderProfile(data);
       setIsRegistered(true);
+      return data;
     } catch (err) {
       console.error('Failed to fetch profile:', err);
       logout();
+      return null;
     } finally {
       setLoadingProfile(false);
     }
@@ -158,8 +190,13 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       setAuthToken(token);
       // Clean query parameters from URL bar
       window.history.replaceState({}, document.title, window.location.pathname);
-      fetchProfile();
-      navigateTo('dashboard');
+      fetchProfile().then((profile) => {
+        if (profile?.role === 'CUSTOMER') {
+          navigateTo('beranda');
+        } else {
+          navigateTo('dashboard');
+        }
+      });
     } else if (getAuthToken()) {
       fetchProfile();
     }
@@ -184,9 +221,18 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     setIsRegistered(true);
     if (res.provider.role === 'ADMIN') {
       navigateTo('admin-dashboard');
-    } else {
+    } else if (res.provider.role === 'PROVIDER') {
       navigateTo('dashboard');
+    } else {
+      navigateTo('beranda');
     }
+  };
+
+  const registerCustomer = async (name: string, email: string, password: string, whatsapp: string) => {
+    await request('/public/auth/register-customer', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password, whatsapp }),
+    });
   };
 
   const registerProvider = async () => {
@@ -267,11 +313,20 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
         setProviderProfile,
         login,
         registerProvider,
+        registerCustomer,
         updateProfile,
         logout,
         loadingProfile,
         editingPackageId,
         setEditingPackageId,
+        selectedPackageForDetail,
+        setSelectedPackageForDetail,
+        selectedBookingForInvoice,
+        setSelectedBookingForInvoice,
+        searchParams,
+        setSearchParams,
+        bookingFormData,
+        setBookingFormData,
       }}
     >
       {children}

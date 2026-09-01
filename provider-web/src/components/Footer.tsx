@@ -22,10 +22,10 @@ export const Footer: React.FC = () => {
 
       <style>{`
         .site-footer {
-          background-color: var(--color-primary-dark);
-          padding: 40px 0;
-          color: #ffffff;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          background-color: #ffffff;
+          padding: 24px 0;
+          color: #94a3b8;
+          border-top: 1px solid #e2e8f0;
         }
 
         .footer-container {
@@ -33,63 +33,63 @@ export const Footer: React.FC = () => {
           justify-content: space-between;
           align-items: center;
           flex-wrap: wrap;
-          gap: 24px;
+          gap: 16px;
         }
 
         .footer-left {
           display: flex;
-          flex-direction: column;
-          gap: 12px;
+          align-items: center;
+          gap: 16px;
         }
 
         .footer-left .logo-brand {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
         }
 
         .footer-left .logo-icon {
-          font-size: 20px;
+          font-size: 18px;
         }
 
         .footer-left .logo-text {
-          font-size: 18px;
-          color: #ffffff;
-          font-weight: 700;
+          font-size: 16px;
+          color: #007bff;
+          font-weight: 800;
         }
 
         .footer-left .logo-text span {
-          color: var(--color-accent);
+          color: #007bff;
         }
 
         .footer-left .logo-badge {
-          background: rgba(0, 168, 150, 0.15);
-          color: var(--color-accent);
+          background: #e0f2fe;
+          color: #007bff;
           font-size: 10px;
           font-weight: 600;
           padding: 2px 6px;
           border-radius: 20px;
-          border: 1px solid rgba(0, 168, 150, 0.3);
+          border: 1px solid #bae6fd;
         }
 
         .copyright-text {
-          font-size: 13px;
-          color: var(--color-text-light);
+          font-size: 12px;
+          color: #94a3b8;
         }
 
         .footer-right {
           display: flex;
-          gap: 24px;
+          gap: 20px;
         }
 
         .footer-link {
-          font-size: 13px;
-          color: var(--color-text-light);
+          font-size: 12px;
+          color: #64748b;
           transition: var(--transition-fast);
         }
 
         .footer-link:hover {
-          color: #ffffff;
+          color: #007bff;
         }
 
         @media (max-width: 640px) {

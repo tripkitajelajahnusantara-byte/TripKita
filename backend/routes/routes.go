@@ -21,6 +21,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	providerRepo := repositories.NewProviderRepository(db)
 	packageRepo := repositories.NewPackageRepository(db)
 	bookingRepo := repositories.NewBookingRepository(db)
+	payoutRepo := repositories.NewPayoutRepository(db)
 
 	// Initialize Services
 	authService := services.NewAuthService(providerRepo, cfg)
@@ -29,6 +30,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	xenditService := services.NewXenditService(cfg)
 	bookingService := services.NewBookingService(bookingRepo, packageRepo, xenditService)
 	dashboardService := services.NewDashboardService(packageRepo, bookingRepo, providerRepo)
+	payoutService := services.NewPayoutService(payoutRepo, providerRepo, bookingRepo)
 
 	// Initialize Controllers
 	authCtrl := controllers.NewAuthController(authService, cfg)
@@ -38,6 +40,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	dashboardCtrl := controllers.NewDashboardController(dashboardService)
 	uploadCtrl := controllers.NewUploadController()
 	oauthCtrl := controllers.NewOAuthController(db, cfg)
+	payoutCtrl := controllers.NewPayoutController(payoutService)
 
 	// Serve Static Files for uploads
 	r.Static("/uploads", "./uploads")
@@ -48,8 +51,13 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		// PUBLIC ROUTES (No Auth Required)
 		public := apiV1.Group("/public")
 		{
+			// Packages public endpoint for mobile customers
+			public.GET("/packages", packageCtrl.GetAllPublic)
+
 			// Simulation & Webhook routes
 			public.POST("/bookings", bookingCtrl.CreateSimulatedBooking)
+			public.POST("/bookings/:id/upload-proof", bookingCtrl.UploadPaymentProof)
+			public.GET("/bookings/status/:code", bookingCtrl.GetPublicStatus)
 			public.GET("/xendit-mock-checkout/:id", bookingCtrl.RenderMockCheckout)
 			public.POST("/xendit-mock-checkout/:id/pay", bookingCtrl.ProcessMockPayment)
 			public.POST("/webhooks/xendit", bookingCtrl.XenditWebhook)
@@ -58,6 +66,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			auth := public.Group("/auth")
 			{
 				auth.POST("/register", authCtrl.Register)
+				auth.POST("/register-customer", authCtrl.RegisterCustomer)
 				auth.POST("/login", authCtrl.Login)
 				auth.GET("/config", authCtrl.GetAuthConfig)
 				auth.POST("/upload", uploadCtrl.UploadDocument)
@@ -66,13 +75,18 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			}
 		}
 
-		// PROVIDER ROUTES (Auth + Provider Role Required)
+		// AUTHENTICATED PROFILE ROUTES (Accessible by any authenticated user: CUSTOMER, PROVIDER, ADMIN)
+		authProfile := apiV1.Group("/provider")
+		authProfile.Use(middleware.AuthMiddleware(cfg))
+		{
+			authProfile.GET("/profile", authCtrl.GetProfile)
+			authProfile.PUT("/profile", authCtrl.UpdateProfile)
+		}
+
+		// PROVIDER SPECIFIC ROUTES (Auth + Provider Role Required)
 		provider := apiV1.Group("/provider")
 		provider.Use(middleware.AuthMiddleware(cfg), middleware.ProviderRequired())
 		{
-			// Profile
-			provider.GET("/profile", authCtrl.GetProfile)
-			provider.PUT("/profile", authCtrl.UpdateProfile)
 			provider.POST("/upload", uploadCtrl.UploadDocument)
 
 			// Packages
@@ -92,6 +106,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 				bookings.PUT("/:id/status", bookingCtrl.UpdateStatus)
 			}
 
+			// Payouts / Keuangan Mitra
+			provider.GET("/payouts/summary", payoutCtrl.GetProviderPayoutSummary)
+			provider.POST("/payouts/request", payoutCtrl.RequestPayout)
+
 			// Dashboard Stats
 			provider.GET("/dashboard/stats", dashboardCtrl.GetStats)
 		}
@@ -108,13 +126,19 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			admin.POST("/providers/:id/verify-document", adminCtrl.VerifyProviderDocument)
 			admin.GET("/refunds", bookingCtrl.GetRefunds)
 			admin.POST("/refunds/:id/complete", bookingCtrl.CompleteRefund)
+			admin.GET("/bookings", bookingCtrl.AdminListBookings)
+			admin.PUT("/bookings/:id/confirm-payment", bookingCtrl.AdminConfirmPayment)
+
+			// Admin Payout management
+			admin.GET("/payouts", payoutCtrl.AdminGetAllPayouts)
+			admin.PUT("/payouts/:id/process", payoutCtrl.AdminProcessPayout)
 		}
 
-		// CUSTOMER ROUTES (Auth + Customer Role Required - Placeholder for Flutter)
+		// CUSTOMER ROUTES (Auth + Customer Role Required)
 		customer := apiV1.Group("/customer")
 		customer.Use(middleware.AuthMiddleware(cfg), middleware.CustomerRequired())
 		{
-			// customer endpoints will go here
+			customer.GET("/bookings", bookingCtrl.GetCustomerBookings)
 		}
 	}
 

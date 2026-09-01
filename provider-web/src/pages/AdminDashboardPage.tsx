@@ -15,7 +15,9 @@ import {
   ZoomIn,
   ZoomOut,
   Clock,
-  ArrowRight
+  ArrowRight,
+  DollarSign,
+  Wallet
 } from 'lucide-react';
 import { request } from '../utils/api';
 
@@ -92,7 +94,7 @@ interface StatusHistoryItem {
 export const AdminDashboardPage: React.FC = () => {
   const { providerProfile, logout, navigateTo } = useNavigation();
   const [providers, setProviders] = useState<ProviderAdminData[]>([]);
-  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund'>('kelola-provider');
+  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider'>('kelola-provider');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Semua Kategori');
   const [cityFilter, setCityFilter] = useState('Semua Kota');
@@ -114,6 +116,44 @@ export const AdminDashboardPage: React.FC = () => {
   const [refundLoading, setRefundLoading] = useState(false);
   const [refundError, setRefundError] = useState('');
   const [refundSuccess, setRefundSuccess] = useState('');
+
+  // Booking states for manual payments
+  const [adminBookings, setAdminBookings] = useState<any[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+
+  // Admin Payout States
+  const [adminPayouts, setAdminPayouts] = useState<any[]>([]);
+  const [payoutLoading, setPayoutLoading] = useState(false);
+
+  const fetchAdminPayouts = async () => {
+    setPayoutLoading(true);
+    try {
+      const data = await request('/admin/payouts');
+      setAdminPayouts(data || []);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setPayoutLoading(false);
+    }
+  };
+
+  const handleProcessPayout = async (payoutId: number, status: 'APPROVED' | 'REJECTED') => {
+    const notesPrompt = window.prompt(`Masukkan catatan transfer/alasan (${status}):`, status === 'APPROVED' ? 'Telah ditransfer oleh Admin TripKita' : 'Pengajuan ditolak');
+    if (notesPrompt === null) return;
+
+    try {
+      setError('');
+      setSuccessMsg('');
+      await request(`/admin/payouts/${payoutId}/process`, {
+        method: 'PUT',
+        body: JSON.stringify({ status, notes: notesPrompt })
+      });
+      setSuccessMsg(`Berhasil memproses pencairan dana (${status}).`);
+      fetchAdminPayouts();
+    } catch (err: any) {
+      setError(err.message || 'Gagal memproses pencairan.');
+    }
+  };
 
   const adminName = providerProfile?.picName || 'Administrator';
   const adminEmail = providerProfile?.email || 'admin@tripkita.id';
@@ -145,6 +185,41 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  const fetchAdminBookings = async () => {
+    setBookingsLoading(true);
+    setError('');
+    try {
+      const data = await request('/admin/bookings');
+      setAdminBookings(data || []);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Gagal memuat data booking.');
+    } finally {
+      setBookingsLoading(false);
+    }
+  };
+
+  const handleConfirmPayment = async (bookingId: number) => {
+    if (!window.confirm('Apakah Anda yakin sudah memverifikasi mutasi bank OCBC dan ingin mengubah status pembayaran booking ini menjadi LUNAS (PAID)?')) {
+      return;
+    }
+    setLoading(true);
+    try {
+      setError('');
+      setSuccessMsg('');
+      await request(`/admin/bookings/${bookingId}/confirm-payment`, {
+        method: 'PUT',
+      });
+      setSuccessMsg('Berhasil memverifikasi pembayaran booking.');
+      fetchAdminBookings();
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Gagal mengonfirmasi pembayaran.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCompleteRefund = async (bookingId: number) => {
     if (!window.confirm('Apakah Anda yakin sudah memproses refund ini secara manual di dashboard Xendit dan ingin menandai transaksi ini sebagai SELESAI (REFUNDED)?')) {
       return;
@@ -170,6 +245,8 @@ export const AdminDashboardPage: React.FC = () => {
   useEffect(() => {
     if (activeView === 'administrasi-refund') {
       fetchRefunds();
+    } else if (activeView === 'kelola-pembayaran') {
+      fetchAdminBookings();
     }
   }, [activeView]);
 
@@ -498,6 +575,18 @@ export const AdminDashboardPage: React.FC = () => {
             >
               <FileText size={18} /> Administrasi Refund
             </button>
+            <button 
+              className={`menu-btn ${activeView === 'kelola-pembayaran' ? 'active' : ''}`}
+              onClick={() => { setActiveView('kelola-pembayaran'); setSelectedProvider(null); }}
+            >
+              <DollarSign size={18} /> Kelola Pembayaran
+            </button>
+            <button 
+              className={`menu-btn ${activeView === 'pencairan-provider' ? 'active' : ''}`}
+              onClick={() => { setActiveView('pencairan-provider'); fetchAdminPayouts(); setSelectedProvider(null); }}
+            >
+              <Wallet size={18} /> Pencairan Dana Provider
+            </button>
           </nav>
         </div>
 
@@ -545,8 +634,24 @@ export const AdminDashboardPage: React.FC = () => {
             
             {/* Header Title */}
             <div className="verification-header-box">
-              <h1>{activeView === 'administrasi-refund' ? 'Administrasi Refund' : 'Provider Verification Center'}</h1>
-              <p>{activeView === 'administrasi-refund' ? 'Pantau dan kelola proses refund dana customer.' : 'Kelola dan verifikasi semua provider yang terdaftar di TripKita.'}</p>
+              <h1>
+                {activeView === 'administrasi-refund' 
+                  ? 'Administrasi Refund' 
+                  : activeView === 'kelola-pembayaran'
+                  ? 'Kelola Pembayaran Manual'
+                  : activeView === 'pencairan-provider'
+                  ? 'Pengajuan Pencairan Dana Provider (Payouts)'
+                  : 'Provider Verification Center'}
+              </h1>
+              <p>
+                {activeView === 'administrasi-refund' 
+                  ? 'Pantau dan kelola proses refund dana customer.' 
+                  : activeView === 'kelola-pembayaran'
+                  ? 'Verifikasi bukti transfer pembayaran manual Bank OCBC.'
+                  : activeView === 'pencairan-provider'
+                  ? 'Kelola pengajuan pencairan saldo DP 50% & pelunasan dari mitra provider.'
+                  : 'Kelola dan verifikasi semua provider yang terdaftar di TripKita.'}
+              </p>
             </div>
 
             {/* Alert Messages */}
@@ -570,6 +675,89 @@ export const AdminDashboardPage: React.FC = () => {
                       Kelola Refund <ArrowRight size={16} style={{ marginLeft: '8px' }} />
                     </button>
                   </div>
+                </div>
+              </div>
+            ) : activeView === 'kelola-pembayaran' ? (
+              /* View 4: Kelola Pembayaran (Verifikasi Manual Transfer) Panel */
+              <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
+                <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
+                  {bookingsLoading ? (
+                    <div className="loading-state">Memuat data booking...</div>
+                  ) : (
+                    <table className="admin-providers-table">
+                      <thead>
+                        <tr>
+                          <th>Kode Booking</th>
+                          <th>Pelanggan</th>
+                          <th>Paket Wisata</th>
+                          <th>Total Pembayaran</th>
+                          <th>Metode</th>
+                          <th>Bukti Transfer</th>
+                          <th>Status</th>
+                          <th>Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminBookings.length > 0 ? (
+                          adminBookings.map((b) => {
+                            const isPendingVerification = b.status === 'WAITING_CONFIRMATION';
+                            return (
+                              <tr key={b.id}>
+                                <td><strong>{b.bookingCode}</strong></td>
+                                <td>
+                                  <div style={{ fontWeight: '600' }}>{b.customerName}</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>Initial: {b.customerInitial}</div>
+                                </td>
+                                <td>{b.packageDetails?.name || 'Paket Wisata'}</td>
+                                <td><strong style={{ color: '#00a896' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(b.totalPrice)}</strong></td>
+                                <td>{b.paymentMethod}</td>
+                                <td>
+                                  {b.paymentProof ? (
+                                    <button 
+                                      className="view-doc-btn" 
+                                      onClick={() => { 
+                                        setPreviewDocUrl(b.paymentProof); 
+                                        setPreviewDocName(`Bukti Transfer ${b.bookingCode}`); 
+                                      }}
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', fontSize: '12px' }}
+                                    >
+                                      <Eye size={14} /> Lihat Bukti
+                                    </button>
+                                  ) : (
+                                    <span style={{ fontSize: '12px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>Belum diupload</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <span className={`status-badge-inline ${b.status.toLowerCase()}`}>
+                                    {b.status === 'WAITING_CONFIRMATION' ? 'Menunggu Verifikasi' : b.status}
+                                  </span>
+                                </td>
+                                <td>
+                                  {isPendingVerification ? (
+                                    <button 
+                                      className="approve-action-btn"
+                                      onClick={() => handleConfirmPayment(b.id)}
+                                      style={{ padding: '6px 12px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                      Verifikasi Lunas
+                                    </button>
+                                  ) : (
+                                    <span style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={8} className="empty-table-state" style={{ padding: '40px 0' }}>
+                              Tidak ada data transaksi pembayaran saat ini.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             ) : activeView === 'administrasi-refund' ? (
@@ -634,6 +822,106 @@ export const AdminDashboardPage: React.FC = () => {
                           <tr>
                             <td colSpan={8} className="empty-table-state" style={{ padding: '40px 0' }}>
                               Tidak ada transaksi refund yang perlu diproses saat ini.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            ) : activeView === 'pencairan-provider' ? (
+              /* View 5: Pengajuan Pencairan Dana Provider */
+              <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
+                <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
+                  {payoutLoading ? (
+                    <div className="loading-state">Memuat data pengajuan pencairan...</div>
+                  ) : (
+                    <table className="admin-providers-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Nama Provider</th>
+                          <th>Tipe Pencairan</th>
+                          <th>Nominal</th>
+                          <th>Bank & Rekening Tujuan</th>
+                          <th>Tanggal Pengajuan</th>
+                          <th>Status</th>
+                          <th>Aksi Transfer</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminPayouts.length > 0 ? (
+                          adminPayouts.map((p: any, idx: number) => {
+                            const isPending = p.status === 'PENDING';
+                            return (
+                              <tr key={idx}>
+                                <td style={{ fontWeight: '700', color: '#0f172a' }}>#{p.id}</td>
+                                <td>
+                                  <strong style={{ display: 'block', fontSize: '13.5px', color: '#0f172a' }}>
+                                    {p.provider?.businessName || 'Wisata Nusantara'}
+                                  </strong>
+                                  <span style={{ fontSize: '12px', color: '#64748b' }}>{p.provider?.email}</span>
+                                </td>
+                                <td>
+                                  <span style={{ fontWeight: '700', color: '#0369a1' }}>
+                                    {p.type === 'DP_50' ? 'Uang Muka (DP 50%)' : 'Pelunasan (50%)'}
+                                  </span>
+                                </td>
+                                <td style={{ fontWeight: '800', color: '#0284c7' }}>
+                                  {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(p.amount)}
+                                </td>
+                                <td>
+                                  <div style={{ fontSize: '13px', color: '#1e293b' }}>
+                                    <strong>{p.bankName}</strong> — {p.bankAccount}
+                                    <div style={{ fontSize: '12px', color: '#64748b' }}>a.n. {p.bankAccountName}</div>
+                                  </div>
+                                </td>
+                                <td style={{ fontSize: '12.5px', color: '#64748b' }}>
+                                  {new Date(p.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td>
+                                  <span 
+                                    style={{
+                                      padding: '4px 10px',
+                                      borderRadius: '30px',
+                                      fontSize: '12px',
+                                      fontWeight: '700',
+                                      backgroundColor: p.status === 'APPROVED' ? '#dcfce7' : p.status === 'REJECTED' ? '#fee2e2' : '#fef3c7',
+                                      color: p.status === 'APPROVED' ? '#16a34a' : p.status === 'REJECTED' ? '#dc2626' : '#d97706'
+                                    }}
+                                  >
+                                    {p.status === 'APPROVED' ? '✓ Transfer Selesai' : p.status === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Admin'}
+                                  </span>
+                                </td>
+                                <td>
+                                  {isPending ? (
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                      <button 
+                                        className="approve-action-btn"
+                                        onClick={() => handleProcessPayout(p.id, 'APPROVED')}
+                                        style={{ padding: '6px 10px', fontSize: '12px', width: 'auto', backgroundColor: '#0284c7' }}
+                                      >
+                                        Setujui & Transfer
+                                      </button>
+                                      <button 
+                                        onClick={() => handleProcessPayout(p.id, 'REJECTED')}
+                                        style={{ padding: '6px 10px', fontSize: '12px', width: 'auto', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '700' }}
+                                      >
+                                        Tolak
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Telah Diproses</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={8} className="empty-table-state" style={{ padding: '40px 0' }}>
+                              Tidak ada pengajuan pencairan dana dari provider saat ini.
                             </td>
                           </tr>
                         )}

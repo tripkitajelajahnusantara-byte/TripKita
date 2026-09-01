@@ -58,15 +58,6 @@ class TripKitaBottomNavigation extends StatelessWidget {
               ),
               _buildNavItem(
                 index: 3,
-                icon: Icons.chat_bubble_outline,
-                activeIcon: Icons.chat_bubble,
-                label: 'Pesan',
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-                badgeCount: 2, // Reference designs show 2 messages badge
-              ),
-              _buildNavItem(
-                index: 4,
                 icon: Icons.person_outline,
                 activeIcon: Icons.person,
                 label: 'Profile',

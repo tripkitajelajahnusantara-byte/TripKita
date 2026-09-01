@@ -16,6 +16,11 @@ type BookingService interface {
 	GetRefunds() ([]models.Booking, error)
 	CompleteRefund(id uint) error
 	GetBookingByID(id uint) (*models.Booking, error)
+	GetCustomerBookings(customerID uint) ([]models.Booking, error)
+	GetBookingByCode(code string) (*models.Booking, error)
+	UploadPaymentProof(id uint, proofPath string) (*models.Booking, error)
+	AdminGetAllBookings() ([]models.Booking, error)
+	AdminConfirmPayment(id uint) (*models.Booking, error)
 }
 
 type bookingService struct {
@@ -38,6 +43,14 @@ func (s *bookingService) GetAllBookings(providerID uint) ([]models.Booking, erro
 
 func (s *bookingService) GetBookingByID(id uint) (*models.Booking, error) {
 	return s.repo.FindByID(id)
+}
+
+func (s *bookingService) GetCustomerBookings(customerID uint) ([]models.Booking, error) {
+	return s.repo.FindAllByCustomer(customerID)
+}
+
+func (s *bookingService) GetBookingByCode(code string) (*models.Booking, error) {
+	return s.repo.FindByBookingCode(code)
 }
 
 func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status string) (*models.Booking, error) {
@@ -86,16 +99,26 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 	r := rand.New(randSource)
 	booking.BookingCode = fmt.Sprintf("TK-%d-%d", time.Now().Unix()%100000, r.Intn(10000))
 
-	// Create Xendit Invoice
-	invoiceID, paymentURL, err := s.xenditService.CreateInvoice(booking, pkg.Name)
-	if err != nil {
+	// Save to DB first to generate booking.ID
+	if err := s.repo.Create(booking); err != nil {
 		return err
 	}
 
-	booking.XenditInvoiceID = invoiceID
-	booking.PaymentURL = paymentURL
+	if booking.PaymentMethod == "Manual Transfer" || booking.PaymentMethod == "" {
+		booking.PaymentMethod = "Manual Transfer"
+		booking.XenditInvoiceID = fmt.Sprintf("MANUAL-%d", booking.ID)
+		booking.PaymentURL = ""
+	} else {
+		// Create Xendit Invoice with populated ID
+		invoiceID, paymentURL, err := s.xenditService.CreateInvoice(booking, pkg.Name)
+		if err != nil {
+			return err
+		}
+		booking.XenditInvoiceID = invoiceID
+		booking.PaymentURL = paymentURL
+	}
 
-	return s.repo.Create(booking)
+	return s.repo.Update(booking)
 }
 
 func (s *bookingService) GetRefunds() ([]models.Booking, error) {
@@ -170,4 +193,38 @@ func (s *bookingService) adjustQuota(booking *models.Booking, oldStatus, newStat
 			_ = s.packageRepo.Update(pkg)
 		}
 	}
+}
+
+func (s *bookingService) UploadPaymentProof(id uint, proofPath string) (*models.Booking, error) {
+	booking, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	booking.PaymentProof = proofPath
+	booking.Status = "WAITING_CONFIRMATION"
+	err = s.repo.Update(booking)
+	if err != nil {
+		return nil, err
+	}
+	return booking, nil
+}
+
+func (s *bookingService) AdminGetAllBookings() ([]models.Booking, error) {
+	return s.repo.FindAll()
+}
+
+func (s *bookingService) AdminConfirmPayment(id uint) (*models.Booking, error) {
+	booking, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	oldStatus := booking.Status
+	booking.Status = "PAID"
+	booking.PaymentMethod = "Manual Transfer"
+	err = s.repo.Update(booking)
+	if err != nil {
+		return nil, err
+	}
+	s.adjustQuota(booking, oldStatus, "PAID", booking.ProviderID)
+	return booking, nil
 }

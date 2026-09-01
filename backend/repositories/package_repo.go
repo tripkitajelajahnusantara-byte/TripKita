@@ -9,6 +9,7 @@ import (
 type PackageRepository interface {
 	Create(pkg *models.Package) error
 	FindAllByProvider(providerID uint) ([]models.Package, error)
+	FindAllPublic() ([]models.Package, error)
 	FindByIDAndProvider(id uint, providerID uint) (*models.Package, error)
 	FindByID(id uint) (*models.Package, error)
 	Update(pkg *models.Package) error
@@ -32,6 +33,12 @@ func (r *packageRepository) Create(pkg *models.Package) error {
 func (r *packageRepository) FindAllByProvider(providerID uint) ([]models.Package, error) {
 	var packages []models.Package
 	err := r.db.Where("provider_id = ?", providerID).Order("id desc").Find(&packages).Error
+	return packages, err
+}
+
+func (r *packageRepository) FindAllPublic() ([]models.Package, error) {
+	var packages []models.Package
+	err := r.db.Where("status = ?", "Aktif").Order("id desc").Find(&packages).Error
 	return packages, err
 }
 
