@@ -105,6 +105,10 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		return err
 	}
 
+	// Instantly reserve quota for package in database during PENDING_PAYMENT
+	pkg.QuotaUsed += booking.Guests
+	_ = s.packageRepo.Update(pkg)
+
 	if booking.PaymentMethod == "Manual Transfer" || booking.PaymentMethod == "" {
 		booking.PaymentMethod = "Manual Transfer"
 		booking.XenditInvoiceID = fmt.Sprintf("MANUAL-%d", booking.ID)
@@ -171,21 +175,21 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, xenditStatus st
 }
 
 func (s *bookingService) adjustQuota(booking *models.Booking, oldStatus, newStatus string, providerID uint) {
-	isActive := func(status string) bool {
-		return status == "PAID" || status == "CONFIRMED" || status == "COMPLETED"
+	isReserved := func(status string) bool {
+		return status == "PENDING_PAYMENT" || status == "WAITING_CONFIRMATION" || status == "PAID" || status == "CONFIRMED" || status == "COMPLETED"
 	}
 
-	oldActive := isActive(oldStatus)
-	newActive := isActive(newStatus)
+	oldReserved := isReserved(oldStatus)
+	newReserved := isReserved(newStatus)
 
-	if !oldActive && newActive {
-		pkg, err := s.packageRepo.FindByIDAndProvider(booking.PackageID, providerID)
+	if !oldReserved && newReserved {
+		pkg, err := s.packageRepo.FindByID(booking.PackageID)
 		if err == nil {
 			pkg.QuotaUsed += booking.Guests
 			_ = s.packageRepo.Update(pkg)
 		}
-	} else if oldActive && !newActive {
-		pkg, err := s.packageRepo.FindByIDAndProvider(booking.PackageID, providerID)
+	} else if oldReserved && !newReserved {
+		pkg, err := s.packageRepo.FindByID(booking.PackageID)
 		if err == nil {
 			pkg.QuotaUsed -= booking.Guests
 			if pkg.QuotaUsed < 0 {

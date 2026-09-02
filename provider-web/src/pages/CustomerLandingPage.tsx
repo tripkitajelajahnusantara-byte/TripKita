@@ -308,7 +308,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
         className="hero-section"
         style={{
           position: 'relative',
-          backgroundImage: `linear-gradient(to right, rgba(239, 246, 255, 0.88) 0%, rgba(239, 246, 255, 0.45) 55%, rgba(255, 255, 255, 0) 100%), url(${heroImage})`,
+          backgroundImage: `linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(239, 246, 255, 0.85) 55%, rgba(255, 255, 255, 0.3) 100%), url(${heroImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center 30%',
           minHeight: '420px',
@@ -318,7 +318,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '40px 20px',
+          padding: '40px 20px 60px 20px',
         }}
       >
         <div style={{ width: '100%', maxWidth: '1120px', zIndex: 2, textAlign: 'left' }}>
@@ -326,7 +326,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
             Cari Open Trip <br />
             Indonesia dengan Mudah
           </h1>
-          <p style={{ fontSize: 'clamp(14px, 2.5vw, 16px)', color: '#334155', marginBottom: '24px', fontWeight: 600, maxWidth: '540px', lineHeight: '1.5' }}>
+          <p style={{ fontSize: 'clamp(14px, 2.5vw, 16px)', color: '#1e293b', marginBottom: '24px', fontWeight: 600, maxWidth: '500px', lineHeight: '1.5', backgroundColor: 'rgba(255, 255, 255, 0.65)', padding: '8px 12px', borderRadius: '8px', backdropFilter: 'blur(4px)' }}>
             Temukan berbagai open trip seru dan tour guide terpercaya di seluruh Indonesia.
           </p>
           <button 
@@ -355,7 +355,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
       </div>
 
       {/* Floating Search Widget Card matching Gambar 1 */}
-      <div className="container" style={{ marginTop: '-55px', position: 'relative', zIndex: 10, maxWidth: '1120px', padding: '0 20px' }}>
+      <div className="container" style={{ marginTop: '-45px', position: 'relative', zIndex: 10, maxWidth: '1120px', padding: '0 20px', marginBottom: '30px' }}>
         <div 
           className="search-widget-card"
           style={{ 

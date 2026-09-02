@@ -20,7 +20,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
 
   // Reviews & Rating State with Pagination
-  const [reviewsList, setReviewsList] = useState([
+  const [reviewsList] = useState([
     { id: 1, name: 'Budi Santoso', avatar: 'BS', rating: 5, date: '15 Mei 2026', comment: 'Pengalaman luar biasa di Bromo! Tour guidenya sangat membantu dan mengambil foto-foto yang ciamik banget.', verified: true },
     { id: 2, name: 'Siti Rahmawati', avatar: 'SR', rating: 5, date: '10 Mei 2026', comment: 'Penjemputan tepat waktu, armada AC dingin, dan homestay sangat bersih. Pokoknya mantap TripKita!', verified: true },
     { id: 3, name: 'Andi Wijaya', avatar: 'AW', rating: 4, date: '02 Mei 2026', comment: 'Perjalanan menyenangkan. Driver Jeep ramah banget, rekomendasi sarapan lokalnya mantap.', verified: true },
@@ -35,33 +35,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const totalReviewPages = Math.ceil(reviewsList.length / reviewsPerPage);
   const currentReviews = reviewsList.slice((reviewPage - 1) * reviewsPerPage, reviewPage * reviewsPerPage);
 
-  // New review form state
-  const [newReviewName, setNewReviewName] = useState('');
-  const [newReviewRating, setNewReviewRating] = useState(5);
-  const [newReviewComment, setNewReviewComment] = useState('');
-  const [reviewSubmittedNotice, setReviewSubmittedNotice] = useState(false);
 
-  const handleAddReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newReviewName.trim() || !newReviewComment.trim()) return;
-
-    const newRev = {
-      id: Date.now(),
-      name: newReviewName,
-      avatar: newReviewName.slice(0, 2).toUpperCase(),
-      rating: newReviewRating,
-      date: 'Hari ini',
-      comment: newReviewComment,
-      verified: true
-    };
-
-    setReviewsList([newRev, ...reviewsList]);
-    setNewReviewName('');
-    setNewReviewComment('');
-    setNewReviewRating(5);
-    setReviewSubmittedNotice(true);
-    setTimeout(() => setReviewSubmittedNotice(false), 4000);
-  };
 
   if (!selectedPackageForDetail) {
     return (
@@ -309,7 +283,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
         
         {/* Tiket.com Style 5-Photo Grid Gallery (Clean without overlay badges) */}
         <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
+          <div className="detail-gallery-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
             
             {/* Photo 1 (Main Big Left) */}
             <div 
@@ -406,7 +380,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
               <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0' }}>
                 {pkg.name}
               </h1>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '14px', color: '#64748b' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '14px', color: '#64748b', flexWrap: 'wrap' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <MapPin size={16} color="#007bff" /> {pkg.destination}
                 </span>
@@ -655,87 +629,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   </div>
                 </div>
               )}
-
-              {/* Add New Review Form */}
-              <div style={{ backgroundColor: '#f0f9ff', borderRadius: '14px', padding: '20px', border: '1px solid #bae6fd' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#0369a1', margin: '0 0 12px 0' }}>
-                  Tulis Ulasan & Rating Anda
-                </h3>
-
-                {reviewSubmittedNotice && (
-                  <div style={{ backgroundColor: '#dcfce7', border: '1px solid #86efac', color: '#15803d', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '700', marginBottom: '14px' }}>
-                    ✓ Ulasan Anda berhasil diterbitkan! Terima kasih atas masukan Anda.
-                  </div>
-                )}
-
-                <form onSubmit={handleAddReview} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                        Nama Anda <span style={{ color: '#ef4444' }}>*</span>
-                      </label>
-                      <input 
-                        type="text"
-                        placeholder="Nama Anda..."
-                        value={newReviewName}
-                        onChange={(e) => setNewReviewName(e.target.value)}
-                        required
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                        Beri Rating
-                      </label>
-                      <div style={{ display: 'flex', gap: '4px', paddingTop: '6px' }}>
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setNewReviewRating(star)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}
-                          >
-                            <Star size={20} fill={star <= newReviewRating ? '#f59e0b' : 'none'} color={star <= newReviewRating ? '#f59e0b' : '#cbd5e1'} />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                      Komentar / Pengalaman <span style={{ color: '#ef4444' }}>*</span>
-                    </label>
-                    <textarea 
-                      rows={3}
-                      placeholder="Bagikan pengalaman liburan Anda bersama TripKita..."
-                      value={newReviewComment}
-                      onChange={(e) => setNewReviewComment(e.target.value)}
-                      required
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '10px 20px',
-                      backgroundColor: '#0284c7',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      alignSelf: 'flex-start',
-                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)'
-                    }}
-                  >
-                    Kirim Ulasan
-                  </button>
-                </form>
-              </div>
             </div>
 
           </div>

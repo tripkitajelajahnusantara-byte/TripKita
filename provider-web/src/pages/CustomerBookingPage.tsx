@@ -247,8 +247,8 @@ export const CustomerBookingPage: React.FC = () => {
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
                     Nama Lengkap Pemesan <span style={{ color: '#ef4444' }}>*</span>
                   </label>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <User size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', borderRadius: '10px', border: errors.pemesanName ? '1.5px solid #ef4444' : '1px solid #cbd5e1', padding: '0 14px', backgroundColor: '#ffffff' }}>
+                    <User size={16} color="#94a3b8" style={{ flexShrink: 0, marginRight: '10px' }} />
                     <input 
                       type="text" 
                       placeholder="Masukkan nama pemesan (hanya huruf)..."
@@ -256,15 +256,14 @@ export const CustomerBookingPage: React.FC = () => {
                       onChange={(e) => setPemesanName(e.target.value)}
                       required
                       style={{
+                        flex: 1,
                         width: '100%',
-                        padding: '12px 14px 12px 42px',
-                        borderRadius: '10px',
-                        border: errors.pemesanName ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                        fontSize: '14px',
+                        padding: '12px 0',
+                        border: 'none',
                         outline: 'none',
+                        fontSize: '14px',
                         color: '#0f172a',
-                        backgroundColor: '#ffffff',
-                        cursor: 'text',
+                        backgroundColor: 'transparent',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -281,8 +280,8 @@ export const CustomerBookingPage: React.FC = () => {
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
                     Alamat Email <span style={{ color: '#ef4444' }}>*</span>
                   </label>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <Mail size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', borderRadius: '10px', border: errors.pemesanEmail ? '1.5px solid #ef4444' : '1px solid #cbd5e1', padding: '0 14px', backgroundColor: '#ffffff' }}>
+                    <Mail size={16} color="#94a3b8" style={{ flexShrink: 0, marginRight: '10px' }} />
                     <input 
                       type="email" 
                       placeholder="Email untuk pengiriman tiket..."
@@ -290,15 +289,14 @@ export const CustomerBookingPage: React.FC = () => {
                       onChange={(e) => setPemesanEmail(e.target.value)}
                       required
                       style={{
+                        flex: 1,
                         width: '100%',
-                        padding: '12px 14px 12px 42px',
-                        borderRadius: '10px',
-                        border: errors.pemesanEmail ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                        fontSize: '14px',
+                        padding: '12px 0',
+                        border: 'none',
                         outline: 'none',
+                        fontSize: '14px',
                         color: '#0f172a',
-                        backgroundColor: '#ffffff',
-                        cursor: 'text',
+                        backgroundColor: 'transparent',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -315,8 +313,8 @@ export const CustomerBookingPage: React.FC = () => {
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
                     Nomor WhatsApp / HP <span style={{ color: '#ef4444' }}>*</span>
                   </label>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <Phone size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', borderRadius: '10px', border: errors.pemesanPhone ? '1.5px solid #ef4444' : '1px solid #cbd5e1', padding: '0 14px', backgroundColor: '#ffffff' }}>
+                    <Phone size={16} color="#94a3b8" style={{ flexShrink: 0, marginRight: '10px' }} />
                     <input 
                       type="tel" 
                       placeholder="Contoh: 081234567890..."
@@ -324,15 +322,14 @@ export const CustomerBookingPage: React.FC = () => {
                       onChange={(e) => setPemesanPhone(e.target.value)}
                       required
                       style={{
+                        flex: 1,
                         width: '100%',
-                        padding: '12px 14px 12px 42px',
-                        borderRadius: '10px',
-                        border: errors.pemesanPhone ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                        fontSize: '14px',
+                        padding: '12px 0',
+                        border: 'none',
                         outline: 'none',
+                        fontSize: '14px',
                         color: '#0f172a',
-                        backgroundColor: '#ffffff',
-                        cursor: 'text',
+                        backgroundColor: 'transparent',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -357,13 +354,14 @@ export const CustomerBookingPage: React.FC = () => {
                       required
                       style={{
                         width: '100%',
-                        padding: '11px 14px',
+                        padding: '12px 14px',
                         borderRadius: '10px',
                         border: errors.pemesanBirthDate ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
                         fontSize: '14px',
                         outline: 'none',
                         color: '#0f172a',
                         backgroundColor: '#ffffff',
+                        cursor: 'pointer',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -381,9 +379,10 @@ export const CustomerBookingPage: React.FC = () => {
                     <select
                       value={pemesanGender}
                       onChange={(e) => setPemesanGender(e.target.value)}
+                      required
                       style={{
                         width: '100%',
-                        padding: '11px 14px',
+                        padding: '12px 14px',
                         borderRadius: '10px',
                         border: '1px solid #cbd5e1',
                         fontSize: '14px',
@@ -415,7 +414,7 @@ export const CustomerBookingPage: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {participants.map((p, idx) => (
                   <div key={idx} style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                       <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#007bff', margin: 0 }}>
                         Peserta {idx + 1}
                       </h3>
