@@ -17,37 +17,15 @@ import (
 var DB *gorm.DB
 
 func ConnectDB(cfg *config.Config) {
-	// 1. Connect to default postgres database to check/create target database if not exists
-	defaultDsn := fmt.Sprintf("host=%s user=%s password=%s dbname=postgres port=%s sslmode=%s",
-		cfg.DBHost, cfg.DBUser, cfg.DBPass, cfg.DBPort, cfg.DBSSLMode)
-
-	tempDB, err := gorm.Open(postgres.Open(defaultDsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
-	if err != nil {
-		log.Printf("Warning: Failed to connect to default postgres DB to check target database: %v. Will try connecting to target DB directly.", err)
+	var dsn string
+	if cfg.DatabaseURL != "" {
+		dsn = cfg.DatabaseURL
 	} else {
-		var exists int
-		tempDB.Raw("SELECT 1 FROM pg_database WHERE datname = ?", cfg.DBName).Scan(&exists)
-		if exists != 1 {
-			fmt.Printf("Database %s does not exist, creating...\n", cfg.DBName)
-			err = tempDB.Exec(fmt.Sprintf("CREATE DATABASE %s", cfg.DBName)).Error
-			if err != nil {
-				log.Printf("Warning: Failed to create database %s: %v", cfg.DBName, err)
-			} else {
-				fmt.Printf("Database %s created successfully\n", cfg.DBName)
-			}
-		}
-		sqlDB, err := tempDB.DB()
-		if err == nil {
-			sqlDB.Close()
-		}
+		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
+			cfg.DBHost, cfg.DBUser, cfg.DBPass, cfg.DBName, cfg.DBPort, cfg.DBSSLMode)
 	}
 
-	// 2. Connect to target database
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
-		cfg.DBHost, cfg.DBUser, cfg.DBPass, cfg.DBName, cfg.DBPort, cfg.DBSSLMode)
-
+	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
