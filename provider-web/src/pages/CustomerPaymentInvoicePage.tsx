@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
-import { Clock, Copy, CheckCircle2, ArrowLeft, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Clock, Copy, CheckCircle2, ArrowLeft, ExternalLink, ShieldCheck, XCircle, RefreshCw } from 'lucide-react';
 
 export const CustomerPaymentInvoicePage: React.FC = () => {
   const { navigateTo, selectedBookingForInvoice } = useNavigation();
@@ -10,8 +10,8 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   const [isPaid, setIsPaid] = useState(false);
   const [simulating, setSimulating] = useState(false);
 
-  // 2-hour countdown timer logic (7200 seconds)
-  const [timeLeft, setTimeLeft] = useState(7200);
+  // 1-minute countdown timer logic (60 seconds testing limit)
+  const [timeLeft, setTimeLeft] = useState(60);
 
   useEffect(() => {
     if (timeLeft <= 0) return;
@@ -22,10 +22,9 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   }, [timeLeft]);
 
   const formatTimer = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
+    const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const booking = selectedBookingForInvoice || {
@@ -35,10 +34,12 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
     totalPrice: 350000,
     guests: 1,
     tripDate: '22 Mei 2026',
-    vaNumber: '8839001434739102',
+    accountNumber: '693800143473',
     bankName: 'Bank OCBC',
     paymentUrl: ''
   };
+
+  const isExpired = timeLeft <= 0 && !isPaid;
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -132,14 +133,32 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
               Lihat E-Ticket & Detail Trip
             </button>
           </div>
+        ) : isExpired ? (
+          <div style={{ backgroundColor: '#fef2f2', border: '1.5px solid #ef4444', borderRadius: '20px', padding: '32px', textAlign: 'center', marginBottom: '28px', boxShadow: '0 4px 14px rgba(239, 68, 68, 0.08)' }}>
+            <div style={{ backgroundColor: '#fee2e2', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+              <XCircle size={36} color="#ef4444" />
+            </div>
+            <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#991b1b', margin: '0 0 6px 0' }}>
+              Batas Waktu Pembayaran Habis (Kadaluwarsa)
+            </h2>
+            <p style={{ fontSize: '14.5px', color: '#b91c1c', margin: '0 0 20px 0', fontWeight: '500' }}>
+              Batas waktu testing 1 menit telah habis. Transaksi ini dibatalkan secara otomatis dan tidak dapat diproses lagi.
+            </p>
+            <button 
+              onClick={() => navigateTo('beranda')}
+              style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '12px 28px', fontSize: '14.5px', fontWeight: '700', borderRadius: '10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+            >
+              <RefreshCw size={16} /> Pesan Ulang Trip Ini
+            </button>
+          </div>
         ) : (
           <div style={{ backgroundColor: '#fffbe6', border: '1.5px solid #f59e0b', borderRadius: '20px', padding: '24px 28px', marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
             <div>
               <span style={{ fontSize: '12px', fontWeight: '800', color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Status: Menunggu Pembayaran
+                Status: Menunggu Pembayaran (Testing Mode: 1 Menit)
               </span>
               <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#78350f', margin: '4px 0 0 0' }}>
-                Selesaikan Pembayaran Sebelum Waktu Habis
+                Transfer Sebelum Waktu Batas 1 Menit Habis
               </h2>
             </div>
 
@@ -147,7 +166,7 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #fcd34d', padding: '10px 18px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Clock size={20} color="#d97706" />
               <div>
-                <span style={{ fontSize: '11px', color: '#b45309', display: 'block', fontWeight: '600' }}>Sisa Waktu Pembayaran</span>
+                <span style={{ fontSize: '11px', color: '#b45309', display: 'block', fontWeight: '600' }}>Sisa Waktu Testing</span>
                 <strong style={{ fontSize: '18px', fontWeight: '800', color: '#d97706', fontFamily: 'monospace' }}>
                   {formatTimer(timeLeft)}
                 </strong>
@@ -156,7 +175,7 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
           </div>
         )}
 
-        {/* VA Payment Details Card */}
+        {/* Payment Details Card */}
         <div style={{ backgroundColor: '#ffffff', borderRadius: '20px', border: '1px solid #e2e8f0', overflow: 'hidden', marginBottom: '28px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
           <div style={{ backgroundColor: '#0f172a', padding: '20px 28px', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -175,25 +194,25 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
 
           <div style={{ padding: '28px' }}>
             <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: '0 0 16px 0' }}>
-              Instruksi Transfer Virtual Account (VA)
+              Informasi Rekening Bank Tujuan Transfer
             </h3>
 
-            {/* Virtual Account Box */}
+            {/* Bank Rekening Box */}
             <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '20px 24px', border: '1.5px solid #cbd5e1', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
               <div>
                 <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>
-                  Nomor Virtual Account Bank ({booking.bankName || 'Bank OCBC'})
+                  Bank OCBC
                 </span>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', letterSpacing: '1.5px', marginTop: '4px' }}>
-                  {booking.vaNumber || '8839001434739102'}
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#0284c7', letterSpacing: '1px', marginTop: '4px' }}>
+                  693800143473
                 </div>
-                <span style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                  a.n. <strong>TripKita Official Payment Gateway</strong>
+                <span style={{ fontSize: '13px', color: '#475569', marginTop: '2px', display: 'block' }}>
+                  Atas Nama: <strong>TripKita</strong>
                 </span>
               </div>
 
               <button 
-                onClick={() => handleCopy(booking.vaNumber || '8839001434739102')}
+                onClick={() => handleCopy('693800143473')}
                 style={{
                   backgroundColor: copied ? '#10b981' : '#0284c7',
                   color: '#ffffff',
@@ -210,17 +229,17 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
                 }}
               >
                 {copied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
-                {copied ? 'Tersalin!' : 'Salin Nomor VA'}
+                {copied ? 'Tersalin!' : 'Salin No. Rekening'}
               </button>
             </div>
 
             {/* 1-Click Sandbox Test Simulation Box */}
-            {!isPaid && (
-              <div style={{ backgroundColor: '#f0f9ff', borderRadius: '14px', padding: '20px 24px', border: '1.5px solid #0284c7', marginBottom: '24px' }}>
+            {!isPaid && !isExpired && (
+              <div style={{ backgroundColor: '#f0f9ff', borderRadius: '14px', padding: '20px 24px', border: '1.5px solid #0284c7', marginBottom: '28px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                   <ShieldCheck size={20} color="#0284c7" />
                   <strong style={{ fontSize: '15px', color: '#0369a1', fontWeight: '800' }}>
-                    Simulasi Pengujian Pembayaran Instant (Sandbox Mode)
+                    Simulasi Pengujian Pembayaran Instant (Test Mode)
                   </strong>
                 </div>
                 <p style={{ fontSize: '13.5px', color: '#0284c7', margin: '0 0 16px 0', lineHeight: '1.5' }}>
@@ -277,16 +296,39 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
 
             {/* Transfer Instructions */}
             <div>
-              <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>
-                Cara Pembayaran via ATM / M-Banking:
+              <h4 style={{ fontSize: '14.5px', fontWeight: '800', color: '#0f172a', marginBottom: '14px' }}>
+                Tata Cara Pembayaran Transfer Bank OCBC:
               </h4>
-              <ol style={{ fontSize: '13.5px', color: '#475569', paddingLeft: '20px', margin: 0, lineHeight: '1.8' }}>
-                <li>Buka aplikasi Mobile Banking atau ATM Bank Anda.</li>
-                <li>Pilih menu <strong>Transfer ➔ Virtual Account (VA)</strong>.</li>
-                <li>Masukkan nomor Virtual Account: <strong style={{ color: '#0f172a' }}>{booking.vaNumber || '8839001434739102'}</strong></li>
-                <li>Pastikan nama tagihan muncul sebagai <strong>TripKita Official</strong> dan nominal cocok (<strong>{formatIDR(booking.totalPrice || 350000)}</strong>).</li>
-                <li>Konfirmasi transaksi. Sistem akan memverifikasi status Anda secara otomatis.</li>
-              </ol>
+
+              {/* Tab 1: OCBC Mobile App */}
+              <div style={{ backgroundColor: '#f8fafc', padding: '18px', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
+                <strong style={{ fontSize: '14px', color: '#0284c7', display: 'block', marginBottom: '8px' }}>
+                  📱 Via Aplikasi OCBC Mobile (ONe Mobile):
+                </strong>
+                <ol style={{ fontSize: '13.5px', color: '#475569', paddingLeft: '20px', margin: 0, lineHeight: '1.8' }}>
+                  <li>Buka aplikasi <strong>OCBC Mobile</strong> di smartphone Anda lalu login.</li>
+                  <li>Pilih menu <strong>Transfer ➔ Ke Rekening Bank OCBC</strong>.</li>
+                  <li>Masukkan Nomor Rekening: <strong style={{ color: '#0f172a' }}>693800143473</strong></li>
+                  <li>Pastikan Nama Pemilik Rekening tertera: <strong style={{ color: '#0284c7' }}>TripKita</strong>.</li>
+                  <li>Masukkan nominal transfer sebesar <strong style={{ color: '#0f172a' }}>{formatIDR(booking.totalPrice || 350000)}</strong>.</li>
+                  <li>Konfirmasi transaksi & masukkan PIN OCBC Mobile Anda. Sistem akan memverifikasi pembayaran secara otomatis.</li>
+                </ol>
+              </div>
+
+              {/* Tab 2: ATM Bank OCBC / ATM Bersama */}
+              <div style={{ backgroundColor: '#f8fafc', padding: '18px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                <strong style={{ fontSize: '14px', color: '#0284c7', display: 'block', marginBottom: '8px' }}>
+                  🏧 Via ATM Bank OCBC / ATM Bank Lain:
+                </strong>
+                <ol style={{ fontSize: '13.5px', color: '#475569', paddingLeft: '20px', margin: 0, lineHeight: '1.8' }}>
+                  <li>Masukkan Kartu ATM & PIN Bank Anda di mesin ATM.</li>
+                  <li>Pilih menu <strong>Transaksi Lainnya ➔ Transfer ➔ Ke Rekening Bank OCBC</strong>.</li>
+                  <li>Gunakan Kode Bank OCBC: <strong>028</strong> *(jika mentransfer dari bank lain)*.</li>
+                  <li>Masukkan Nomor Rekening: <strong style={{ color: '#0f172a' }}>693800143473</strong>.</li>
+                  <li>Masukkan nominal transfer tepat sebesar <strong style={{ color: '#0f172a' }}>{formatIDR(booking.totalPrice || 350000)}</strong>.</li>
+                  <li>Konfirmasi nama penerima <strong>TripKita</strong> & simpan resi bukti transaksi Anda.</li>
+                </ol>
+              </div>
             </div>
 
           </div>
@@ -296,3 +338,4 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
     </div>
   );
 };
+

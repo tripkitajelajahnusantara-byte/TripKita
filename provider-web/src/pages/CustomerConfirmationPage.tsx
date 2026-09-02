@@ -202,10 +202,10 @@ export const CustomerConfirmationPage: React.FC = () => {
                 </div>
                 <div>
                   <h4 style={{ fontSize: '14.5px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
-                    Transfer Virtual Account & E-Wallet
+                    Transfer Bank (Bank OCBC)
                   </h4>
                   <p style={{ fontSize: '13px', color: '#0369a1', margin: 0, fontWeight: '600' }}>
-                    Bank OCBC, BCA, Mandiri, BRI, QRIS, ShopeePay & Dana
+                    Bank OCBC — Rekening: 693800143473 a.n. TripKita
                   </p>
                 </div>
               </div>

@@ -24,32 +24,7 @@ interface BookingItem {
   createdAt: string;
 }
 
-const CountdownTimer: React.FC<{ createdAt?: string }> = ({ createdAt }) => {
-  const [timeLeft, setTimeLeft] = useState<number>(7200);
 
-  useEffect(() => {
-    const createdTime = createdAt ? new Date(createdAt).getTime() : Date.now();
-    const expireTime = createdTime + 2 * 60 * 60 * 1000;
-
-    const interval = setInterval(() => {
-      const diff = Math.max(0, Math.floor((expireTime - Date.now()) / 1000));
-      setTimeLeft(diff);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [createdAt]);
-
-  const hours = String(Math.floor(timeLeft / 3600)).padStart(2, '0');
-  const minutes = String(Math.floor((timeLeft % 3600) / 60)).padStart(2, '0');
-  const seconds = String(timeLeft % 60).padStart(2, '0');
-
-  return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', padding: '6px 14px', borderRadius: '30px', fontSize: '12.5px', fontWeight: '800' }}>
-      <Clock size={14} color="#ea580c" />
-      <span>Batas Transfer: {hours}:{minutes}:{seconds}</span>
-    </div>
-  );
-};
 
 export const CustomerHistoryPage: React.FC = () => {
   const { navigateTo, providerProfile } = useNavigation();
@@ -119,46 +94,6 @@ export const CustomerHistoryPage: React.FC = () => {
     }
   };
 
-  const handleUploadProof = async (bookingId: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const uploadRes = await request('/public/auth/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!uploadRes.documentPath) {
-        throw new Error('Gagal mengunggah file bukti transfer.');
-      }
-
-      await request(`/public/bookings/${bookingId}/upload-proof`, {
-        method: 'POST',
-        body: JSON.stringify({ paymentProof: uploadRes.documentPath })
-      });
-
-      setModalNotice({
-        title: 'Bukti Transfer Berhasil Diunggah!',
-        message: 'Terima kasih. Bukti pembayaran Anda telah kami terima dan sedang dalam proses verifikasi oleh Admin.'
-      });
-      fetchHistory();
-    } catch (err: any) {
-      console.error(err);
-      setModalNotice({
-        title: 'Gagal Mengunggah Bukti',
-        message: err.message || 'Gagal mengunggah bukti pembayaran. Pastikan ukuran file < 5MB dengan format PDF/JPG/PNG.',
-        isError: true
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleTrackTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     setTrackingError('');
@@ -181,7 +116,7 @@ export const CustomerHistoryPage: React.FC = () => {
     if (!createdAt) return false;
     const createdTime = new Date(createdAt).getTime();
     if (isNaN(createdTime)) return false;
-    const expireTime = createdTime + 2 * 60 * 60 * 1000;
+    const expireTime = createdTime + 1 * 60 * 1000; // 1 minute limit for testing expiration
     return Date.now() > expireTime;
   };
 
@@ -479,13 +414,13 @@ export const CustomerHistoryPage: React.FC = () => {
                       <div style={{ backgroundColor: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                           <strong style={{ fontSize: '13.5px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <XCircle size={16} color="#dc2626" /> Batas Waktu Pembayaran Habis (2 Jam)
+                            <XCircle size={16} color="#dc2626" /> Batas Waktu Pembayaran Habis (Kadaluwarsa)
                           </strong>
                           <span style={{ fontSize: '12px', fontWeight: '800', color: '#dc2626', backgroundColor: '#fee2e2', padding: '4px 12px', borderRadius: '20px' }}>DIBATALKAN</span>
                         </div>
                         
                         <p style={{ fontSize: '13px', color: '#7f1d1d', margin: 0, lineHeight: '1.5' }}>
-                          Batas waktu transfer 2 jam untuk transaksi ini telah kadaluwarsa. Bukti pembayaran sudah tidak dapat diunggah. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.
+                          Batas waktu transfer 1 menit untuk testing transaksi ini telah kadaluwarsa. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.
                         </p>
 
                         <div style={{ marginTop: '4px' }}>
@@ -513,7 +448,7 @@ export const CustomerHistoryPage: React.FC = () => {
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                           <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Transfer Pembayaran:</strong>
-                          <CountdownTimer createdAt={booking.createdAt} />
+                          <span style={{ fontSize: '12px', fontWeight: '700', color: '#0284c7', backgroundColor: '#e0f2fe', padding: '4px 10px', borderRadius: '20px' }}>Testing Limit: 1 Menit</span>
                         </div>
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
@@ -548,31 +483,6 @@ export const CustomerHistoryPage: React.FC = () => {
                           >
                             Salin No. Rekening
                           </button>
-                        </div>
-                        
-                        <div style={{ marginTop: '4px' }}>
-                          <label 
-                            style={{
-                              display: 'inline-block',
-                              backgroundColor: '#0284c7',
-                              color: '#ffffff',
-                              padding: '12px 24px',
-                              borderRadius: '10px',
-                              fontSize: '13.5px',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              textAlign: 'center',
-                              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
-                            }}
-                          >
-                            Unggah Bukti Transfer
-                            <input 
-                              type="file" 
-                              style={{ display: 'none' }} 
-                              onChange={(e) => handleUploadProof(booking.id, e)} 
-                              accept="image/*,application/pdf" 
-                            />
-                          </label>
                         </div>
                       </div>
                     )
