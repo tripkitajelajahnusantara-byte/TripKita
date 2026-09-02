@@ -19,6 +19,7 @@ type BookingService interface {
 	GetCustomerBookings(customerID uint) ([]models.Booking, error)
 	GetBookingByCode(code string) (*models.Booking, error)
 	UploadPaymentProof(id uint, proofPath string) (*models.Booking, error)
+	PublicUpdateStatus(id uint, status string) (*models.Booking, error)
 	AdminGetAllBookings() ([]models.Booking, error)
 	AdminConfirmPayment(id uint) (*models.Booking, error)
 }
@@ -228,3 +229,18 @@ func (s *bookingService) AdminConfirmPayment(id uint) (*models.Booking, error) {
 	s.adjustQuota(booking, oldStatus, "PAID", booking.ProviderID)
 	return booking, nil
 }
+
+func (s *bookingService) PublicUpdateStatus(id uint, status string) (*models.Booking, error) {
+	booking, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	oldStatus := booking.Status
+	booking.Status = status
+	if err := s.repo.Update(booking); err != nil {
+		return nil, err
+	}
+	s.adjustQuota(booking, oldStatus, status, booking.ProviderID)
+	return booking, nil
+}
+

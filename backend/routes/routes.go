@@ -57,6 +57,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			// Simulation & Webhook routes
 			public.POST("/bookings", bookingCtrl.CreateSimulatedBooking)
 			public.POST("/bookings/:id/upload-proof", bookingCtrl.UploadPaymentProof)
+			public.PUT("/bookings/:id/status", bookingCtrl.PublicUpdateStatus)
 			public.GET("/bookings/status/:code", bookingCtrl.GetPublicStatus)
 			public.GET("/xendit-mock-checkout/:id", bookingCtrl.RenderMockCheckout)
 			public.POST("/xendit-mock-checkout/:id/pay", bookingCtrl.ProcessMockPayment)

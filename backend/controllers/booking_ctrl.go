@@ -91,6 +91,34 @@ func (ctrl *BookingController) UpdateStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, booking)
 }
 
+func (ctrl *BookingController) PublicUpdateStatus(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		// Try finding by BookingCode if ID is not numeric
+		booking, err := ctrl.service.GetBookingByCode(idStr)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Booking not found"})
+			return
+		}
+		id = uint64(booking.ID)
+	}
+
+	var req models.UpdateBookingStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	booking, err := ctrl.service.PublicUpdateStatus(uint(id), req.Status)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, booking)
+}
+
 func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 	var req struct {
 		PackageID       uint      `json:"packageId" binding:"required"`

@@ -113,12 +113,12 @@ interface NavigationContextType {
   setSearchParams: React.Dispatch<React.SetStateAction<{ destination: string; date: string; type: string; category: string }>>;
   bookingFormData: {
     pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string }>;
+    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
   } | null;
   setBookingFormData: React.Dispatch<React.SetStateAction<{
     pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string }>;
+    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
   } | null>>;
 }

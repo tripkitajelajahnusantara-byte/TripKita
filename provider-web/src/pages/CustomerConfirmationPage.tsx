@@ -50,6 +50,19 @@ export const CustomerConfirmationPage: React.FC = () => {
     setShowConfirmModal(true);
   };
 
+  const calculateAge = (dobString?: string) => {
+    if (!dobString) return '-';
+    const birth = new Date(dobString);
+    if (isNaN(birth.getTime())) return '-';
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const monthDiff = now.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age > 0 ? `${age} Tahun` : '0 Tahun';
+  };
+
   const handleFinalConfirmBooking = async () => {
     setShowConfirmModal(false);
     setSubmitting(true);
@@ -63,7 +76,14 @@ export const CustomerConfirmationPage: React.FC = () => {
         customerInitial: pemesan.nama.charAt(0).toUpperCase(),
         guests: guestsCount,
         tripDate: new Date(pkg.bookingDate || '2026-05-22').toISOString(),
-        paymentMethod: 'Xendit Invoice'
+        paymentMethod: 'Xendit Invoice',
+        participants: peserta.map((p: any) => ({
+          nama: p.nama,
+          hp: p.hp,
+          gender: p.gender,
+          tanggalLahir: p.tanggalLahir || '',
+          riwayatPenyakit: p.riwayatPenyakit || 'Tidak Ada'
+        }))
       };
 
       if (providerProfile && providerProfile.role === 'CUSTOMER') {
@@ -173,17 +193,27 @@ export const CustomerConfirmationPage: React.FC = () => {
               </h2>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {peserta.map((p, idx) => (
-                  <div key={idx} style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontSize: '12px', fontWeight: '800', color: '#0284c7', display: 'block', marginBottom: '4px' }}>
+                {peserta.map((p: any, idx: number) => (
+                  <div key={idx} style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: '#0284c7' }}>
                         Peserta {idx + 1}
                       </span>
-                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>{p.nama}</strong>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a', backgroundColor: '#e2e8f0', padding: '2px 8px', borderRadius: '6px' }}>
+                        Umur: {calculateAge(p.tanggalLahir)}
+                      </span>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: '13px', color: '#64748b' }}>
-                      <div>{p.hp || '-'}</div>
-                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>{p.gender}</span>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                      <div>
+                        <strong style={{ fontSize: '14.5px', color: '#0f172a', display: 'block' }}>{p.nama}</strong>
+                        <span style={{ fontSize: '12.5px', color: '#64748b' }}>HP: {p.hp || '-'} • Gender: {p.gender}</span>
+                      </div>
+
+                      <div style={{ textAlign: 'right', fontSize: '12.5px', color: '#475569' }}>
+                        <div>Tgl Lahir: <strong style={{ color: '#0f172a' }}>{p.tanggalLahir || '-'}</strong></div>
+                        <div>Penyakit: <strong style={{ color: p.riwayatPenyakit && p.riwayatPenyakit !== 'Tidak Ada' ? '#ef4444' : '#10b981' }}>{p.riwayatPenyakit || 'Tidak Ada'}</strong></div>
+                      </div>
                     </div>
                   </div>
                 ))}

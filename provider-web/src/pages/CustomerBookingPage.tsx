@@ -6,6 +6,8 @@ interface Participant {
   nama: string;
   hp: string;
   gender: string;
+  tanggalLahir: string;
+  riwayatPenyakit: string;
 }
 
 export const CustomerBookingPage: React.FC = () => {
@@ -49,7 +51,9 @@ export const CustomerBookingPage: React.FC = () => {
           updated.push({
             nama: i === 0 && providerProfile ? (providerProfile.picName || '') : '',
             hp: i === 0 && providerProfile ? (providerProfile.whatsapp || '') : '',
-            gender: 'Laki-laki'
+            gender: 'Laki-laki',
+            tanggalLahir: i === 0 ? pemesanBirthDate : '2000-01-01',
+            riwayatPenyakit: 'Tidak Ada'
           });
         }
       } else if (updated.length > guestsCount) {
@@ -67,12 +71,14 @@ export const CustomerBookingPage: React.FC = () => {
         copy[0] = {
           nama: pemesanName,
           hp: pemesanPhone,
-          gender: pemesanGender
+          gender: pemesanGender,
+          tanggalLahir: pemesanBirthDate,
+          riwayatPenyakit: prev[0]?.riwayatPenyakit || 'Tidak Ada'
         };
         return copy;
       });
     }
-  }, [isSameAsPemesan, pemesanName, pemesanPhone, pemesanGender]);
+  }, [isSameAsPemesan, pemesanName, pemesanPhone, pemesanGender, pemesanBirthDate]);
 
   if (!selectedPackageForDetail) {
     return (
@@ -473,14 +479,68 @@ export const CustomerBookingPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginTop: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                          Jenis Kelamin <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <select
+                          value={p.gender}
+                          onChange={(e) => handleParticipantChange(idx, 'gender', e.target.value)}
+                          disabled={idx === 0 && isSameAsPemesan}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '13px',
+                            outline: 'none',
+                            color: '#0f172a',
+                            backgroundColor: idx === 0 && isSameAsPemesan ? '#f1f5f9' : '#ffffff',
+                            cursor: idx === 0 && isSameAsPemesan ? 'not-allowed' : 'pointer',
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <option value="Laki-laki">Laki-laki</option>
+                          <option value="Perempuan">Perempuan</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                          Tanggal Lahir Peserta <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input 
+                          type="date"
+                          value={p.tanggalLahir || '2000-01-01'}
+                          onChange={(e) => handleParticipantChange(idx, 'tanggalLahir', e.target.value)}
+                          disabled={idx === 0 && isSameAsPemesan}
+                          required
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '13px',
+                            outline: 'none',
+                            color: '#0f172a',
+                            backgroundColor: idx === 0 && isSameAsPemesan ? '#f1f5f9' : '#ffffff',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '12px' }}>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-                        Jenis Kelamin <span style={{ color: '#ef4444' }}>*</span>
+                        Riwayat Penyakit & Alergi <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '400' }}>(Maks. 255 Karakter, opsional)</span>
                       </label>
-                      <select
-                        value={p.gender}
-                        onChange={(e) => handleParticipantChange(idx, 'gender', e.target.value)}
-                        disabled={idx === 0 && isSameAsPemesan}
+                      <input 
+                        type="text"
+                        maxLength={255}
+                        placeholder="Misal: Asma, Alergi Sehat, Jantung, atau '-' jika tidak ada"
+                        value={p.riwayatPenyakit || ''}
+                        onChange={(e) => handleParticipantChange(idx, 'riwayatPenyakit', e.target.value)}
                         style={{
                           width: '100%',
                           padding: '10px 12px',
@@ -489,14 +549,10 @@ export const CustomerBookingPage: React.FC = () => {
                           fontSize: '13px',
                           outline: 'none',
                           color: '#0f172a',
-                          backgroundColor: idx === 0 && isSameAsPemesan ? '#f1f5f9' : '#ffffff',
-                          cursor: idx === 0 && isSameAsPemesan ? 'not-allowed' : 'pointer',
+                          backgroundColor: '#ffffff',
                           boxSizing: 'border-box'
                         }}
-                      >
-                        <option value="Laki-laki">Laki-laki</option>
-                        <option value="Perempuan">Perempuan</option>
-                      </select>
+                      />
                     </div>
                   </div>
                 ))}
