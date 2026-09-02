@@ -64,7 +64,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         customerInitial: pemesan.nama.charAt(0).toUpperCase(),
         guests: guestsCount,
         tripDate: new Date(pkg.bookingDate || '2026-05-22').toISOString(),
-        paymentMethod: 'Manual Transfer'
+        paymentMethod: 'Xendit Invoice'
       };
 
       if (providerProfile && providerProfile.role === 'CUSTOMER') {
@@ -75,6 +75,8 @@ export const CustomerConfirmationPage: React.FC = () => {
         method: 'POST',
         body: JSON.stringify(payload)
       });
+
+      const paymentUrl = response.paymentUrl || response.payment_url || `https://tripkita-production.up.railway.app/public/mock-checkout/${response.id}`;
 
       // Save into local history
       const existingHistoryStr = localStorage.getItem('tripkita_my_bookings') || '[]';
@@ -87,13 +89,19 @@ export const CustomerConfirmationPage: React.FC = () => {
         totalPrice: totalCost,
         guests: guestsCount,
         tripDate: pkg.bookingDate || '2026-05-22',
+        paymentUrl: paymentUrl,
         createdAt: new Date().toISOString()
       };
       
       history.unshift(newHistoryItem);
       localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
 
-      // Show Custom High-End Success Modal (No browser alert)
+      // Redirect straight to Xendit Payment Invoice URL!
+      if (paymentUrl) {
+        window.open(paymentUrl, '_blank');
+      }
+
+      // Show Custom High-End Success Modal
       setSuccessBookingCode(response.bookingCode || 'TK-OFFICIAL');
       setShowSuccessModal(true);
     } catch (err: any) {
@@ -163,7 +171,7 @@ export const CustomerConfirmationPage: React.FC = () => {
             {/* Payment Method Card */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
               <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-                Metode Pembayaran
+                Metode Pembayaran (Xendit Payment Gateway)
               </h2>
 
               <div style={{ backgroundColor: '#f0f9ff', borderRadius: '12px', padding: '18px', border: '1.5px solid #0284c7', display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -172,10 +180,10 @@ export const CustomerConfirmationPage: React.FC = () => {
                 </div>
                 <div>
                   <h4 style={{ fontSize: '14.5px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
-                    Transfer Bank (Bank OCBC)
+                    Pembayaran Otomatis Xendit (Bank OCBC, BCA, QRIS, E-Wallet)
                   </h4>
                   <p style={{ fontSize: '13px', color: '#0369a1', margin: 0, fontWeight: '600' }}>
-                    Bank OCBC — Rekening: 693800143473 a.n. TripKita
+                    Otomatis Terverifikasi 24/7 • Tanpa Perlu Unggah Bukti Bayar
                   </p>
                 </div>
               </div>
@@ -401,7 +409,7 @@ export const CustomerConfirmationPage: React.FC = () => {
             </div>
 
             <p style={{ fontSize: '14px', color: '#475569', lineHeight: '1.6', margin: '0 0 26px 0' }}>
-              Pemesanan paket <strong style={{ color: '#0f172a' }}>{pkg.name}</strong> berhasil dikonfirmasi! Silakan lakukan transfer pembayaran ke <strong>Bank OCBC</strong> dan unggah bukti transfer di halaman Cek Booking.
+              Invoice pembayaran Xendit untuk paket <strong style={{ color: '#0f172a' }}>{pkg.name}</strong> telah diterbitkan! Silakan selesaikan pembayaran via <strong>Bank OCBC (Virtual Account), QRIS, atau E-Wallet</strong>. Sistem akan memverifikasi secara otomatis 24/7 tanpa perlu unggah bukti transfer.
             </p>
 
             <button
@@ -423,7 +431,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                 transition: 'all 0.2s'
               }}
             >
-              Lihat Riwayat & Upload Bukti Transfer
+              Cek Riwayat Pemesanan
             </button>
 
           </div>
