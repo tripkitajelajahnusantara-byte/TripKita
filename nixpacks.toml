@@ -1,8 +1,0 @@
-[providers]
-providers = ["go"]
-
-[build]
-cmds = ["cd backend && go build -o app main.go"]
-
-[start]
-cmd = "cd backend && ./app"
