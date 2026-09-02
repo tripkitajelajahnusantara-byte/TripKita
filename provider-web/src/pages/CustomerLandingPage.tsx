@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
+import { getTripImage } from '../utils/tripImages';
 import { Search, ShieldCheck, CreditCard, Headset, ThumbsUp, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight } from 'lucide-react';
 import heroImage from '../assets/hero.jpg';
 
@@ -270,42 +271,8 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  // 100% Unique & Authentic high quality image per package (0 duplicates)
-  const getImageUrl = (_pkgId: number, name: string, category: string) => {
-    const nameLower = name.toLowerCase();
-    if (nameLower.includes('bromo')) {
-      return 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=800&q=80';
-    }
-    if (nameLower.includes('tidung')) {
-      return 'https://images.unsplash.com/photo-1506953711105-89bf2347e221?auto=format&fit=crop&w=800&q=80';
-    }
-    if (nameLower.includes('cilember')) {
-      return 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=800&q=80';
-    }
-    if (nameLower.includes('bandung')) {
-      return 'https://images.unsplash.com/photo-1584810359583-96fc3448beaa?auto=format&fit=crop&w=800&q=80';
-    }
-    if (nameLower.includes('ranu') || nameLower.includes('kumbolo')) {
-      return 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80';
-    }
-    if (nameLower.includes('baduy')) {
-      return 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80';
-    }
-    if (nameLower.includes('tanjung karang') || nameLower.includes('palu')) {
-      return 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80';
-    }
-    if (nameLower.includes('yogyakarta') || nameLower.includes('jogja')) {
-      return 'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?auto=format&fit=crop&w=800&q=80';
-    }
-    
-    // Category fallbacks
-    if (category.toLowerCase().includes('gunung')) {
-      return 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80';
-    }
-    if (category.toLowerCase().includes('pantai')) {
-      return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80';
-    }
-    return 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80';
+  const getImageUrl = (pkgId: number, name: string, category: string) => {
+    return getTripImage(pkgId, name, category);
   };
 
   const dateInputRef = React.useRef<HTMLInputElement>(null);
