@@ -94,19 +94,24 @@ export const CustomerHistoryPage: React.FC = () => {
           // Fetch live status for each local booking code
           const liveBookings = await Promise.all(
             localItems.map(async (item: any) => {
+              let created = item.createdAt;
+              if (!created || isNaN(new Date(created).getTime())) {
+                created = new Date().toISOString();
+              }
               try {
                 const liveData = await request(`/public/bookings/status/${item.bookingCode}`);
-                return liveData;
+                return {
+                  ...item,
+                  ...liveData,
+                  status: liveData.status || item.status || 'PENDING_PAYMENT',
+                  createdAt: liveData.createdAt || created
+                };
               } catch (e) {
                 // If not found in DB or error, fallback to local item structure
                 return {
-                  bookingCode: item.bookingCode,
-                  packageName: item.packageName,
-                  totalPrice: item.totalPrice,
-                  guests: item.guests,
-                  tripDate: item.tripDate,
-                  status: 'PENDING_PAYMENT',
-                  createdAt: item.createdAt
+                  ...item,
+                  status: item.status || 'PENDING_PAYMENT',
+                  createdAt: created
                 };
               }
             })
@@ -406,7 +411,9 @@ export const CustomerHistoryPage: React.FC = () => {
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                       <span style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>{booking.bookingCode}</span>
                       <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                        {new Date(booking.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                        {booking.createdAt && !isNaN(new Date(booking.createdAt).getTime()) 
+                          ? new Date(booking.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+                          : ''}
                       </span>
                     </div>
                     <span 

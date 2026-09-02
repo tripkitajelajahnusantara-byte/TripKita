@@ -71,8 +71,9 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   const handleSimulatePayment = async () => {
     setSimulating(true);
     try {
-      if (booking.id) {
-        await request(`/public/bookings/${booking.id}/status`, {
+      const targetId = booking.bookingCode || booking.id;
+      if (targetId) {
+        await request(`/public/bookings/${targetId}/status`, {
           method: 'PUT',
           body: JSON.stringify({ status: 'PAID' })
         }).catch(() => {});
@@ -90,6 +91,39 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
       localStorage.setItem('tripkita_my_bookings', JSON.stringify(updatedHistory));
 
       // Redirect straight to Cek Booking with PAID status!
+      navigateTo('riwayat-booking');
+    } catch (err) {
+      console.error(err);
+      navigateTo('riwayat-booking');
+    } finally {
+      setSimulating(false);
+    }
+  };
+
+  // Simulate Timer Expired (Sandbox Test)
+  const handleSimulateExpired = async () => {
+    setSimulating(true);
+    try {
+      const targetId = booking.bookingCode || booking.id;
+      if (targetId) {
+        await request(`/public/bookings/${targetId}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({ status: 'EXPIRED' })
+        }).catch(() => {});
+      }
+
+      // Update local storage history
+      const existingStr = localStorage.getItem('tripkita_my_bookings') || '[]';
+      const history = JSON.parse(existingStr);
+      const updatedHistory = history.map((item: any) => {
+        if (item.id === booking.id || item.bookingCode === booking.bookingCode) {
+          return { ...item, status: 'EXPIRED' };
+        }
+        return item;
+      });
+      localStorage.setItem('tripkita_my_bookings', JSON.stringify(updatedHistory));
+
+      // Redirect straight to Cek Booking with EXPIRED status!
       navigateTo('riwayat-booking');
     } catch (err) {
       console.error(err);
@@ -225,21 +259,41 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
                   onClick={handleSimulatePayment}
                   disabled={simulating}
                   style={{
-                    backgroundColor: '#0284c7',
+                    backgroundColor: '#10b981',
                     color: '#ffffff',
                     border: 'none',
                     padding: '12px 24px',
-                    fontSize: '14.5px',
+                    fontSize: '14px',
                     fontWeight: '700',
                     borderRadius: '10px',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px'
                   }}
                 >
-                  ⚡ {simulating ? 'Memproses Simulasi...' : 'Simulasi Bayar Sekarang (1-Click Test)'}
+                  ⚡ {simulating ? 'Memproses...' : 'Simulasi Bayar Lunas (LUNAS / PAID)'}
+                </button>
+
+                <button 
+                  onClick={handleSimulateExpired}
+                  disabled={simulating}
+                  style={{
+                    backgroundColor: '#fee2e2',
+                    color: '#ef4444',
+                    border: '1px solid #fca5a5',
+                    padding: '12px 20px',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  ❌ {simulating ? 'Memproses...' : 'Simulasi Waktu Habis (EXPIRED)'}
                 </button>
 
                 {booking.paymentUrl && (

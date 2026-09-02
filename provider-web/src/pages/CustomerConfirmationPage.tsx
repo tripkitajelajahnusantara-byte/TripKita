@@ -95,6 +95,8 @@ export const CustomerConfirmationPage: React.FC = () => {
         body: JSON.stringify(payload)
       }).catch(() => null);
 
+      const nowIso = new Date().toISOString();
+
       if (response && response.id) {
         bookingObj = {
           id: response.id,
@@ -103,6 +105,8 @@ export const CustomerConfirmationPage: React.FC = () => {
           totalPrice: totalCost,
           guests: guestsCount,
           tripDate: pkg.bookingDate || '22 Mei 2026',
+          createdAt: response.createdAt || nowIso,
+          status: response.status || 'PENDING_PAYMENT',
           vaNumber: '8839001434739102',
           bankName: 'Bank OCBC',
           paymentUrl: response.paymentUrl || ''
@@ -117,6 +121,8 @@ export const CustomerConfirmationPage: React.FC = () => {
           totalPrice: totalCost,
           guests: guestsCount,
           tripDate: pkg.bookingDate || '22 Mei 2026',
+          createdAt: nowIso,
+          status: 'PENDING_PAYMENT',
           vaNumber: '8839001434739102',
           bankName: 'Bank OCBC',
           paymentUrl: ''
@@ -134,7 +140,7 @@ export const CustomerConfirmationPage: React.FC = () => {
       navigateTo('halaman-pembayaran');
     } catch (err: any) {
       console.error(err);
-      // Fallback redirect even on error
+      const nowIso = new Date().toISOString();
       const randomCode = `TK-${Math.floor(Math.random() * 90000 + 10000)}`;
       const fallbackObj = {
         id: Date.now(),
@@ -143,6 +149,8 @@ export const CustomerConfirmationPage: React.FC = () => {
         totalPrice: totalCost,
         guests: guestsCount,
         tripDate: pkg.bookingDate || '22 Mei 2026',
+        createdAt: nowIso,
+        status: 'PENDING_PAYMENT',
         vaNumber: '8839001434739102',
         bankName: 'Bank OCBC',
         paymentUrl: ''
