@@ -303,17 +303,17 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '40px', fontFamily: 'Inter, sans-serif' }}>
       
-      {/* Hero Section with hero.jpg background & crisp soft gradient for text readability */}
+      {/* Hero Section with vivid hero.jpg background & elegant text contrast */}
       <div 
         className="hero-section"
         style={{
           position: 'relative',
-          backgroundImage: `linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(239, 246, 255, 0.85) 55%, rgba(255, 255, 255, 0.3) 100%), url(${heroImage})`,
+          backgroundImage: `linear-gradient(to right, rgba(15, 23, 42, 0.75) 0%, rgba(15, 23, 42, 0.45) 45%, rgba(15, 23, 42, 0.1) 80%), url(${heroImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center 30%',
           minHeight: '420px',
           height: 'auto',
-          color: '#0f172a',
+          color: '#ffffff',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -322,11 +322,11 @@ const DEFAULT_PACKAGES: TripPackage[] = [
         }}
       >
         <div style={{ width: '100%', maxWidth: '1120px', zIndex: 2, textAlign: 'left' }}>
-          <h1 className="hero-title" style={{ fontSize: 'clamp(24px, 5vw, 44px)', fontWeight: '800', marginBottom: '16px', lineHeight: '1.2', color: '#0f172a', letterSpacing: '-0.5px' }}>
+          <h1 className="hero-title" style={{ fontSize: 'clamp(24px, 5vw, 44px)', fontWeight: '800', marginBottom: '16px', lineHeight: '1.2', color: '#ffffff', letterSpacing: '-0.5px', textShadow: '0 2px 10px rgba(0, 0, 0, 0.4)' }}>
             Cari Open Trip <br />
             Indonesia dengan Mudah
           </h1>
-          <p style={{ fontSize: 'clamp(14px, 2.5vw, 16px)', color: '#1e293b', marginBottom: '24px', fontWeight: 600, maxWidth: '500px', lineHeight: '1.5', backgroundColor: 'rgba(255, 255, 255, 0.65)', padding: '8px 12px', borderRadius: '8px', backdropFilter: 'blur(4px)' }}>
+          <p style={{ fontSize: 'clamp(14px, 2.5vw, 16.5px)', color: '#f1f5f9', marginBottom: '24px', fontWeight: 600, maxWidth: '500px', lineHeight: '1.5', textShadow: '0 1px 6px rgba(0, 0, 0, 0.5)' }}>
             Temukan berbagai open trip seru dan tour guide terpercaya di seluruh Indonesia.
           </p>
           <button 
