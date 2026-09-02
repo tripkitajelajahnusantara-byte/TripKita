@@ -86,39 +86,23 @@ export const CustomerHistoryPage: React.FC = () => {
         const data = await request('/customer/bookings');
         setBookings(data || []);
       } else {
-        // Guest customer: fetch from localStorage and fetch live statuses
-        const localHistoryStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-        const localItems = JSON.parse(localHistoryStr);
-        
-        if (localItems.length > 0) {
-          // Fetch live status for each local booking code
-          const liveBookings = await Promise.all(
-            localItems.map(async (item: any) => {
-              let created = item.createdAt;
-              if (!created || isNaN(new Date(created).getTime())) {
-                created = new Date().toISOString();
-              }
-              try {
-                const liveData = await request(`/public/bookings/status/${item.bookingCode}`);
-                return {
-                  ...item,
-                  ...liveData,
-                  status: liveData.status || item.status || 'PENDING_PAYMENT',
-                  createdAt: liveData.createdAt || created
-                };
-              } catch (e) {
-                // If not found in DB or error, fallback to local item structure
-                return {
-                  ...item,
-                  status: item.status || 'PENDING_PAYMENT',
-                  createdAt: created
-                };
-              }
-            })
-          );
-          setBookings(liveBookings);
-        } else {
-          setBookings([]);
+        // Guest customer: do NOT automatically display old history from previous sessions
+        setBookings([]);
+
+        // Check if user JUST placed a booking in this active session
+        try {
+          const recentStr = sessionStorage.getItem('tripkita_recent_guest_booking');
+          if (recentStr) {
+            const recentObj = JSON.parse(recentStr);
+            if (recentObj && recentObj.bookingCode) {
+              setSearchCode(recentObj.bookingCode);
+              // Auto-track status live from database for this active session booking
+              const liveData = await request(`/public/bookings/status/${recentObj.bookingCode}`).catch(() => recentObj);
+              setTrackedBooking(liveData || recentObj);
+            }
+          }
+        } catch (e) {
+          console.error(e);
         }
       }
     } catch (err) {
@@ -364,9 +348,9 @@ export const CustomerHistoryPage: React.FC = () => {
           )}
         </div>
 
-        {/* History List */}
+        {/* History List Header */}
         <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', marginBottom: '20px' }}>
-          Riwayat Pemesanan Anda
+          {providerProfile && providerProfile.role === 'CUSTOMER' ? 'Riwayat Pemesanan Akun Anda' : 'Detail Status Pemesanan Tiket'}
         </h1>
 
         {loading ? (
@@ -374,16 +358,33 @@ export const CustomerHistoryPage: React.FC = () => {
             <p>Sedang memuat riwayat pesanan...</p>
           </div>
         ) : bookings.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#64748b' }}>
-            <Calendar size={48} color="#cbd5e1" style={{ marginBottom: '16px' }} />
-            <h3 style={{ color: '#0f172a', fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>Belum Ada Riwayat Pemesanan</h3>
-            <p style={{ fontSize: '14px', margin: 0 }}>Pesanan yang Anda beli akan tercatat secara otomatis di sini.</p>
-            <button 
-              onClick={() => navigateTo('beranda')}
-              style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#00a896', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
-            >
-              Cari Paket Wisata
-            </button>
+          <div style={{ textAlign: 'center', padding: '50px 24px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#64748b' }}>
+            <Calendar size={44} color="#007bff" style={{ marginBottom: '14px' }} />
+            <h3 style={{ color: '#0f172a', fontSize: '16px', fontWeight: '800', marginBottom: '6px' }}>
+              {providerProfile ? 'Belum Ada Pemesanan Terdaftar' : 'Melacak Tiket Pesanan (Mode Tamu)'}
+            </h3>
+            <p style={{ fontSize: '13.5px', maxWidth: '500px', margin: '0 auto 20px auto', lineHeight: '1.5' }}>
+              {providerProfile 
+                ? 'Anda belum memiliki riwayat transaksi di akun ini.' 
+                : 'Anda saat ini mengakses tanpa akun. Masukkan Kode Booking yang telah Anda salin pada kolom pencarian di atas untuk melacak pesanan Anda.'}
+            </p>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {!providerProfile && (
+                <button 
+                  onClick={() => navigateTo('masuk' as any)}
+                  style={{ padding: '11px 22px', backgroundColor: '#007bff', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: '700', fontSize: '13.5px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,123,255,0.25)' }}
+                >
+                  🔑 Masuk ke Akun Saya
+                </button>
+              )}
+              <button 
+                onClick={() => navigateTo('beranda')}
+                style={{ padding: '11px 22px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '10px', fontWeight: '700', fontSize: '13.5px', cursor: 'pointer' }}
+              >
+                Cari Paket Wisata
+              </button>
+            </div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

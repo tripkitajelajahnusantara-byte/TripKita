@@ -129,11 +129,12 @@ export const CustomerConfirmationPage: React.FC = () => {
         };
       }
 
-      // Save into local history
+      // Save into local history and sessionStorage for active session guest tracking
       const existingHistoryStr = localStorage.getItem('tripkita_my_bookings') || '[]';
       const history = JSON.parse(existingHistoryStr);
       history.unshift(bookingObj);
       localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
+      sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
       // Set for invoice page and navigate!
       setSelectedBookingForInvoice(bookingObj);
