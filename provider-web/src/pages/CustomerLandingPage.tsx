@@ -79,14 +79,158 @@ export const CustomerLandingPage: React.FC = () => {
     navigateTo('cari-trip');
   };
 
+const DEFAULT_PACKAGES: TripPackage[] = [
+  {
+    id: 1,
+    providerId: 1,
+    name: "Open Trip Gunung Bromo",
+    destination: "Probolinggo, Jawa Timur",
+    category: "Gunung",
+    tripType: "Open Trip",
+    price: 350000,
+    quotaMin: 5,
+    quotaUsed: 3,
+    quotaMax: 15,
+    startDate: "2026-05-22",
+    endDate: "2026-05-24",
+    schedule: "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+    status: "Aktif",
+    rating: 4.8
+  },
+  {
+    id: 2,
+    providerId: 1,
+    name: "Open Trip Pulau Tidung",
+    destination: "Kepulauan Seribu, Jakarta",
+    category: "Pantai",
+    tripType: "Open Trip",
+    price: 450000,
+    quotaMin: 4,
+    quotaUsed: 2,
+    quotaMax: 12,
+    startDate: "2026-05-22",
+    endDate: "2026-05-24",
+    schedule: "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+    status: "Aktif",
+    rating: 4.7
+  },
+  {
+    id: 3,
+    providerId: 1,
+    name: "Trip Curug Cilember",
+    destination: "Bogor, Jawa Barat",
+    category: "Curug",
+    tripType: "Open Trip",
+    price: 275000,
+    quotaMin: 5,
+    quotaUsed: 4,
+    quotaMax: 10,
+    startDate: "2026-05-22",
+    endDate: "2026-05-23",
+    schedule: "22 Mei 2026 - 23 Mei 2026 (2 Hari)",
+    status: "Aktif",
+    rating: 4.6
+  },
+  {
+    id: 4,
+    providerId: 1,
+    name: "Bandung City Tour",
+    destination: "Bandung, Jawa Barat",
+    category: "City Tour",
+    tripType: "Open Trip",
+    price: 420000,
+    quotaMin: 4,
+    quotaUsed: 3,
+    quotaMax: 15,
+    startDate: "2026-05-22",
+    endDate: "2026-05-24",
+    schedule: "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+    status: "Aktif",
+    rating: 4.9
+  },
+  {
+    id: 5,
+    providerId: 1,
+    name: "Wisata Budaya Suku Baduy",
+    destination: "Lebak, Banten",
+    category: "Budaya",
+    tripType: "Open Trip",
+    price: 380000,
+    quotaMin: 5,
+    quotaUsed: 2,
+    quotaMax: 15,
+    startDate: "2026-05-22",
+    endDate: "2026-05-24",
+    schedule: "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+    status: "Aktif",
+    rating: 4.8
+  },
+  {
+    id: 6,
+    providerId: 1,
+    name: "Open Trip Ranu Kumbolo",
+    destination: "Malang, Jawa Timur",
+    category: "Gunung",
+    tripType: "Open Trip",
+    price: 550000,
+    quotaMin: 6,
+    quotaUsed: 4,
+    quotaMax: 15,
+    startDate: "2026-05-22",
+    endDate: "2026-05-25",
+    schedule: "22 Mei 2026 - 25 Mei 2026 (4 Hari)",
+    status: "Aktif",
+    rating: 4.9
+  },
+  {
+    id: 7,
+    providerId: 1,
+    name: "Wisata Pantai Tanjung Karang Palu",
+    destination: "Palu, Sulawesi Tengah",
+    category: "Pantai",
+    tripType: "Open Trip",
+    price: 850000,
+    quotaMin: 4,
+    quotaUsed: 2,
+    quotaMax: 10,
+    startDate: "2026-05-22",
+    endDate: "2026-05-25",
+    schedule: "22 Mei 2026 - 25 Mei 2026 (4 Hari)",
+    status: "Aktif",
+    rating: 4.7
+  },
+  {
+    id: 8,
+    providerId: 1,
+    name: "Yogyakarta City Tour",
+    destination: "Yogyakarta, DI Yogyakarta",
+    category: "City Tour",
+    tripType: "Open Trip",
+    price: 490000,
+    quotaMin: 4,
+    quotaUsed: 3,
+    quotaMax: 15,
+    startDate: "2026-05-22",
+    endDate: "2026-05-24",
+    schedule: "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+    status: "Aktif",
+    rating: 4.8
+  }
+];
+
   useEffect(() => {
     const fetchPackages = async () => {
       try {
         const data = await request('/public/packages');
-        const activePkgs = data.filter((p: TripPackage) => p.status === 'Aktif');
-        setPackages(activePkgs);
+        if (Array.isArray(data) && data.length > 0) {
+          const activePkgs = data.filter((p: TripPackage) => p.status === 'Aktif');
+          setPackages(activePkgs.length > 0 ? activePkgs : DEFAULT_PACKAGES);
+        } else {
+          setPackages(DEFAULT_PACKAGES);
+        }
       } catch (err) {
         console.error('Failed to load packages:', err);
+        setPackages(DEFAULT_PACKAGES);
       } finally {
         setLoading(false);
       }
