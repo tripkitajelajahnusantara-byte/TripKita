@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -19,7 +20,14 @@ var DB *gorm.DB
 func ConnectDB(cfg *config.Config) {
 	var dsn string
 	if cfg.DatabaseURL != "" {
-		dsn = cfg.DatabaseURL
+		rawUrl := cfg.DatabaseURL
+		// Auto encode '#' in password before @ to avoid URL parse errors
+		if strings.Contains(rawUrl, "#") && strings.Contains(rawUrl, "@") {
+			parts := strings.SplitN(rawUrl, "@", 2)
+			userInfo := strings.ReplaceAll(parts[0], "#", "%23")
+			rawUrl = userInfo + "@" + parts[1]
+		}
+		dsn = rawUrl
 	} else {
 		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 			cfg.DBHost, cfg.DBUser, cfg.DBPass, cfg.DBName, cfg.DBPort, cfg.DBSSLMode)
