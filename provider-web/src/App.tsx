@@ -20,6 +20,7 @@ import { CustomerLoginPage } from './pages/CustomerLoginPage';
 import { ProviderLandingPage } from './pages/ProviderLandingPage';
 import { CustomerSearchPage } from './pages/CustomerSearchPage';
 import { CustomerConfirmationPage } from './pages/CustomerConfirmationPage';
+import { CustomerPaymentInvoicePage } from './pages/CustomerPaymentInvoicePage';
 import { ProviderFinancePage } from './pages/ProviderFinancePage';
 
 const AppContent: React.FC = () => {
@@ -112,6 +113,15 @@ const AppContent: React.FC = () => {
       <div className="app-wrapper">
         <Header />
         <CustomerConfirmationPage />
+        <Footer />
+      </div>
+    );
+  }
+  if (route === 'halaman-pembayaran') {
+    return (
+      <div className="app-wrapper">
+        <Header />
+        <CustomerPaymentInvoicePage />
         <Footer />
       </div>
     );

@@ -18,7 +18,8 @@ export type Route =
   | 'partner-landing'
   | 'cari-trip'
   | 'keuangan-provider'
-  | 'customer-confirmation';
+  | 'customer-confirmation'
+  | 'halaman-pembayaran';
 
 export interface Booking {
   id: string;
