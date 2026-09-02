@@ -94,8 +94,8 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 		}
 	}
 
-	platformFee := totalEarnings * 0.14
-	netEarnings := totalEarnings * 0.86
+	platformFee := totalEarnings * 0.15
+	netEarnings := totalEarnings * 0.85
 
 	// Available DP is 50% of provider net earnings (86%) minus already requested/paid DP
 	availableDP := (netEarnings * 0.5) - totalPaidOut - pendingPayout

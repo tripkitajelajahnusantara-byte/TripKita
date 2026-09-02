@@ -140,7 +140,7 @@ export const ProviderFinancePage: React.FC = () => {
         {/* 4 Summary Cards Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px' }}>
           
-          {/* Card 1: Total Pendapatan Bersih (86%) */}
+          {/* Card 1: Total Pendapatan Bersih (85%) */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '22px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -154,7 +154,7 @@ export const ProviderFinancePage: React.FC = () => {
               {formatIDR(summary?.netEarnings || 0)}
             </strong>
             <span style={{ fontSize: '11.5px', color: '#16a34a', fontWeight: '600' }}>
-              86% Net Share (Omset Kotor: {formatIDR(summary?.totalEarnings || 0)})
+              85% Net Share (Omset Kotor: {formatIDR(summary?.totalEarnings || 0)})
             </span>
           </div>
 
@@ -171,14 +171,14 @@ export const ProviderFinancePage: React.FC = () => {
             <strong style={{ fontSize: '20px', fontWeight: '800', color: '#0284c7', display: 'block', marginBottom: '4px' }}>
               {formatIDR(summary?.availableDp || 0)}
             </strong>
-            <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '600' }}>Bisa dicairkan sekarang</span>
+            <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '600' }}>Bisa dicairkan sekarang (Awal)</span>
           </div>
 
           {/* Card 3: Saldo Pelunasan 50% (Held) */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '22px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Pelunasan 50% (Tertahan)
+                Pelunasan 50% (Akhir Trip)
               </span>
               <div style={{ backgroundColor: '#fef3c7', padding: '6px', borderRadius: '8px' }}>
                 <Lock size={18} color="#d97706" />
@@ -190,11 +190,11 @@ export const ProviderFinancePage: React.FC = () => {
             <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '600' }}>Dicairkan setelah trip selesai</span>
           </div>
 
-          {/* Card 4: Fee Platform TripKita 14% */}
+          {/* Card 4: Fee Platform TripKita 15% */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '22px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Komisi TripKita (14%)
+                Komisi TripKita (15%)
               </span>
               <div style={{ backgroundColor: '#f1f5f9', padding: '6px', borderRadius: '8px' }}>
                 <CheckCircle2 size={18} color="#475569" />
@@ -203,7 +203,7 @@ export const ProviderFinancePage: React.FC = () => {
             <strong style={{ fontSize: '20px', fontWeight: '800', color: '#64748b', display: 'block', marginBottom: '4px' }}>
               {formatIDR(summary?.platformFee || 0)}
             </strong>
-            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Potongan biaya platform 14%</span>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Potongan biaya platform 15%</span>
           </div>
 
         </div>
