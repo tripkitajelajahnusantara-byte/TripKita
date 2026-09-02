@@ -100,12 +100,14 @@ export const CustomerSearchPage: React.FC = () => {
   });
 
   // Dynamic sorting based on dropdown selection
-  if (sortBy === 'Termahal') {
+  if (sortBy === 'Terpopuler') {
+    processedPackages.sort((a, b) => (b.quotaUsed || 0) - (a.quotaUsed || 0));
+  } else if (sortBy === 'Rating Tertinggi') {
+    processedPackages.sort((a, b) => (b.rating || 4.8) - (a.rating || 4.8));
+  } else if (sortBy === 'Termahal') {
     processedPackages.sort((a, b) => b.price - a.price);
   } else if (sortBy === 'Termurah') {
     processedPackages.sort((a, b) => a.price - b.price);
-  } else if (sortBy === 'Rating Tertinggi') {
-    processedPackages.sort((a, b) => (b.rating || 4.8) - (a.rating || 4.8));
   } else if (searchParams.date) {
     // Sort by closest start date to user selected date
     const targetTime = new Date(searchParams.date).getTime();
@@ -140,7 +142,7 @@ export const CustomerSearchPage: React.FC = () => {
         </button>
 
         {/* Top Header Result Bar with Single Sort Dropdown */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', flexWrap: 'wrap', gap: '14px' }}>
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
               Daftar Paket Open Trip
@@ -151,8 +153,8 @@ export const CustomerSearchPage: React.FC = () => {
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', whiteSpace: 'nowrap' }}>
               Urutkan berdasarkan:
             </label>
             <select 
@@ -168,13 +170,15 @@ export const CustomerSearchPage: React.FC = () => {
                 backgroundColor: '#ffffff',
                 outline: 'none',
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(0,123,255,0.08)'
+                boxShadow: '0 2px 4px rgba(0,123,255,0.08)',
+                maxWidth: '100%'
               }}
             >
               <option value="Rekomendasi">Rekomendasi</option>
-              <option value="Termahal">Termahal</option>
-              <option value="Termurah">Termurah</option>
+              <option value="Terpopuler">Terpopuler (Paling Sering Dipesan)</option>
               <option value="Rating Tertinggi">Rating Tertinggi</option>
+              <option value="Termurah">Termurah</option>
+              <option value="Termahal">Termahal</option>
             </select>
           </div>
         </div>
@@ -327,6 +331,11 @@ export const CustomerSearchPage: React.FC = () => {
         .search-card-item:hover {
           box-shadow: 0 8px 24px rgba(0,0,0,0.06) !important;
           border-color: #007bff !important;
+        }
+        @media (max-width: 768px) {
+          .search-card-item {
+            grid-template-columns: 1fr !important;
+          }
         }
       `}</style>
     </div>

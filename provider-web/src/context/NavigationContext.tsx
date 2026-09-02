@@ -140,11 +140,38 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     type: 'Semua Tipe',
     category: 'Semua Kategori'
   });
-  const [bookingFormData, setBookingFormData] = useState<{
+  const [bookingFormData, setBookingFormDataState] = useState<{
     pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string }>;
+    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
-  } | null>(null);
+  } | null>(() => {
+    try {
+      const saved = sessionStorage.getItem('tripkita_booking_form_data');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const setBookingFormData: React.Dispatch<React.SetStateAction<{
+    pemesan: { nama: string; email: string; whatsapp: string };
+    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
+    selectedAddOns?: Array<{ id: string; name: string; price: number }>;
+  } | null>> = (valueOrFn) => {
+    setBookingFormDataState((prev) => {
+      const next = typeof valueOrFn === 'function' ? (valueOrFn as any)(prev) : valueOrFn;
+      try {
+        if (next) {
+          sessionStorage.setItem('tripkita_booking_form_data', JSON.stringify(next));
+        } else {
+          sessionStorage.removeItem('tripkita_booking_form_data');
+        }
+      } catch (e) {
+        console.error('Failed to save to sessionStorage', e);
+      }
+      return next;
+    });
+  };
   const [registerData, setRegisterData] = useState<RegisterData>({
     businessName: '',
     businessCategory: '',

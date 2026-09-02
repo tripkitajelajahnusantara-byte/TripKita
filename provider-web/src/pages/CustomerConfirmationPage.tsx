@@ -200,27 +200,44 @@ export const CustomerConfirmationPage: React.FC = () => {
                 Daftar Peserta Trip ({guestsCount} Orang)
               </h2>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {peserta.map((p: any, idx: number) => (
-                  <div key={idx} style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '800', color: '#0284c7' }}>
+                  <div key={idx} style={{ backgroundColor: '#ffffff', borderRadius: '14px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '800', color: '#0284c7' }}>
                         Peserta {idx + 1}
                       </span>
-                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a', backgroundColor: '#e2e8f0', padding: '2px 8px', borderRadius: '6px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>
                         Umur: {calculateAge(p.tanggalLahir)}
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
                       <div>
-                        <strong style={{ fontSize: '14.5px', color: '#0f172a', display: 'block' }}>{p.nama}</strong>
-                        <span style={{ fontSize: '12.5px', color: '#64748b' }}>HP: {p.hp || '-'} • Gender: {p.gender}</span>
+                        <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nama Lengkap</span>
+                        <strong style={{ fontSize: '14px', color: '#0f172a' }}>{p.nama || '-'}</strong>
                       </div>
 
-                      <div style={{ textAlign: 'right', fontSize: '12.5px', color: '#475569' }}>
-                        <div>Tgl Lahir: <strong style={{ color: '#0f172a' }}>{p.tanggalLahir || '-'}</strong></div>
-                        <div>Penyakit: <strong style={{ color: p.riwayatPenyakit && p.riwayatPenyakit !== 'Tidak Ada' ? '#ef4444' : '#10b981' }}>{p.riwayatPenyakit || 'Tidak Ada'}</strong></div>
+                      <div>
+                        <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nomor HP / WhatsApp</span>
+                        <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.hp || '-'}</span>
+                      </div>
+
+                      <div>
+                        <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Jenis Kelamin</span>
+                        <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.gender || '-'}</span>
+                      </div>
+
+                      <div>
+                        <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Tanggal Lahir</span>
+                        <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.tanggalLahir || '-'}</span>
+                      </div>
+
+                      <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #f1f5f9', paddingTop: '10px' }}>
+                        <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Riwayat Penyakit & Alergi</span>
+                        <span style={{ fontSize: '13.5px', fontWeight: '600', color: p.riwayatPenyakit && p.riwayatPenyakit !== 'Tidak Ada' ? '#ef4444' : '#10b981' }}>
+                          {p.riwayatPenyakit || 'Tidak Ada'}
+                        </span>
                       </div>
                     </div>
                   </div>

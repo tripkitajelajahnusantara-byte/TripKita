@@ -11,36 +11,53 @@ interface Participant {
 }
 
 export const CustomerBookingPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, providerProfile, setBookingFormData } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, providerProfile, bookingFormData, setBookingFormData } = useNavigation();
 
   // Check if user is logged in
   const isLoggedIn = !!(providerProfile && providerProfile.email);
 
-  // Data Pemesan State
-  const [pemesanName, setPemesanName] = useState('');
-  const [pemesanEmail, setPemesanEmail] = useState('');
-  const [pemesanPhone, setPemesanPhone] = useState('');
-  const [pemesanBirthDate, setPemesanBirthDate] = useState('1998-05-15');
-  const [pemesanGender, setPemesanGender] = useState('Laki-laki');
+  // Data Pemesan State - initialize from bookingFormData if available, else defaults/profile
+  const [pemesanName, setPemesanName] = useState(() => bookingFormData?.pemesan?.nama || providerProfile?.picName || providerProfile?.businessName || '');
+  const [pemesanEmail, setPemesanEmail] = useState(() => bookingFormData?.pemesan?.email || providerProfile?.email || '');
+  const [pemesanPhone, setPemesanPhone] = useState(() => bookingFormData?.pemesan?.whatsapp || providerProfile?.whatsapp || '');
+  const [pemesanBirthDate, setPemesanBirthDate] = useState(() => bookingFormData?.peserta?.[0]?.tanggalLahir || '1998-05-15');
+  const [pemesanGender, setPemesanGender] = useState(() => bookingFormData?.peserta?.[0]?.gender || 'Laki-laki');
 
   // Checkbox state: Peserta 1 sama dengan Pemesan
-  const [isSameAsPemesan, setIsSameAsPemesan] = useState(false);
+  const [isSameAsPemesan, setIsSameAsPemesan] = useState(() => {
+    if (bookingFormData?.peserta && bookingFormData.peserta.length > 0) {
+      const p0 = bookingFormData.peserta[0];
+      return p0.nama === bookingFormData.pemesan.nama && p0.hp === bookingFormData.pemesan.whatsapp;
+    }
+    return false;
+  });
 
   // Data Peserta Dynamic State
   const guestsCount = selectedPackageForDetail?.bookingGuests || 1;
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>(() => {
+    if (bookingFormData?.peserta && bookingFormData.peserta.length > 0) {
+      return bookingFormData.peserta.map(p => ({
+        nama: p.nama || '',
+        hp: p.hp || '',
+        gender: p.gender || 'Laki-laki',
+        tanggalLahir: p.tanggalLahir || '2000-01-01',
+        riwayatPenyakit: p.riwayatPenyakit || 'Tidak Ada'
+      }));
+    }
+    return [];
+  });
 
   // Validation Error States
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  // Auto-fill fields if user is logged in
+  // Auto-fill fields if user is logged in and form wasn't already filled
   useEffect(() => {
-    if (providerProfile) {
-      setPemesanName(providerProfile.picName || providerProfile.businessName || '');
-      setPemesanEmail(providerProfile.email || '');
-      setPemesanPhone(providerProfile.whatsapp || '');
+    if (providerProfile && !bookingFormData) {
+      if (!pemesanName) setPemesanName(providerProfile.picName || providerProfile.businessName || '');
+      if (!pemesanEmail) setPemesanEmail(providerProfile.email || '');
+      if (!pemesanPhone) setPemesanPhone(providerProfile.whatsapp || '');
     }
-  }, [providerProfile]);
+  }, [providerProfile, bookingFormData]);
 
   // Adjust participants array dynamically whenever guestsCount changes
   useEffect(() => {
@@ -49,8 +66,8 @@ export const CustomerBookingPage: React.FC = () => {
       if (updated.length < guestsCount) {
         for (let i = updated.length; i < guestsCount; i++) {
           updated.push({
-            nama: i === 0 && providerProfile ? (providerProfile.picName || '') : '',
-            hp: i === 0 && providerProfile ? (providerProfile.whatsapp || '') : '',
+            nama: i === 0 && providerProfile && !bookingFormData ? (providerProfile.picName || '') : '',
+            hp: i === 0 && providerProfile && !bookingFormData ? (providerProfile.whatsapp || '') : '',
             gender: 'Laki-laki',
             tanggalLahir: i === 0 ? pemesanBirthDate : '2000-01-01',
             riwayatPenyakit: 'Tidak Ada'
@@ -61,7 +78,7 @@ export const CustomerBookingPage: React.FC = () => {
       }
       return updated;
     });
-  }, [guestsCount, providerProfile]);
+  }, [guestsCount, providerProfile, bookingFormData]);
 
   // Sync Peserta 1 with Pemesan when checkbox is toggled or when pemesan data changes
   useEffect(() => {

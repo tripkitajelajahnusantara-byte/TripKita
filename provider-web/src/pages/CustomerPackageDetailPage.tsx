@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare } from 'lucide-react';
 
 interface AddOn {
   id: string;
@@ -18,6 +18,50 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   // Add-ons State
   const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
+
+  // Reviews & Rating State with Pagination
+  const [reviewsList, setReviewsList] = useState([
+    { id: 1, name: 'Budi Santoso', avatar: 'BS', rating: 5, date: '15 Mei 2026', comment: 'Pengalaman luar biasa di Bromo! Tour guidenya sangat membantu dan mengambil foto-foto yang ciamik banget.', verified: true },
+    { id: 2, name: 'Siti Rahmawati', avatar: 'SR', rating: 5, date: '10 Mei 2026', comment: 'Penjemputan tepat waktu, armada AC dingin, dan homestay sangat bersih. Pokoknya mantap TripKita!', verified: true },
+    { id: 3, name: 'Andi Wijaya', avatar: 'AW', rating: 4, date: '02 Mei 2026', comment: 'Perjalanan menyenangkan. Driver Jeep ramah banget, rekomendasi sarapan lokalnya mantap.', verified: true },
+    { id: 4, name: 'Dewi Lestari', avatar: 'DL', rating: 5, date: '28 April 2026', comment: 'Sunset dan sunrisenya spektakuler. Sangat cocok buat refreshing akhir pekan.', verified: true },
+    { id: 5, name: 'Rian Hidayat', avatar: 'RH', rating: 5, date: '20 April 2026', comment: 'Pelayanan ramah, tidak ada biaya tersembunyi. Nanti mau booking trip lain lagi di TripKita.', verified: true },
+    { id: 6, name: 'Maya Putri', avatar: 'MP', rating: 4, date: '12 April 2026', comment: 'Semua itinerary terlaksana sesuai jadwal. Pemandu lokalnya sangat berwawasan.', verified: true },
+    { id: 7, name: 'Fikri Pratama', avatar: 'FP', rating: 5, date: '05 April 2026', comment: 'Fasilitas sangat worth it dengan harganya. Top banget!', verified: true },
+  ]);
+
+  const [reviewPage, setReviewPage] = useState(1);
+  const reviewsPerPage = 3;
+  const totalReviewPages = Math.ceil(reviewsList.length / reviewsPerPage);
+  const currentReviews = reviewsList.slice((reviewPage - 1) * reviewsPerPage, reviewPage * reviewsPerPage);
+
+  // New review form state
+  const [newReviewName, setNewReviewName] = useState('');
+  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [newReviewComment, setNewReviewComment] = useState('');
+  const [reviewSubmittedNotice, setReviewSubmittedNotice] = useState(false);
+
+  const handleAddReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReviewName.trim() || !newReviewComment.trim()) return;
+
+    const newRev = {
+      id: Date.now(),
+      name: newReviewName,
+      avatar: newReviewName.slice(0, 2).toUpperCase(),
+      rating: newReviewRating,
+      date: 'Hari ini',
+      comment: newReviewComment,
+      verified: true
+    };
+
+    setReviewsList([newRev, ...reviewsList]);
+    setNewReviewName('');
+    setNewReviewComment('');
+    setNewReviewRating(5);
+    setReviewSubmittedNotice(true);
+    setTimeout(() => setReviewSubmittedNotice(false), 4000);
+  };
 
   if (!selectedPackageForDetail) {
     return (
@@ -485,6 +529,212 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     </label>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Ulasan & Rating Pengunjung Section (Paged) */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <MessageSquare size={18} color="#007bff" /> Ulasan & Rating Pengunjung
+                  </h2>
+                  <span style={{ fontSize: '13px', color: '#64748b' }}>
+                    Berdasarkan <strong>{reviewsList.length}</strong> ulasan wisatawan terverifikasi
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 14px', borderRadius: '30px' }}>
+                  <Star size={18} fill="#f59e0b" color="#f59e0b" />
+                  <span style={{ fontSize: '15px', fontWeight: '800', color: '#b45309' }}>
+                    {(reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)} / 5.0
+                  </span>
+                </div>
+              </div>
+
+              {/* Reviews List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+                {currentReviews.map((rev) => (
+                  <div key={rev.id} style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#007bff', color: '#ffffff', fontWeight: '700', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {rev.avatar}
+                        </div>
+                        <div>
+                          <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block' }}>{rev.name}</strong>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
+                            <CheckCircle2 size={12} /> Terverifikasi Pembeli
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end', marginBottom: '2px' }}>
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} size={13} fill={i < rev.rating ? '#f59e0b' : 'none'} color={i < rev.rating ? '#f59e0b' : '#cbd5e1'} />
+                          ))}
+                        </div>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>{rev.date}</span>
+                      </div>
+                    </div>
+
+                    <p style={{ fontSize: '13.5px', color: '#334155', margin: 0, lineHeight: '1.5' }}>
+                      "{rev.comment}"
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalReviewPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginBottom: '28px', flexWrap: 'wrap', gap: '10px' }}>
+                  <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
+                    Halaman {reviewPage} dari {totalReviewPages} ({reviewsList.length} Ulasan)
+                  </span>
+
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => setReviewPage(p => Math.max(1, p - 1))}
+                      disabled={reviewPage === 1}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        backgroundColor: reviewPage === 1 ? '#f1f5f9' : '#ffffff',
+                        color: reviewPage === 1 ? '#94a3b8' : '#0f172a',
+                        cursor: reviewPage === 1 ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <ChevronLeft size={14} /> Sebelumnya
+                    </button>
+
+                    {[...Array(totalReviewPages)].map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setReviewPage(idx + 1)}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          border: reviewPage === idx + 1 ? 'none' : '1px solid #cbd5e1',
+                          backgroundColor: reviewPage === idx + 1 ? '#007bff' : '#ffffff',
+                          color: reviewPage === idx + 1 ? '#ffffff' : '#0f172a',
+                          fontWeight: '700',
+                          fontSize: '12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {idx + 1}
+                      </button>
+                    ))}
+
+                    <button
+                      onClick={() => setReviewPage(p => Math.min(totalReviewPages, p + 1))}
+                      disabled={reviewPage === totalReviewPages}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        backgroundColor: reviewPage === totalReviewPages ? '#f1f5f9' : '#ffffff',
+                        color: reviewPage === totalReviewPages ? '#94a3b8' : '#0f172a',
+                        cursor: reviewPage === totalReviewPages ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      Berikutnya <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Add New Review Form */}
+              <div style={{ backgroundColor: '#f0f9ff', borderRadius: '14px', padding: '20px', border: '1px solid #bae6fd' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#0369a1', margin: '0 0 12px 0' }}>
+                  Tulis Ulasan & Rating Anda
+                </h3>
+
+                {reviewSubmittedNotice && (
+                  <div style={{ backgroundColor: '#dcfce7', border: '1px solid #86efac', color: '#15803d', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '700', marginBottom: '14px' }}>
+                    ✓ Ulasan Anda berhasil diterbitkan! Terima kasih atas masukan Anda.
+                  </div>
+                )}
+
+                <form onSubmit={handleAddReview} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                        Nama Anda <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input 
+                        type="text"
+                        placeholder="Nama Anda..."
+                        value={newReviewName}
+                        onChange={(e) => setNewReviewName(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                        Beri Rating
+                      </label>
+                      <div style={{ display: 'flex', gap: '4px', paddingTop: '6px' }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setNewReviewRating(star)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}
+                          >
+                            <Star size={20} fill={star <= newReviewRating ? '#f59e0b' : 'none'} color={star <= newReviewRating ? '#f59e0b' : '#cbd5e1'} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                      Komentar / Pengalaman <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <textarea 
+                      rows={3}
+                      placeholder="Bagikan pengalaman liburan Anda bersama TripKita..."
+                      value={newReviewComment}
+                      onChange={(e) => setNewReviewComment(e.target.value)}
+                      required
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      alignSelf: 'flex-start',
+                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)'
+                    }}
+                  >
+                    Kirim Ulasan
+                  </button>
+                </form>
               </div>
             </div>
 

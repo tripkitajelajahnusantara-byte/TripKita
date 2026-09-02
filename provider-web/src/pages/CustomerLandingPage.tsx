@@ -305,26 +305,28 @@ const DEFAULT_PACKAGES: TripPackage[] = [
       
       {/* Hero Section with hero.jpg background & crisp soft gradient for text readability */}
       <div 
+        className="hero-section"
         style={{
           position: 'relative',
           backgroundImage: `linear-gradient(to right, rgba(239, 246, 255, 0.88) 0%, rgba(239, 246, 255, 0.45) 55%, rgba(255, 255, 255, 0) 100%), url(${heroImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center 30%',
-          height: '460px',
+          minHeight: '420px',
+          height: 'auto',
           color: '#0f172a',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '0 20px 40px 20px',
+          padding: '40px 20px',
         }}
       >
         <div style={{ width: '100%', maxWidth: '1120px', zIndex: 2, textAlign: 'left' }}>
-          <h1 style={{ fontSize: '46px', fontWeight: '800', marginBottom: '16px', lineHeight: '1.2', color: '#0f172a', letterSpacing: '-0.5px' }}>
+          <h1 className="hero-title" style={{ fontSize: 'clamp(24px, 5vw, 44px)', fontWeight: '800', marginBottom: '16px', lineHeight: '1.2', color: '#0f172a', letterSpacing: '-0.5px' }}>
             Cari Open Trip <br />
             Indonesia dengan Mudah
           </h1>
-          <p style={{ fontSize: '16px', color: '#334155', marginBottom: '30px', fontWeight: 600, maxWidth: '540px', lineHeight: '1.5' }}>
+          <p style={{ fontSize: 'clamp(14px, 2.5vw, 16px)', color: '#334155', marginBottom: '24px', fontWeight: 600, maxWidth: '540px', lineHeight: '1.5' }}>
             Temukan berbagai open trip seru dan tour guide terpercaya di seluruh Indonesia.
           </p>
           <button 
@@ -355,6 +357,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
       {/* Floating Search Widget Card matching Gambar 1 */}
       <div className="container" style={{ marginTop: '-55px', position: 'relative', zIndex: 10, maxWidth: '1120px', padding: '0 20px' }}>
         <div 
+          className="search-widget-card"
           style={{ 
             backgroundColor: '#ffffff', 
             borderRadius: '16px', 
@@ -832,6 +835,16 @@ const DEFAULT_PACKAGES: TripPackage[] = [
           transform: translateY(-4px);
           box-shadow: 0 10px 24px rgba(0,0,0,0.08) !important;
           border-color: #007bff !important;
+        }
+        @media (max-width: 768px) {
+          .hero-section {
+            min-height: 320px !important;
+            padding: 30px 16px !important;
+          }
+          .search-widget-card {
+            padding: 18px 16px !important;
+            margin-top: -30px !important;
+          }
         }
       `}</style>
     </div>
