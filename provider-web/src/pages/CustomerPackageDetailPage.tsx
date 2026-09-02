@@ -49,7 +49,30 @@ export const CustomerPackageDetailPage: React.FC = () => {
   }
 
   const pkg = selectedPackageForDetail;
-  const availableSeats = pkg.quotaMax ? (pkg.quotaMax - pkg.quotaUsed) : 10;
+  
+  // Calculate active reserved seats from pending/paid/completed bookings
+  const getActiveBookedGuests = (pkgObj: any) => {
+    try {
+      const historyStr = localStorage.getItem('tripkita_my_bookings') || '[]';
+      const history = JSON.parse(historyStr);
+      const activeStatuses = ['PENDING_PAYMENT', 'WAITING_CONFIRMATION', 'PAID', 'CONFIRMED', 'COMPLETED'];
+      return history.reduce((sum: number, b: any) => {
+        const isMatch = b.packageId === pkgObj.id || b.packageName === pkgObj.name;
+        if (isMatch && activeStatuses.includes(b.status)) {
+          return sum + (b.guests || 1);
+        }
+        return sum;
+      }, 0);
+    } catch {
+      return 0;
+    }
+  };
+
+  const totalQuotaMax = pkg.quotaMax || 12;
+  const activeReserved = getActiveBookedGuests(pkg);
+  const totalQuotaUsed = Math.min(totalQuotaMax, (pkg.quotaUsed || 0) + activeReserved);
+  const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
+  const remainingAvailable = Math.max(0, availableSeats - guestsCount);
 
   // 5 High quality photos per destination matching actual trip content
   const getGalleryImages = (name: string) => {
@@ -674,7 +697,9 @@ export const CustomerPackageDetailPage: React.FC = () => {
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
                 <span>Jumlah Peserta</span>
-                <span style={{ color: '#10b981' }}>Sisa {availableSeats} seat</span>
+                <span style={{ color: remainingAvailable > 0 ? '#10b981' : '#ef4444', fontWeight: '800' }}>
+                  Sisa {remainingAvailable} seat
+                </span>
               </label>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '8px 14px' }}>
@@ -684,14 +709,18 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 </span>
                 
                 <button 
+                  type="button"
                   onClick={() => setGuestsCount((prev) => Math.max(1, prev - 1))}
-                  style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontWeight: '700', cursor: 'pointer' }}
+                  disabled={guestsCount <= 1}
+                  style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: guestsCount <= 1 ? '#e2e8f0' : '#f8fafc', fontWeight: '700', cursor: guestsCount <= 1 ? 'not-allowed' : 'pointer' }}
                 >
                   -
                 </button>
                 <button 
+                  type="button"
                   onClick={() => setGuestsCount((prev) => Math.min(availableSeats, prev + 1))}
-                  style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontWeight: '700', cursor: 'pointer' }}
+                  disabled={guestsCount >= availableSeats || availableSeats === 0}
+                  style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: (guestsCount >= availableSeats || availableSeats === 0) ? '#e2e8f0' : '#f8fafc', fontWeight: '700', cursor: (guestsCount >= availableSeats || availableSeats === 0) ? 'not-allowed' : 'pointer' }}
                 >
                   +
                 </button>
