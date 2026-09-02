@@ -26,8 +26,37 @@ interface BookingItem {
 
 
 
+const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = ({ createdAt, onExpire }) => {
+  const [timeLeft, setTimeLeft] = useState<number>(60);
+
+  useEffect(() => {
+    const createdTime = createdAt ? new Date(createdAt).getTime() : Date.now();
+    const expireTime = createdTime + 1 * 60 * 1000;
+
+    const interval = setInterval(() => {
+      const diff = Math.max(0, Math.floor((expireTime - Date.now()) / 1000));
+      setTimeLeft(diff);
+      if (diff <= 0 && onExpire) {
+        onExpire();
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [createdAt, onExpire]);
+
+  const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+  const seconds = String(timeLeft % 60).padStart(2, '0');
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', padding: '5px 12px', borderRadius: '30px', fontSize: '12px', fontWeight: '800' }}>
+      <Clock size={14} color="#ea580c" />
+      <span>Batas Transfer: {minutes}:{seconds}</span>
+    </div>
+  );
+};
+
 export const CustomerHistoryPage: React.FC = () => {
-  const { navigateTo, providerProfile } = useNavigation();
+  const { navigateTo, providerProfile, setSelectedBookingForInvoice } = useNavigation();
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -448,7 +477,7 @@ export const CustomerHistoryPage: React.FC = () => {
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                           <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Transfer Pembayaran:</strong>
-                          <span style={{ fontSize: '12px', fontWeight: '700', color: '#0284c7', backgroundColor: '#e0f2fe', padding: '4px 10px', borderRadius: '20px' }}>Testing Limit: 1 Menit</span>
+                          <CountdownTimer createdAt={booking.createdAt} onExpire={fetchHistory} />
                         </div>
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
@@ -462,27 +491,59 @@ export const CustomerHistoryPage: React.FC = () => {
                             <div><span style={{ color: '#64748b' }}>Atas Nama:</span> <strong>TripKita</strong></div>
                           </div>
 
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText('693800143473');
-                              setModalNotice({
-                                title: 'Nomor Rekening Disalin!',
-                                message: 'Nomor Rekening Bank OCBC (693800143473) telah berhasil disalin ke clipboard.'
-                              });
-                            }}
-                            style={{
-                              padding: '8px 14px',
-                              backgroundColor: '#e0f2fe',
-                              color: '#0284c7',
-                              border: '1px solid #7dd3fc',
-                              borderRadius: '8px',
-                              fontSize: '12.5px',
-                              fontWeight: '700',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Salin No. Rekening
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText('693800143473');
+                                setModalNotice({
+                                  title: 'Nomor Rekening Disalin!',
+                                  message: 'Nomor Rekening Bank OCBC (693800143473) telah berhasil disalin ke clipboard.'
+                                });
+                              }}
+                              style={{
+                                padding: '8px 14px',
+                                backgroundColor: '#e0f2fe',
+                                color: '#0284c7',
+                                border: '1px solid #7dd3fc',
+                                borderRadius: '8px',
+                                fontSize: '12.5px',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Salin No. Rekening
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setSelectedBookingForInvoice({
+                                  id: booking.id,
+                                  bookingCode: booking.bookingCode,
+                                  packageName: tripName,
+                                  totalPrice: booking.totalPrice,
+                                  guests: booking.guests,
+                                  tripDate: formattedTripDate,
+                                  accountNumber: '693800143473',
+                                  bankName: 'Bank OCBC',
+                                  paymentUrl: booking.paymentUrl || ''
+                                });
+                                navigateTo('halaman-pembayaran');
+                              }}
+                              style={{
+                                padding: '8px 16px',
+                                backgroundColor: '#0284c7',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '12.5px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
+                              }}
+                            >
+                              ⚡ Selesaikan Pembayaran
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )
