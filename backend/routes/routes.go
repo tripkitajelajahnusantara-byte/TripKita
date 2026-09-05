@@ -36,7 +36,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	authCtrl := controllers.NewAuthController(authService, cfg)
 	adminCtrl := controllers.NewAdminController(adminService)
 	packageCtrl := controllers.NewPackageController(packageService)
-	bookingCtrl := controllers.NewBookingController(bookingService)
+	bookingCtrl := controllers.NewBookingController(bookingService, cfg)
 	dashboardCtrl := controllers.NewDashboardController(dashboardService)
 	uploadCtrl := controllers.NewUploadController()
 	oauthCtrl := controllers.NewOAuthController(db, cfg)

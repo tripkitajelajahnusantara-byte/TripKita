@@ -14,10 +14,11 @@ import (
 
 type BookingController struct {
 	service services.BookingService
+	cfg     *config.Config
 }
 
-func NewBookingController(service services.BookingService) *BookingController {
-	return &BookingController{service: service}
+func NewBookingController(service services.BookingService, cfg *config.Config) *BookingController {
+	return &BookingController{service: service, cfg: cfg}
 }
 
 func (ctrl *BookingController) GetAll(c *gin.Context) {
@@ -463,7 +464,11 @@ func (ctrl *BookingController) ProcessMockPayment(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusFound, "http://localhost:5173/booking")
+	redirectURL := ctrl.cfg.FrontendURL
+	if redirectURL == "" {
+		redirectURL = "https://trip-kita.vercel.app"
+	}
+	c.Redirect(http.StatusFound, redirectURL)
 }
 
 func (ctrl *BookingController) XenditWebhook(c *gin.Context) {
