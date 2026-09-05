@@ -162,14 +162,15 @@ export const CustomerConfirmationPage: React.FC = () => {
         localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
         sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
-        // ALWAYS REDIRECT DIRECTLY TO XENDIT CHECKOUT INVOICE PAGE!
-        if (bookingObj.paymentUrl && bookingObj.paymentUrl.startsWith('http')) {
+        // If real Xendit Invoice URL from backend exists and is valid, redirect external:
+        if (bookingObj.paymentUrl && bookingObj.paymentUrl.includes('checkout.xendit.co')) {
           window.location.href = bookingObj.paymentUrl;
           return;
         }
 
+        // Seamless built-in Xendit Sandbox Invoice test experience:
         setSelectedBookingForInvoice(bookingObj);
-        navigateTo('halaman-pembayaran');
+        navigateTo('xendit-checkout');
       }
     }
   };

@@ -19,7 +19,8 @@ export type Route =
   | 'cari-trip'
   | 'keuangan-provider'
   | 'customer-confirmation'
-  | 'halaman-pembayaran';
+  | 'halaman-pembayaran'
+  | 'xendit-checkout';
 
 export interface Booking {
   id: string;

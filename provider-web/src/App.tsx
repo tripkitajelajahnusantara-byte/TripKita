@@ -21,6 +21,7 @@ import { ProviderLandingPage } from './pages/ProviderLandingPage';
 import { CustomerSearchPage } from './pages/CustomerSearchPage';
 import { CustomerConfirmationPage } from './pages/CustomerConfirmationPage';
 import { CustomerPaymentInvoicePage } from './pages/CustomerPaymentInvoicePage';
+import { CustomerXenditCheckoutPage } from './pages/CustomerXenditCheckoutPage';
 import { ProviderFinancePage } from './pages/ProviderFinancePage';
 
 const AppContent: React.FC = () => {
@@ -125,6 +126,9 @@ const AppContent: React.FC = () => {
         <Footer />
       </div>
     );
+  }
+  if (route === 'xendit-checkout') {
+    return <CustomerXenditCheckoutPage />;
   }
   if (route === 'riwayat-booking') {
     return (
