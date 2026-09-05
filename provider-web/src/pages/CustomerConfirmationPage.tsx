@@ -136,6 +136,12 @@ export const CustomerConfirmationPage: React.FC = () => {
       localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
       sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
+      // If a real Xendit Invoice URL was created, redirect directly to Xendit Checkout Page!
+      if (bookingObj.paymentUrl && (bookingObj.paymentUrl.includes('xendit.co') || bookingObj.paymentUrl.includes('checkout'))) {
+        window.location.href = bookingObj.paymentUrl;
+        return;
+      }
+
       // Set for invoice page and navigate!
       setSelectedBookingForInvoice(bookingObj);
       navigateTo('halaman-pembayaran');

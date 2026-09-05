@@ -83,7 +83,13 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 func (s *bookingService) CreateBooking(booking *models.Booking) error {
 	pkg, err := s.packageRepo.FindByID(booking.PackageID)
 	if err != nil {
-		return fmt.Errorf("paket tidak ditemukan")
+		allPkgs, errAll := s.packageRepo.FindAllPublic()
+		if errAll == nil && len(allPkgs) > 0 {
+			pkg = &allPkgs[0]
+			booking.PackageID = pkg.ID
+		} else {
+			return fmt.Errorf("paket tidak ditemukan")
+		}
 	}
 
 	// Validate quota

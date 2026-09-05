@@ -36,7 +36,7 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 	if s.cfg.XenditAPIKey == "" || s.cfg.XenditAPIKey == "dummy" || s.cfg.XenditAPIKey == "placeholder" {
 		log.Println("[Xendit] Using Simulation Mode (No valid API Key provided)")
 		mockInvoiceID := fmt.Sprintf("xendit_inv_%d", booking.ID)
-		mockPaymentURL := fmt.Sprintf("http://localhost:8080/api/v1/public/xendit-mock-checkout/%d", booking.ID)
+		mockPaymentURL := fmt.Sprintf("%s/halaman-pembayaran", s.cfg.FrontendURL)
 		return mockInvoiceID, mockPaymentURL, nil
 	}
 
