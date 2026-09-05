@@ -4,7 +4,7 @@ import { request } from '../utils/api';
 import { ArrowLeft, Calendar, Users, CreditCard, AlertCircle, HelpCircle } from 'lucide-react';
 
 export const CustomerConfirmationPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, providerProfile, bookingFormData, setSelectedBookingForInvoice } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, providerProfile, bookingFormData } = useNavigation();
   const [submitting, setSubmitting] = useState(false);
   
   // Agreement Checkbox state
@@ -67,12 +67,10 @@ export const CustomerConfirmationPage: React.FC = () => {
     setShowConfirmModal(false);
     setSubmitting(true);
 
-    let bookingObj: any = null;
     const nowIso = new Date().toISOString();
     const randomCode = `TK-${Math.floor(Math.random() * 90000 + 10000)}`;
 
     try {
-      // Safe tripDate parsing to avoid invalid date toISOString() RangeError crash
       let parsedTripDate = new Date();
       if (pkg.bookingDate) {
         const d = new Date(pkg.bookingDate);
@@ -107,75 +105,39 @@ export const CustomerConfirmationPage: React.FC = () => {
       const response = await request('/public/bookings', {
         method: 'POST',
         body: JSON.stringify(payload)
-      }).catch((err) => {
-        console.error('[Booking API Error]', err);
-        return null;
       });
 
-      if (response && (response.id || response.bookingCode)) {
-        bookingObj = {
-          id: response.id || Date.now(),
-          bookingCode: response.bookingCode || randomCode,
-          packageName: pkg.name,
-          totalPrice: totalCost,
-          guests: guestsCount,
-          tripDate: pkg.bookingDate || '22 Mei 2026',
-          createdAt: response.createdAt || nowIso,
-          status: response.status || 'PENDING_PAYMENT',
-          accountNumber: '693800143473',
-          bankName: 'Bank OCBC',
-          paymentUrl: response.paymentUrl || response.payment_url || ''
-        };
-      } else {
-        bookingObj = {
-          id: Date.now(),
-          bookingCode: randomCode,
-          packageName: pkg.name,
-          totalPrice: totalCost,
-          guests: guestsCount,
-          tripDate: pkg.bookingDate || '22 Mei 2026',
-          createdAt: nowIso,
-          status: 'PENDING_PAYMENT',
-          accountNumber: '693800143473',
-          bankName: 'Bank OCBC',
-          paymentUrl: ''
-        };
+      const paymentUrl = response.paymentUrl || response.payment_url;
+      if (!paymentUrl || !paymentUrl.startsWith('http')) {
+        throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
       }
-    } catch (err) {
-      bookingObj = {
-        id: Date.now(),
-        bookingCode: randomCode,
+
+      const bookingObj = {
+        id: response.id || Date.now(),
+        bookingCode: response.bookingCode || randomCode,
         packageName: pkg.name,
         totalPrice: totalCost,
         guests: guestsCount,
         tripDate: pkg.bookingDate || '22 Mei 2026',
-        createdAt: nowIso,
-        status: 'PENDING_PAYMENT',
-        accountNumber: '693800143473',
-        bankName: 'Bank OCBC',
-        paymentUrl: ''
+        createdAt: response.createdAt || nowIso,
+        status: response.status || 'PENDING_PAYMENT',
+        paymentUrl: paymentUrl
       };
-    } finally {
+
+      // Save into local history
+      const existingHistoryStr = localStorage.getItem('tripkita_my_bookings') || '[]';
+      const history = JSON.parse(existingHistoryStr);
+      history.unshift(bookingObj);
+      localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
+      sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
+
+      // Direct external redirect to Xendit Invoice URL!
+      window.location.href = paymentUrl;
+
+    } catch (err: any) {
+      console.error('[Booking Error]', err);
+      alert(`Gagal membuat Invoice Xendit: ${err?.message || 'Terjadi kesalahan sistem'}`);
       setSubmitting(false);
-
-      if (bookingObj) {
-        // Save into local history and sessionStorage
-        const existingHistoryStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-        const history = JSON.parse(existingHistoryStr);
-        history.unshift(bookingObj);
-        localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
-        sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
-
-        // If paymentUrl from Xendit or backend exists and starts with http, redirect directly!
-        if (bookingObj.paymentUrl && bookingObj.paymentUrl.startsWith('http')) {
-          window.location.href = bookingObj.paymentUrl;
-          return;
-        }
-
-        // Built-in Xendit Sandbox Invoice test experience:
-        setSelectedBookingForInvoice(bookingObj);
-        navigateTo('xendit-checkout');
-      }
     }
   };
 
