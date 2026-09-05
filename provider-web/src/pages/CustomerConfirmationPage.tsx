@@ -81,11 +81,14 @@ export const CustomerConfirmationPage: React.FC = () => {
         }
       }
 
+      const rawPkgId = Number(pkg.id);
+      const safePackageId = (!isNaN(rawPkgId) && rawPkgId > 0) ? rawPkgId : 1;
+
       const payload: any = {
-        packageId: Number(pkg.id),
-        customerName: pemesan.nama,
-        customerInitial: pemesan.nama.charAt(0).toUpperCase(),
-        guests: guestsCount,
+        packageId: safePackageId,
+        customerName: pemesan.nama || 'Pelanggan TripKita',
+        customerInitial: (pemesan.nama || 'P').charAt(0).toUpperCase(),
+        guests: guestsCount || 1,
         tripDate: parsedTripDate.toISOString(),
         paymentMethod: 'Xendit Invoice',
         participants: peserta.map((p: any) => ({
@@ -104,7 +107,10 @@ export const CustomerConfirmationPage: React.FC = () => {
       const response = await request('/public/bookings', {
         method: 'POST',
         body: JSON.stringify(payload)
-      }).catch(() => null);
+      }).catch((err) => {
+        console.error('[Booking API Error]', err);
+        return null;
+      });
 
       if (response && (response.id || response.bookingCode)) {
         bookingObj = {

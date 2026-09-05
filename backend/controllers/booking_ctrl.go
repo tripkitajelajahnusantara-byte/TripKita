@@ -123,7 +123,7 @@ func (ctrl *BookingController) PublicUpdateStatus(c *gin.Context) {
 
 func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 	var req struct {
-		PackageID       uint      `json:"packageId" binding:"required"`
+		PackageID       uint      `json:"packageId"`
 		CustomerID      *uint     `json:"customerId"`
 		CustomerName    string    `json:"customerName" binding:"required"`
 		CustomerInitial string    `json:"customerInitial"`
@@ -134,6 +134,10 @@ func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	if req.PackageID == 0 {
+		req.PackageID = 1
 	}
 
 	booking := &models.Booking{
