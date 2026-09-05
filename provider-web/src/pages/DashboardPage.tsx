@@ -188,7 +188,7 @@ export const DashboardPage: React.FC = () => {
               <h3 style={{ fontSize: '15px' }}>
                 {stats ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(stats.totalRevenue) : 'Rp ...'}
               </h3>
-              <p>Total Pendapatan</p>
+              <p>Total Pendapatan (Kotor)</p>
             </div>
           </div>
 
