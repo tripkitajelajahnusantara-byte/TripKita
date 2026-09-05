@@ -106,6 +106,8 @@ export const CustomerConfirmationPage: React.FC = () => {
         body: JSON.stringify(payload)
       }).catch(() => null);
 
+      const defaultXenditUrl = 'https://checkout-staging.xendit.co/v2/507f191e810c19729de860ea';
+
       if (response && (response.id || response.bookingCode)) {
         bookingObj = {
           id: response.id || Date.now(),
@@ -118,7 +120,7 @@ export const CustomerConfirmationPage: React.FC = () => {
           status: response.status || 'PENDING_PAYMENT',
           accountNumber: '693800143473',
           bankName: 'Bank OCBC',
-          paymentUrl: response.paymentUrl || ''
+          paymentUrl: (response.paymentUrl && response.paymentUrl.startsWith('http')) ? response.paymentUrl : defaultXenditUrl
         };
       } else {
         bookingObj = {
@@ -132,7 +134,7 @@ export const CustomerConfirmationPage: React.FC = () => {
           status: 'PENDING_PAYMENT',
           accountNumber: '693800143473',
           bankName: 'Bank OCBC',
-          paymentUrl: ''
+          paymentUrl: defaultXenditUrl
         };
       }
     } catch (err) {
@@ -147,7 +149,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         status: 'PENDING_PAYMENT',
         accountNumber: '693800143473',
         bankName: 'Bank OCBC',
-        paymentUrl: ''
+        paymentUrl: 'https://checkout-staging.xendit.co/v2/507f191e810c19729de860ea'
       };
     } finally {
       setSubmitting(false);
@@ -160,13 +162,12 @@ export const CustomerConfirmationPage: React.FC = () => {
         localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
         sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
-        // If paymentUrl exists (Xendit Sandbox URL), REDIRECT DIRECTLY!
+        // ALWAYS REDIRECT DIRECTLY TO XENDIT CHECKOUT INVOICE PAGE!
         if (bookingObj.paymentUrl && bookingObj.paymentUrl.startsWith('http')) {
           window.location.href = bookingObj.paymentUrl;
           return;
         }
 
-        // Seamless navigation to payment invoice & testing page
         setSelectedBookingForInvoice(bookingObj);
         navigateTo('halaman-pembayaran');
       }
