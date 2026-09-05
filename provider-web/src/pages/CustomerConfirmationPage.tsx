@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
-import { ArrowLeft, Calendar, Users, CreditCard, AlertCircle, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle } from 'lucide-react';
 
 export const CustomerConfirmationPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, providerProfile, bookingFormData } = useNavigation();
