@@ -304,74 +304,34 @@ export const CustomerHistoryPage: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {trackedBooking.status === 'PENDING_PAYMENT' && (
-                      <>
-                        <button
-                          onClick={() => {
-                            setSelectedBookingForInvoice({
-                              id: trackedBooking.id,
-                              bookingCode: trackedBooking.bookingCode,
-                              packageName: trackedBooking.packageDetails?.name || trackedBooking.packageName,
-                              totalPrice: trackedBooking.totalPrice,
-                              guests: trackedBooking.guests,
-                              tripDate: trackedBooking.tripDate,
-                              accountNumber: '693800143473',
-                              bankName: 'Bank OCBC',
-                              paymentUrl: trackedBooking.paymentUrl || ''
-                            });
-                            navigateTo('halaman-pembayaran');
-                          }}
-                          style={{
-                            padding: '8px 14px',
-                            backgroundColor: '#0284c7',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontWeight: '700',
-                            fontSize: '13px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          ⚡ Selesaikan Pembayaran
-                        </button>
-                        <button
-                          onClick={async () => {
-                            setTrackingLoading(true);
-                            try {
-                              await request(`/public/bookings/${trackedBooking.bookingCode}/status`, {
-                                method: 'PUT',
-                                body: JSON.stringify({ status: 'PAID' })
-                              });
-                              // Re-fetch updated booking live from DB
-                              const updated = await request(`/public/bookings/status/${trackedBooking.bookingCode}`);
-                              setTrackedBooking(updated);
-                              setModalNotice({
-                                title: 'Pembayaran Dikonfirmasi!',
-                                message: `Status tiket ${trackedBooking.bookingCode} telah berhasil diperbarui di Database menjadi LUNAS & AKTIF (PAID).`
-                              });
-                            } catch (err: any) {
-                              setModalNotice({
-                                title: 'Gagal Memperbarui Status',
-                                message: err.message || 'Gagal memperbarui status di database.',
-                                isError: true
-                              });
-                            } finally {
-                              setTrackingLoading(false);
-                            }
-                          }}
-                          style={{
-                            padding: '8px 14px',
-                            backgroundColor: '#10b981',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontWeight: '700',
-                            fontSize: '13px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          ✔ Simulasikan Lunas
-                        </button>
-                      </>
+                      <button
+                        onClick={() => {
+                          setSelectedBookingForInvoice({
+                            id: trackedBooking.id,
+                            bookingCode: trackedBooking.bookingCode,
+                            packageName: trackedBooking.packageDetails?.name || trackedBooking.packageName,
+                            totalPrice: trackedBooking.totalPrice,
+                            guests: trackedBooking.guests,
+                            tripDate: trackedBooking.tripDate,
+                            accountNumber: '693800143473',
+                            bankName: 'Bank OCBC',
+                            paymentUrl: trackedBooking.paymentUrl || ''
+                          });
+                          navigateTo('halaman-pembayaran');
+                        }}
+                        style={{
+                          padding: '10px 18px',
+                          backgroundColor: '#0284c7',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontWeight: '700',
+                          fontSize: '13px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ⚡ Selesaikan Pembayaran
+                      </button>
                     )}
                     {(trackedBooking.status === 'PAID' || trackedBooking.status === 'CONFIRMED') && (
                       <a

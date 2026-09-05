@@ -90,6 +90,20 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
       });
       localStorage.setItem('tripkita_my_bookings', JSON.stringify(updatedHistory));
 
+      // Also update sessionStorage recent guest booking for active session sync
+      try {
+        const recentStr = sessionStorage.getItem('tripkita_recent_guest_booking');
+        if (recentStr) {
+          const recentObj = JSON.parse(recentStr);
+          if (recentObj.id === booking.id || recentObj.bookingCode === booking.bookingCode) {
+            recentObj.status = 'PAID';
+            sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(recentObj));
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
       // Redirect straight to Cek Booking with PAID status!
       navigateTo('riwayat-booking');
     } catch (err) {
@@ -122,6 +136,20 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
         return item;
       });
       localStorage.setItem('tripkita_my_bookings', JSON.stringify(updatedHistory));
+
+      // Also update sessionStorage recent guest booking for active session sync
+      try {
+        const recentStr = sessionStorage.getItem('tripkita_recent_guest_booking');
+        if (recentStr) {
+          const recentObj = JSON.parse(recentStr);
+          if (recentObj.id === booking.id || recentObj.bookingCode === booking.bookingCode) {
+            recentObj.status = 'EXPIRED';
+            sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(recentObj));
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
 
       // Redirect straight to Cek Booking with EXPIRED status!
       navigateTo('riwayat-booking');
