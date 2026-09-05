@@ -118,7 +118,7 @@ export const CustomerConfirmationPage: React.FC = () => {
           status: response.status || 'PENDING_PAYMENT',
           accountNumber: '693800143473',
           bankName: 'Bank OCBC',
-          paymentUrl: response.paymentUrl || ''
+          paymentUrl: response.paymentUrl || response.payment_url || ''
         };
       } else {
         bookingObj = {
