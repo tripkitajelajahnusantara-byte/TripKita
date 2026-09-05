@@ -234,6 +234,37 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
               Informasi Rekening Bank Tujuan Transfer
             </h3>
 
+            {/* Prominent Xendit Invoice Link Banner */}
+            {booking.paymentUrl && (
+              <div style={{ backgroundColor: '#0f172a', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)' }}>
+                <div>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#38bdf8', fontWeight: '800' }}>Pembayaran Xendit Gateway</span>
+                  <strong style={{ fontSize: '15px', color: '#ffffff', display: 'block', marginTop: '2px' }}>Tautan Checkout Invoice Xendit Resmi</strong>
+                  <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Klik tombol untuk membuka simulator checkout resmi Xendit (BCA VA, QRIS, dll).</span>
+                </div>
+                <a
+                  href={booking.paymentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    backgroundColor: '#0284c7',
+                    color: '#ffffff',
+                    padding: '12px 22px',
+                    borderRadius: '10px',
+                    fontWeight: '800',
+                    fontSize: '14px',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.4)'
+                  }}
+                >
+                  💳 Buka Invoice Xendit <ExternalLink size={16} />
+                </a>
+              </div>
+            )}
+
             {/* Bank Rekening Box */}
             <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '20px 24px', border: '1.5px solid #cbd5e1', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
               <div>
