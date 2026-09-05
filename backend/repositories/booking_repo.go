@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"strings"
+
 	"gorm.io/gorm"
 
 	"tripkita-provider/models"
@@ -75,7 +77,10 @@ func (r *bookingRepository) FindByXenditInvoiceID(invoiceID string) (*models.Boo
 
 func (r *bookingRepository) FindByBookingCode(code string) (*models.Booking, error) {
 	var booking models.Booking
-	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).Where("booking_code = ?", code).First(&booking).Error
+	cleanCode := strings.TrimSpace(code)
+	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Where("LOWER(booking_code) = LOWER(?) OR LOWER(booking_code) LIKE LOWER(?)", cleanCode, "%"+cleanCode+"%").
+		Order("id desc").First(&booking).Error
 	if err != nil {
 		return nil, err
 	}

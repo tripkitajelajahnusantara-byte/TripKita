@@ -119,10 +119,24 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 	booking.TotalPrice = int64(booking.Guests) * pkg.Price
 	booking.Status = "PENDING_PAYMENT"
 	
-	// Create BookingCode
-	randSource := rand.NewSource(time.Now().UnixNano())
-	r := rand.New(randSource)
-	booking.BookingCode = fmt.Sprintf("TK-%d-%d", time.Now().Unix()%100000, r.Intn(10000))
+	// Ensure unique BookingCode
+	if strings.TrimSpace(booking.BookingCode) == "" {
+		randSource := rand.NewSource(time.Now().UnixNano())
+		r := rand.New(randSource)
+		booking.BookingCode = fmt.Sprintf("TK-%d-%d", time.Now().Unix()%90000+10000, r.Intn(9000)+1000)
+	}
+
+	// Guarantee uniqueness in database (retry if collision occurs)
+	for i := 0; i < 5; i++ {
+		existing, errExist := s.repo.FindByBookingCode(booking.BookingCode)
+		if errExist == nil && existing != nil && existing.ID != booking.ID {
+			randSource := rand.NewSource(time.Now().UnixNano())
+			r := rand.New(randSource)
+			booking.BookingCode = fmt.Sprintf("TK-%d-%d", time.Now().Unix()%90000+10000, r.Intn(9000)+1000)
+		} else {
+			break
+		}
+	}
 
 	// Save to DB first to generate booking.ID
 	if err := s.repo.Create(booking); err != nil {

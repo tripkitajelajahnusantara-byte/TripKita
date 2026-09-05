@@ -84,6 +84,7 @@ export const CustomerConfirmationPage: React.FC = () => {
 
       const payload: any = {
         packageId: safePackageId,
+        bookingCode: randomCode,
         customerName: pemesan.nama || 'Pelanggan TripKita',
         customerInitial: (pemesan.nama || 'P').charAt(0).toUpperCase(),
         guests: guestsCount || 1,

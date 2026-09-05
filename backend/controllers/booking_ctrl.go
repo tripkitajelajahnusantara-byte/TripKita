@@ -125,6 +125,7 @@ func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 	var req struct {
 		PackageID       uint      `json:"packageId"`
 		CustomerID      *uint     `json:"customerId"`
+		BookingCode     string    `json:"bookingCode"`
 		CustomerName    string    `json:"customerName" binding:"required"`
 		CustomerInitial string    `json:"customerInitial"`
 		Guests          int       `json:"guests" binding:"required,gt=0"`
@@ -143,6 +144,7 @@ func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 	booking := &models.Booking{
 		PackageID:       req.PackageID,
 		CustomerID:      req.CustomerID,
+		BookingCode:     req.BookingCode,
 		CustomerName:    req.CustomerName,
 		CustomerInitial: req.CustomerInitial,
 		Guests:          req.Guests,
