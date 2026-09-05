@@ -106,7 +106,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         body: JSON.stringify(payload)
       }).catch(() => null);
 
-      const defaultXenditUrl = 'https://checkout-staging.xendit.co/v2/507f191e810c19729de860ea';
+      const defaultXenditUrl = 'https://tripkita-production.up.railway.app/api/v1/public/xendit-mock-checkout/1';
 
       if (response && (response.id || response.bookingCode)) {
         bookingObj = {
@@ -149,7 +149,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         status: 'PENDING_PAYMENT',
         accountNumber: '693800143473',
         bankName: 'Bank OCBC',
-        paymentUrl: 'https://checkout-staging.xendit.co/v2/507f191e810c19729de860ea'
+        paymentUrl: 'https://tripkita-production.up.railway.app/api/v1/public/xendit-mock-checkout/1'
       };
     } finally {
       setSubmitting(false);
