@@ -46,7 +46,7 @@ func LoadConfig() *Config {
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
 		GoogleRedirectURI:  getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/v1/public/auth/google/callback"),
 		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:5173"),
-		XenditAPIKey:       getEnv("XENDIT_API_KEY", ""),
+		XenditAPIKey:       getEnv("XENDIT_SECRET_KEY", getEnv("XENDIT_API_KEY", "")),
 		XenditWebhookToken: getEnv("XENDIT_WEBHOOK_TOKEN", ""),
 	}
 }
