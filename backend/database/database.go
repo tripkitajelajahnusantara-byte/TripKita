@@ -58,9 +58,9 @@ func ConnectDB(cfg *config.Config) {
 
 func SeedDatabase() {
 	var count int64
-	DB.Model(&models.Provider{}).Count(&count)
+	DB.Model(&models.Package{}).Count(&count)
 	if count > 0 {
-		fmt.Println("Database already seeded, skipping initial seed.")
+		fmt.Println("Database already seeded with packages, skipping initial seed.")
 		return
 	}
 

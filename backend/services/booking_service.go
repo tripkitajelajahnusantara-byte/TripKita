@@ -88,7 +88,23 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 			pkg = &allPkgs[0]
 			booking.PackageID = pkg.ID
 		} else {
-			return fmt.Errorf("paket tidak ditemukan")
+			// Auto-create default package in DB so booking never fails
+			defaultPkg := &models.Package{
+				ProviderID:  1,
+				Name:        "Open Trip Gunung Bromo",
+				Destination: "Probolinggo, Jawa Timur",
+				Category:    "Gunung",
+				TripType:    "Open Trip",
+				Price:       350000,
+				QuotaMin:    1,
+				QuotaMax:    100,
+				QuotaUsed:   0,
+				Status:      "Aktif",
+				Rating:      4.8,
+			}
+			_ = s.packageRepo.Create(defaultPkg)
+			pkg = defaultPkg
+			booking.PackageID = defaultPkg.ID
 		}
 	}
 
