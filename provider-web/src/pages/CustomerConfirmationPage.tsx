@@ -160,13 +160,13 @@ export const CustomerConfirmationPage: React.FC = () => {
         localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
         sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
-        // If real Xendit Invoice URL from backend exists and is valid, redirect external:
-        if (bookingObj.paymentUrl && bookingObj.paymentUrl.includes('checkout.xendit.co')) {
+        // If paymentUrl from Xendit or backend exists and starts with http, redirect directly!
+        if (bookingObj.paymentUrl && bookingObj.paymentUrl.startsWith('http')) {
           window.location.href = bookingObj.paymentUrl;
           return;
         }
 
-        // Seamless built-in Xendit Sandbox Invoice test experience:
+        // Built-in Xendit Sandbox Invoice test experience:
         setSelectedBookingForInvoice(bookingObj);
         navigateTo('xendit-checkout');
       }
