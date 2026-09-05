@@ -474,7 +474,7 @@ func (ctrl *BookingController) ProcessMockPayment(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.UpdateStatusByWebhook(booking.XenditInvoiceID, status, paymentMethod)
+	err = ctrl.service.UpdateStatusByWebhook(booking.XenditInvoiceID, fmt.Sprintf("booking_%d", booking.ID), status, paymentMethod)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -489,16 +489,26 @@ func (ctrl *BookingController) ProcessMockPayment(c *gin.Context) {
 
 func (ctrl *BookingController) XenditWebhook(c *gin.Context) {
 	var req struct {
-		ID            string `json:"id"`
-		Status        string `json:"status"`
-		PaymentMethod string `json:"payment_method"`
+		ID             string `json:"id"`
+		ExternalID     string `json:"external_id"`
+		Status         string `json:"status"`
+		PaymentMethod  string `json:"payment_method"`
+		PaymentChannel string `json:"payment_channel"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err := ctrl.service.UpdateStatusByWebhook(req.ID, req.Status, req.PaymentMethod)
+	payMethod := req.PaymentMethod
+	if payMethod == "" && req.PaymentChannel != "" {
+		payMethod = req.PaymentChannel
+	}
+	if payMethod == "" {
+		payMethod = "Xendit Payment"
+	}
+
+	err := ctrl.service.UpdateStatusByWebhook(req.ID, req.ExternalID, req.Status, payMethod)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

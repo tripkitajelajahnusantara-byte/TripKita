@@ -75,7 +75,45 @@ export const CustomerHistoryPage: React.FC = () => {
   const [modalNotice, setModalNotice] = useState<{ title: string; message: string; isError?: boolean } | null>(null);
 
   useEffect(() => {
-    fetchHistory();
+    // Handle return from Xendit payment gateway
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment_status');
+    const bookingId = urlParams.get('booking_id');
+    const bookingCode = urlParams.get('code');
+
+    if (paymentStatus === 'PAID' && (bookingId || bookingCode)) {
+      const targetId = bookingId || bookingCode;
+      request(`/public/bookings/${targetId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'PAID' })
+      }).then(() => {
+        try {
+          const historyStr = localStorage.getItem('tripkita_my_bookings') || '[]';
+          const history = JSON.parse(historyStr);
+          const updatedHistory = history.map((b: any) => {
+            if (b.id == bookingId || b.bookingCode === bookingCode) {
+              return { ...b, status: 'PAID' };
+            }
+            return b;
+          });
+          localStorage.setItem('tripkita_my_bookings', JSON.stringify(updatedHistory));
+
+          const recentStr = sessionStorage.getItem('tripkita_recent_guest_booking');
+          if (recentStr) {
+            const recent = JSON.parse(recentStr);
+            sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify({ ...recent, status: 'PAID' }));
+          }
+        } catch (e) {
+          console.error(e);
+        }
+        fetchHistory();
+      }).catch((e) => {
+        console.error('Failed to update payment status:', e);
+        fetchHistory();
+      });
+    } else {
+      fetchHistory();
+    }
   }, [providerProfile]);
 
   const fetchHistory = async () => {

@@ -52,8 +52,8 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 		"payer_email":          customerEmail,
 		"description":          fmt.Sprintf("Pembayaran Paket Wisata: %s (%d peserta)", packageName, booking.Guests),
 		"invoice_duration":     86400, // 24 hours
-		"success_redirect_url": fmt.Sprintf("%s/riwayat-booking", s.cfg.FrontendURL),
-		"failure_redirect_url": fmt.Sprintf("%s/riwayat-booking", s.cfg.FrontendURL),
+		"success_redirect_url": fmt.Sprintf("%s/riwayat-booking?payment_status=PAID&booking_id=%d&code=%s", s.cfg.FrontendURL, booking.ID, booking.BookingCode),
+		"failure_redirect_url": fmt.Sprintf("%s/riwayat-booking?payment_status=FAILED&booking_id=%d&code=%s", s.cfg.FrontendURL, booking.ID, booking.BookingCode),
 		"currency":             "IDR",
 	}
 

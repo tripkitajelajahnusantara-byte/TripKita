@@ -12,7 +12,7 @@ type BookingService interface {
 	GetAllBookings(providerID uint) ([]models.Booking, error)
 	UpdateBookingStatus(id uint, providerID uint, status string) (*models.Booking, error)
 	CreateBooking(booking *models.Booking) error
-	UpdateStatusByWebhook(invoiceID string, xenditStatus string, paymentMethod string) error
+	UpdateStatusByWebhook(invoiceID string, externalID string, xenditStatus string, paymentMethod string) error
 	GetRefunds() ([]models.Booking, error)
 	CompleteRefund(id uint) error
 	GetBookingByID(id uint) (*models.Booking, error)
@@ -161,10 +161,19 @@ func (s *bookingService) CompleteRefund(id uint) error {
 	return s.repo.Update(booking)
 }
 
-func (s *bookingService) UpdateStatusByWebhook(invoiceID string, xenditStatus string, paymentMethod string) error {
+func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID string, xenditStatus string, paymentMethod string) error {
 	booking, err := s.repo.FindByXenditInvoiceID(invoiceID)
-	if err != nil {
-		return err
+	if (err != nil || booking == nil) && externalID != "" {
+		parts := strings.Split(externalID, "_")
+		if len(parts) >= 2 {
+			idVal, parseErr := strconv.ParseUint(parts[1], 10, 32)
+			if parseErr == nil {
+				booking, err = s.repo.FindByID(uint(idVal))
+			}
+		}
+	}
+	if err != nil || booking == nil {
+		return fmt.Errorf("booking tidak ditemukan untuk invoice %s / external_id %s", invoiceID, externalID)
 	}
 
 	oldStatus := booking.Status
