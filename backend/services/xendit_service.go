@@ -33,12 +33,9 @@ func NewXenditService(cfg *config.Config) XenditService {
 }
 
 func (s *xenditService) CreateInvoice(booking *models.Booking, packageName string) (string, string, error) {
-	// Fallback to Simulation Mode if API Key is not set or is dummy
-	if s.cfg.XenditAPIKey == "" || s.cfg.XenditAPIKey == "dummy" || s.cfg.XenditAPIKey == "placeholder" {
-		log.Println("[Xendit] Using Simulation Mode (No valid API Key provided)")
-		mockInvoiceID := fmt.Sprintf("xendit_inv_%d", booking.ID)
-		mockPaymentURL := fmt.Sprintf("%s/xendit-checkout", s.cfg.FrontendURL)
-		return mockInvoiceID, mockPaymentURL, nil
+	// Ensure valid Xendit API Key is used
+	if strings.TrimSpace(s.cfg.XenditAPIKey) == "" || s.cfg.XenditAPIKey == "dummy" || s.cfg.XenditAPIKey == "placeholder" {
+		s.cfg.XenditAPIKey = "xnd_development_tm5ouw4jC8H6vWuyHr0oZan5hs2GcFgvo8NYsm5wCfiAM6Oxe505JdZhJFHFe3"
 	}
 
 	url := "https://api.xendit.co/v2/invoices"
