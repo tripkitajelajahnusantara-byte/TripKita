@@ -50,27 +50,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const pkg = selectedPackageForDetail;
   
-  // Calculate active reserved seats from pending/paid/completed bookings
-  const getActiveBookedGuests = (pkgObj: any) => {
-    try {
-      const historyStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-      const history = JSON.parse(historyStr);
-      const activeStatuses = ['PENDING_PAYMENT', 'WAITING_CONFIRMATION', 'PAID', 'CONFIRMED', 'COMPLETED'];
-      return history.reduce((sum: number, b: any) => {
-        const isMatch = b.packageId === pkgObj.id || b.packageName === pkgObj.name;
-        if (isMatch && activeStatuses.includes(b.status)) {
-          return sum + (b.guests || 1);
-        }
-        return sum;
-      }, 0);
-    } catch {
-      return 0;
-    }
-  };
-
-  const totalQuotaMax = pkg.quotaMax || 12;
-  const activeReserved = getActiveBookedGuests(pkg);
-  const totalQuotaUsed = Math.min(totalQuotaMax, (pkg.quotaUsed || 0) + activeReserved);
+  const totalQuotaMax = pkg.quotaMax || 15;
+  const totalQuotaUsed = pkg.quotaUsed || 0;
   const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
 
   // 5 High quality photos per destination matching actual trip content
