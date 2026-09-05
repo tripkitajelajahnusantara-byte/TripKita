@@ -34,7 +34,7 @@ func LoadConfig() *Config {
 		log.Println("No .env file found, relying on system environment variables")
 	}
 
-	xenditKey := strings.TrimSpace(getEnv("XENDIT_SECRET_KEY", getEnv("XENDIT_API_KEY", "")))
+	xenditKey := strings.TrimSpace(getEnv("XENDIT_SECRET_KEY", getEnv("XENDIT_API_KEY", "xnd_development_tm5ouw4jC8H6vWuyHr0oZan5hs2GcFgvo8NYsm5wCfiAM6Oxe505JdZhJFHFe3")))
 
 	return &Config{
 		Port:               getEnv("PORT", "8080"),
