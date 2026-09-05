@@ -31,7 +31,8 @@ export const CustomerConfirmationPage: React.FC = () => {
   const selectedAddOns = pkg.selectedAddOns || bookingFormData?.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
   const baseCost = pkg.price * guestsCount;
-  const totalCost = baseCost + addOnsTotal;
+  const serviceFee = 4000;
+  const totalCost = baseCost + addOnsTotal + serviceFee;
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -145,7 +146,7 @@ export const CustomerConfirmationPage: React.FC = () => {
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '80px', paddingTop: '24px', fontFamily: 'Inter, sans-serif' }}>
-      <div className="container" style={{ maxWidth: '1000px', margin: '0 auto' }}>
+      <div className="container" style={{ maxWidth: '800px', margin: '0 auto' }}>
         
         {/* Back Button */}
         <button 
@@ -170,107 +171,61 @@ export const CustomerConfirmationPage: React.FC = () => {
           Konfirmasi & Pembayaran Trip
         </h1>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '30px', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Left Column: Details Summary */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
-            {/* Pemesan & Peserta Card */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-                Daftar Peserta Trip ({guestsCount} Orang)
-              </h2>
+          {/* Pemesan & Peserta Card */}
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
+              Daftar Peserta Trip ({guestsCount} Orang)
+            </h2>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {peserta.map((p: any, idx: number) => (
-                  <div key={idx} style={{ backgroundColor: '#ffffff', borderRadius: '14px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
-                      <span style={{ fontSize: '14px', fontWeight: '800', color: '#0284c7' }}>
-                        Peserta {idx + 1}
-                      </span>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>
-                        Umur: {calculateAge(p.tanggalLahir)}
-                      </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {peserta.map((p: any, idx: number) => (
+                <div key={idx} style={{ backgroundColor: '#ffffff', borderRadius: '14px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '800', color: '#0284c7' }}>
+                      Peserta {idx + 1}
+                    </span>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>
+                      Umur: {calculateAge(p.tanggalLahir)}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nama Lengkap</span>
+                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>{p.nama || '-'}</strong>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
-                      <div>
-                        <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nama Lengkap</span>
-                        <strong style={{ fontSize: '14px', color: '#0f172a' }}>{p.nama || '-'}</strong>
-                      </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nomor HP / WhatsApp</span>
+                      <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.hp || '-'}</span>
+                    </div>
 
-                      <div>
-                        <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nomor HP / WhatsApp</span>
-                        <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.hp || '-'}</span>
-                      </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Jenis Kelamin</span>
+                      <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.gender || '-'}</span>
+                    </div>
 
-                      <div>
-                        <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Jenis Kelamin</span>
-                        <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.gender || '-'}</span>
-                      </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Tanggal Lahir</span>
+                      <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.tanggalLahir || '-'}</span>
+                    </div>
 
-                      <div>
-                        <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Tanggal Lahir</span>
-                        <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.tanggalLahir || '-'}</span>
-                      </div>
-
-                      <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #f1f5f9', paddingTop: '10px' }}>
-                        <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Riwayat Penyakit & Alergi</span>
-                        <span style={{ fontSize: '13.5px', fontWeight: '600', color: p.riwayatPenyakit && p.riwayatPenyakit !== 'Tidak Ada' ? '#ef4444' : '#10b981' }}>
-                          {p.riwayatPenyakit || 'Tidak Ada'}
-                        </span>
-                      </div>
+                    <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #f1f5f9', paddingTop: '10px' }}>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Riwayat Penyakit & Alergi</span>
+                      <span style={{ fontSize: '13.5px', fontWeight: '600', color: p.riwayatPenyakit && p.riwayatPenyakit !== 'Tidak Ada' ? '#ef4444' : '#10b981' }}>
+                        {p.riwayatPenyakit || 'Tidak Ada'}
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Payment Method Card */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-                Metode Pembayaran
-              </h2>
-
-              <div style={{ backgroundColor: '#f0fdf4', borderRadius: '12px', padding: '18px', border: '1.5px solid #10b981', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ backgroundColor: '#dcfce7', width: '48px', height: '48px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <CreditCard size={24} color="#10b981" />
                 </div>
-                <div>
-                  <h4 style={{ fontSize: '14.5px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
-                    Xendit Payment Gateway (Otomatis & Real-time)
-                  </h4>
-                  <p style={{ fontSize: '13px', color: '#15803d', margin: 0, fontWeight: '600' }}>
-                    QRIS, Virtual Account (BCA/Mandiri/BRI/BNI), E-Wallet & Kartu Kredit
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
-
-            {/* Agreement Checkbox Card */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px 24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox"
-                  checked={isAgreed}
-                  onChange={(e) => setIsAgreed(e.target.checked)}
-                  style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: '#0284c7', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: '13px', color: '#334155', lineHeight: '1.5' }}>
-                  Saya telah membaca dan menyetujui <strong style={{ color: '#0284c7' }}>Syarat & Ketentuan</strong> serta <strong style={{ color: '#0284c7' }}>Kebijakan Pembatalan TripKita</strong>. Seluruh data peserta yang diisikan adalah benar.
-                </span>
-              </label>
-              {agreementError && (
-                <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '700', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <AlertCircle size={14} /> {agreementError}
-                </span>
-              )}
-            </div>
-
           </div>
 
-          {/* Right Column: Pricing Summary Sidebar */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', position: 'sticky', top: '100px' }}>
+          {/* Ringkasan Pembayaran Card (Positioned directly below Data Peserta) */}
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
               Ringkasan Pembayaran
             </h2>
@@ -308,35 +263,56 @@ export const CustomerConfirmationPage: React.FC = () => {
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Biaya Layanan</span>
-                <span style={{ color: '#10b981', fontWeight: '700' }}>GRATIS</span>
+                <span style={{ color: '#0f172a', fontWeight: '600' }}>{formatIDR(serviceFee)}</span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1.5px dashed #cbd5e1', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1.5px dashed #cbd5e1' }}>
               <strong style={{ fontSize: '14px', color: '#0f172a' }}>TOTAL PEMBAYARAN</strong>
               <strong style={{ fontSize: '18px', color: '#0284c7', fontWeight: '800' }}>{formatIDR(totalCost)}</strong>
             </div>
-
-            <button
-              onClick={handleOpenConfirmModal}
-              disabled={submitting}
-              style={{
-                width: '100%',
-                padding: '14px',
-                backgroundColor: submitting ? '#94a3b8' : '#0284c7',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '12px',
-                fontSize: '15px',
-                fontWeight: '700',
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                boxShadow: submitting ? 'none' : '0 4px 14px rgba(2, 132, 199, 0.3)',
-                transition: 'all 0.2s'
-              }}
-            >
-              {submitting ? 'Memproses Booking...' : 'Konfirmasi & Bayar Sekarang'}
-            </button>
           </div>
+
+          {/* Agreement Checkbox Card */}
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px 24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+              <input 
+                type="checkbox"
+                checked={isAgreed}
+                onChange={(e) => setIsAgreed(e.target.checked)}
+                style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: '#0284c7', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '13px', color: '#334155', lineHeight: '1.5' }}>
+                Saya telah membaca dan menyetujui <strong style={{ color: '#0284c7' }}>Syarat & Ketentuan</strong> serta <strong style={{ color: '#0284c7' }}>Kebijakan Pembatalan TripKita</strong>. Seluruh data peserta yang diisikan adalah benar.
+              </span>
+            </label>
+            {agreementError && (
+              <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '700', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <AlertCircle size={14} /> {agreementError}
+              </span>
+            )}
+          </div>
+
+          {/* Action CTA Button */}
+          <button
+            onClick={handleOpenConfirmModal}
+            disabled={submitting}
+            style={{
+              width: '100%',
+              padding: '16px',
+              backgroundColor: submitting ? '#94a3b8' : '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '16px',
+              fontWeight: '700',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              boxShadow: submitting ? 'none' : '0 4px 14px rgba(2, 132, 199, 0.3)',
+              transition: 'all 0.2s'
+            }}
+          >
+            {submitting ? 'Memproses Booking...' : 'Konfirmasi & Bayar Sekarang'}
+          </button>
 
         </div>
 
