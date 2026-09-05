@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -21,6 +22,7 @@ type Config struct {
 	GoogleClientSecret string
 	GoogleRedirectURI  string
 	FrontendURL        string
+	BackendURL         string
 	XenditAPIKey       string
 	XenditWebhookToken string
 }
@@ -31,6 +33,8 @@ func LoadConfig() *Config {
 	if err != nil {
 		log.Println("No .env file found, relying on system environment variables")
 	}
+
+	xenditKey := strings.TrimSpace(getEnv("XENDIT_SECRET_KEY", getEnv("XENDIT_API_KEY", "")))
 
 	return &Config{
 		Port:               getEnv("PORT", "8080"),
@@ -46,7 +50,8 @@ func LoadConfig() *Config {
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
 		GoogleRedirectURI:  getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/v1/public/auth/google/callback"),
 		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:5173"),
-		XenditAPIKey:       getEnv("XENDIT_SECRET_KEY", getEnv("XENDIT_API_KEY", "")),
+		BackendURL:         getEnv("BACKEND_URL", "https://tripkita-production.up.railway.app"),
+		XenditAPIKey:       xenditKey,
 		XenditWebhookToken: getEnv("XENDIT_WEBHOOK_TOKEN", ""),
 	}
 }

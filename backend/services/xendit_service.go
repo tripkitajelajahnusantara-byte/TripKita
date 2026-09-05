@@ -37,7 +37,7 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 	if s.cfg.XenditAPIKey == "" || s.cfg.XenditAPIKey == "dummy" || s.cfg.XenditAPIKey == "placeholder" {
 		log.Println("[Xendit] Using Simulation Mode (No valid API Key provided)")
 		mockInvoiceID := fmt.Sprintf("xendit_inv_%d", booking.ID)
-		mockPaymentURL := fmt.Sprintf("%s/halaman-pembayaran", s.cfg.FrontendURL)
+		mockPaymentURL := fmt.Sprintf("%s/api/v1/public/xendit-mock-checkout/%d", s.cfg.BackendURL, booking.ID)
 		return mockInvoiceID, mockPaymentURL, nil
 	}
 
@@ -86,7 +86,7 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 	if err != nil {
 		log.Printf("[Xendit Error] Failed connection: %v. Falling back to Simulation Mode.", err)
 		mockInvoiceID := fmt.Sprintf("xendit_inv_%d", booking.ID)
-		mockPaymentURL := fmt.Sprintf("%s/api/v1/public/xendit-mock-checkout/%d", s.cfg.FrontendURL, booking.ID)
+		mockPaymentURL := fmt.Sprintf("%s/api/v1/public/xendit-mock-checkout/%d", s.cfg.BackendURL, booking.ID)
 		return mockInvoiceID, mockPaymentURL, nil
 	}
 	defer resp.Body.Close()
@@ -96,7 +96,7 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		log.Printf("[Xendit Error Response] Status: %d, Body: %s. Falling back to Simulation Mode.", resp.StatusCode, string(bodyBytes))
 		mockInvoiceID := fmt.Sprintf("xendit_inv_%d", booking.ID)
-		mockPaymentURL := fmt.Sprintf("%s/api/v1/public/xendit-mock-checkout/%d", s.cfg.FrontendURL, booking.ID)
+		mockPaymentURL := fmt.Sprintf("%s/api/v1/public/xendit-mock-checkout/%d", s.cfg.BackendURL, booking.ID)
 		return mockInvoiceID, mockPaymentURL, nil
 	}
 
