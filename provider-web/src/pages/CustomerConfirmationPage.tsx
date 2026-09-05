@@ -67,15 +67,22 @@ export const CustomerConfirmationPage: React.FC = () => {
     setShowConfirmModal(false);
     setSubmitting(true);
 
-    let bookingObj: any = null;
-
     try {
+      // Safe tripDate parsing to avoid invalid date toISOString() RangeError crash
+      let parsedTripDate = new Date();
+      if (pkg.bookingDate) {
+        const d = new Date(pkg.bookingDate);
+        if (!isNaN(d.getTime())) {
+          parsedTripDate = d;
+        }
+      }
+
       const payload: any = {
         packageId: Number(pkg.id),
         customerName: pemesan.nama,
         customerInitial: pemesan.nama.charAt(0).toUpperCase(),
         guests: guestsCount,
-        tripDate: new Date(pkg.bookingDate || '2026-05-22').toISOString(),
+        tripDate: parsedTripDate.toISOString(),
         paymentMethod: 'Xendit Invoice',
         participants: peserta.map((p: any) => ({
           nama: p.nama,
@@ -93,13 +100,13 @@ export const CustomerConfirmationPage: React.FC = () => {
       const response = await request('/public/bookings', {
         method: 'POST',
         body: JSON.stringify(payload)
-      }).catch(() => null);
+      });
 
       const nowIso = new Date().toISOString();
 
-      if (response && response.id) {
-        bookingObj = {
-          id: response.id,
+      if (response && (response.id || response.bookingCode)) {
+        const bookingObj = {
+          id: response.id || Date.now(),
           bookingCode: response.bookingCode || `TK-${Math.floor(Math.random() * 90000 + 10000)}`,
           packageName: pkg.name,
           totalPrice: totalCost,
@@ -111,59 +118,29 @@ export const CustomerConfirmationPage: React.FC = () => {
           bankName: 'Bank OCBC',
           paymentUrl: response.paymentUrl || ''
         };
+
+        // Save into local history and sessionStorage
+        const existingHistoryStr = localStorage.getItem('tripkita_my_bookings') || '[]';
+        const history = JSON.parse(existingHistoryStr);
+        history.unshift(bookingObj);
+        localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
+        sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
+
+        // If paymentUrl exists (Xendit Sandbox URL or Mock Checkout), REDIRECT DIRECTLY!
+        if (bookingObj.paymentUrl && bookingObj.paymentUrl.startsWith('http')) {
+          window.location.href = bookingObj.paymentUrl;
+          return;
+        }
+
+        // Only fall back to local invoice page if paymentUrl is missing
+        setSelectedBookingForInvoice(bookingObj);
+        navigateTo('halaman-pembayaran');
       } else {
-        // Fallback local booking object for seamless test flow
-        const randomCode = `TK-${Math.floor(Math.random() * 90000 + 10000)}`;
-        bookingObj = {
-          id: Date.now(),
-          bookingCode: randomCode,
-          packageName: pkg.name,
-          totalPrice: totalCost,
-          guests: guestsCount,
-          tripDate: pkg.bookingDate || '22 Mei 2026',
-          createdAt: nowIso,
-          status: 'PENDING_PAYMENT',
-          vaNumber: '8839001434739102',
-          bankName: 'Bank OCBC',
-          paymentUrl: ''
-        };
+        throw new Error('Respon dari server tidak valid');
       }
-
-      // Save into local history and sessionStorage for active session guest tracking
-      const existingHistoryStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-      const history = JSON.parse(existingHistoryStr);
-      history.unshift(bookingObj);
-      localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
-      sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
-
-      // If a paymentUrl was created (Xendit Invoice or Mock Checkout), redirect directly to payment URL!
-      if (bookingObj.paymentUrl && bookingObj.paymentUrl.startsWith('http')) {
-        window.location.href = bookingObj.paymentUrl;
-        return;
-      }
-
-      // Set for invoice page and navigate!
-      setSelectedBookingForInvoice(bookingObj);
-      navigateTo('halaman-pembayaran');
     } catch (err: any) {
-      console.error(err);
-      const nowIso = new Date().toISOString();
-      const randomCode = `TK-${Math.floor(Math.random() * 90000 + 10000)}`;
-      const fallbackObj = {
-        id: Date.now(),
-        bookingCode: randomCode,
-        packageName: pkg.name,
-        totalPrice: totalCost,
-        guests: guestsCount,
-        tripDate: pkg.bookingDate || '22 Mei 2026',
-        createdAt: nowIso,
-        status: 'PENDING_PAYMENT',
-        vaNumber: '8839001434739102',
-        bankName: 'Bank OCBC',
-        paymentUrl: ''
-      };
-      setSelectedBookingForInvoice(fallbackObj);
-      navigateTo('halaman-pembayaran');
+      console.error("Booking Error:", err);
+      alert(`Gagal memproses pembayaran Xendit: ${err.message || 'Terjadi kesalahan server'}`);
     } finally {
       setSubmitting(false);
     }
