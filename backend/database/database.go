@@ -47,20 +47,24 @@ func ConnectDB(cfg *config.Config) {
 	// Run Auto-Migrations
 	err = DB.AutoMigrate(&models.Provider{}, &models.Package{}, &models.Booking{}, &models.ProviderStatusHistory{}, &models.Payout{})
 	if err != nil {
-		log.Fatalf("Database auto-migration failed: %v", err)
+		log.Printf("[Migration Notice] %v", err)
+	} else {
+		fmt.Println("Database migration completed")
 	}
-	fmt.Println("Database migration completed")
 
 	// Seed DB if empty
 	SeedDatabase()
 }
 
 func SeedDatabase() {
-	fmt.Println("Clearing database tables for clean testing state...")
-	DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.Booking{})
-	DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.Package{})
-	DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.ProviderStatusHistory{})
-	DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.Provider{})
+	var count int64
+	DB.Model(&models.Provider{}).Count(&count)
+	if count > 0 {
+		fmt.Println("Database already seeded, skipping initial seed.")
+		return
+	}
+
+	fmt.Println("Seeding initial database data...")
 
 	// 1. Seed Admin
 	fmt.Println("Seeding default admin account...")
