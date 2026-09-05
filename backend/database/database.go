@@ -62,9 +62,21 @@ func ConnectDB(cfg *config.Config) {
 
 func SeedDatabase() {
 	var count int64
+	todayStr := time.Now().Format("2006-01-02")
+	months := []string{"Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"}
+	now := time.Now()
+	sched3 := fmt.Sprintf("%d %s %d - %d %s %d (3 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 2).Day(), months[now.AddDate(0, 0, 2).Month()-1], now.AddDate(0, 0, 2).Year())
+	sched2 := fmt.Sprintf("%d %s %d - %d %s %d (2 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 1).Day(), months[now.AddDate(0, 0, 1).Month()-1], now.AddDate(0, 0, 1).Year())
+	sched4 := fmt.Sprintf("%d %s %d - %d %s %d (4 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 3).Day(), months[now.AddDate(0, 0, 3).Month()-1], now.AddDate(0, 0, 3).Year())
+
 	DB.Model(&models.Package{}).Count(&count)
 	if count > 0 {
-		fmt.Println("Database already seeded with packages, skipping initial seed.")
+		DB.Model(&models.Package{}).Where("start_date = ? OR schedule LIKE ?", "2026-05-22", "%22 Mei 2026%").Updates(map[string]interface{}{
+			"start_date": todayStr,
+			"end_date":   todayStr,
+			"schedule":   sched3,
+		})
+		fmt.Println("Database already seeded with packages, updated legacy date references.")
 		return
 	}
 
@@ -151,9 +163,9 @@ func SeedDatabase() {
 			QuotaMin:    5,
 			QuotaUsed:   3,
 			QuotaMax:    15,
-			StartDate:   "2026-05-22",
-			EndDate:     "2026-05-24",
-			Schedule:    "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+			StartDate:   todayStr,
+			EndDate:     todayStr,
+			Schedule:    sched3,
 			Status:      "Aktif",
 			Rating:      4.8,
 		},
@@ -167,9 +179,9 @@ func SeedDatabase() {
 			QuotaMin:    4,
 			QuotaUsed:   2,
 			QuotaMax:    12,
-			StartDate:   "2026-05-22",
-			EndDate:     "2026-05-24",
-			Schedule:    "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+			StartDate:   todayStr,
+			EndDate:     todayStr,
+			Schedule:    sched3,
 			Status:      "Aktif",
 			Rating:      4.7,
 		},
@@ -183,9 +195,9 @@ func SeedDatabase() {
 			QuotaMin:    5,
 			QuotaUsed:   4,
 			QuotaMax:    10,
-			StartDate:   "2026-05-22",
-			EndDate:     "2026-05-23",
-			Schedule:    "22 Mei 2026 - 23 Mei 2026 (2 Hari)",
+			StartDate:   todayStr,
+			EndDate:     todayStr,
+			Schedule:    sched2,
 			Status:      "Aktif",
 			Rating:      4.6,
 		},
@@ -199,9 +211,9 @@ func SeedDatabase() {
 			QuotaMin:    2,
 			QuotaUsed:   0,
 			QuotaMax:    10,
-			StartDate:   "2026-05-22",
-			EndDate:     "2026-05-22",
-			Schedule:    "22 Mei 2026 (1 Hari)",
+			StartDate:   todayStr,
+			EndDate:     todayStr,
+			Schedule:    sched2,
 			Status:      "Aktif",
 			Rating:      4.5,
 		},
@@ -215,9 +227,9 @@ func SeedDatabase() {
 			QuotaMin:    5,
 			QuotaUsed:   5,
 			QuotaMax:    15,
-			StartDate:   "2026-05-24",
-			EndDate:     "2026-05-26",
-			Schedule:    "24 Mei 2026 - 26 Mei 2026 (3 Hari)",
+			StartDate:   todayStr,
+			EndDate:     todayStr,
+			Schedule:    sched3,
 			Status:      "Aktif",
 			Rating:      4.7,
 		},
@@ -231,9 +243,9 @@ func SeedDatabase() {
 			QuotaMin:    4,
 			QuotaUsed:   1,
 			QuotaMax:    12,
-			StartDate:   "2026-05-26",
-			EndDate:     "2026-05-27",
-			Schedule:    "26 Mei 2026 - 27 Mei 2026 (2 Hari)",
+			StartDate:   todayStr,
+			EndDate:     todayStr,
+			Schedule:    sched2,
 			Status:      "Aktif",
 			Rating:      4.8,
 		},
@@ -247,9 +259,9 @@ func SeedDatabase() {
 			QuotaMin:    4,
 			QuotaUsed:   0,
 			QuotaMax:    8,
-			StartDate:   "2026-05-28",
-			EndDate:     "2026-05-30",
-			Schedule:    "28 Mei 2026 - 30 Mei 2026 (3 Hari)",
+			StartDate:   todayStr,
+			EndDate:     todayStr,
+			Schedule:    sched3,
 			Status:      "Aktif",
 			Rating:      4.9,
 		},
@@ -263,11 +275,11 @@ func SeedDatabase() {
 			QuotaMin:    2,
 			QuotaUsed:   1,
 			QuotaMax:    20,
-			StartDate:   "2026-05-30",
-			EndDate:     "2026-05-31",
-			Schedule:    "30 Mei 2026 - 31 Mei 2026 (2 Hari)",
+			StartDate:   todayStr,
+			EndDate:     todayStr,
+			Schedule:    sched2,
 			Status:      "Aktif",
-			Rating:      4.6,
+			Rating:      4.8,
 		},
 	}
 

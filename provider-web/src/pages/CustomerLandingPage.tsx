@@ -48,6 +48,30 @@ const categoriesList = [
   'Diving & Snorkeling'
 ];
 
+const getTodayIsoDate = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getDynamicScheduleStr = (daysFromToday: number, durationDays: number) => {
+  const d1 = new Date();
+  d1.setDate(d1.getDate() + daysFromToday);
+  const d2 = new Date(d1);
+  d2.setDate(d2.getDate() + durationDays - 1);
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  const m1 = months[d1.getMonth()];
+  const m2 = months[d2.getMonth()];
+
+  if (m1 === m2) {
+    return `${d1.getDate()} ${m1} ${d1.getFullYear()} - ${d2.getDate()} ${m2} ${d2.getFullYear()} (${durationDays} Hari)`;
+  }
+  return `${d1.getDate()} ${m1} - ${d2.getDate()} ${m2} ${d2.getFullYear()} (${durationDays} Hari)`;
+};
+
 export const CustomerLandingPage: React.FC = () => {
   const { navigateTo, setSelectedPackageForDetail, setSearchParams } = useNavigation();
   const [packages, setPackages] = useState<TripPackage[]>([]);
@@ -55,7 +79,7 @@ export const CustomerLandingPage: React.FC = () => {
 
   // Search widget states
   const [searchDest, setSearchDest] = useState('');
-  const [searchDate, setSearchDate] = useState('2026-05-22'); 
+  const [searchDate, setSearchDate] = useState(getTodayIsoDate()); 
   const [searchType, setSearchType] = useState('Open Trip');   
   const [searchCategory, setSearchCategory] = useState('Semua Kategori');
 
@@ -63,7 +87,7 @@ export const CustomerLandingPage: React.FC = () => {
   const [dateError, setDateError] = useState('');
 
   // Minimum date for date picker (today - no backdates)
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayIsoDate();
 
   const handleSearchSubmit = () => {
     if (!searchDate) {
@@ -92,9 +116,9 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     quotaMin: 5,
     quotaUsed: 3,
     quotaMax: 15,
-    startDate: "2026-05-22",
-    endDate: "2026-05-24",
-    schedule: "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: getDynamicScheduleStr(0, 3),
     status: "Aktif",
     rating: 4.8
   },
@@ -109,9 +133,9 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     quotaMin: 4,
     quotaUsed: 2,
     quotaMax: 12,
-    startDate: "2026-05-22",
-    endDate: "2026-05-24",
-    schedule: "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: getDynamicScheduleStr(0, 3),
     status: "Aktif",
     rating: 4.7
   },
@@ -126,9 +150,9 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     quotaMin: 5,
     quotaUsed: 4,
     quotaMax: 10,
-    startDate: "2026-05-22",
-    endDate: "2026-05-23",
-    schedule: "22 Mei 2026 - 23 Mei 2026 (2 Hari)",
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: getDynamicScheduleStr(0, 2),
     status: "Aktif",
     rating: 4.6
   },
@@ -143,9 +167,9 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     quotaMin: 4,
     quotaUsed: 3,
     quotaMax: 15,
-    startDate: "2026-05-22",
-    endDate: "2026-05-24",
-    schedule: "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: getDynamicScheduleStr(0, 3),
     status: "Aktif",
     rating: 4.9
   },
@@ -154,15 +178,15 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     providerId: 1,
     name: "Wisata Budaya Suku Baduy",
     destination: "Lebak, Banten",
-    category: "Budaya",
+    category: "Wisata Budaya & Sejarah",
     tripType: "Open Trip",
     price: 380000,
     quotaMin: 5,
     quotaUsed: 2,
     quotaMax: 15,
-    startDate: "2026-05-22",
-    endDate: "2026-05-24",
-    schedule: "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: getDynamicScheduleStr(0, 3),
     status: "Aktif",
     rating: 4.8
   },
@@ -177,9 +201,9 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     quotaMin: 6,
     quotaUsed: 4,
     quotaMax: 15,
-    startDate: "2026-05-22",
-    endDate: "2026-05-25",
-    schedule: "22 Mei 2026 - 25 Mei 2026 (4 Hari)",
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: getDynamicScheduleStr(0, 4),
     status: "Aktif",
     rating: 4.9
   },
@@ -194,9 +218,9 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     quotaMin: 4,
     quotaUsed: 2,
     quotaMax: 10,
-    startDate: "2026-05-22",
-    endDate: "2026-05-25",
-    schedule: "22 Mei 2026 - 25 Mei 2026 (4 Hari)",
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: getDynamicScheduleStr(0, 4),
     status: "Aktif",
     rating: 4.7
   },
@@ -211,9 +235,9 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     quotaMin: 4,
     quotaUsed: 3,
     quotaMax: 15,
-    startDate: "2026-05-22",
-    endDate: "2026-05-24",
-    schedule: "22 Mei 2026 - 24 Mei 2026 (3 Hari)",
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: getDynamicScheduleStr(0, 3),
     status: "Aktif",
     rating: 4.8
   }

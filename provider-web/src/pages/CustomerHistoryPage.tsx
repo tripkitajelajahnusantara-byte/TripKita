@@ -262,14 +262,16 @@ export const CustomerHistoryPage: React.FC = () => {
             Ingin mencari pesanan Anda yang hilang? Masukkan Kode Booking (Contoh: TK-2824-xxxx) di bawah ini.
           </p>
 
-          <form onSubmit={handleTrackTicket} style={{ display: 'flex', gap: '10px' }}>
+          <form onSubmit={handleTrackTicket} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <input
               type="text"
               placeholder="Masukkan Kode Booking Anda..."
               value={searchCode}
               onChange={(e) => setSearchCode(e.target.value)}
               style={{
-                flexGrow: 1,
+                flex: '1 1 200px',
+                minWidth: 0,
+                boxSizing: 'border-box',
                 padding: '12px 16px',
                 borderRadius: '8px',
                 border: '1px solid #cbd5e1',
@@ -282,6 +284,7 @@ export const CustomerHistoryPage: React.FC = () => {
               type="submit"
               disabled={trackingLoading}
               style={{
+                flex: '1 0 auto',
                 backgroundColor: '#007bff',
                 color: '#ffffff',
                 border: 'none',
@@ -289,7 +292,8 @@ export const CustomerHistoryPage: React.FC = () => {
                 padding: '12px 24px',
                 fontWeight: '700',
                 fontSize: '14px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}
             >
               {trackingLoading ? 'Melacak...' : 'Cari Tiket'}

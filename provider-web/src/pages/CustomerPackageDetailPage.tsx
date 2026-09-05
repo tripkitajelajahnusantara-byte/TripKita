@@ -377,7 +377,14 @@ export const CustomerPackageDetailPage: React.FC = () => {
         </div>
 
         {/* Content Layout: Left Details, Right Fixed Booking Card */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '30px', alignItems: 'flex-start' }}>
+        <style>{`
+          @media (max-width: 768px) {
+            .detail-grid-layout {
+              grid-template-columns: 1fr !important;
+            }
+          }
+        `}</style>
+        <div className="detail-grid-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '30px', alignItems: 'flex-start' }}>
           
           {/* Left Column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -485,6 +492,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '10px',
                         padding: '14px 16px',
                         borderRadius: '12px',
                         border: isChecked ? '1.5px solid #007bff' : '1px solid #cbd5e1',
@@ -493,18 +502,18 @@ export const CustomerPackageDetailPage: React.FC = () => {
                         transition: 'all 0.2s'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 180px', minWidth: 0 }}>
                         <input 
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => toggleAddOn(addon.id)}
-                          style={{ width: '16px', height: '16px', accentColor: '#007bff', cursor: 'pointer' }}
+                          style={{ width: '16px', height: '16px', accentColor: '#007bff', cursor: 'pointer', flexShrink: 0 }}
                         />
-                        <span style={{ fontSize: '13.5px', fontWeight: '600', color: '#0f172a' }}>
+                        <span style={{ fontSize: '13.5px', fontWeight: '600', color: '#0f172a', wordBreak: 'break-word' }}>
                           {addon.name}
                         </span>
                       </div>
-                      <strong style={{ fontSize: '13.5px', color: '#007bff' }}>
+                      <strong style={{ fontSize: '13.5px', color: '#007bff', flexShrink: 0, marginLeft: 'auto' }}>
                         +{formatIDR(addon.price)}
                       </strong>
                     </label>
