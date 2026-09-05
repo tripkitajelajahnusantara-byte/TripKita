@@ -268,6 +268,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
   };
 
   const handleBookNow = () => {
+    if (availableSeats <= 0) {
+      alert('Maaf, kuota untuk paket ini telah habis. Silakan pilih paket wisata lain.');
+      return;
+    }
     const selectedAddOnObjects = addOnsList.filter(a => selectedAddOnIds.includes(a.id));
     const updatedPkg = {
       ...pkg,
@@ -697,8 +701,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
                 <span>Jumlah Peserta</span>
-                <span style={{ color: remainingAvailable > 0 ? '#10b981' : '#ef4444', fontWeight: '800' }}>
-                  Sisa {remainingAvailable} seat
+                <span style={{ color: availableSeats > 0 ? '#10b981' : '#ef4444', fontWeight: '800' }}>
+                  Sisa {availableSeats} seat
                 </span>
               </label>
               
@@ -711,8 +715,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 <button 
                   type="button"
                   onClick={() => setGuestsCount((prev) => Math.max(1, prev - 1))}
-                  disabled={guestsCount <= 1}
-                  style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: guestsCount <= 1 ? '#e2e8f0' : '#f8fafc', fontWeight: '700', cursor: guestsCount <= 1 ? 'not-allowed' : 'pointer' }}
+                  disabled={guestsCount <= 1 || availableSeats <= 0}
+                  style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: (guestsCount <= 1 || availableSeats <= 0) ? '#e2e8f0' : '#f8fafc', fontWeight: '700', cursor: (guestsCount <= 1 || availableSeats <= 0) ? 'not-allowed' : 'pointer' }}
                 >
                   -
                 </button>
@@ -749,20 +753,22 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
             <button
               onClick={handleBookNow}
+              disabled={availableSeats <= 0}
               style={{
                 width: '100%',
                 padding: '14px',
-                backgroundColor: '#007bff',
+                backgroundColor: availableSeats <= 0 ? '#94a3b8' : '#007bff',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '15px',
                 fontWeight: '700',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(0, 123, 255, 0.3)'
+                cursor: availableSeats <= 0 ? 'not-allowed' : 'pointer',
+                boxShadow: availableSeats <= 0 ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
+                transition: 'all 0.2s'
               }}
             >
-              Pesan Sekarang
+              {availableSeats <= 0 ? 'Kuota Habis (Tidak Bisa Dipesan)' : 'Pesan Sekarang'}
             </button>
           </div>
 

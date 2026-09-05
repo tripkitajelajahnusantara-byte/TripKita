@@ -13,30 +13,39 @@ interface Participant {
 export const CustomerBookingPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, providerProfile, bookingFormData, setBookingFormData } = useNavigation();
 
+  const currentPackageId = selectedPackageForDetail?.id;
+  const activeFormData = (bookingFormData && String(bookingFormData.packageId) === String(currentPackageId)) ? bookingFormData : null;
+
   // Check if user is logged in
   const isLoggedIn = !!(providerProfile && providerProfile.email);
 
-  // Data Pemesan State - initialize from bookingFormData if available, else defaults/profile
-  const [pemesanName, setPemesanName] = useState(() => bookingFormData?.pemesan?.nama || providerProfile?.picName || providerProfile?.businessName || '');
-  const [pemesanEmail, setPemesanEmail] = useState(() => bookingFormData?.pemesan?.email || providerProfile?.email || '');
-  const [pemesanPhone, setPemesanPhone] = useState(() => bookingFormData?.pemesan?.whatsapp || providerProfile?.whatsapp || '');
-  const [pemesanBirthDate, setPemesanBirthDate] = useState(() => bookingFormData?.peserta?.[0]?.tanggalLahir || '1998-05-15');
-  const [pemesanGender, setPemesanGender] = useState(() => bookingFormData?.peserta?.[0]?.gender || 'Laki-laki');
+  // Data Pemesan State - initialize with priority: providerProfile (logged in) > activeFormData > defaults
+  const [pemesanName, setPemesanName] = useState(() => 
+    providerProfile?.picName || providerProfile?.businessName || activeFormData?.pemesan?.nama || ''
+  );
+  const [pemesanEmail, setPemesanEmail] = useState(() => 
+    providerProfile?.email || activeFormData?.pemesan?.email || ''
+  );
+  const [pemesanPhone, setPemesanPhone] = useState(() => 
+    providerProfile?.whatsapp || activeFormData?.pemesan?.whatsapp || ''
+  );
+  const [pemesanBirthDate, setPemesanBirthDate] = useState(() => activeFormData?.peserta?.[0]?.tanggalLahir || '1998-05-15');
+  const [pemesanGender, setPemesanGender] = useState(() => activeFormData?.peserta?.[0]?.gender || 'Laki-laki');
 
   // Checkbox state: Peserta 1 sama dengan Pemesan
   const [isSameAsPemesan, setIsSameAsPemesan] = useState(() => {
-    if (bookingFormData?.peserta && bookingFormData.peserta.length > 0) {
-      const p0 = bookingFormData.peserta[0];
-      return p0.nama === bookingFormData.pemesan.nama && p0.hp === bookingFormData.pemesan.whatsapp;
+    if (activeFormData?.peserta && activeFormData.peserta.length > 0) {
+      const p0 = activeFormData.peserta[0];
+      return p0.nama === activeFormData.pemesan.nama && p0.hp === activeFormData.pemesan.whatsapp;
     }
-    return false;
+    return true; // Default to true so logged-in user details auto-populate Peserta 1!
   });
 
   // Data Peserta Dynamic State
   const guestsCount = selectedPackageForDetail?.bookingGuests || 1;
   const [participants, setParticipants] = useState<Participant[]>(() => {
-    if (bookingFormData?.peserta && bookingFormData.peserta.length > 0) {
-      return bookingFormData.peserta.map(p => ({
+    if (activeFormData?.peserta && activeFormData.peserta.length > 0) {
+      return activeFormData.peserta.map(p => ({
         nama: p.nama || '',
         hp: p.hp || '',
         gender: p.gender || 'Laki-laki',
@@ -50,14 +59,20 @@ export const CustomerBookingPage: React.FC = () => {
   // Validation Error States
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  // Auto-fill fields if user is logged in and form wasn't already filled
+  // Auto-fill fields if user is logged in (Google OAuth or customer account)
   useEffect(() => {
-    if (providerProfile && !bookingFormData) {
-      if (!pemesanName) setPemesanName(providerProfile.picName || providerProfile.businessName || '');
-      if (!pemesanEmail) setPemesanEmail(providerProfile.email || '');
-      if (!pemesanPhone) setPemesanPhone(providerProfile.whatsapp || '');
+    if (providerProfile) {
+      if (providerProfile.picName || providerProfile.businessName) {
+        setPemesanName(providerProfile.picName || providerProfile.businessName || '');
+      }
+      if (providerProfile.email) {
+        setPemesanEmail(providerProfile.email || '');
+      }
+      if (providerProfile.whatsapp) {
+        setPemesanPhone(providerProfile.whatsapp || '');
+      }
     }
-  }, [providerProfile, bookingFormData]);
+  }, [providerProfile]);
 
   // Adjust participants array dynamically whenever guestsCount changes
   useEffect(() => {
@@ -184,6 +199,7 @@ export const CustomerBookingPage: React.FC = () => {
 
     // Save into NavigationContext for Step 5 Confirmation
     setBookingFormData({
+      packageId: currentPackageId,
       pemesan: {
         nama: pemesanName,
         email: pemesanEmail,
