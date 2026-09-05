@@ -116,7 +116,10 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 	}
 
 	booking.ProviderID = pkg.ProviderID
-	booking.TotalPrice = int64(booking.Guests) * pkg.Price
+	const serviceFee int64 = 4000
+	if booking.TotalPrice <= 0 {
+		booking.TotalPrice = int64(booking.Guests)*pkg.Price + serviceFee
+	}
 	booking.Status = "PENDING_PAYMENT"
 	
 	// Ensure unique BookingCode

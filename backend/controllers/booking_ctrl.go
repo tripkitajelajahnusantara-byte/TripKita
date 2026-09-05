@@ -129,6 +129,7 @@ func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 		CustomerName    string    `json:"customerName" binding:"required"`
 		CustomerInitial string    `json:"customerInitial"`
 		Guests          int       `json:"guests" binding:"required,gt=0"`
+		TotalPrice      int64     `json:"totalPrice"`
 		TripDate        time.Time `json:"tripDate" binding:"required"`
 		PaymentMethod   string    `json:"paymentMethod"`
 	}
@@ -148,6 +149,7 @@ func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 		CustomerName:    req.CustomerName,
 		CustomerInitial: req.CustomerInitial,
 		Guests:          req.Guests,
+		TotalPrice:      req.TotalPrice,
 		TripDate:        req.TripDate,
 		PaymentMethod:   req.PaymentMethod,
 	}

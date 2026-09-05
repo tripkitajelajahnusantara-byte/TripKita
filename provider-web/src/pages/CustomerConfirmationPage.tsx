@@ -89,6 +89,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         customerName: pemesan.nama || 'Pelanggan TripKita',
         customerInitial: (pemesan.nama || 'P').charAt(0).toUpperCase(),
         guests: guestsCount || 1,
+        totalPrice: totalCost,
         tripDate: parsedTripDate.toISOString(),
         paymentMethod: 'Xendit Invoice',
         participants: peserta.map((p: any) => ({

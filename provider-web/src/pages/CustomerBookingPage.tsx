@@ -126,7 +126,8 @@ export const CustomerBookingPage: React.FC = () => {
   const pkg = selectedPackageForDetail;
   const selectedAddOns = pkg.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
-  const totalCost = (pkg.price * guestsCount) + addOnsTotal;
+  const serviceFee = 4000;
+  const totalCost = (pkg.price * guestsCount) + addOnsTotal + serviceFee;
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -648,7 +649,7 @@ export const CustomerBookingPage: React.FC = () => {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b' }}>
                 <span>Biaya Layanan</span>
-                <span style={{ color: '#10b981', fontWeight: '600' }}>GRATIS</span>
+                <span style={{ color: '#0f172a', fontWeight: '600' }}>{formatIDR(serviceFee)}</span>
               </div>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '800', color: '#0f172a', borderTop: '1px solid #e2e8f0', paddingTop: '12px', marginTop: '4px' }}>
