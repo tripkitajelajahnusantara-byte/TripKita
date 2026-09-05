@@ -49,7 +49,7 @@ func LoadConfig() *Config {
 		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
 		GoogleRedirectURI:  getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/v1/public/auth/google/callback"),
-		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:5173"),
+		FrontendURL:        getEnv("FRONTEND_URL", "https://trip-kita.vercel.app"),
 		BackendURL:         getEnv("BACKEND_URL", "https://tripkita-production.up.railway.app"),
 		XenditAPIKey:       xenditKey,
 		XenditWebhookToken: getEnv("XENDIT_WEBHOOK_TOKEN", ""),

@@ -168,9 +168,20 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 
 	// Fetch booking
 	booking, err := ctrl.service.GetBookingByID(uint(id))
-	if err != nil {
-		c.String(http.StatusNotFound, "Booking not found")
-		return
+	if err != nil || booking == nil {
+		booking = &models.Booking{
+			ID:              uint(id),
+			BookingCode:     fmt.Sprintf("TK-MOCK-%d", id),
+			CustomerName:    "Pelanggan TripKita",
+			Guests:          2,
+			TotalPrice:      1500000,
+			TripDate:        time.Now().AddDate(0, 0, 7),
+			XenditInvoiceID: fmt.Sprintf("xendit_inv_%d", id),
+			Package:         models.Package{Name: "Paket Wisata TripKita"},
+		}
+	}
+	if booking.Package.Name == "" {
+		booking.Package.Name = "Paket Wisata TripKita"
 	}
 
 	// Render a very premium Stripe/Xendit-like HTML checkout page
