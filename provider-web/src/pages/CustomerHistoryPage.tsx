@@ -162,7 +162,11 @@ export const CustomerHistoryPage: React.FC = () => {
     e.preventDefault();
     setTrackingError('');
     setTrackedBooking(null);
-    if (!searchCode.trim()) return;
+    
+    if (!searchCode.trim()) {
+      setTrackingError('Silakan masukkan Kode Booking Anda terlebih dahulu.');
+      return;
+    }
 
     setTrackingLoading(true);
     try {
@@ -170,7 +174,7 @@ export const CustomerHistoryPage: React.FC = () => {
       setTrackedBooking(data);
     } catch (err: any) {
       console.error(err);
-      setTrackingError('Kode booking tidak ditemukan. Silakan periksa kembali kode Anda.');
+      setTrackingError('Kode booking tidak ditemukan. Mohon masukkan Kode Booking secara lengkap dan tepat (contoh: TK-2824-1889).');
     } finally {
       setTrackingLoading(false);
     }

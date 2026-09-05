@@ -80,7 +80,7 @@ func (r *bookingRepository) FindByBookingCode(code string) (*models.Booking, err
 	var booking models.Booking
 	cleanCode := strings.TrimSpace(code)
 	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Where("LOWER(booking_code) = LOWER(?) OR LOWER(booking_code) LIKE LOWER(?) OR LOWER(?) LIKE CONCAT('%', LOWER(booking_code), '%')", cleanCode, "%"+cleanCode+"%", cleanCode).
+		Where("LOWER(booking_code) = LOWER(?)", cleanCode).
 		Order("id desc").First(&booking).Error
 	if err != nil {
 		return nil, err
