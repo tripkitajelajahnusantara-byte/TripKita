@@ -72,7 +72,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const activeReserved = getActiveBookedGuests(pkg);
   const totalQuotaUsed = Math.min(totalQuotaMax, (pkg.quotaUsed || 0) + activeReserved);
   const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
-  const remainingAvailable = Math.max(0, availableSeats - guestsCount);
 
   // 5 High quality photos per destination matching actual trip content
   const getGalleryImages = (name: string) => {

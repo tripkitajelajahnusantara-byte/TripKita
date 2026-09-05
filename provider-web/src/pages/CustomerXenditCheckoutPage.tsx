@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { QrCode, CreditCard, Building2, CheckCircle2, AlertCircle, Copy, ArrowLeft, ShieldCheck, Clock } from 'lucide-react';
+import { QrCode, CreditCard, Building2, CheckCircle2, Copy, ArrowLeft, ShieldCheck, Clock } from 'lucide-react';
 
 export const CustomerXenditCheckoutPage: React.FC = () => {
   const { navigateTo, selectedBookingForInvoice } = useNavigation();
