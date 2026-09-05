@@ -90,10 +90,8 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 	bodyBytes, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Printf("[Xendit Error Response] Status: %d, Body: %s. Falling back to Simulation Mode.", resp.StatusCode, string(bodyBytes))
-		mockInvoiceID := fmt.Sprintf("xendit_inv_%d", booking.ID)
-		mockPaymentURL := fmt.Sprintf("%s/xendit-checkout", s.cfg.FrontendURL)
-		return mockInvoiceID, mockPaymentURL, nil
+		log.Printf("[Xendit Error Response] Status: %d, Body: %s", resp.StatusCode, string(bodyBytes))
+		return "", "", fmt.Errorf("xendit API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var xenditResp XenditInvoiceResponse
