@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 	"tripkita-provider/config"
 	"tripkita-provider/models"
@@ -42,17 +43,25 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 
 	url := "https://api.xendit.co/v2/invoices"
 	
+	customerEmail := "customer@tripkita.id"
+	if booking.CustomerName != "" {
+		sanitized := strings.ToLower(strings.ReplaceAll(booking.CustomerName, " ", "."))
+		customerEmail = fmt.Sprintf("%s@mail.com", sanitized)
+	}
+
 	payload := map[string]interface{}{
-		"external_id":      fmt.Sprintf("booking_%d", booking.ID),
+		"external_id":      fmt.Sprintf("booking_%d_%d", booking.ID, time.Now().Unix()),
 		"amount":           booking.TotalPrice,
+		"payer_email":      customerEmail,
 		"description":      fmt.Sprintf("Pembayaran Paket Wisata: %s (%d peserta)", packageName, booking.Guests),
 		"invoice_duration": 86400, // 24 hours
 		"customer": map[string]string{
 			"given_names": booking.CustomerName,
-			"email":       fmt.Sprintf("%s@mail.com", booking.CustomerInitial),
+			"email":       customerEmail,
 		},
-		"success_redirect_url": fmt.Sprintf("%s/booking", s.cfg.FrontendURL),
-		"failure_redirect_url": fmt.Sprintf("%s/booking", s.cfg.FrontendURL),
+		"success_redirect_url": fmt.Sprintf("%s/riwayat-booking", s.cfg.FrontendURL),
+		"failure_redirect_url": fmt.Sprintf("%s/riwayat-booking", s.cfg.FrontendURL),
+		"currency":             "IDR",
 	}
 
 	jsonPayload, err := json.Marshal(payload)
@@ -77,7 +86,7 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 	if err != nil {
 		log.Printf("[Xendit Error] Failed connection: %v. Falling back to Simulation Mode.", err)
 		mockInvoiceID := fmt.Sprintf("xendit_inv_%d", booking.ID)
-		mockPaymentURL := fmt.Sprintf("http://localhost:8080/api/v1/public/xendit-mock-checkout/%d", booking.ID)
+		mockPaymentURL := fmt.Sprintf("%s/api/v1/public/xendit-mock-checkout/%d", s.cfg.FrontendURL, booking.ID)
 		return mockInvoiceID, mockPaymentURL, nil
 	}
 	defer resp.Body.Close()
@@ -87,7 +96,7 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		log.Printf("[Xendit Error Response] Status: %d, Body: %s. Falling back to Simulation Mode.", resp.StatusCode, string(bodyBytes))
 		mockInvoiceID := fmt.Sprintf("xendit_inv_%d", booking.ID)
-		mockPaymentURL := fmt.Sprintf("http://localhost:8080/api/v1/public/xendit-mock-checkout/%d", booking.ID)
+		mockPaymentURL := fmt.Sprintf("%s/api/v1/public/xendit-mock-checkout/%d", s.cfg.FrontendURL, booking.ID)
 		return mockInvoiceID, mockPaymentURL, nil
 	}
 
