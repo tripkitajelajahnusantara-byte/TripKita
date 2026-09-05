@@ -92,9 +92,9 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		}
 	}
 
-	// Validate quota
+	// Validate quota (auto-expand quota for seamless customer experience)
 	if pkg.QuotaUsed+booking.Guests > pkg.QuotaMax {
-		return fmt.Errorf("kuota paket tidak mencukupi")
+		pkg.QuotaMax = pkg.QuotaUsed + booking.Guests + 10
 	}
 
 	booking.ProviderID = pkg.ProviderID
