@@ -187,12 +187,9 @@ export const CustomerConfirmationPage: React.FC = () => {
                     <span style={{ fontSize: '14px', fontWeight: '800', color: '#0284c7' }}>
                       Peserta {idx + 1}
                     </span>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>
-                      Umur: {calculateAge(p.tanggalLahir)}
-                    </span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px' }}>
                     <div>
                       <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nama Lengkap</span>
                       <strong style={{ fontSize: '14px', color: '#0f172a' }}>{p.nama || '-'}</strong>
@@ -211,6 +208,11 @@ export const CustomerConfirmationPage: React.FC = () => {
                     <div>
                       <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Tanggal Lahir</span>
                       <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.tanggalLahir || '-'}</span>
+                    </div>
+
+                    <div>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Umur</span>
+                      <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{calculateAge(p.tanggalLahir)}</span>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #f1f5f9', paddingTop: '10px' }}>
