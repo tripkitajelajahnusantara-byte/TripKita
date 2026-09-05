@@ -262,16 +262,16 @@ export const CustomerConfirmationPage: React.FC = () => {
                 Metode Pembayaran
               </h2>
 
-              <div style={{ backgroundColor: '#f0f9ff', borderRadius: '12px', padding: '18px', border: '1.5px solid #0284c7', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ backgroundColor: '#e0f2fe', width: '48px', height: '48px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <CreditCard size={24} color="#0284c7" />
+              <div style={{ backgroundColor: '#f0fdf4', borderRadius: '12px', padding: '18px', border: '1.5px solid #10b981', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ backgroundColor: '#dcfce7', width: '48px', height: '48px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CreditCard size={24} color="#10b981" />
                 </div>
                 <div>
                   <h4 style={{ fontSize: '14.5px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
-                    Transfer Bank (Bank OCBC)
+                    Xendit Payment Gateway (Otomatis & Real-time)
                   </h4>
-                  <p style={{ fontSize: '13px', color: '#0369a1', margin: 0, fontWeight: '600' }}>
-                    Bank OCBC — Rekening: 693800143473 a.n. TripKita
+                  <p style={{ fontSize: '13px', color: '#15803d', margin: 0, fontWeight: '600' }}>
+                    QRIS, Virtual Account (BCA/Mandiri/BRI/BNI), E-Wallet & Kartu Kredit
                   </p>
                 </div>
               </div>
