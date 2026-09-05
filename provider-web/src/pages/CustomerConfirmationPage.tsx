@@ -68,7 +68,7 @@ export const CustomerConfirmationPage: React.FC = () => {
     setSubmitting(true);
 
     const nowIso = new Date().toISOString();
-    const randomCode = `TK-${Math.floor(Math.random() * 90000 + 10000)}`;
+    const randomCode = `TK-${Math.floor(Math.random() * 90000 + 10000)}-${Math.floor(Math.random() * 9000 + 1000)}`;
 
     try {
       let parsedTripDate = new Date();
@@ -113,9 +113,10 @@ export const CustomerConfirmationPage: React.FC = () => {
         throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
       }
 
+      const finalBookingCode = response.bookingCode || response.booking_code || randomCode;
       const bookingObj = {
         id: response.id || Date.now(),
-        bookingCode: response.bookingCode || randomCode,
+        bookingCode: finalBookingCode,
         packageName: pkg.name,
         totalPrice: totalCost,
         guests: guestsCount,

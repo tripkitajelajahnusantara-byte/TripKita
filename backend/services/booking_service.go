@@ -126,9 +126,9 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		booking.BookingCode = fmt.Sprintf("TK-%d-%d", time.Now().Unix()%90000+10000, r.Intn(9000)+1000)
 	}
 
-	// Guarantee uniqueness in database (retry if collision occurs)
+	// Guarantee uniqueness in database (retry if exact collision occurs)
 	for i := 0; i < 5; i++ {
-		existing, errExist := s.repo.FindByBookingCode(booking.BookingCode)
+		existing, errExist := s.repo.FindExactByBookingCode(booking.BookingCode)
 		if errExist == nil && existing != nil && existing.ID != booking.ID {
 			randSource := rand.NewSource(time.Now().UnixNano())
 			r := rand.New(randSource)

@@ -127,17 +127,25 @@ export const CustomerHistoryPage: React.FC = () => {
         // Guest customer: do NOT automatically display old history from previous sessions
         setBookings([]);
 
-        // Check if user JUST placed a booking in this active session
+        // Check if guest user has a recent booking (from sessionStorage or localStorage)
         try {
           const recentStr = sessionStorage.getItem('tripkita_recent_guest_booking');
-          if (recentStr) {
-            const recentObj = JSON.parse(recentStr);
-            if (recentObj && recentObj.bookingCode) {
-              setSearchCode(recentObj.bookingCode);
-              // Auto-track status live from database for this active session booking
-              const liveData = await request(`/public/bookings/status/${recentObj.bookingCode}`).catch(() => recentObj);
-              setTrackedBooking(liveData || recentObj);
+          let recentObj = recentStr ? JSON.parse(recentStr) : null;
+          if (!recentObj) {
+            const localStr = localStorage.getItem('tripkita_my_bookings');
+            if (localStr) {
+              const list = JSON.parse(localStr);
+              if (Array.isArray(list) && list.length > 0) {
+                recentObj = list[0];
+              }
             }
+          }
+          if (recentObj && (recentObj.bookingCode || recentObj.id)) {
+            const targetCode = recentObj.bookingCode || recentObj.id;
+            setSearchCode(targetCode);
+            // Auto-track status live from database for this booking
+            const liveData = await request(`/public/bookings/status/${targetCode}`).catch(() => recentObj);
+            setTrackedBooking(liveData || recentObj);
           }
         } catch (e) {
           console.error(e);

@@ -15,6 +15,7 @@ type BookingRepository interface {
 	FindByID(id uint) (*models.Booking, error)
 	FindByXenditInvoiceID(invoiceID string) (*models.Booking, error)
 	FindByBookingCode(code string) (*models.Booking, error)
+	FindExactByBookingCode(code string) (*models.Booking, error)
 	FindAllRefunds() ([]models.Booking, error)
 	FindAllByCustomer(customerID uint) ([]models.Booking, error)
 	FindAll() ([]models.Booking, error)
@@ -81,6 +82,18 @@ func (r *bookingRepository) FindByBookingCode(code string) (*models.Booking, err
 	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Where("LOWER(booking_code) = LOWER(?) OR LOWER(booking_code) LIKE LOWER(?) OR LOWER(?) LIKE CONCAT('%', LOWER(booking_code), '%')", cleanCode, "%"+cleanCode+"%", cleanCode).
 		Order("id desc").First(&booking).Error
+	if err != nil {
+		return nil, err
+	}
+	return &booking, nil
+}
+
+func (r *bookingRepository) FindExactByBookingCode(code string) (*models.Booking, error) {
+	var booking models.Booking
+	cleanCode := strings.TrimSpace(code)
+	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Where("LOWER(booking_code) = LOWER(?)", cleanCode).
+		First(&booking).Error
 	if err != nil {
 		return nil, err
 	}
