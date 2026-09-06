@@ -3,6 +3,7 @@ import { NavigationProvider, useNavigation } from './context/NavigationContext';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { AboutPage } from './pages/AboutPage';
+import { CustomerHelpPage } from './pages/CustomerHelpPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -184,6 +185,7 @@ const AppContent: React.FC = () => {
         {route === 'cari-trip' && <CustomerSearchPage />}
         {route === 'partner-landing' && <ProviderLandingPage />}
         {route === 'tentang-kami' && <AboutPage />}
+        {route === 'bantuan' && <CustomerHelpPage />}
       </main>
       <Footer />
     </div>

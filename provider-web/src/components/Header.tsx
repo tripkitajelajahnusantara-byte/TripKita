@@ -73,6 +73,12 @@ export const Header: React.FC = () => {
             className={`nav-link ${route === 'tentang-kami' ? 'active' : ''}`}
             onClick={() => handleNav('tentang-kami' as any)}
           >
+            Tentang Kami
+          </button>
+          <button 
+            className={`nav-link ${route === 'bantuan' ? 'active' : ''}`}
+            onClick={() => handleNav('bantuan' as any)}
+          >
             Bantuan
           </button>
         </nav>
@@ -168,6 +174,12 @@ export const Header: React.FC = () => {
             <button 
               className={`mobile-nav-link ${route === 'tentang-kami' ? 'active' : ''}`}
               onClick={() => handleNav('tentang-kami' as any)}
+            >
+              Tentang Kami
+            </button>
+            <button 
+              className={`mobile-nav-link ${route === 'bantuan' ? 'active' : ''}`}
+              onClick={() => handleNav('bantuan' as any)}
             >
               Bantuan
             </button>

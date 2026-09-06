@@ -1,6 +1,7 @@
 export type Route = 
   | 'beranda' 
   | 'tentang-kami' 
+  | 'bantuan' 
   | 'daftar' 
   | 'masuk'
   | 'dashboard' 
