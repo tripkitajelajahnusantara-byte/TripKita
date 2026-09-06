@@ -228,22 +228,31 @@ export const ProviderFinancePage: React.FC = () => {
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button
               onClick={() => {
+                if ((summary?.availableDp || 0) <= 0) {
+                  setModalNotice({
+                    title: 'Saldo DP Belum Tersedia',
+                    message: 'Belum ada saldo DP 50% yang siap dicairkan. Saldo DP 50% akan otomatis masuk ke sini saat pesanan baru lunas dibayar oleh pelanggan.',
+                    isError: true
+                  });
+                  return;
+                }
                 setRequestType('DP_50');
                 setShowRequestModal(true);
               }}
               style={{
                 padding: '12px 20px',
-                backgroundColor: '#0284c7',
+                backgroundColor: (summary?.availableDp || 0) > 0 ? '#0284c7' : '#94a3b8',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '13.5px',
                 fontWeight: '700',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(2, 132, 199, 0.3)',
+                cursor: (summary?.availableDp || 0) > 0 ? 'pointer' : 'not-allowed',
+                boxShadow: (summary?.availableDp || 0) > 0 ? '0 4px 14px rgba(2, 132, 199, 0.3)' : 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
+                opacity: (summary?.availableDp || 0) > 0 ? 1 : 0.75
               }}
             >
               <ArrowUpRight size={18} /> Cairkan DP (50% Awal)
@@ -251,25 +260,36 @@ export const ProviderFinancePage: React.FC = () => {
 
             <button
               onClick={() => {
+                if ((summary?.availablePelunasan || 0) <= 0) {
+                  setModalNotice({
+                    title: 'Pencairan Pelunasan Masih Tertahan',
+                    message: 'Saldo Pelunasan 50% kedua didisable/tertahan selama trip berlangsung. Tombol ini akan otomatis AKTIF dan saldo bisa dicairkan setelah tanggal & jam akhir trip selesai.',
+                    isError: true
+                  });
+                  return;
+                }
                 setRequestType('PELUNASAN_50');
                 setShowRequestModal(true);
               }}
               style={{
                 padding: '12px 20px',
-                backgroundColor: '#16a34a',
+                backgroundColor: (summary?.availablePelunasan || 0) > 0 ? '#16a34a' : '#64748b',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '13.5px',
                 fontWeight: '700',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
+                cursor: (summary?.availablePelunasan || 0) > 0 ? 'pointer' : 'not-allowed',
+                boxShadow: (summary?.availablePelunasan || 0) > 0 ? '0 4px 14px rgba(22, 163, 74, 0.3)' : 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
+                opacity: (summary?.availablePelunasan || 0) > 0 ? 1 : 0.75
               }}
+              title={(summary?.availablePelunasan || 0) > 0 ? 'Klik untuk mencairkan pelunasan' : 'Disabled hingga tanggal & jam trip selesai'}
             >
-              <ArrowUpRight size={18} /> Cairkan Pelunasan (50% Akhir Trip)
+              {(summary?.availablePelunasan || 0) > 0 ? <ArrowUpRight size={18} /> : <Lock size={16} />} 
+              Cairkan Pelunasan (50% Akhir Trip) {(summary?.availablePelunasan || 0) <= 0 && '(Terkunci)'}
             </button>
           </div>
         </div>
