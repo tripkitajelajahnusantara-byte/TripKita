@@ -96,28 +96,49 @@ export const Header: React.FC = () => {
               </button>
             </div>
           ) : (
-            <button 
-              onClick={() => navigateTo('masuk')}
-              style={{ 
-                padding: '9px 24px', 
-                backgroundColor: '#0284c7', 
-                color: '#ffffff', 
-                border: 'none', 
-                borderRadius: '30px', 
-                fontSize: '14px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 3px 10px rgba(2, 132, 199, 0.25)',
-                transition: 'all 0.2s'
-              }} 
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0369a1'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#0284c7'}
-            >
-              <User size={16} /> Masuk
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button 
+                onClick={() => navigateTo('masuk')}
+                style={{ 
+                  padding: '8px 20px', 
+                  backgroundColor: '#0284c7', 
+                  color: '#ffffff', 
+                  border: 'none', 
+                  borderRadius: '30px', 
+                  fontSize: '13.5px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 3px 10px rgba(2, 132, 199, 0.2)',
+                  transition: 'all 0.2s'
+                }} 
+              >
+                <User size={15} /> Masuk Customer
+              </button>
+
+              <button 
+                onClick={() => navigateTo('provider-login')}
+                style={{ 
+                  padding: '8px 18px', 
+                  backgroundColor: '#00a896', 
+                  color: '#ffffff', 
+                  border: 'none', 
+                  borderRadius: '30px', 
+                  fontSize: '13.5px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 3px 10px rgba(0, 168, 150, 0.2)',
+                  transition: 'all 0.2s'
+                }} 
+              >
+                Portal Mitra
+              </button>
+            </div>
           )}
         </div>
 

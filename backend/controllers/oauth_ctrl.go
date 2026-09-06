@@ -31,14 +31,32 @@ func NewOAuthController(db *gorm.DB, cfg *config.Config) *OAuthController {
 // If GOOGLE_CLIENT_ID is not configured, it acts in developer mock mode and redirects
 // the user straight back to the frontend with a valid JWT for the seeded demo account.
 func (ctrl *OAuthController) RedirectToGoogle(c *gin.Context) {
+	authType := c.Query("type")
+	if authType == "" {
+		authType = "provider"
+	}
+
 	if ctrl.cfg.GoogleClientID == "" || ctrl.cfg.GoogleClientSecret == "" {
 		log.Println("[OAuth] Google Client credentials not set in .env. Falling back to Developer Mock Mode.")
 		
-		// Find first provider in DB (which is seeded by default)
 		var provider models.Provider
-		if err := ctrl.db.First(&provider).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get mock provider: " + err.Error()})
-			return
+		if authType == "customer" {
+			ctrl.db.Where("role = ?", "CUSTOMER").First(&provider)
+			if provider.ID == 0 {
+				provider = models.Provider{
+					BusinessName: "Traveler Google Mock",
+					PicName:      "Traveler Mock",
+					Email:        "customer.mock@gmail.com",
+					Role:         "CUSTOMER",
+					Status:       "APPROVED",
+				}
+				ctrl.db.Create(&provider)
+			}
+		} else {
+			if err := ctrl.db.Where("role = ?", "PROVIDER").First(&provider).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get mock provider: " + err.Error()})
+				return
+			}
 		}
 
 		tokenString, err := ctrl.generateJWT(provider.ID, provider.Role)
@@ -47,18 +65,27 @@ func (ctrl *OAuthController) RedirectToGoogle(c *gin.Context) {
 			return
 		}
 
-		redirectURL := fmt.Sprintf("%s/?token=%s", ctrl.cfg.FrontendURL, tokenString)
+		targetRoute := "dashboard"
+		if provider.Role == "CUSTOMER" {
+			targetRoute = "beranda"
+		} else if provider.WhatsApp == "" || provider.OperationalProvince == "" {
+			targetRoute = "profil-provider"
+		}
+
+		redirectURL := fmt.Sprintf("%s/?token=%s&route=%s", ctrl.cfg.FrontendURL, tokenString, targetRoute)
 		log.Printf("[OAuth] Mock Redirecting to: %s\n", redirectURL)
 		c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 		return
 	}
 
 	scope := "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile"
+	state := authType
 	googleAuthURL := fmt.Sprintf(
-		"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=%s",
+		"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s",
 		ctrl.cfg.GoogleClientID,
 		url.QueryEscape(ctrl.cfg.GoogleRedirectURI),
 		url.QueryEscape(scope),
+		url.QueryEscape(state),
 	)
 
 	c.Redirect(http.StatusTemporaryRedirect, googleAuthURL)
@@ -67,6 +94,11 @@ func (ctrl *OAuthController) RedirectToGoogle(c *gin.Context) {
 // GoogleCallback handles the callback redirect from Google.
 func (ctrl *OAuthController) GoogleCallback(c *gin.Context) {
 	code := c.Query("code")
+	state := c.Query("state")
+	if state == "" {
+		state = "provider"
+	}
+
 	if code == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Authorization code is missing"})
 		return
@@ -138,28 +170,49 @@ func (ctrl *OAuthController) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// 3. Find or register provider by email
+	// 3. Find or register provider/customer by email
 	var provider models.Provider
+	targetRoute := "dashboard"
+
 	result := ctrl.db.Where("email = ?", googleProfile.Email).First(&provider)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
-			// Register a new customer auto-filled with Google details
-			provider = models.Provider{
-				BusinessName:        googleProfile.Name,
-				BusinessCategory:     "customer",
-				OperationalProvince: "Indonesia",
-				OperationalCity:     "Indonesia",
-				Description:          "Customer mendaftar melalui Google OAuth.",
-				DocumentUploaded: false,
-				PicName:          googleProfile.Name,
-				Email:            googleProfile.Email,
-				WhatsApp:         "",
-				Role:             "CUSTOMER",
-				Status:           "APPROVED",
-				IsVerified:       true, // Google accounts verified
+			if state == "customer" {
+				provider = models.Provider{
+					BusinessName:        googleProfile.Name,
+					BusinessCategory:     "customer",
+					OperationalProvince: "Indonesia",
+					OperationalCity:     "Indonesia",
+					Description:          "Customer mendaftar via Google OAuth.",
+					DocumentUploaded:    false,
+					PicName:             googleProfile.Name,
+					Email:               googleProfile.Email,
+					WhatsApp:            "",
+					Role:                "CUSTOMER",
+					Status:              "APPROVED",
+					IsVerified:          true,
+				}
+				targetRoute = "beranda"
+			} else {
+				// Register new Provider via Google (Pendaftaran Mitra via Google)
+				provider = models.Provider{
+					BusinessName:        googleProfile.Name,
+					BusinessCategory:     "tour",
+					OperationalProvince: "",
+					OperationalCity:     "",
+					Description:          "Mitra mendaftar via Google OAuth.",
+					DocumentUploaded:    false,
+					PicName:             googleProfile.Name,
+					Email:               googleProfile.Email,
+					WhatsApp:            "",
+					Role:                "PROVIDER",
+					Status:              "PENDING",
+					IsVerified:          true,
+				}
+				targetRoute = "profil-provider" // Direct to complete profile & business info
 			}
 			if err := ctrl.db.Create(&provider).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to auto-register provider: " + err.Error()})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to auto-register user: " + err.Error()})
 				return
 			}
 		} else {
@@ -167,11 +220,17 @@ func (ctrl *OAuthController) GoogleCallback(c *gin.Context) {
 			return
 		}
 	} else {
-		// If user already exists but role is not CUSTOMER (e.g. from initial OAuth test), update role to CUSTOMER
-		if provider.Role != "CUSTOMER" && provider.Role != "ADMIN" {
-			ctrl.db.Model(&provider).Updates(map[string]interface{}{"role": "CUSTOMER", "status": "APPROVED"})
-			provider.Role = "CUSTOMER"
-			provider.Status = "APPROVED"
+		if provider.Role == "CUSTOMER" {
+			targetRoute = "beranda"
+		} else if provider.Role == "PROVIDER" {
+			// If provider profile is missing key details, send to complete profile page
+			if provider.WhatsApp == "" || provider.OperationalProvince == "" || provider.OperationalCity == "" {
+				targetRoute = "profil-provider"
+			} else {
+				targetRoute = "dashboard"
+			}
+		} else if provider.Role == "ADMIN" {
+			targetRoute = "admin-dashboard"
 		}
 	}
 
@@ -182,8 +241,8 @@ func (ctrl *OAuthController) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// 5. Redirect back to frontend
-	redirectURL := fmt.Sprintf("%s/?token=%s", ctrl.cfg.FrontendURL, tokenString)
+	// 5. Redirect back to frontend with specific route
+	redirectURL := fmt.Sprintf("%s/?token=%s&route=%s", ctrl.cfg.FrontendURL, tokenString, targetRoute)
 	c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 }
 

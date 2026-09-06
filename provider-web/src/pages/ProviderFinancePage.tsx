@@ -31,6 +31,7 @@ interface PayoutSummary {
   platformFee: number;
   netEarnings: number;
   availableDp: number;
+  availablePelunasan?: number;
   heldSettlement: number;
   totalPaidOut: number;
   pendingPayout: number;
@@ -73,12 +74,14 @@ export const ProviderFinancePage: React.FC = () => {
   const handleCreatePayoutRequest = async () => {
     if (!summary) return;
 
-    const reqAmount = requestType === 'DP_50' ? summary.availableDp : summary.heldSettlement;
+    const reqAmount = requestType === 'DP_50' ? summary.availableDp : (summary.availablePelunasan || 0);
 
     if (reqAmount <= 0) {
       setModalNotice({
         title: 'Saldo Tidak Mencukupi',
-        message: 'Saat ini belum ada saldo yang siap untuk dicairkan.',
+        message: requestType === 'DP_50' 
+          ? 'Saat ini belum ada saldo DP 50% yang siap untuk dicairkan.' 
+          : 'Belum ada saldo pelunasan 50% yang siap dicairkan. Pelunasan 50% kedua dapat dicairkan setelah trip selesai.',
         isError: true
       });
       return;
@@ -97,7 +100,7 @@ export const ProviderFinancePage: React.FC = () => {
       setShowRequestModal(false);
       setModalNotice({
         title: 'Pengajuan Berhasil Dikirim!',
-        message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim ke Admin TripKita.`
+        message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan Akhir 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim dan akan langsung ditransfer ke rekening bank Mitra Anda.`
       });
       fetchSummary();
     } catch (err: any) {
@@ -114,7 +117,7 @@ export const ProviderFinancePage: React.FC = () => {
 
   const bankName = providerProfile?.bankName || 'Bank BCA';
   const bankAccount = providerProfile?.bankAccount || '1234567890';
-  const bankAccountName = providerProfile?.bankAccountName || providerProfile?.picName || 'Wisata Nusantara';
+  const bankAccountName = providerProfile?.bankAccountName || providerProfile?.picName || providerProfile?.businessName || 'Wisata Nusantara';
 
   return (
     <div className="dashboard-layout animate-fade-in" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
@@ -133,14 +136,14 @@ export const ProviderFinancePage: React.FC = () => {
             </h1>
           </div>
           <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-            Kelola pendapatan trip, saldo DP 50%, dan pengajuan pencairan dana ke rekening bank Anda.
+            Sistem pencairan 50% DP di awal dan 50% Pelunasan setelah trip selesai langsung ke rekening bank Mitra Anda.
           </p>
         </div>
 
         {/* 4 Summary Cards Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px' }}>
           
-          {/* Card 1: Total Pendapatan Bersih (85%) */}
+          {/* Card 1: Total Pendapatan Bersih Mitra */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '22px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -154,11 +157,11 @@ export const ProviderFinancePage: React.FC = () => {
               {formatIDR(summary?.netEarnings || 0)}
             </strong>
             <span style={{ fontSize: '11.5px', color: '#16a34a', fontWeight: '600' }}>
-              85% Net Share (Omset Kotor: {formatIDR(summary?.totalEarnings || 0)})
+              Omset Paket (Tanpa potong biaya platform Rp 4rb)
             </span>
           </div>
 
-          {/* Card 2: Saldo DP 50% (Available) */}
+          {/* Card 2: Saldo DP 50% (Awal) */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '22px', border: '1.5px solid #0284c7', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.08)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -171,14 +174,30 @@ export const ProviderFinancePage: React.FC = () => {
             <strong style={{ fontSize: '20px', fontWeight: '800', color: '#0284c7', display: 'block', marginBottom: '4px' }}>
               {formatIDR(summary?.availableDp || 0)}
             </strong>
-            <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '600' }}>Bisa dicairkan sekarang (Awal)</span>
+            <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '600' }}>Bisa dicairkan awal booking lunas</span>
           </div>
 
-          {/* Card 3: Saldo Pelunasan 50% (Held) */}
+          {/* Card 3: Saldo Pelunasan 50% (Akhir Trip) */}
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '22px', border: '1.5px solid #16a34a', boxShadow: '0 4px 12px rgba(22, 163, 74, 0.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Pelunasan 50% Siap Dicairkan
+              </span>
+              <div style={{ backgroundColor: '#dcfce7', padding: '6px', borderRadius: '8px' }}>
+                <CheckCircle2 size={18} color="#16a34a" />
+              </div>
+            </div>
+            <strong style={{ fontSize: '20px', fontWeight: '800', color: '#16a34a', display: 'block', marginBottom: '4px' }}>
+              {formatIDR(summary?.availablePelunasan || 0)}
+            </strong>
+            <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: '600' }}>Aktif dicairkan (Trip Selesai)</span>
+          </div>
+
+          {/* Card 4: Saldo Pelunasan 50% (Tertahan Sebelum Trip) */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '22px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Pelunasan 50% (Akhir Trip)
+                Pelunasan 50% (Tertahan)
               </span>
               <div style={{ backgroundColor: '#fef3c7', padding: '6px', borderRadius: '8px' }}>
                 <Lock size={18} color="#d97706" />
@@ -187,23 +206,7 @@ export const ProviderFinancePage: React.FC = () => {
             <strong style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
               {formatIDR(summary?.heldSettlement || 0)}
             </strong>
-            <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '600' }}>Dicairkan setelah trip selesai</span>
-          </div>
-
-          {/* Card 4: Fee Platform TripKita 15% */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '22px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Komisi TripKita (15%)
-              </span>
-              <div style={{ backgroundColor: '#f1f5f9', padding: '6px', borderRadius: '8px' }}>
-                <CheckCircle2 size={18} color="#475569" />
-              </div>
-            </div>
-            <strong style={{ fontSize: '20px', fontWeight: '800', color: '#64748b', display: 'block', marginBottom: '4px' }}>
-              {formatIDR(summary?.platformFee || 0)}
-            </strong>
-            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Potongan biaya platform 15%</span>
+            <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '600' }}>Aktif saat tanggal trip selesai</span>
           </div>
 
         </div>
@@ -212,7 +215,7 @@ export const ProviderFinancePage: React.FC = () => {
         <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
           <div>
             <span style={{ fontSize: '12px', fontWeight: '800', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Rekening Bank Tujuan Pencairan
+              Rekening Bank Tujuan Pencairan Dana
             </span>
             <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '4px 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Building2 size={18} color="#0284c7" /> {bankName} — {bankAccount}
@@ -222,19 +225,19 @@ export const ProviderFinancePage: React.FC = () => {
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button
               onClick={() => {
                 setRequestType('DP_50');
                 setShowRequestModal(true);
               }}
               style={{
-                padding: '12px 24px',
+                padding: '12px 20px',
                 backgroundColor: '#0284c7',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '12px',
-                fontSize: '14px',
+                fontSize: '13.5px',
                 fontWeight: '700',
                 cursor: 'pointer',
                 boxShadow: '0 4px 14px rgba(2, 132, 199, 0.3)',
@@ -243,7 +246,30 @@ export const ProviderFinancePage: React.FC = () => {
                 gap: '8px'
               }}
             >
-              <ArrowUpRight size={18} /> Ajukan Pencairan DP (50%)
+              <ArrowUpRight size={18} /> Cairkan DP (50% Awal)
+            </button>
+
+            <button
+              onClick={() => {
+                setRequestType('PELUNASAN_50');
+                setShowRequestModal(true);
+              }}
+              style={{
+                padding: '12px 20px',
+                backgroundColor: '#16a34a',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '13.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <ArrowUpRight size={18} /> Cairkan Pelunasan (50% Akhir Trip)
             </button>
           </div>
         </div>
@@ -327,17 +353,19 @@ export const ProviderFinancePage: React.FC = () => {
             </div>
 
             <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', textAlign: 'center', margin: '0 0 8px 0' }}>
-              Konfirmasi Pengajuan DP (50%)
+              {requestType === 'DP_50' ? 'Konfirmasi Pengajuan DP (50% Awal)' : 'Konfirmasi Pencairan Pelunasan (50% Akhir Trip)'}
             </h3>
 
             <p style={{ fontSize: '13.5px', color: '#64748b', textAlign: 'center', lineHeight: '1.5', margin: '0 0 20px 0' }}>
-              Anda akan mengajukan pencairan Uang Muka DP 50% sebesar:
+              {requestType === 'DP_50' 
+                ? 'Anda akan mengajukan pencairan Uang Muka DP 50% ke rekening bank Mitra sebesar:'
+                : 'Anda akan mengajukan pencairan Sisa Pelunasan 50% Akhir Trip ke rekening bank Mitra sebesar:'}
             </p>
 
             <div style={{ backgroundColor: '#f0f9ff', padding: '16px', borderRadius: '12px', border: '1px solid #bae6fd', textAlign: 'center', marginBottom: '20px' }}>
               <span style={{ fontSize: '12px', color: '#0369a1', display: 'block', marginBottom: '2px' }}>Nominal Pencairan:</span>
               <strong style={{ fontSize: '22px', color: '#0284c7', fontWeight: '800' }}>
-                {formatIDR(summary?.availableDp || 0)}
+                {formatIDR(requestType === 'DP_50' ? (summary?.availableDp || 0) : (summary?.availablePelunasan || 0))}
               </strong>
             </div>
 

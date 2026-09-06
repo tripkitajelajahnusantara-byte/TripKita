@@ -41,7 +41,7 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 
 	if bankName == "" || bankAccount == "" {
 		// Fallback to defaults if empty
-		bankName = "Bank OCBC / BCA"
+		bankName = "Bank BCA"
 		bankAccount = "1234567890"
 		bankAccountName = provider.PicName
 	}
@@ -77,44 +77,76 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 	payouts, _ := s.payoutRepo.GetByProviderID(providerID)
 
 	var totalEarnings float64 = 0
+	var dpEligible float64 = 0
+	var pelunasanEligible float64 = 0
+	var heldSettlement float64 = 0
+
+	now := time.Now()
+
 	for _, b := range bookings {
 		if b.Status == "CONFIRMED" || b.Status == "PAID" || b.Status == "COMPLETED" {
-			totalEarnings += float64(b.TotalPrice)
+			grossPackagePrice := float64(b.TotalPrice)
+			totalEarnings += grossPackagePrice
+
+			halfAmount := grossPackagePrice * 0.5
+			dpEligible += halfAmount
+
+			// Check if trip is finished (either status is COMPLETED or tripDate has passed/arrived)
+			isFinished := b.Status == "COMPLETED" || (!b.TripDate.IsZero() && (now.After(b.TripDate) || now.Equal(b.TripDate)))
+			if isFinished {
+				pelunasanEligible += halfAmount
+			} else {
+				heldSettlement += halfAmount
+			}
 		}
 	}
 
+	var dpPaidOut float64 = 0
+	var pelunasanPaidOut float64 = 0
 	var totalPaidOut float64 = 0
 	var pendingPayout float64 = 0
 
 	for _, p := range payouts {
 		if p.Status == "APPROVED" {
 			totalPaidOut += p.Amount
+			if p.Type == "DP_50" {
+				dpPaidOut += p.Amount
+			} else {
+				pelunasanPaidOut += p.Amount
+			}
 		} else if p.Status == "PENDING" {
 			pendingPayout += p.Amount
+			if p.Type == "DP_50" {
+				dpPaidOut += p.Amount
+			} else {
+				pelunasanPaidOut += p.Amount
+			}
 		}
 	}
 
-	platformFee := totalEarnings * 0.15
-	netEarnings := totalEarnings * 0.85
+	netEarnings := totalEarnings // 100% net package revenue for provider
+	platformFee := 0.0           // Customer service fee (Rp 4.000) is paid by customer and excluded from provider
 
-	// Available DP is 50% of provider net earnings (86%) minus already requested/paid DP
-	availableDP := (netEarnings * 0.5) - totalPaidOut - pendingPayout
+	availableDP := dpEligible - dpPaidOut
 	if availableDP < 0 {
 		availableDP = 0
 	}
 
-	// Held settlement is remaining 50% of provider net earnings
-	heldSettlement := (netEarnings * 0.5)
+	availablePelunasan := pelunasanEligible - pelunasanPaidOut
+	if availablePelunasan < 0 {
+		availablePelunasan = 0
+	}
 
 	return &models.PayoutSummary{
-		TotalEarnings:  totalEarnings,
-		PlatformFee:    platformFee,
-		NetEarnings:    netEarnings,
-		AvailableDP:    availableDP,
-		HeldSettlement: heldSettlement,
-		TotalPaidOut:   totalPaidOut,
-		PendingPayout:  pendingPayout,
-		Payouts:        payouts,
+		TotalEarnings:      totalEarnings,
+		PlatformFee:        platformFee,
+		NetEarnings:        netEarnings,
+		AvailableDP:        availableDP,
+		AvailablePelunasan: availablePelunasan,
+		HeldSettlement:     heldSettlement,
+		TotalPaidOut:       totalPaidOut,
+		PendingPayout:      pendingPayout,
+		Payouts:            payouts,
 	}, nil
 }
 

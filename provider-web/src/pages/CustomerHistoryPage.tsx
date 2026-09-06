@@ -661,28 +661,39 @@ export const CustomerHistoryPage: React.FC = () => {
                           >
                             <MessageSquare size={14} /> Grup WhatsApp
                           </a>
-                          <button
-                            onClick={() => {
-                              setSelectedReviewBooking(booking);
-                              setRatingStars(5);
-                              setReviewText('');
-                            }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              backgroundColor: '#ffffff',
-                              border: '1.5px solid #f59e0b',
-                              color: '#d97706',
-                              padding: '8px 16px',
-                              borderRadius: '8px',
-                              fontWeight: '700',
-                              fontSize: '13px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            ⭐ Beri Ulasan
-                          </button>
+                          
+                          {(() => {
+                            const isFinished = booking.status === 'COMPLETED' || (booking.tripDate && new Date(booking.tripDate) <= new Date());
+                            return (
+                              <button
+                                onClick={() => {
+                                  if (!isFinished) {
+                                    alert('Tombol ulasan dan penilaian bintang akan aktif secara otomatis begitu jadwal trip Anda selesai.');
+                                    return;
+                                  }
+                                  setSelectedReviewBooking(booking);
+                                  setRatingStars(5);
+                                  setReviewText('');
+                                }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  backgroundColor: isFinished ? '#ffffff' : '#f8fafc',
+                                  border: isFinished ? '1.5px solid #f59e0b' : '1px solid #cbd5e1',
+                                  color: isFinished ? '#d97706' : '#94a3b8',
+                                  padding: '8px 16px',
+                                  borderRadius: '8px',
+                                  fontWeight: '700',
+                                  fontSize: '13px',
+                                  cursor: 'pointer'
+                                }}
+                                title={isFinished ? 'Klik untuk memberikan ulasan' : 'Ulasan dapat diberikan setelah waktu trip berakhir'}
+                              >
+                                ⭐ Beri Ulasan {isFinished ? '(Aktif)' : '(Aktif Selesai Trip)'}
+                              </button>
+                            );
+                          })()}
                         </>
                       )}
                     </div>

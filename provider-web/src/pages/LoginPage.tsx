@@ -183,12 +183,13 @@ export const LoginPage: React.FC = () => {
                 <span>atau</span>
               </div>
 
+              {/* Google Auth Button (Set type=provider) */}
               {googleOAuthEnabled ? (
                 <button
                   type="button"
                   className="google-signin-btn"
                   onClick={() => {
-                    window.location.href = `${API_BASE_URL}/public/auth/google`;
+                    window.location.href = `${API_BASE_URL}/public/auth/google?type=provider`;
                   }}
                   disabled={isLoading}
                 >
@@ -198,7 +199,7 @@ export const LoginPage: React.FC = () => {
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
                   </svg>
-                  <span>Masuk dengan Google</span>
+                  <span>Masuk dengan Google (Khusus Mitra)</span>
                 </button>
               ) : (
                 <button
@@ -217,6 +218,53 @@ export const LoginPage: React.FC = () => {
                   <span className="coming-soon-badge">Coming Soon</span>
                 </button>
               )}
+
+              {/* Demo Accounts Picker for 8 Trip Destinations */}
+              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px', marginTop: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <strong style={{ fontSize: '12.5px', color: '#166534' }}>8 Akun Demo Mitra (8 Destinasi Trip)</strong>
+                  <span style={{ fontSize: '11px', backgroundColor: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '10px', fontWeight: '700' }}>Password: demo123</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                  {[
+                    { name: '1. Bromo', email: 'partner@wisatanusantara.id' },
+                    { name: '2. Tidung', email: 'partner2@tidung.id' },
+                    { name: '3. Curug Cilember', email: 'partner3@cilember.id' },
+                    { name: '4. Bandung', email: 'partner4@bandung.id' },
+                    { name: '5. Ranu Kumbolo', email: 'partner5@ranukumbolo.id' },
+                    { name: '6. Baduy', email: 'partner6@baduy.id' },
+                    { name: '7. Palu', email: 'partner7@palu.id' },
+                    { name: '8. Jogja', email: 'partner8@jogja.id' }
+                  ].map((acc) => (
+                    <button
+                      key={acc.email}
+                      type="button"
+                      onClick={() => {
+                        setEmail(acc.email);
+                        setPassword('demo123');
+                        setError('');
+                      }}
+                      style={{
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #86efac',
+                        borderRadius: '8px',
+                        color: '#15803d',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                      title={`Gunakan ${acc.email}`}
+                    >
+                      {acc.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Register Prompt */}
               <p className="register-prompt-text">

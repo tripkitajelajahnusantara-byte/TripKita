@@ -29,12 +29,13 @@ type CreatePayoutRequest struct {
 }
 
 type PayoutSummary struct {
-	TotalEarnings  float64  `json:"totalEarnings"`
-	PlatformFee    float64  `json:"platformFee"`
-	NetEarnings    float64  `json:"netEarnings"`
-	AvailableDP    float64  `json:"availableDp"`
-	HeldSettlement float64  `json:"heldSettlement"`
-	TotalPaidOut   float64  `json:"totalPaidOut"`
-	PendingPayout  float64  `json:"pendingPayout"`
-	Payouts        []Payout `json:"payouts"`
+	TotalEarnings      float64  `json:"totalEarnings"`
+	PlatformFee        float64  `json:"platformFee"`
+	NetEarnings        float64  `json:"netEarnings"`
+	AvailableDP        float64  `json:"availableDp"`
+	AvailablePelunasan float64  `json:"availablePelunasan"`
+	HeldSettlement     float64  `json:"heldSettlement"`
+	TotalPaidOut       float64  `json:"totalPaidOut"`
+	PendingPayout      float64  `json:"pendingPayout"`
+	Payouts            []Payout `json:"payouts"`
 }

@@ -97,7 +97,7 @@ export const CustomerLoginPage: React.FC = () => {
   };
 
   const handleGoogleSignIn = () => {
-    window.location.href = `${API_BASE_URL}/public/auth/google`;
+    window.location.href = `${API_BASE_URL}/public/auth/google?type=customer`;
   };
 
   if (isRegistered && providerProfile) {
@@ -473,6 +473,18 @@ export const CustomerLoginPage: React.FC = () => {
               </button>
             </>
           )}
+        </div>
+
+        <div style={{ marginTop: '16px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+          <span style={{ fontSize: '12.5px', color: '#475569' }}>
+            Mitra Provider / Pemilik Tour?{' '}
+          </span>
+          <span 
+            onClick={() => navigateTo('provider-login')} 
+            style={{ color: '#00a896', fontWeight: 700, cursor: 'pointer', fontSize: '12.5px', textDecoration: 'underline' }}
+          >
+            Masuk ke Dashboard Provider
+          </span>
         </div>
 
       </div>
