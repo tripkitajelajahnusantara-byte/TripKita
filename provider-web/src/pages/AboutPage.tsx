@@ -24,21 +24,18 @@ export const AboutPage: React.FC = () => {
     { year: '2026', title: 'Jaringan Mitra Destinasi Nusantara', desc: 'Mengintegrasikan paket wisata unggulan terverifikasi dari Bromo, Bali, Lombok, hingga Raja Ampat.' },
   ];
 
-  const founders = [
-    { name: 'Evan', role: 'Co-Founder & Product/Project Lead', initial: 'EV', bg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', badge: 'Co-Founder' },
-    { name: 'Garry', role: 'Co-Founder & Tech Strategy Lead', initial: 'GA', bg: 'linear-gradient(135deg, #00c9a7 0%, #0f766e 100%)', badge: 'Co-Founder' },
-  ];
-
-  const teamLeads = [
-    { name: 'Kris', role: 'Provider & Partnership Lead', initial: 'KR', bg: '#f59e0b', dept: 'Partnership' },
-    { name: 'Bakri', role: 'Legal & Compliance Lead', initial: 'BA', bg: '#8b5cf6', dept: 'Legal' },
-    { name: 'Cindy', role: 'Business Analyst Lead', initial: 'CI', bg: '#ec4899', dept: 'Analytics' },
-    { name: 'Farza', role: 'FSD & Documentation Lead', initial: 'FA', bg: '#3b82f6', dept: 'Engineering' },
-    { name: 'Heaven', role: 'Marketing Lead', initial: 'HE', bg: '#10b981', dept: 'Marketing' },
-    { name: 'Ilham', role: 'Customer Relations Lead', initial: 'IL', bg: '#f97316', dept: 'Relations' },
-    { name: 'Kevin', role: 'QA Lead', initial: 'KE', bg: '#14b8a6', dept: 'Quality Assurance' },
-    { name: 'Ando', role: 'Business Development Associate', initial: 'AN', bg: '#6366f1', dept: 'Business Dev' },
-    { name: 'Aan', role: 'Support Lead', initial: 'AA', bg: '#84cc16', dept: 'Customer Support' },
+  const teamMembers = [
+    { name: 'Evan', role: 'Co-Founder & Product/Project Lead', initial: 'EV', bg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', dept: 'Co-Founder & Product' },
+    { name: 'Garry', role: 'Co-Founder & Tech Strategy Lead', initial: 'GA', bg: 'linear-gradient(135deg, #00c9a7 0%, #0f766e 100%)', dept: 'Co-Founder & Tech' },
+    { name: 'Kris', role: 'Provider & Partnership Lead', initial: 'KR', bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', dept: 'Partnership' },
+    { name: 'Bakri', role: 'Legal & Compliance Lead', initial: 'BA', bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', dept: 'Legal' },
+    { name: 'Cindy', role: 'Business Analyst Lead', initial: 'CI', bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', dept: 'Analytics' },
+    { name: 'Farza', role: 'FSD & Documentation Lead', initial: 'FA', bg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', dept: 'Engineering' },
+    { name: 'Heaven', role: 'Marketing Lead', initial: 'HE', bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', dept: 'Marketing' },
+    { name: 'Ilham', role: 'Customer Relations Lead', initial: 'IL', bg: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', dept: 'Relations' },
+    { name: 'Kevin', role: 'QA Lead', initial: 'KE', bg: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', dept: 'Quality Assurance' },
+    { name: 'Ando', role: 'Business Development Associate', initial: 'AN', bg: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)', dept: 'Business Dev' },
+    { name: 'Aan', role: 'Support Lead', initial: 'AA', bg: 'linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%)', dept: 'Customer Support' },
   ];
 
   return (
@@ -170,7 +167,7 @@ export const AboutPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Professional Team Section */}
+      {/* Professional Team Section - Equal Grid Layout with Circular Avatars */}
       <section className="team-section">
         <div className="container">
           <div className="section-header">
@@ -179,35 +176,17 @@ export const AboutPage: React.FC = () => {
             <p className="section-subtitle">Talenta hebat Indonesia yang berdedikasi tinggi membangun platform wisata digital terbaik.</p>
           </div>
 
-          {/* Founders Highlight Grid */}
-          <div className="founders-grid">
-            {founders.map((f, i) => (
-              <div key={i} className="founder-card">
-                <div className="founder-avatar" style={{ background: f.bg }}>
-                  {f.initial}
-                </div>
-                <div className="founder-info">
-                  <div className="founder-top-row">
-                    <h3>{f.name}</h3>
-                    <span className="founder-badge">{f.badge}</span>
-                  </div>
-                  <p className="founder-role">{f.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Team Leads Grid */}
-          <div className="team-leads-grid">
-            {teamLeads.map((t, i) => (
-              <div key={i} className="lead-card">
-                <div className="lead-avatar" style={{ backgroundColor: t.bg }}>
+          {/* Equal Grid of All Team Members */}
+          <div className="unified-team-grid">
+            {teamMembers.map((t, i) => (
+              <div key={i} className="team-member-card">
+                <div className="member-avatar-circle" style={{ background: t.bg }}>
                   {t.initial}
                 </div>
-                <div className="lead-details">
+                <div className="member-info">
                   <h3>{t.name}</h3>
-                  <p>{t.role}</p>
-                  <span className="dept-tag">{t.dept}</span>
+                  <p className="member-role">{t.role}</p>
+                  <span className="member-dept-badge">{t.dept}</span>
                 </div>
               </div>
             ))}
@@ -248,8 +227,9 @@ export const AboutPage: React.FC = () => {
         }
 
         .about-hero p {
-          font-size: 15px;
-          color: #94a3b8;
+          font-size: 16px;
+          color: #e2e8f0;
+          line-height: 1.6;
         }
 
         /* Intro */
@@ -260,20 +240,30 @@ export const AboutPage: React.FC = () => {
 
         .intro-container {
           display: grid;
-          grid-template-columns: 1.1fr 0.9fr;
+          grid-template-columns: 1fr 1fr;
           gap: 60px;
           align-items: center;
         }
 
+        .section-tag {
+          font-size: 12px;
+          font-weight: 800;
+          color: #0284c7;
+          letter-spacing: 1px;
+          display: block;
+          margin-bottom: 8px;
+        }
+
         .intro-content h2 {
-          font-size: 30px;
+          font-size: 32px;
           font-weight: 800;
           color: #0f172a;
           margin-bottom: 20px;
+          line-height: 1.3;
         }
 
         .intro-content p {
-          font-size: 14px;
+          font-size: 15px;
           color: #475569;
           line-height: 1.7;
           margin-bottom: 16px;
@@ -283,84 +273,94 @@ export const AboutPage: React.FC = () => {
           display: flex;
           gap: 32px;
           margin-top: 32px;
-          border-top: 1px solid #e2e8f0;
           padding-top: 24px;
+          border-top: 1px solid #e2e8f0;
         }
 
         .intro-stat-item h3 {
-          font-size: 26px;
+          font-size: 28px;
           font-weight: 800;
-          color: #0284c7;
+          color: #00c9a7;
+          margin-bottom: 4px;
         }
 
         .intro-stat-item p {
-          font-size: 13px;
+          font-size: 12px;
           color: #64748b;
-          margin-bottom: 0;
+          margin: 0;
+          font-weight: 600;
         }
 
-        .intro-media .media-wrapper {
+        .intro-media {
           position: relative;
         }
 
-        .intro-media img {
+        .media-wrapper {
+          position: relative;
+          border-radius: 24px;
+          overflow: hidden;
+          box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.15);
+        }
+
+        .media-wrapper img {
           width: 100%;
-          border-radius: 20px;
-          height: 360px;
+          height: 380px;
           object-fit: cover;
-          box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+          display: block;
         }
 
         .media-pill {
           position: absolute;
           bottom: 24px;
           left: 24px;
-          padding: 12px 20px;
-          border-radius: 14px;
-          background: rgba(15, 23, 42, 0.88);
-          backdrop-filter: blur(8px);
+          right: 24px;
+          background: rgba(255, 255, 255, 0.85);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.6);
+          padding: 16px 20px;
+          border-radius: 16px;
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 14px;
         }
 
         .media-pill strong {
-          color: #ffffff;
-          font-size: 14px;
           display: block;
+          font-size: 14px;
+          color: #0f172a;
         }
 
         .media-pill p {
-          color: #94a3b8;
-          font-size: 11px;
+          font-size: 12px;
+          color: #64748b;
           margin: 0;
         }
 
         /* Vision & Mission */
         .vision-mission-section {
-          padding: 60px 0;
+          padding: 80px 0;
           background: #f8fafc;
         }
 
         .vision-mission-grid {
           display: grid;
-          grid-template-columns: 1fr 1.1fr;
-          gap: 24px;
+          grid-template-columns: 1fr 1fr;
+          gap: 32px;
         }
 
         .vision-card, .mission-card {
-          background-color: #0f172a;
-          color: #ffffff;
-          border-radius: 20px;
+          background: #ffffff;
           padding: 36px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 20px;
+          border: 1px solid #e2e8f0;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.02);
         }
 
         .card-icon-wrapper {
-          background: rgba(0, 201, 167, 0.15);
           width: 48px;
           height: 48px;
           border-radius: 12px;
+          background: #e6fffa;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -368,35 +368,54 @@ export const AboutPage: React.FC = () => {
         }
 
         .vision-card h3, .mission-card h3 {
-          color: #ffffff;
           font-size: 22px;
           font-weight: 800;
-          margin-bottom: 14px;
+          color: #0f172a;
+          margin-bottom: 12px;
         }
 
         .vision-card p {
-          font-size: 14px;
-          color: #94a3b8;
+          font-size: 15px;
+          color: #475569;
           line-height: 1.7;
         }
 
         .mission-card ul {
           list-style: none;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
           padding: 0;
+          margin: 0;
         }
 
         .mission-card li {
-          font-size: 13px;
-          color: #cbd5e1;
+          font-size: 14px;
+          color: #475569;
+          margin-bottom: 12px;
+          line-height: 1.5;
         }
 
         /* Values */
         .values-section {
           padding: 80px 0;
           background: #ffffff;
+        }
+
+        .section-header {
+          text-align: center;
+          max-width: 600px;
+          margin: 0 auto 48px auto;
+        }
+
+        .section-title {
+          font-size: 32px;
+          font-weight: 800;
+          color: #0f172a;
+          margin-top: 6px;
+        }
+
+        .section-subtitle {
+          font-size: 15px;
+          color: #64748b;
+          margin-top: 8px;
         }
 
         .values-grid {
@@ -495,171 +514,96 @@ export const AboutPage: React.FC = () => {
           margin: 0;
         }
 
-        /* Team Section - Sleek & Professional Layout */
+        /* Team Section - Equal Grid Layout with Circular Avatars */
         .team-section {
           padding: 85px 0;
           background: #ffffff;
         }
 
-        .founders-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 24px;
-          max-width: 840px;
-          margin: 36px auto 32px auto;
-        }
-
-        .founder-card {
-          background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-          border: 1.5px solid #bae6fd;
-          border-radius: 20px;
-          padding: 24px 28px;
-          display: flex;
-          align-items: center;
-          gap: 20px;
-          box-shadow: 0 8px 20px -5px rgba(2, 132, 199, 0.1);
-          transition: all 0.2s ease;
-        }
-
-        .founder-card:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 12px 25px -5px rgba(2, 132, 199, 0.2);
-          border-color: #0284c7;
-        }
-
-        .founder-avatar {
-          width: 60px;
-          height: 60px;
-          border-radius: 16px;
-          color: #ffffff;
-          font-size: 20px;
-          font-weight: 800;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          flex-shrink: 0;
-        }
-
-        .founder-info {
-          flex: 1;
-        }
-
-        .founder-top-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 4px;
-        }
-
-        .founder-top-row h3 {
-          font-size: 18px;
-          font-weight: 800;
-          color: #0f172a;
-          margin: 0;
-        }
-
-        .founder-badge {
-          background: #0284c7;
-          color: #ffffff;
-          font-size: 10.5px;
-          font-weight: 800;
-          padding: 3px 10px;
-          border-radius: 20px;
-          letter-spacing: 0.5px;
-        }
-
-        .founder-role {
-          font-size: 13px;
-          font-weight: 600;
-          color: #0369a1;
-          margin: 0;
-        }
-
-        .team-leads-grid {
+        .unified-team-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 20px;
-          max-width: 960px;
-          margin: 0 auto;
+          max-width: 1020px;
+          margin: 36px auto 0 auto;
         }
 
-        .lead-card {
+        .team-member-card {
           background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 16px;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 20px;
           padding: 20px;
           display: flex;
           align-items: center;
           gap: 16px;
-          transition: all 0.2s ease;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .lead-card:hover {
+        .team-member-card:hover {
           border-color: #00c9a7;
-          transform: translateY(-2px);
-          box-shadow: 0 8px 18px -4px rgba(0, 201, 167, 0.15);
+          transform: translateY(-3px);
+          box-shadow: 0 12px 24px -6px rgba(0, 201, 167, 0.15);
         }
 
-        .lead-avatar {
-          width: 48px;
-          height: 48px;
-          border-radius: 14px;
+        .member-avatar-circle {
+          width: 54px;
+          height: 54px;
+          border-radius: 50%;
           color: #ffffff;
-          font-size: 16px;
+          font-size: 17px;
           font-weight: 800;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+          border: 2.5px solid #ffffff;
         }
 
-        .lead-details h3 {
-          font-size: 15px;
+        .member-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .member-info h3 {
+          font-size: 16px;
           font-weight: 800;
           color: #0f172a;
           margin: 0 0 2px 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        .lead-details p {
-          font-size: 12px;
+        .member-role {
+          font-size: 12.5px;
           font-weight: 600;
           color: #475569;
           margin: 0 0 6px 0;
-          line-height: 1.3;
+          line-height: 1.35;
         }
 
-        .dept-tag {
-          font-size: 10px;
-          font-weight: 700;
-          color: #0f766e;
-          background: #f0fdf4;
-          padding: 2px 8px;
-          border-radius: 10px;
-          border: 1px solid #bbf7d0;
+        .member-dept-badge {
           display: inline-block;
+          font-size: 10.5px;
+          font-weight: 700;
+          color: #0284c7;
+          background-color: #f0f9ff;
+          border: 1px solid #bae6fd;
+          padding: 2px 9px;
+          border-radius: 12px;
         }
 
-        @media (max-width: 992px) {
-          .intro-container, .vision-mission-grid {
-            grid-template-columns: 1fr;
-          }
-          .values-grid {
+        @media (max-width: 900px) {
+          .unified-team-grid {
             grid-template-columns: repeat(2, 1fr);
           }
-          .founders-grid, .team-leads-grid {
-            grid-template-columns: 1fr 1fr;
-          }
         }
 
-        @media (max-width: 640px) {
-          .values-grid, .founders-grid, .team-leads-grid {
+        @media (max-width: 600px) {
+          .unified-team-grid {
             grid-template-columns: 1fr;
-          }
-          .intro-stats {
-            flex-direction: column;
-            gap: 16px;
           }
         }
       `}</style>
