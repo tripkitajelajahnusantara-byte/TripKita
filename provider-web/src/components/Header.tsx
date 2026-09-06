@@ -17,19 +17,28 @@ export const Header: React.FC = () => {
         <div className="logo-section" onClick={() => navigateTo('beranda')}>
           <div className="logo-brand">
             <span className="logo-icon" style={{ display: 'flex', alignItems: 'center' }}>
-              <svg width="30" height="30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="32" height="32" rx="10" fill="url(#tementrip-hdr-grad)"/>
-                <path d="M16 6C12.134 6 9 9.134 9 13C9 18.25 16 26 16 26C16 26 23 18.25 23 13C23 9.134 19.866 6 16 6ZM16 16.5C14.067 16.5 12.5 14.933 12.5 13C12.5 11.067 14.067 9.5 16 9.5C17.933 9.5 19.5 11.067 19.5 13C19.5 14.933 17.933 16.5 16 16.5Z" fill="white"/>
-                <path d="M13.5 13C13.5 14.3807 14.6193 15.5 16 15.5C17.3807 15.5 18.5 14.3807 18.5 13" stroke="#007bff" strokeWidth="1.8" strokeLinecap="round"/>
+              <svg width="34" height="34" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="36" height="36" rx="12" fill="url(#cute-tementrip-hdr-grad)"/>
+                <path d="M18 5C12.4772 5 8 9.47715 8 15C8 21.6 18 30 18 30C18 30 28 21.6 28 15C28 9.47715 23.5228 5 18 5Z" fill="white"/>
+                <circle cx="18" cy="14" r="6" fill="#F8FAFC"/>
+                <circle cx="15" cy="13.5" r="1.3" fill="#0F172A"/>
+                <circle cx="21" cy="13.5" r="1.3" fill="#0F172A"/>
+                <circle cx="15.4" cy="13" r="0.4" fill="white"/>
+                <circle cx="21.4" cy="13" r="0.4" fill="white"/>
+                <circle cx="13" cy="15.2" r="1.2" fill="#FF8E8E" opacity="0.8"/>
+                <circle cx="23" cy="15.2" r="1.2" fill="#FF8E8E" opacity="0.8"/>
+                <path d="M16 15.5C16 16.6 16.9 17.5 18 17.5C19.1 17.5 20 16.6 20 15.5" stroke="#0F172A" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M27 5L28.2 7.8L31 9L28.2 10.2L27 13L25.8 10.2L23 9L25.8 7.8L27 5Z" fill="#FFD166"/>
                 <defs>
-                  <linearGradient id="tementrip-hdr-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#007bff"/>
-                    <stop offset="1" stopColor="#00a896"/>
+                  <linearGradient id="cute-tementrip-hdr-grad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#0284C7"/>
+                    <stop offset="0.55" stopColor="#00C9A7"/>
+                    <stop offset="1" stopColor="#FF6B81"/>
                   </linearGradient>
                 </defs>
               </svg>
             </span>
-            <span className="logo-text" style={{ color: '#007bff', fontWeight: 800, fontSize: '22px' }}>Temen<span style={{ color: '#00a896' }}>Trip</span></span>
+            <span className="logo-text" style={{ color: '#0284c7', fontWeight: 800, fontSize: '22px', letterSpacing: '-0.5px' }}>Temen<span style={{ color: '#00c9a7' }}>Trip</span><span style={{ color: '#ff6b81', fontSize: '18px' }}>✨</span></span>
             {isRegistered && providerProfile ? (
               providerProfile.role === 'ADMIN' ? (
                 <span className="logo-badge" style={{ backgroundColor: '#fee2e2', color: '#ef4444', borderColor: '#fecaca' }}>Admin</span>
@@ -107,7 +116,7 @@ export const Header: React.FC = () => {
               <button 
                 onClick={() => navigateTo('masuk')}
                 style={{ 
-                  padding: '8px 20px', 
+                  padding: '8px 22px', 
                   backgroundColor: '#0284c7', 
                   color: '#ffffff', 
                   border: 'none', 
@@ -122,28 +131,7 @@ export const Header: React.FC = () => {
                   transition: 'all 0.2s'
                 }} 
               >
-                <User size={15} /> Masuk Customer
-              </button>
-
-              <button 
-                onClick={() => navigateTo('provider-login')}
-                style={{ 
-                  padding: '8px 18px', 
-                  backgroundColor: '#00a896', 
-                  color: '#ffffff', 
-                  border: 'none', 
-                  borderRadius: '30px', 
-                  fontSize: '13.5px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: '0 3px 10px rgba(0, 168, 150, 0.2)',
-                  transition: 'all 0.2s'
-                }} 
-              >
-                Portal Mitra
+                <User size={15} /> Masuk
               </button>
             </div>
           )}

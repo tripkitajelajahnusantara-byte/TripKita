@@ -219,52 +219,7 @@ export const LoginPage: React.FC = () => {
                 </button>
               )}
 
-              {/* Demo Accounts Picker for 8 Trip Destinations */}
-              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px', marginTop: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <strong style={{ fontSize: '12.5px', color: '#166534' }}>8 Akun Demo Mitra (8 Destinasi Trip)</strong>
-                  <span style={{ fontSize: '11px', backgroundColor: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '10px', fontWeight: '700' }}>Password: demo123</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  {[
-                    { name: '1. Bromo', email: 'partner@wisatanusantara.id' },
-                    { name: '2. Tidung', email: 'partner2@tidung.id' },
-                    { name: '3. Curug Cilember', email: 'partner3@cilember.id' },
-                    { name: '4. Bandung', email: 'partner4@bandung.id' },
-                    { name: '5. Ranu Kumbolo', email: 'partner5@ranukumbolo.id' },
-                    { name: '6. Baduy', email: 'partner6@baduy.id' },
-                    { name: '7. Palu', email: 'partner7@palu.id' },
-                    { name: '8. Jogja', email: 'partner8@jogja.id' }
-                  ].map((acc) => (
-                    <button
-                      key={acc.email}
-                      type="button"
-                      onClick={() => {
-                        setEmail(acc.email);
-                        setPassword('demo123');
-                        setError('');
-                      }}
-                      style={{
-                        padding: '6px 8px',
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #86efac',
-                        borderRadius: '8px',
-                        color: '#15803d',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}
-                      title={`Gunakan ${acc.email}`}
-                    >
-                      {acc.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
+
 
               {/* Register Prompt */}
               <p className="register-prompt-text">
