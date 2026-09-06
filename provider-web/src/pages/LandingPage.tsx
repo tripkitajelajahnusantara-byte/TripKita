@@ -37,7 +37,7 @@ export const LandingPage: React.FC = () => {
             <h1 className="hero-title">
               Kembangkan Bisnis <br />
               <span className="accent-text">Wisata Anda</span> <br />
-              Bersama TripKita
+              Bersama TemenTrip
             </h1>
             <p className="hero-subtitle">
               Bergabunglah dengan 2,500+ provider wisata terpercaya. Jangkau jutaan traveler, kelola booking dengan mudah, dan tingkatkan pendapatan bisnis Anda.
@@ -138,7 +138,7 @@ export const LandingPage: React.FC = () => {
         <div className="container">
           <div className="section-header">
             <span className="section-tag">KEUNTUNGAN PARTNER</span>
-            <h2 className="section-title">Kenapa Pilih TripKita?</h2>
+            <h2 className="section-title">Kenapa Pilih TemenTrip?</h2>
             <p className="section-subtitle">
               Platform terlengkap untuk mengembangkan bisnis wisata Anda secara digital.
             </p>
@@ -178,7 +178,7 @@ export const LandingPage: React.FC = () => {
               </div>
               <h3>Jangkauan Nasional</h3>
               <p>
-                Tampil di aplikasi & website TripKita yang dikunjungi 1M+ juta user setiap bulan dari seluruh Indonesia.
+                Tampil di aplikasi & website TemenTrip yang dikunjungi 1M+ juta user setiap bulan dari seluruh Indonesia.
               </p>
             </div>
           </div>
@@ -258,7 +258,7 @@ export const LandingPage: React.FC = () => {
                 ))}
               </div>
               <p className="testimonial-quote">
-                "Bergabung dengan TripKita adalah keputusan terbaik untuk bisnis wisata saya. Dalam 3 bulan, booking meningkat 4x lipat dan pendapatan naik signifikan."
+                "Bergabung dengan TemenTrip adalah keputusan terbaik untuk bisnis wisata saya. Dalam 3 bulan, booking meningkat 4x lipat dan pendapatan naik signifikan."
               </p>
               <div className="testimonial-user">
                 <span className="avatar bg-green">BS</span>
@@ -292,7 +292,7 @@ export const LandingPage: React.FC = () => {
                 ))}
               </div>
               <p className="testimonial-quote">
-                "Support team TripKita luar biasa responsif. Setiap pertanyaan langsung dijawab dan masalah teknis diselesaikan dengan cepat."
+                "Support team TemenTrip luar biasa responsif. Setiap pertanyaan langsung dijawab dan masalah teknis diselesaikan dengan cepat."
               </p>
               <div className="testimonial-user">
                 <span className="avatar bg-orange">AF</span>
@@ -312,7 +312,7 @@ export const LandingPage: React.FC = () => {
           <div className="cta-icon-wrapper">
             <Compass size={36} color="#00a896" />
           </div>
-          <h2>Siap Bergabung dengan TripKita?</h2>
+          <h2>Siap Bergabung dengan TemenTrip?</h2>
           <p>Daftar sekarang dan mulai terima booking dalam 24 jam. Gratis tanpa biaya setup.</p>
           
           <div className="cta-actions">

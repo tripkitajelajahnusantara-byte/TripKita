@@ -244,7 +244,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   children: [
                     Icon(Icons.confirmation_num_outlined, color: Color(0xFF0F8B8D), size: 16),
                     SizedBox(width: 6),
-                    Text('E-VOUCHER TRIPKITA', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF0F8B8D), letterSpacing: 1)),
+                    Text('E-VOUCHER TEMENTRIP', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF0F8B8D), letterSpacing: 1)),
                   ],
                 ),
                 const SizedBox(height: 12),

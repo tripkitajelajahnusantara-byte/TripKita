@@ -162,7 +162,7 @@ export const RegisterPage: React.FC = () => {
                 Anda Hari Ini
               </h2>
               <p className="sidebar-subtitle">
-                Bergabung dengan ribuan provider wisata yang sudah berkembang bersama TripKita. Daftar gratis dan mulai terima booking hari ini.
+                Bergabung dengan ribuan provider wisata yang sudah berkembang bersama TemenTrip. Daftar gratis dan mulai terima booking hari ini.
               </p>
             </div>
           </div>
@@ -176,7 +176,7 @@ export const RegisterPage: React.FC = () => {
                 </div>
                 <h2 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '12px' }}>Pendaftaran Berhasil!</h2>
                 <p style={{ fontSize: '14px', color: 'var(--color-text-medium)', lineHeight: 1.6, marginBottom: '24px' }}>
-                  Terima kasih telah mendaftar sebagai partner TripKita. Akun Anda saat ini <strong>sedang menunggu verifikasi</strong> dari tim Admin kami.
+                  Terima kasih telah mendaftar sebagai partner TemenTrip. Akun Anda saat ini <strong>sedang menunggu verifikasi</strong> dari tim Admin kami.
                 </p>
                 <div style={{ backgroundColor: 'var(--color-bg-light)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '16px', textAlign: 'left', marginBottom: '28px', fontSize: '13px', color: 'var(--color-text-medium)', lineHeight: 1.6 }}>
                   <p style={{ fontWeight: 600, color: 'var(--color-primary-medium)', marginBottom: '8px' }}>Langkah Selanjutnya:</p>
@@ -203,9 +203,19 @@ export const RegisterPage: React.FC = () => {
         {/* Left Info Sidebar */}
         <div className="register-sidebar">
           <div className="sidebar-logo">
-            <span className="logo-brand">
-              <span className="logo-icon">🗺️</span>
-              <span className="logo-text">Trip<span>Kita</span></span>
+            <span className="logo-brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" rx="10" fill="url(#tementrip-reg-grad)"/>
+                <path d="M16 6C12.134 6 9 9.134 9 13C9 18.25 16 26 16 26C16 26 23 18.25 23 13C23 9.134 19.866 6 16 6ZM16 16.5C14.067 16.5 12.5 14.933 12.5 13C12.5 11.067 14.067 9.5 16 9.5C17.933 9.5 19.5 11.067 19.5 13C19.5 14.933 17.933 16.5 16 16.5Z" fill="white"/>
+                <path d="M13.5 13C13.5 14.3807 14.6193 15.5 16 15.5C17.3807 15.5 18.5 14.3807 18.5 13" stroke="#007bff" strokeWidth="1.8" strokeLinecap="round"/>
+                <defs>
+                  <linearGradient id="tementrip-reg-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#007bff"/>
+                    <stop offset="1" stopColor="#00a896"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+              <span className="logo-text" style={{ color: '#007bff', fontWeight: 800, fontSize: '20px' }}>Temen<span style={{ color: '#00a896' }}>Trip</span></span>
               <span className="logo-badge">Partner</span>
             </span>
           </div>
@@ -217,7 +227,7 @@ export const RegisterPage: React.FC = () => {
               Anda Hari Ini
             </h2>
             <p className="sidebar-subtitle">
-              Bergabung dengan ribuan provider wisata yang sudah berkembang bersama TripKita. Daftar gratis dan mulai terima booking hari ini.
+              Bergabung dengan ribuan provider wisata yang sudah berkembang bersama TemenTrip. Daftar gratis dan mulai terima booking hari ini.
             </p>
 
             <ul className="benefits-checklist">
@@ -367,7 +377,7 @@ export const RegisterPage: React.FC = () => {
 
                   {/* Informational Notice */}
                   <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '14px', fontSize: '12px', color: '#1e3a8a', lineHeight: '1.5', marginBottom: '20px' }}>
-                    <strong>💡 Info Tambahan Dokumen:</strong> Mengunggah dokumen legalitas bisnis tambahan seperti SIUP, NPWP, Akta Pendirian, dan Sertifikat Pariwisata membantu meningkatkan kredibilitas provider, memperkuat proses verifikasi usaha, meningkatkan kepercayaan wisatawan, serta meningkatkan visibilitas di platform TripKita.
+                    <strong>💡 Info Tambahan Dokumen:</strong> Mengunggah dokumen legalitas bisnis tambahan seperti SIUP, NPWP, Akta Pendirian, dan Sertifikat Pariwisata membantu meningkatkan kredibilitas provider, memperkuat proses verifikasi usaha, meningkatkan kepercayaan wisatawan, serta meningkatkan visibilitas di platform TemenTrip.
                   </div>
 
                   {/* Optional Docs Grid */}
@@ -524,7 +534,7 @@ export const RegisterPage: React.FC = () => {
                     onChange={(e) => updateRegisterData({ agreeToTerms: e.target.checked })}
                   />
                   <label htmlFor="terms">
-                    Saya menyetujui <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTermsModal(true); }} style={{ color: 'var(--color-accent)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Syarat & Ketentuan dan Kebijakan Privasi</span> TripKita Partner
+                    Saya menyetujui <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTermsModal(true); }} style={{ color: 'var(--color-accent)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Syarat & Ketentuan dan Kebijakan Privasi</span> TemenTrip Partner
                   </label>
                 </div>
                 {localErrors.agree && <span className="error-text block-error">{localErrors.agree}</span>}
@@ -551,7 +561,7 @@ export const RegisterPage: React.FC = () => {
         <div className="modal-overlay">
           <div className="modal-content premium-terms-modal">
             <div className="modal-header">
-              <h2>Syarat & Ketentuan dan Kebijakan Privasi TripKita</h2>
+              <h2>Syarat & Ketentuan dan Kebijakan Privasi TemenTrip</h2>
               <button 
                 type="button"
                 className="close-x-btn" 
@@ -561,13 +571,13 @@ export const RegisterPage: React.FC = () => {
               </button>
             </div>
             <div className="modal-body scrollable-terms-body">
-              <h3>SYARAT DAN KETENTUAN LAYANAN MITRA TRIPKITA</h3>
-              <p>Selamat datang di TripKita. Syarat & Ketentuan Layanan Mitra ("Ketentuan") ini mengatur hubungan hukum antara TripKita (selaku pemilik dan pengelola platform) dengan Mitra Jasa Pariwisata ("Mitra" atau "Anda") yang menggunakan platform kami untuk menawarkan jasa dan layanan pariwisata. Dengan mendaftar, mengakses, atau menggunakan layanan kami, Anda menyatakan bahwa Anda telah membaca, memahami, dan menyetujui Ketentuan ini.</p>
+              <h3>SYARAT DAN KETENTUAN LAYANAN MITRA TEMENTRIP</h3>
+              <p>Selamat datang di TemenTrip. Syarat & Ketentuan Layanan Mitra ("Ketentuan") ini mengatur hubungan hukum antara TemenTrip (selaku pemilik dan pengelola platform) dengan Mitra Jasa Pariwisata ("Mitra" atau "Anda") yang menggunakan platform kami untuk menawarkan jasa dan layanan pariwisata. Dengan mendaftar, mengakses, atau menggunakan layanan kami, Anda menyatakan bahwa Anda telah membaca, memahami, dan menyetujui Ketentuan ini.</p>
               
               <strong>1. KETENTUAN UMUM</strong>
               <p>1.1 Kemitraan: Kemitraan ini adalah hubungan kontraktual antara pihak akademis/independen dan bukan merupakan hubungan kerja, keagenan, waralaba, atau kemitraan hukum (partnership) lainnya.<br/>
-              1.2 Perubahan Ketentuan: TripKita berhak untuk mengubah Ketentuan ini sewaktu-waktu. Perubahan akan diumumkan melalui platform dan akan berlaku efektif 7 (tujuh) hari setelah pengumuman.<br/>
-              1.3 Layanan Platform: TripKita menyediakan platform online sebagai sarana bagi Mitra untuk menawarkan dan menjual paket perjalanan wisata kepada pengguna akhir.</p>
+              1.2 Perubahan Ketentuan: TemenTrip berhak untuk mengubah Ketentuan ini sewaktu-waktu. Perubahan akan diumumkan melalui platform dan akan berlaku efektif 7 (tujuh) hari setelah pengumuman.<br/>
+              1.3 Layanan Platform: TemenTrip menyediakan platform online sebagai sarana bagi Mitra untuk menawarkan dan menjual paket perjalanan wisata kepada pengguna akhir.</p>
 
               <strong>2. PENDAFTARAN MITRA DAN AKUN</strong>
               <p>2.1 Persyaratan Pendaftaran: Mitra wajib mengunggah dokumen legalitas sebagai berikut:<br/>
@@ -577,36 +587,36 @@ export const RegisterPage: React.FC = () => {
               Kategori bisnis yang didukung meliputi: Open Trip, Private Trip, Corporate Trip / Gathering, Family Trip, Honeymoon Trip, City Tour, Cultural & Heritage Tour.<br/>
               2.2 Keakuratan Informasi: Mitra wajib memberikan informasi yang akurat, lengkap, dan terbaru selama proses pendaftaran dan pemeliharaan akun demi kenyamanan pengguna dan kelancaran program.<br/>
               2.3 Keamanan Akun: Mitra bertanggung jawab penuh atas kerahasiaan kredensial akun dan setiap aktivitas yang terjadi di bawah akun Mitra.<br/>
-              2.4 Penolakan Pendaftaran: TripKita berhak menolak pendaftaran Mitra tanpa kewajiban memberikan alasan.</p>
+              2.4 Penolakan Pendaftaran: TemenTrip berhak menolak pendaftaran Mitra tanpa kewajiban memberikan alasan.</p>
 
               <strong>3. HAK DAN KEWAJIBAN MITRA</strong>
               <p>3.1 Penyediaan Layanan: Mitra wajib menyediakan layanan pariwisata yang ditawarkan secara profesional dan sesuai dengan deskripsi paket yang dipublikasikan. Mitra wajib memastikan keselamatan dan kenyamanan pengguna akhir selama pelaksanaan program wisata.<br/>
               3.2 Harga dan Ketersediaan: Mitra berhak menentukan harga paket wisatanya sendiri. Mitra wajib memperbarui ketersediaan kuota paket wisata secara berkala di platform.<br/>
               3.3 Komunikasi dengan Pengguna: Mitra wajib berkomunikasi dengan pengguna akhir secara sopan, cepat, dan profesional melalui sarana komunikasi yang disetujui.<br/>
-              3.4 Larangan Transaksi di Luar Platform: Mitra dilarang keras mengarahkan pengguna akhir untuk melakukan transaksi pembayaran di luar platform TripKita. Pelanggaran terhadap ketentuan ini dapat mengakibatkan penangguhan atau pemutusan akun Mitra secara permanen.</p>
+              3.4 Larangan Transaksi di Luar Platform: Mitra dilarang keras mengarahkan pengguna akhir untuk melakukan transaksi pembayaran di luar platform TemenTrip. Pelanggaran terhadap ketentuan ini dapat mengakibatkan penangguhan atau pemutusan akun Mitra secara permanen.</p>
 
               <strong>4. BIAYA DAN PEMBAYARAN</strong>
-              <p>4.1 Biaya Layanan: TripKita mengenakan biaya komisi sebesar 10% (sepuluh persen) dari setiap transaksi pembayaran paket wisata yang berhasil dilakukan melalui platform. Biaya ini akan dipotong sebelum pencairan dana ke Mitra.<br/>
+              <p>4.1 Biaya Layanan: TemenTrip mengenakan biaya komisi sebesar 10% (sepuluh persen) dari setiap transaksi pembayaran paket wisata yang berhasil dilakukan melalui platform. Biaya ini akan dipotong sebelum pencairan dana ke Mitra.<br/>
               4.2 Pencairan Dana: Dana hasil penjualan paket wisata akan dicairkan ke rekening bank terdaftar milik Mitra setelah program wisata selesai dilaksanakan dan dikonfirmasi oleh pengguna akhir. Proses pencairan dana membutuhkan waktu 1-3 hari kerja.</p>
 
               <strong>5. PEMBATALAN DAN PENGEMBALIAN DANA (REFUND)</strong>
               <p>5.1 Pembatalan oleh Pengguna: Pengembalian dana akibat pembatalan oleh pengguna tunduk pada kebijakan pembatalan masing-masing paket wisata yang ditetapkan oleh Mitra.<br/>
-              5.2 Pembatalan oleh Mitra: Jika Mitra membatalkan keberangkatan program wisata secara sepihak, Mitra wajib mengembalikan dana 100% kepada pengguna akhir melalui platform, dan TripKita berhak mengenakan denda administrasi kepada Mitra.<br/>
-              5.3 Kebijakan Refund Khusus: Dalam hal terjadi force majeure, pengembalian dana akan didasarkan pada kesepakatan bersama antara Mitra, Pengguna, dan TripKita.</p>
+              5.2 Pembatalan oleh Mitra: Jika Mitra membatalkan keberangkatan program wisata secara sepihak, Mitra wajib mengembalikan dana 100% kepada pengguna akhir melalui platform, dan TemenTrip berhak mengenakan denda administrasi kepada Mitra.<br/>
+              5.3 Kebijakan Refund Khusus: Dalam hal terjadi force majeure, pengembalian dana akan didasarkan pada kesepakatan bersama antara Mitra, Pengguna, dan TemenTrip.</p>
 
               <strong>6. PERNYATAAN DAN JAMINAN</strong>
               <p>6.1 Legalitas Usaha: Mitra menyatakan dan menjamin bahwa ia memiliki seluruh perizinan dan lisensi usaha yang sah untuk menjalankan jasa pariwisata yang ditawarkan.<br/>
               6.2 Kepemilikan Konten: Mitra jamin bahwa seluruh materi promosi, gambar, dan deskripsi paket wisata yang diunggah tidak melanggar hak kekayaan intelektual pihak ketiga.</p>
 
               <strong>7. BATASAN TANGGUNG JAWAB DAN GANTI RUGI</strong>
-              <p>7.1 Tanggung Jawab Platform: TripKita bertindak hanya sebagai platform perantara dan tidak bertanggung jawab atas kerugian, cedera, keterlambatan, atau klaim apa pun yang timbul akibat kelalaian atau kegagalan Mitra.<br/>
-              7.2 Ganti Rugi: Mitra setuju untuk membebaskan, membela, dan melindungi TripKita dari segala tuntutan hukum, klaim, kerugian, biaya, dan pengeluaran yang timbul akibat pelanggaran Ketentuan ini oleh Mitra.</p>
+              <p>7.1 Tanggung Jawab Platform: TemenTrip bertindak hanya sebagai platform perantara dan tidak bertanggung jawab atas kerugian, cedera, keterlambatan, atau klaim apa pun yang timbul akibat kelalaian atau kegagalan Mitra.<br/>
+              7.2 Ganti Rugi: Mitra setuju untuk membebaskan, membela, dan melindungi TemenTrip dari segala tuntutan hukum, klaim, kerugian, biaya, dan pengeluaran yang timbul akibat pelanggaran Ketentuan ini oleh Mitra.</p>
 
               <strong>8. FORCE MAJEURE</strong>
               <p>8.1 Keadaan Kahar: Kedua belah pihak dibebaskan dari tanggung jawab atas kegagalan pelaksanaan kewajiban akibat keadaan di luar kendali yang wajar, termasuk bencana alam, perang, huru-hara, pemogokan massal, wabah penyakit, dan kebijakan pemerintah.</p>
 
               <strong>9. PENANGGUHAN DAN PEMUTUSAN AKUN</strong>
-              <p>9.1 Pelanggaran Mitra: TripKita berhak menangguhkan atau memutuskan akun Mitra secara sepihak jika Mitra terbukti melanggar Ketentuan ini, melakukan penipuan, menerima keluhan berulang dari pengguna, atau merusak reputasi platform.<br/>
+              <p>9.1 Pelanggaran Mitra: TemenTrip berhak menangguhkan atau memutuskan akun Mitra secara sepihak jika Mitra terbukti melanggar Ketentuan ini, melakukan penipuan, menerima keluhan berulang dari pengguna, atau merusak reputasi platform.<br/>
               9.2 Pemutusan Sukarela: Mitra dapat mengajukan pemutusan kemitraan dan penuturan akun secara tertulis dengan ketentuan seluruh kewajiban transaksi dan keberangkatan paket wisata telah diselesaikan.</p>
 
               <strong>10. PENYELESAIAN PERSELISIHAN</strong>
@@ -616,10 +626,10 @@ export const RegisterPage: React.FC = () => {
               <strong>11. LAIN-LAIN</strong>
               <p>11.1 Keterpisahan (Severability): Jika ada ketentuan dalam Ketentuan ini yang dinyatakan tidak sah, ketentuan lainnya akan tetap berlaku penuh.<br/>
               11.2 Hukum yang Berlaku: Ketentuan ini diatur dan ditafsirkan sesuai dengan hukum Negara Republik Indonesia.<br/>
-              11.3 Keseluruhan Perjanjian: Ketentuan ini merupakan keseluruhan perjanjian antara TripKita dan Mitra.</p>
+              11.3 Keseluruhan Perjanjian: Ketentuan ini merupakan keseluruhan perjanjian antara TemenTrip dan Mitra.</p>
 
               <strong>12. HUBUNGI KAMI</strong>
-              <p>Jika Anda memiliki pertanyaan mengenai Ketentuan ini, Anda dapat menghubungi kami melalui email support@tripkita.id atau WhatsApp +62 800 0000 0000.</p>
+              <p>Jika Anda memiliki pertanyaan mengenai Ketentuan ini, Anda dapat menghubungi kami melalui email support@tementrip.id atau WhatsApp +62 800 0000 0000.</p>
             </div>
             <div className="modal-footer">
               <button 

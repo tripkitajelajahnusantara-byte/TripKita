@@ -59,14 +59,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ],
     ),
     ChatConversation(
-      name: 'TripKita Support',
+      name: 'TemenTrip Support',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
       lastMessage: 'Halo Kak Budi, ada yang bisa kami bantu terkait keberangkatan Raja Ampat?',
       time: '14:30',
       unreadCount: 2,
       isVerified: true,
       messages: [
-        {'isSender': false, 'text': 'Selamat siang Kak Budi! Terima kasih telah memesan melalui TripKita.', 'time': '14:25'},
+        {'isSender': false, 'text': 'Selamat siang Kak Budi! Terima kasih telah memesan melalui TemenTrip.', 'time': '14:25'},
         {'isSender': false, 'text': 'Halo Kak Budi, ada yang bisa kami bantu terkait keberangkatan Raja Ampat?', 'time': '14:30'},
       ],
     ),
@@ -78,7 +78,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       unreadCount: 1,
       messages: [
         {'isSender': true, 'text': 'Halo, apakah meeting point di Bandara Sorong sudah termasuk antar jemput ke resort?', 'time': '10:45'},
-        {'isSender': false, 'text': 'Betul Kak Budi, nanti akan ada driver kami yang stand by membawa papan nama TripKita.', 'time': '11:00'},
+        {'isSender': false, 'text': 'Betul Kak Budi, nanti akan ada driver kami yang stand by membawa papan nama TemenTrip.', 'time': '11:00'},
         {'isSender': false, 'text': 'Selamat siang, untuk penjemputan di Bandara Sorong nanti jam 08:00 WIT ya.', 'time': '11:15'},
       ],
     ),

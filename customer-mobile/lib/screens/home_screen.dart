@@ -203,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(width: 8),
                             const Text(
-                              'TripKita',
+                              'TemenTrip',
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -265,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Jelajahi destinasi impian dan ciptakan\nmomen tak terlupakan bersama TripKita.',
+                        'Jelajahi destinasi impian dan ciptakan\nmomen tak terlupakan bersama TemenTrip.',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.white.withOpacity(0.9),

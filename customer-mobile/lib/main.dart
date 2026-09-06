@@ -13,16 +13,16 @@ import 'package:customer_mobile/screens/profile_screen.dart';
 
 
 void main() {
-  runApp(const TripKitaApp());
+  runApp(const TemenTripApp());
 }
 
-class TripKitaApp extends StatelessWidget {
-  const TripKitaApp({Key? key}) : super(key: key);
+class TemenTripApp extends StatelessWidget {
+  const TemenTripApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'TripKita Customer Mobile',
+      title: 'TemenTrip Customer Mobile',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primaryColor: const Color(0xFF0F8B8D), // Teal

@@ -114,14 +114,14 @@ func SeedDatabase() {
 	fmt.Println("Mengisi akun admin bawaan...")
 	hashedAdminPassword, _ := bcrypt.GenerateFromPassword([]byte("Admin123!"), bcrypt.DefaultCost)
 	admin := models.Provider{
-		BusinessName:        "TripKita Admin",
+		BusinessName:        "TemenTrip Admin",
 		BusinessCategory:     "admin",
 		OperationalProvince: "DKI Jakarta",
 		OperationalCity:     "Jakarta Central",
 		Description:          "System Administrator",
 		DocumentUploaded:    true,
 		PicName:              "Admin",
-		Email:                "admin@tripkita.id",
+		Email:                "admin@tementrip.id",
 		PasswordHash:         string(hashedAdminPassword),
 		WhatsApp:             "+62 800 0000 0000",
 		IsVerified:           true,

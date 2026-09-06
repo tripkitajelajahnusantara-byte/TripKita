@@ -40,7 +40,7 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 
 	url := "https://api.xendit.co/v2/invoices"
 	
-	customerEmail := "customer@tripkita.id"
+	customerEmail := "customer@tementrip.id"
 	if booking.CustomerName != "" {
 		sanitized := strings.ToLower(strings.ReplaceAll(booking.CustomerName, " ", "."))
 		customerEmail = fmt.Sprintf("%s@mail.com", sanitized)

@@ -17,12 +17,19 @@ export const Header: React.FC = () => {
         <div className="logo-section" onClick={() => navigateTo('beranda')}>
           <div className="logo-brand">
             <span className="logo-icon" style={{ display: 'flex', alignItems: 'center' }}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="11" fill="#007bff" />
-                <path d="M12 6C9.24 6 7 8.24 7 11c0 3.75 5 7 5 7s5-3.25 5-7c0-2.76-2.24-5-5-5zm0 6.75c-.97 0-1.75-.78-1.75-1.75S11.03 9.25 12 9.25s1.75 0.78 1.75 1.75-0.78 1.75-1.75 1.75z" fill="white" />
+              <svg width="30" height="30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" rx="10" fill="url(#tementrip-hdr-grad)"/>
+                <path d="M16 6C12.134 6 9 9.134 9 13C9 18.25 16 26 16 26C16 26 23 18.25 23 13C23 9.134 19.866 6 16 6ZM16 16.5C14.067 16.5 12.5 14.933 12.5 13C12.5 11.067 14.067 9.5 16 9.5C17.933 9.5 19.5 11.067 19.5 13C19.5 14.933 17.933 16.5 16 16.5Z" fill="white"/>
+                <path d="M13.5 13C13.5 14.3807 14.6193 15.5 16 15.5C17.3807 15.5 18.5 14.3807 18.5 13" stroke="#007bff" strokeWidth="1.8" strokeLinecap="round"/>
+                <defs>
+                  <linearGradient id="tementrip-hdr-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#007bff"/>
+                    <stop offset="1" stopColor="#00a896"/>
+                  </linearGradient>
+                </defs>
               </svg>
             </span>
-            <span className="logo-text" style={{ color: '#007bff', fontWeight: 800, fontSize: '22px' }}>Trip<span style={{ color: '#007bff' }}>Kita</span></span>
+            <span className="logo-text" style={{ color: '#007bff', fontWeight: 800, fontSize: '22px' }}>Temen<span style={{ color: '#00a896' }}>Trip</span></span>
             {isRegistered && providerProfile ? (
               providerProfile.role === 'ADMIN' ? (
                 <span className="logo-badge" style={{ backgroundColor: '#fee2e2', color: '#ef4444', borderColor: '#fecaca' }}>Admin</span>

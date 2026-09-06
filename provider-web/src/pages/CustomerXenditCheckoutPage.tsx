@@ -159,7 +159,7 @@ export const CustomerXenditCheckoutPage: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #334155', paddingBottom: '20px', marginBottom: '20px' }}>
             <div>
               <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '700' }}>Penyedia Layanan / Merchant</span>
-              <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#ffffff', margin: '4px 0 0 0' }}>TripKita</h2>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#ffffff', margin: '4px 0 0 0' }}>TemenTrip</h2>
               <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: '600', marginTop: '2px', display: 'block' }}>{booking.packageName}</span>
             </div>
 

@@ -56,7 +56,7 @@ export const CustomerRegisterPage: React.FC = () => {
       >
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0' }}>
-            Daftar Akun TripKita
+            Daftar Akun TemenTrip
           </h2>
           <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
             Simpan tiket perjalanan & cek riwayat pesanan dengan mudah.

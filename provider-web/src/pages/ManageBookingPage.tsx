@@ -490,7 +490,7 @@ export const ManageBookingPage: React.FC = () => {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#64748b' }}>Tujuan:</span>
-                          <span style={{ fontWeight: 600, color: '#1e293b' }}>BCA - TRIPKITA</span>
+                          <span style={{ fontWeight: 600, color: '#1e293b' }}>BCA - TEMENTRIP</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#64748b' }}>Jumlah:</span>

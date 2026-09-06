@@ -250,7 +250,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   const Text('Petunjuk Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F2937))),
                   const SizedBox(height: 12),
                   _buildInstructionAccordion(0, 'Langkah 1: Buka aplikasi E-Wallet atau M-Banking', 'Pastikan saldo mencukupi dan cari menu transfer / scan QR.'),
-                  _buildInstructionAccordion(1, 'Langkah 2: Arahkan kamera ke QR Code', 'Posisikan QR code TripKita di dalam kotak pemindai di aplikasi pembayaran Anda.'),
+                  _buildInstructionAccordion(1, 'Langkah 2: Arahkan kamera ke QR Code', 'Posisikan QR code TemenTrip di dalam kotak pemindai di aplikasi pembayaran Anda.'),
                   _buildInstructionAccordion(2, 'Langkah 3: Konfirmasi dan Bayar', 'Masukkan PIN transaksi dan tunggu status pembayaran berhasil di halaman ini.'),
                 ],
               ),
@@ -297,7 +297,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   TextButton.icon(
                     onPressed: () {},
                     icon: const Icon(Icons.support_agent, size: 16, color: Color(0xFF0F8B8D)),
-                    label: const Text('Hubungi CS TripKita', style: TextStyle(color: Color(0xFF0F8B8D), fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: const Text('Hubungi CS TemenTrip', style: TextStyle(color: Color(0xFF0F8B8D), fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),

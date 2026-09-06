@@ -179,17 +179,17 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 	if err != nil || booking == nil {
 		booking = &models.Booking{
 			ID:              uint(id),
-			BookingCode:     fmt.Sprintf("TK-MOCK-%d", id),
-			CustomerName:    "Pelanggan TripKita",
+			BookingCode:     fmt.Sprintf("TT-MOCK-%d", id),
+			CustomerName:    "Pelanggan TemenTrip",
 			Guests:          2,
 			TotalPrice:      1500000,
 			TripDate:        time.Now().AddDate(0, 0, 7),
 			XenditInvoiceID: fmt.Sprintf("xendit_inv_%d", id),
-			Package:         models.Package{Name: "Paket Wisata TripKita"},
+			Package:         models.Package{Name: "Paket Wisata TemenTrip"},
 		}
 	}
 	if booking.Package.Name == "" {
-		booking.Package.Name = "Paket Wisata TripKita"
+		booking.Package.Name = "Paket Wisata TemenTrip"
 	}
 
 	// Render a very premium Stripe/Xendit-like HTML checkout page
@@ -199,7 +199,7 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>TripKita Invoice - Xendit Payment Simulator</title>
+		<title>TemenTrip Invoice - Xendit Payment Simulator</title>
 		<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 		<style>
 			:root {

@@ -4,14 +4,16 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
     : 'http://localhost:8080/api/v1');
 
 export function getAuthToken(): string | null {
-  return localStorage.getItem('tripkita_partner_token');
+  return localStorage.getItem('tementrip_partner_token') || localStorage.getItem('tripkita_partner_token');
 }
 
 export function setAuthToken(token: string) {
+  localStorage.setItem('tementrip_partner_token', token);
   localStorage.setItem('tripkita_partner_token', token);
 }
 
 export function removeAuthToken() {
+  localStorage.removeItem('tementrip_partner_token');
   localStorage.removeItem('tripkita_partner_token');
 }
 

@@ -110,7 +110,7 @@ class ProfileScreen extends StatelessWidget {
                   _buildProfileMenuItem(
                     icon: Icons.star_border,
                     title: 'Beri Nilai Aplikasi',
-                    subtitle: 'Suka dengan TripKita? Berikan ulasan di App Store',
+                    subtitle: 'Suka dengan TemenTrip? Berikan ulasan di App Store',
                     onTap: () {},
                   ),
                 ],

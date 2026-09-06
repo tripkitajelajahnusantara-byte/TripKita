@@ -141,7 +141,7 @@ class _BookingListScreenState extends State<BookingListScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Anda belum memiliki transaksi booking dengan status filter "$selectedFilter". Yuk, cari open trip menarik di TripKita!',
+              'Anda belum memiliki transaksi booking dengan status filter "$selectedFilter". Yuk, cari open trip menarik di TemenTrip!',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500, height: 1.4),
             ),
