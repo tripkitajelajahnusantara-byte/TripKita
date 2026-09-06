@@ -4,7 +4,6 @@ import { Sidebar } from '../components/Sidebar';
 import { 
   Search, 
   CalendarDays, 
-  Clock, 
   CheckCircle2, 
   DollarSign, 
   Eye, 
@@ -182,13 +181,6 @@ export const ManageBookingPage: React.FC = () => {
             </div>
           </div>
           <div className="pkg-stat-card">
-            <div className="p-icon bg-orange"><Clock size={18} color="#f59e0b" /></div>
-            <div>
-              <h3 style={{ color: '#f59e0b' }}>{stats ? stats.pendingBookings : '...'}</h3>
-              <p>Menunggu Konfirmasi</p>
-            </div>
-          </div>
-          <div className="pkg-stat-card">
             <div className="p-icon bg-green"><CheckCircle2 size={18} color="#10b981" /></div>
             <div>
               <h3 style={{ color: '#10b981' }}>{stats ? stats.completedBookings : '...'}</h3>
@@ -225,9 +217,8 @@ export const ManageBookingPage: React.FC = () => {
               className="status-dropdown"
             >
               <option value="Semua">Semua Status</option>
+              <option value="CONFIRMED">Lunas & Aktif</option>
               <option value="PENDING_PAYMENT">Menunggu Pembayaran</option>
-              <option value="PAID">Menunggu Konfirmasi</option>
-              <option value="CONFIRMED">Dikonfirmasi</option>
               <option value="COMPLETED">Selesai</option>
               <option value="CANCELLED_BY_CUSTOMER">Batal (Customer)</option>
               <option value="CANCELLED_BY_PROVIDER">Batal (Mitra)</option>
@@ -279,28 +270,22 @@ export const ManageBookingPage: React.FC = () => {
                       <span className={`status-pill`} style={{
                         backgroundColor: 
                           b.status === 'PENDING_PAYMENT' ? '#fef3c7' :
-                          b.status === 'WAITING_CONFIRMATION' ? '#e0f2fe' :
-                          b.status === 'PAID' ? '#dcfce7' :
-                          b.status === 'CONFIRMED' ? '#d1fae5' :
+                          (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#dcfce7' :
                           b.status === 'COMPLETED' ? '#ecfdf5' :
                           b.status === 'REFUND_REQUIRED' ? '#fee2e2' : '#f1f5f9',
                         color:
                           b.status === 'PENDING_PAYMENT' ? '#d97706' :
-                          b.status === 'WAITING_CONFIRMATION' ? '#0369a1' :
-                          b.status === 'PAID' ? '#15803d' :
-                          b.status === 'CONFIRMED' ? '#059669' :
+                          (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#15803d' :
                           b.status === 'COMPLETED' ? '#047857' :
                           b.status === 'REFUND_REQUIRED' ? '#dc2626' : '#475569',
                       }}>
-                        {b.status === 'PENDING_PAYMENT' ? 'Belum Bayar' :
-                         b.status === 'WAITING_CONFIRMATION' ? 'Menunggu Verifikasi Admin' :
-                         b.status === 'PAID' ? 'Lunas (Perlu Konfirmasi)' :
-                         b.status === 'CONFIRMED' ? 'Dikonfirmasi' :
+                        {b.status === 'PENDING_PAYMENT' ? 'Menunggu Pembayaran' :
+                         (b.status === 'CONFIRMED' || b.status === 'PAID') ? 'Lunas & Aktif' :
                          b.status === 'COMPLETED' ? 'Selesai' :
                          b.status === 'CANCELLED_BY_CUSTOMER' ? 'Batal (Cust)' :
                          b.status === 'CANCELLED_BY_PROVIDER' ? 'Batal (Mitra)' :
                          b.status === 'REFUND_REQUIRED' ? 'Butuh Refund' :
-                         b.status === 'REFUNDED' ? 'Refund Selesai' : b.status}
+                         b.status === 'REFUNDED' ? 'Refund Selesai' : 'Expired / Dibatalkan'}
                       </span>
                     </td>
                     <td>
@@ -308,17 +293,7 @@ export const ManageBookingPage: React.FC = () => {
                         <button className="action-btn" onClick={() => handleAction('detail', b.id)}>
                           <Eye size={14} />
                         </button>
-                        {b.status === 'PAID' && b.dbId && (
-                          <>
-                            <button className="action-btn text-green" title="Konfirmasi Perjalanan" onClick={() => handleAction('approve', b.dbId!)}>
-                              <Check size={14} />
-                            </button>
-                            <button className="action-btn text-red" title="Tolak / Batalkan" onClick={() => handleAction('reject', b.dbId!)}>
-                              <X size={14} />
-                            </button>
-                          </>
-                        )}
-                        {b.status === 'CONFIRMED' && b.dbId && (
+                        {(b.status === 'CONFIRMED' || b.status === 'PAID') && b.dbId && (
                           <>
                             <button className="action-btn text-green" title="Selesaikan Perjalanan" onClick={() => handleAction('complete', b.dbId!)}>
                               <Check size={14} />
@@ -409,24 +384,20 @@ export const ManageBookingPage: React.FC = () => {
                     <span className={`status-pill`} style={{
                       backgroundColor: 
                         selectedBooking.status === 'PENDING_PAYMENT' ? '#fef3c7' :
-                        selectedBooking.status === 'PAID' ? '#dbeafe' :
-                        selectedBooking.status === 'CONFIRMED' ? '#d1fae5' :
+                        (selectedBooking.status === 'CONFIRMED' || selectedBooking.status === 'PAID') ? '#dcfce7' :
                         selectedBooking.status === 'COMPLETED' ? '#ecfdf5' :
-                        selectedBooking.status === 'REFUND_REQUIRED' ? '#fee2e2' : '#f1f5f9',
+                        (selectedBooking.status === 'CANCELLED_BY_CUSTOMER' || selectedBooking.status === 'CANCELLED_BY_PROVIDER') ? '#fee2e2' : '#f1f5f9',
                       color:
                         selectedBooking.status === 'PENDING_PAYMENT' ? '#d97706' :
-                        selectedBooking.status === 'PAID' ? '#2563eb' :
-                        selectedBooking.status === 'CONFIRMED' ? '#059669' :
+                        (selectedBooking.status === 'CONFIRMED' || selectedBooking.status === 'PAID') ? '#15803d' :
                         selectedBooking.status === 'COMPLETED' ? '#047857' :
-                        selectedBooking.status === 'REFUND_REQUIRED' ? '#dc2626' : '#475569',
+                        (selectedBooking.status === 'CANCELLED_BY_CUSTOMER' || selectedBooking.status === 'CANCELLED_BY_PROVIDER') ? '#dc2626' : '#475569',
                     }}>
-                      {selectedBooking.status === 'PENDING_PAYMENT' ? 'Belum Bayar' :
-                       selectedBooking.status === 'PAID' ? 'Perlu Konfirmasi' :
-                       selectedBooking.status === 'CONFIRMED' ? 'Dikonfirmasi' :
+                      {selectedBooking.status === 'PENDING_PAYMENT' ? 'Pending' :
+                       (selectedBooking.status === 'CONFIRMED' || selectedBooking.status === 'PAID') ? 'Lunas' :
                        selectedBooking.status === 'COMPLETED' ? 'Selesai' :
-                       selectedBooking.status === 'CANCELLED_BY_CUSTOMER' ? 'Batal (Cust)' :
-                       selectedBooking.status === 'CANCELLED_BY_PROVIDER' ? 'Batal (Mitra)' :
-                       selectedBooking.status === 'REFUND_REQUIRED' ? 'Butuh Refund' : 'Refund Selesai'}
+                       (selectedBooking.status === 'CANCELLED_BY_CUSTOMER' || selectedBooking.status === 'CANCELLED_BY_PROVIDER') ? 'Batal' :
+                       (selectedBooking.status === 'REFUND_REQUIRED' || selectedBooking.status === 'REFUNDED') ? 'Refund' : 'Lainnya'}
                     </span>
                   </div>
                 </div>

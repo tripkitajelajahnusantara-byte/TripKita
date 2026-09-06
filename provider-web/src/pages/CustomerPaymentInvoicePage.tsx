@@ -15,7 +15,7 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
 
   const booking = selectedBookingForInvoice || {
     id: 1,
-    bookingCode: 'TK-89412-4029',
+    bookingCode: 'TK-20260906-8941',
     packageName: 'Open Trip Gunung Bromo',
     totalPrice: 350000,
     guests: 1,

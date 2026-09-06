@@ -446,7 +446,7 @@ func SeedDatabase() {
 	// 4. Seed Bookings for each provider
 	bookingsList := []models.Booking{
 		{
-			BookingCode:     "TK-2824-1891",
+			BookingCode:     "TK-20260906-7891",
 			ProviderID:      createdProviders[0].ID,
 			PackageID:       pkgs[0].ID,
 			CustomerName:    "Anisa Rahmawati",
@@ -455,11 +455,11 @@ func SeedDatabase() {
 			Guests:          2,
 			TotalPrice:      700000,
 			DPAmount:        140000,
-			PaymentMethod:   "Manual Transfer",
+			PaymentMethod:   "Xendit Invoice",
 			Status:          "CONFIRMED",
 		},
 		{
-			BookingCode:     "TK-2824-1890",
+			BookingCode:     "TK-20260906-7890",
 			ProviderID:      createdProviders[1].ID,
 			PackageID:       pkgs[1].ID,
 			CustomerName:    "Dimas Prasetyo",
@@ -468,12 +468,12 @@ func SeedDatabase() {
 			Guests:          4,
 			TotalPrice:      1800000,
 			DPAmount:        360000,
-			PaymentMethod:   "Manual Transfer",
-			Status:          "WAITING_CONFIRMATION",
+			PaymentMethod:   "Xendit Invoice",
+			Status:          "CONFIRMED",
 			PaymentProof:    "/uploads/bukti_dummy.png",
 		},
 		{
-			BookingCode:     "TK-2824-1889",
+			BookingCode:     "TK-20260906-7889",
 			ProviderID:      createdProviders[2].ID,
 			PackageID:       pkgs[2].ID,
 			CustomerName:    "Rika Susanti",
@@ -486,7 +486,7 @@ func SeedDatabase() {
 			Status:          "CONFIRMED",
 		},
 		{
-			BookingCode:     "TK-2824-1888",
+			BookingCode:     "TK-20260906-7888",
 			ProviderID:      createdProviders[3].ID,
 			PackageID:       pkgs[3].ID,
 			CustomerName:    "Budi Hermawan",

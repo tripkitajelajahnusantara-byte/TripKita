@@ -69,7 +69,9 @@ export const CustomerConfirmationPage: React.FC = () => {
     setSubmitting(true);
 
     const nowIso = new Date().toISOString();
-    const randomCode = `TK-${Math.floor(Math.random() * 90000 + 10000)}-${Math.floor(Math.random() * 9000 + 1000)}`;
+    const dateStr = nowIso.slice(0, 10).replace(/-/g, '');
+    const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const randomCode = `TK-${dateStr}-${randSuffix}`;
 
     try {
       let parsedTripDate = new Date();

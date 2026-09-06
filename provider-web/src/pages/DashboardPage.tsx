@@ -6,12 +6,15 @@ import {
   CalendarDays, 
   Search, 
   Bell,
-  Clock,
   CheckCircle,
   TrendingUp,
   Star,
   ChevronRight,
-  ArrowUpRight
+  ArrowUpRight,
+  ShoppingBag,
+  CheckCircle2,
+  XCircle,
+  X
 } from 'lucide-react';
 import type { Booking } from '../types';
 import { request } from '../utils/api';
@@ -26,6 +29,15 @@ interface DashboardStats {
   activePackages: number;
 }
 
+interface NotificationItem {
+  id: string;
+  type: 'ORDER_IN' | 'PAYOUT_SUCCESS' | 'PAYOUT_REJECTED';
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+}
+
 export const DashboardPage: React.FC = () => {
   const { providerProfile, navigateTo } = useNavigation();
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,7 +46,37 @@ export const DashboardPage: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [popularPackages, setPopularPackages] = useState<any[]>([]);
 
+  // Notification state
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([
+    {
+      id: 'n1',
+      type: 'ORDER_IN',
+      title: 'Pesanan Baru Masuk',
+      message: 'Booking TK-20260906-7891 dari Antonius (Yogyakarta City Tour). Status: Lunas & Aktif.',
+      time: '5 menit yang lalu',
+      read: false,
+    },
+    {
+      id: 'n2',
+      type: 'PAYOUT_SUCCESS',
+      title: 'Pencairan Berhasil',
+      message: 'Pengajuan pencairan saldo sebesar Rp 1.500.000 telah berhasil ditransfer ke rekening BCA ***8821 Anda.',
+      time: '1 jam yang lalu',
+      read: false,
+    },
+    {
+      id: 'n3',
+      type: 'PAYOUT_REJECTED',
+      title: 'Pencairan Ditolak',
+      message: 'Pengajuan pencairan saldo Rp 500.000 ditolak. Alasan: Nama pemilik rekening tidak cocok dengan dokumen identitas provider.',
+      time: 'Kemarin',
+      read: false,
+    },
+  ]);
+
   const providerName = providerProfile?.businessName || 'Wisata Nusantara';
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -81,15 +123,17 @@ export const DashboardPage: React.FC = () => {
     loadDashboardData();
   }, []);
 
-  const handleAction = (actionName: string) => {
-    alert(`Aksi: "${actionName}" berhasil dipicu.`);
+  const handleMarkAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const filteredBookings = bookings.filter((b) => {
     const matchesSearch = b.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           b.package.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           b.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'Semua' || b.status === statusFilter;
+    const matchesStatus = statusFilter === 'Semua' || 
+      (statusFilter === 'CONFIRMED' && (b.status === 'CONFIRMED' || b.status === 'PAID')) ||
+      b.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -100,7 +144,7 @@ export const DashboardPage: React.FC = () => {
       {/* Main Content Pane */}
       <main className="dashboard-main">
         {/* Top Header */}
-        <header className="dashboard-header">
+        <header className="dashboard-header" style={{ position: 'relative' }}>
           <div className="header-welcome">
             <h1>Dashboard</h1>
             <p>Selamat pagi, {providerName}! 👋</p>
@@ -115,10 +159,120 @@ export const DashboardPage: React.FC = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <button className="notification-btn" onClick={() => handleAction('Notifikasi')}>
-              <Bell size={18} />
-              <span className="bell-badge"></span>
-            </button>
+            
+            {/* Notification Bell with Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                className="notification-btn" 
+                onClick={() => setShowNotifications(!showNotifications)}
+                title="Notifikasi"
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && <span className="bell-badge">{unreadCount}</span>}
+              </button>
+
+              {showNotifications && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '48px',
+                    right: '0',
+                    width: '360px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '16px',
+                    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.15)',
+                    border: '1px solid #e2e8f0',
+                    zIndex: 100,
+                    overflow: 'hidden',
+                    animation: 'fadeIn 0.2s ease-out'
+                  }}
+                >
+                  <div style={{
+                    padding: '14px 18px',
+                    borderBottom: '1px solid #f1f5f9',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#f8fafc'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Bell size={16} color="#0284c7" />
+                      <span style={{ fontWeight: '700', fontSize: '14px', color: '#0f172a' }}>Notifikasi Mitra</span>
+                      {unreadCount > 0 && (
+                        <span style={{ backgroundColor: '#0284c7', color: '#ffffff', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
+                          {unreadCount} baru
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {unreadCount > 0 && (
+                        <button 
+                          onClick={handleMarkAllRead} 
+                          style={{ border: 'none', background: 'none', color: '#0284c7', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          Tandai Dibaca
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => setShowNotifications(false)} 
+                        style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex' }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                    {notifications.map((n) => (
+                      <div 
+                        key={n.id}
+                        onClick={() => setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item))}
+                        style={{
+                          padding: '14px 18px',
+                          borderBottom: '1px solid #f1f5f9',
+                          backgroundColor: n.read ? '#ffffff' : '#f0f9ff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          gap: '12px',
+                          alignItems: 'flex-start',
+                          transition: 'background-color 0.2s'
+                        }}
+                      >
+                        <div style={{
+                          padding: '8px',
+                          borderRadius: '10px',
+                          backgroundColor: n.type === 'ORDER_IN' ? '#e0f2fe' : n.type === 'PAYOUT_SUCCESS' ? '#dcfce7' : '#fee2e2',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          {n.type === 'ORDER_IN' && <ShoppingBag size={16} color="#0284c7" />}
+                          {n.type === 'PAYOUT_SUCCESS' && <CheckCircle2 size={16} color="#16a34a" />}
+                          {n.type === 'PAYOUT_REJECTED' && <XCircle size={16} color="#dc2626" />}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: n.type === 'ORDER_IN' ? '#0369a1' : n.type === 'PAYOUT_SUCCESS' ? '#15803d' : '#b91c1c' }}>
+                              {n.title}
+                            </span>
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>{n.time}</span>
+                          </div>
+                          <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: '1.4' }}>
+                            {n.message}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ padding: '10px', textAlign: 'center', backgroundColor: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11.5px', color: '#64748b' }}>Hanya menampilkan notifikasi terbaru Mitra</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="user-profile-circle">{providerName.substring(0, 2).toUpperCase()}</div>
           </div>
         </header>
@@ -148,19 +302,6 @@ export const DashboardPage: React.FC = () => {
             <div className="card-bottom">
               <h3>{stats ? stats.totalBookings : '...'}</h3>
               <p>Total Booking</p>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="card-top">
-              <div className="stat-icon-bg bg-orange">
-                <Clock size={20} color="#f59e0b" />
-              </div>
-              <span className="trend-warning">Perlu Tindakan</span>
-            </div>
-            <div className="card-bottom">
-              <h3>{stats ? stats.pendingBookings : '...'}</h3>
-              <p>Menunggu Konfirmasi</p>
             </div>
           </div>
 
@@ -215,8 +356,8 @@ export const DashboardPage: React.FC = () => {
               <div className="table-filter-tabs">
                 {[
                   { value: 'Semua', label: 'Semua' },
-                  { value: 'PAID', label: 'Perlu Konfirmasi' },
-                  { value: 'CONFIRMED', label: 'Dikonfirmasi' },
+                  { value: 'CONFIRMED', label: 'Dikonfirmasi / Lunas' },
+                  { value: 'PENDING_PAYMENT', label: 'Menunggu Pembayaran' },
                   { value: 'COMPLETED', label: 'Selesai' }
                 ].map((tab) => (
                   <button 
@@ -262,24 +403,16 @@ export const DashboardPage: React.FC = () => {
                           <span className={`status-pill`} style={{
                             backgroundColor: 
                               b.status === 'PENDING_PAYMENT' ? '#fef3c7' :
-                              b.status === 'PAID' ? '#dbeafe' :
-                              b.status === 'CONFIRMED' ? '#d1fae5' :
-                              b.status === 'COMPLETED' ? '#ecfdf5' :
-                              b.status === 'REFUND_REQUIRED' ? '#fee2e2' : '#f1f5f9',
+                              (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#dcfce7' :
+                              b.status === 'COMPLETED' ? '#ecfdf5' : '#f1f5f9',
                             color:
                               b.status === 'PENDING_PAYMENT' ? '#d97706' :
-                              b.status === 'PAID' ? '#2563eb' :
-                              b.status === 'CONFIRMED' ? '#059669' :
-                              b.status === 'COMPLETED' ? '#047857' :
-                              b.status === 'REFUND_REQUIRED' ? '#dc2626' : '#475569',
+                              (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#15803d' :
+                              b.status === 'COMPLETED' ? '#047857' : '#475569',
                           }}>
-                            {b.status === 'PENDING_PAYMENT' ? 'Belum Bayar' :
-                             b.status === 'PAID' ? 'Perlu Konfirmasi' :
-                             b.status === 'CONFIRMED' ? 'Dikonfirmasi' :
-                             b.status === 'COMPLETED' ? 'Selesai' :
-                             b.status === 'CANCELLED_BY_CUSTOMER' ? 'Batal (Cust)' :
-                             b.status === 'CANCELLED_BY_PROVIDER' ? 'Batal (Mitra)' :
-                             b.status === 'REFUND_REQUIRED' ? 'Butuh Refund' : 'Refund Selesai'}
+                            {b.status === 'PENDING_PAYMENT' ? 'Menunggu Pembayaran' :
+                             (b.status === 'CONFIRMED' || b.status === 'PAID') ? 'Lunas & Aktif' :
+                             b.status === 'COMPLETED' ? 'Selesai' : 'Expired / Dibatalkan'}
                           </span>
                         </td>
                       </tr>

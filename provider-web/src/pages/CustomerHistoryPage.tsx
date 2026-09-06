@@ -204,11 +204,14 @@ export const CustomerHistoryPage: React.FC = () => {
           icon: <Clock size={14} color="#f59e0b" />
         };
       case 'WAITING_CONFIRMATION':
+      case 'PAID':
+      case 'CONFIRMED':
+      case 'Dikonfirmasi':
         return {
-          label: 'Menunggu Verifikasi Admin',
-          color: '#3b82f6',
-          bgColor: '#eff6ff',
-          icon: <Clock size={14} color="#3b82f6" />
+          label: 'Lunas & Aktif',
+          color: '#10b981',
+          bgColor: '#ecfdf5',
+          icon: <CheckCircle2 size={14} color="#10b981" />
         };
       case 'REFUND_REQUIRED':
         return {
@@ -602,14 +605,7 @@ export const CustomerHistoryPage: React.FC = () => {
                     )
                   )}
 
-                  {booking.status === 'WAITING_CONFIRMATION' && (
-                    <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px', fontSize: '13px', color: '#14532d' }}>
-                      <strong>Bukti Transfer Telah Diunggah!</strong>
-                      <p style={{ margin: '4px 0 0 0', color: '#15803d', lineHeight: '1.4' }}>
-                        Pembayaran Anda sedang dalam proses verifikasi oleh Admin TripKita. Tiket dan detail grup koordinasi akan otomatis aktif setelah pembayaran dikonfirmasi lunas.
-                      </p>
-                    </div>
-                  )}
+
 
                   <div style={{ borderTop: '1px dotted #e2e8f0', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>

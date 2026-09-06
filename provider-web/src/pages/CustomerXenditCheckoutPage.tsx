@@ -14,7 +14,7 @@ export const CustomerXenditCheckoutPage: React.FC = () => {
   // Fallback booking object if navigated directly
   const booking = selectedBookingForInvoice || {
     id: Date.now(),
-    bookingCode: `TK-${Math.floor(Math.random() * 90000 + 10000)}`,
+    bookingCode: `TK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
     packageName: 'Open Trip Gunung Bromo',
     totalPrice: 350000,
     guests: 1,

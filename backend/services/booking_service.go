@@ -122,20 +122,29 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 	}
 	booking.Status = "PENDING_PAYMENT"
 	
-	// Ensure unique BookingCode
-	if strings.TrimSpace(booking.BookingCode) == "" {
+	// Ensure unique BookingCode (Format: TK-YYYYMMDD-XXXX)
+	generateCode := func() string {
+		now := time.Now()
+		datePart := now.Format("20060102")
 		randSource := rand.NewSource(time.Now().UnixNano())
 		r := rand.New(randSource)
-		booking.BookingCode = fmt.Sprintf("TK-%d-%d", time.Now().Unix()%90000+10000, r.Intn(9000)+1000)
+		charset := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+		suffix := make([]byte, 4)
+		for i := range suffix {
+			suffix[i] = charset[r.Intn(len(charset))]
+		}
+		return fmt.Sprintf("TK-%s-%s", datePart, string(suffix))
+	}
+
+	if strings.TrimSpace(booking.BookingCode) == "" {
+		booking.BookingCode = generateCode()
 	}
 
 	// Guarantee uniqueness in database (retry if exact collision occurs)
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		existing, errExist := s.repo.FindExactByBookingCode(booking.BookingCode)
 		if errExist == nil && existing != nil && existing.ID != booking.ID {
-			randSource := rand.NewSource(time.Now().UnixNano())
-			r := rand.New(randSource)
-			booking.BookingCode = fmt.Sprintf("TK-%d-%d", time.Now().Unix()%90000+10000, r.Intn(9000)+1000)
+			booking.BookingCode = generateCode()
 		} else {
 			break
 		}
@@ -200,7 +209,7 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID stri
 
 	switch xenditStatus {
 	case "PAID":
-		newStatus = "PAID"
+		newStatus = "CONFIRMED"
 		booking.PaymentMethod = paymentMethod
 	case "EXPIRED", "FAILED":
 		if oldStatus == "PAID" || oldStatus == "CONFIRMED" || oldStatus == "COMPLETED" {
@@ -255,12 +264,14 @@ func (s *bookingService) UploadPaymentProof(id uint, proofPath string) (*models.
 	if err != nil {
 		return nil, err
 	}
+	oldStatus := booking.Status
 	booking.PaymentProof = proofPath
-	booking.Status = "WAITING_CONFIRMATION"
+	booking.Status = "CONFIRMED"
 	err = s.repo.Update(booking)
 	if err != nil {
 		return nil, err
 	}
+	s.adjustQuota(booking, oldStatus, "CONFIRMED", booking.ProviderID)
 	return booking, nil
 }
 
@@ -274,13 +285,13 @@ func (s *bookingService) AdminConfirmPayment(id uint) (*models.Booking, error) {
 		return nil, err
 	}
 	oldStatus := booking.Status
-	booking.Status = "PAID"
+	booking.Status = "CONFIRMED"
 	booking.PaymentMethod = "Manual Transfer"
 	err = s.repo.Update(booking)
 	if err != nil {
 		return nil, err
 	}
-	s.adjustQuota(booking, oldStatus, "PAID", booking.ProviderID)
+	s.adjustQuota(booking, oldStatus, "CONFIRMED", booking.ProviderID)
 	return booking, nil
 }
 
