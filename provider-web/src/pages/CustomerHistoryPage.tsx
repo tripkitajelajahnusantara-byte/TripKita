@@ -124,32 +124,10 @@ export const CustomerHistoryPage: React.FC = () => {
         const data = await request('/customer/bookings');
         setBookings(data || []);
       } else {
-        // Guest customer: do NOT automatically display old history from previous sessions
+        // Guest customer: keep search empty until user manually enters booking code
         setBookings([]);
-
-        // Check if guest user has a recent booking (from sessionStorage or localStorage)
-        try {
-          const recentStr = sessionStorage.getItem('tripkita_recent_guest_booking');
-          let recentObj = recentStr ? JSON.parse(recentStr) : null;
-          if (!recentObj) {
-            const localStr = localStorage.getItem('tripkita_my_bookings');
-            if (localStr) {
-              const list = JSON.parse(localStr);
-              if (Array.isArray(list) && list.length > 0) {
-                recentObj = list[0];
-              }
-            }
-          }
-          if (recentObj && (recentObj.bookingCode || recentObj.id)) {
-            const targetCode = recentObj.bookingCode || recentObj.id;
-            setSearchCode(targetCode);
-            // Auto-track status live from database for this booking
-            const liveData = await request(`/public/bookings/status/${targetCode}`).catch(() => recentObj);
-            setTrackedBooking(liveData || recentObj);
-          }
-        } catch (e) {
-          console.error(e);
-        }
+        setSearchCode('');
+        setTrackedBooking(null);
       }
     } catch (err) {
       console.error('Failed to fetch booking history:', err);
