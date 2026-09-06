@@ -5,9 +5,9 @@ import {
   Smile, 
   Award, 
   ChevronUp, 
-  TrendingUp,
   Compass,
-  Users
+  Users,
+  Sparkles
 } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
@@ -19,26 +19,26 @@ export const AboutPage: React.FC = () => {
   ];
 
   const milestones = [
-    { year: '2019', title: 'Pendirian TemenTrip', desc: 'Dibuat di Jakarta oleh sekumpulan talenta Indonesia yang luar biasa di industri pariwisata dan teknologi.' },
-    { year: '2020', title: '100 Provider Pertama', desc: 'Berhasil mengajak 100 provider wisata pertama dan melayani 5.000+ pemesanan dalam tahun pertama.' },
-    { year: '2021', title: 'Ekspansi Nasional', desc: 'Jangkauan diperluas ke 50+ kota di seluruh Indonesia. Total provider mencapai 500+.' },
-    { year: '2022', title: 'Inovasi Digital Escrow', desc: 'Meluncurkan sistem pembayaran aman escrow & pencairan DP 50% otomatis bagi mitra provider.' },
-    { year: '2023', title: '1 Juta Traveler', desc: 'Mencapai 1 juta traveler yang terkoneksi dengan 1,500+ provider aktif dan 20,000+ paket wisata.' },
-    { year: '2024 - 2026', title: '2,500+ Provider Aktif', desc: 'Tumbuh menjadi platform partner wisata #1 di Indonesia dengan 850K+ wisatawan puas.' },
+    { year: '2026', title: 'Peluncuran Resmi TemenTrip', desc: 'TemenTrip resmi hadir di Jakarta sebagai platform digital open trip modern bagi wisatawan Indonesia.' },
+    { year: '2026', title: 'Sistem Escrow & DP 50%', desc: 'Penerapan skema transaksi aman dengan DP 50% dan pencairan otomatis untuk melindungi provider dan traveler.' },
+    { year: '2026', title: 'Jaringan Mitra Destinasi Nusantara', desc: 'Mengintegrasikan paket wisata unggulan terverifikasi dari Bromo, Bali, Lombok, hingga Raja Ampat.' },
   ];
 
-  const team = [
-    { name: 'Evan', role: 'Co-Founder & Product/Project Lead', initial: 'EV', bg: '#0284c7' },
-    { name: 'Garry', role: 'Co-Founder & Tech Strategy Lead', initial: 'GA', bg: '#00c9a7' },
-    { name: 'Kris', role: 'Provider & Partnership Lead', initial: 'KR', bg: '#f59e0b' },
-    { name: 'Bakri', role: 'Legal & Compliance Lead', initial: 'BA', bg: '#8b5cf6' },
-    { name: 'Cindy', role: 'Business Analyst Lead', initial: 'CI', bg: '#ec4899' },
-    { name: 'Farza', role: 'FSD & Documentation Lead', initial: 'FA', bg: '#3b82f6' },
-    { name: 'Heaven', role: 'Marketing Lead', initial: 'HE', bg: '#10b981' },
-    { name: 'Ilham', role: 'Customer Relations Lead', initial: 'IL', bg: '#f97316' },
-    { name: 'Kevin', role: 'QA Lead', initial: 'KE', bg: '#14b8a6' },
-    { name: 'Ando', role: 'Business Development Associate', initial: 'AN', bg: '#6366f1' },
-    { name: 'Aan', role: 'Support Lead', initial: 'AA', bg: '#84cc16' },
+  const founders = [
+    { name: 'Evan', role: 'Co-Founder & Product/Project Lead', initial: 'EV', bg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', badge: 'Co-Founder' },
+    { name: 'Garry', role: 'Co-Founder & Tech Strategy Lead', initial: 'GA', bg: 'linear-gradient(135deg, #00c9a7 0%, #0f766e 100%)', badge: 'Co-Founder' },
+  ];
+
+  const teamLeads = [
+    { name: 'Kris', role: 'Provider & Partnership Lead', initial: 'KR', bg: '#f59e0b', dept: 'Partnership' },
+    { name: 'Bakri', role: 'Legal & Compliance Lead', initial: 'BA', bg: '#8b5cf6', dept: 'Legal' },
+    { name: 'Cindy', role: 'Business Analyst Lead', initial: 'CI', bg: '#ec4899', dept: 'Analytics' },
+    { name: 'Farza', role: 'FSD & Documentation Lead', initial: 'FA', bg: '#3b82f6', dept: 'Engineering' },
+    { name: 'Heaven', role: 'Marketing Lead', initial: 'HE', bg: '#10b981', dept: 'Marketing' },
+    { name: 'Ilham', role: 'Customer Relations Lead', initial: 'IL', bg: '#f97316', dept: 'Relations' },
+    { name: 'Kevin', role: 'QA Lead', initial: 'KE', bg: '#14b8a6', dept: 'Quality Assurance' },
+    { name: 'Ando', role: 'Business Development Associate', initial: 'AN', bg: '#6366f1', dept: 'Business Dev' },
+    { name: 'Aan', role: 'Support Lead', initial: 'AA', bg: '#84cc16', dept: 'Customer Support' },
   ];
 
   return (
@@ -48,7 +48,7 @@ export const AboutPage: React.FC = () => {
         <div className="container about-hero-container">
           <span className="about-hero-tag">TENTANG KAMI</span>
           <h1>Kisah di Balik TemenTrip</h1>
-          <p>Misi kami adalah memberdayakan setiap pelaku wisata Indonesia dengan teknologi terbaik.</p>
+          <p>Platform digital open trip terpercaya yang lahir dari semangat memajukan pariwisata Indonesia.</p>
         </div>
       </section>
 
@@ -59,24 +59,24 @@ export const AboutPage: React.FC = () => {
             <span className="section-tag">CERITA KAMI</span>
             <h2>Dimulai dari Passion untuk Pariwisata Indonesia</h2>
             <p>
-              TemenTrip lahir dari passion untuk pariwisata Indonesia, dibuat di Jakarta oleh sekumpulan talenta Indonesia yang luar biasa. Kami berkumpul untuk menjawab tantangan bagaimana menghubungkan keindahan destinasi Nusantara dengan traveler secara aman dan digital.
+              TemenTrip lahir dari passion untuk pariwisata Indonesia, dibuat di Jakarta oleh sekumpulan talenta Indonesia yang luar biasa. Kami berkumpul untuk menjawab tantangan dalam menghubungkan keindahan destinasi Nusantara dengan traveler secara aman dan serba digital.
             </p>
             <p>
-              Kami percaya bahwa Indonesia memiliki kekayaan wisata yang tak tertandingi — dari ujung Sabang sampai Merauke. Yang dibutuhkan adalah jembatan digital terpercaya yang memberikan kemudahan bagi traveler sekaligus memberdayakan usaha jasa pariwisata lokal.
+              Kami percaya bahwa Indonesia memiliki kekayaan wisata yang luar biasa dari Sabang sampai Merauke. Yang dibutuhkan adalah jembatan digital terpercaya yang memberikan kemudahan bagi traveler sekaligus memberdayakan usaha jasa pariwisata lokal.
             </p>
 
             <div className="intro-stats">
               <div className="intro-stat-item">
-                <h3>5+</h3>
-                <p>Tahun Berdiri</p>
+                <h3>2026</h3>
+                <p>Tahun Peluncuran</p>
               </div>
               <div className="intro-stat-item">
-                <h3>2.5K+</h3>
-                <p>Provider Aktif</p>
+                <h3>100%</h3>
+                <p>Karya Talenta Lokal</p>
               </div>
               <div className="intro-stat-item">
-                <h3>850K+</h3>
-                <p>Traveler Puas</p>
+                <h3>8+</h3>
+                <p>Destinasi Utama Terintegrasi</p>
               </div>
             </div>
           </div>
@@ -85,10 +85,10 @@ export const AboutPage: React.FC = () => {
             <div className="media-wrapper">
               <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80" alt="Wisata Indonesia" />
               <div className="glass-card media-pill">
-                <TrendingUp size={16} color="#00c9a7" />
+                <Sparkles size={18} color="#00c9a7" />
                 <div>
-                  <strong>+267% Pertumbuhan</strong>
-                  <p>Kepercayaan Mitra & Traveler</p>
+                  <strong>Platform Digital Terbaru 2026</strong>
+                  <p>Aman, Cepat, dan Transparan</p>
                 </div>
               </div>
             </div>
@@ -105,7 +105,7 @@ export const AboutPage: React.FC = () => {
             </div>
             <h3>Visi</h3>
             <p>
-              Menjadi platform ekosistem pariwisata digital terbesar dan terpercaya di Asia Tenggara, yang memberdayakan jutaan pelaku wisata lokal untuk berkembang di era digital.
+              Menjadi platform ekosistem pariwisata digital terbesar dan terpercaya di Indonesia, yang memberdayakan pelaku wisata lokal untuk berkembang pesat di era digital.
             </p>
           </div>
           <div className="mission-card">
@@ -114,10 +114,10 @@ export const AboutPage: React.FC = () => {
             </div>
             <h3>Misi</h3>
             <ul>
-              <li>✓ Mendigitalisasi bisnis wisata lokal dengan teknologi yang mudah digunakan.</li>
-              <li>✓ Menghubungkan provider terpercaya dengan jutaan traveler Indonesia.</li>
+              <li>✓ Mendigitalisasi bisnis wisata lokal dengan teknologi praktis dan ramah pengguna.</li>
+              <li>✓ Menghubungkan provider terpercaya dengan para traveler di seluruh Nusantara.</li>
               <li>✓ Menjamin keamanan transaksi escrow & garansi kepuasan semua pihak.</li>
-              <li>✓ Mendorong pertumbuhan pariwisata domestik yang berkelanjutan.</li>
+              <li>✓ Mendorong pertumbuhan pariwisata domestik secara berkelanjutan.</li>
             </ul>
           </div>
         </div>
@@ -149,8 +149,8 @@ export const AboutPage: React.FC = () => {
       <section className="timeline-section">
         <div className="container">
           <div className="section-header">
-            <span className="section-tag">PERJALANAN KAMI</span>
-            <h2 className="section-title">Tonggak Pencapaian</h2>
+            <span className="section-tag">LENGKAH AWAL KAMI</span>
+            <h2 className="section-title">Fokus & Komitmen 2026</h2>
           </div>
 
           <div className="timeline-list">
@@ -170,23 +170,45 @@ export const AboutPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Team Section (11 Members) */}
+      {/* Professional Team Section */}
       <section className="team-section">
         <div className="container">
           <div className="section-header">
             <span className="section-tag"><Users size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> TIM KAMI</span>
             <h2 className="section-title">Orang-orang di Balik TemenTrip</h2>
-            <p className="section-subtitle">Talenta hebat Indonesia yang berdedikasi membangun platform wisata digital terbaik.</p>
+            <p className="section-subtitle">Talenta hebat Indonesia yang berdedikasi tinggi membangun platform wisata digital terbaik.</p>
           </div>
 
-          <div className="team-grid">
-            {team.map((t, i) => (
-              <div key={i} className="team-card">
-                <div className="team-avatar" style={{ backgroundColor: t.bg }}>
+          {/* Founders Highlight Grid */}
+          <div className="founders-grid">
+            {founders.map((f, i) => (
+              <div key={i} className="founder-card">
+                <div className="founder-avatar" style={{ background: f.bg }}>
+                  {f.initial}
+                </div>
+                <div className="founder-info">
+                  <div className="founder-top-row">
+                    <h3>{f.name}</h3>
+                    <span className="founder-badge">{f.badge}</span>
+                  </div>
+                  <p className="founder-role">{f.role}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Team Leads Grid */}
+          <div className="team-leads-grid">
+            {teamLeads.map((t, i) => (
+              <div key={i} className="lead-card">
+                <div className="lead-avatar" style={{ backgroundColor: t.bg }}>
                   {t.initial}
                 </div>
-                <h3>{t.name}</h3>
-                <p>{t.role}</p>
+                <div className="lead-details">
+                  <h3>{t.name}</h3>
+                  <p>{t.role}</p>
+                  <span className="dept-tag">{t.dept}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -295,7 +317,7 @@ export const AboutPage: React.FC = () => {
           left: 24px;
           padding: 12px 20px;
           border-radius: 14px;
-          background: rgba(15, 23, 42, 0.85);
+          background: rgba(15, 23, 42, 0.88);
           backdrop-filter: blur(8px);
           display: flex;
           align-items: center;
@@ -443,7 +465,7 @@ export const AboutPage: React.FC = () => {
           display: flex;
           flex-direction: column;
           align-items: center;
-          min-width: 90px;
+          min-width: 80px;
         }
 
         .timeline-year span {
@@ -473,75 +495,167 @@ export const AboutPage: React.FC = () => {
           margin: 0;
         }
 
-        /* Team (11 members grid) */
+        /* Team Section - Sleek & Professional Layout */
         .team-section {
-          padding: 80px 0;
+          padding: 85px 0;
           background: #ffffff;
         }
 
-        .team-grid {
+        .founders-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 20px;
-          margin-top: 36px;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 24px;
+          max-width: 840px;
+          margin: 36px auto 32px auto;
         }
 
-        .team-card {
-          text-align: center;
-          border: 1px solid #e2e8f0;
-          padding: 24px 16px;
-          border-radius: 16px;
-          background: #ffffff;
+        .founder-card {
+          background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+          border: 1.5px solid #bae6fd;
+          border-radius: 20px;
+          padding: 24px 28px;
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          box-shadow: 0 8px 20px -5px rgba(2, 132, 199, 0.1);
           transition: all 0.2s ease;
         }
 
-        .team-card:hover {
+        .founder-card:hover {
           transform: translateY(-3px);
-          box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.06);
-          border-color: #00c9a7;
+          box-shadow: 0 12px 25px -5px rgba(2, 132, 199, 0.2);
+          border-color: #0284c7;
         }
 
-        .team-avatar {
-          width: 64px;
-          height: 64px;
-          border-radius: 50%;
+        .founder-avatar {
+          width: 60px;
+          height: 60px;
+          border-radius: 16px;
           color: #ffffff;
+          font-size: 20px;
+          font-weight: 800;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 20px;
-          font-weight: 800;
-          margin: 0 auto 16px auto;
-          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          flex-shrink: 0;
         }
 
-        .team-card h3 {
-          font-size: 15px;
-          font-weight: 800;
-          color: #0f172a;
+        .founder-info {
+          flex: 1;
+        }
+
+        .founder-top-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
           margin-bottom: 4px;
         }
 
-        .team-card p {
+        .founder-top-row h3 {
+          font-size: 18px;
+          font-weight: 800;
+          color: #0f172a;
+          margin: 0;
+        }
+
+        .founder-badge {
+          background: #0284c7;
+          color: #ffffff;
+          font-size: 10.5px;
+          font-weight: 800;
+          padding: 3px 10px;
+          border-radius: 20px;
+          letter-spacing: 0.5px;
+        }
+
+        .founder-role {
+          font-size: 13px;
+          font-weight: 600;
+          color: #0369a1;
+          margin: 0;
+        }
+
+        .team-leads-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+          max-width: 960px;
+          margin: 0 auto;
+        }
+
+        .lead-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          padding: 20px;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          transition: all 0.2s ease;
+        }
+
+        .lead-card:hover {
+          border-color: #00c9a7;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 18px -4px rgba(0, 201, 167, 0.15);
+        }
+
+        .lead-avatar {
+          width: 48px;
+          height: 48px;
+          border-radius: 14px;
+          color: #ffffff;
+          font-size: 16px;
+          font-weight: 800;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+        }
+
+        .lead-details h3 {
+          font-size: 15px;
+          font-weight: 800;
+          color: #0f172a;
+          margin: 0 0 2px 0;
+        }
+
+        .lead-details p {
           font-size: 12px;
           font-weight: 600;
-          color: #64748b;
-          line-height: 1.4;
-          margin: 0;
+          color: #475569;
+          margin: 0 0 6px 0;
+          line-height: 1.3;
+        }
+
+        .dept-tag {
+          font-size: 10px;
+          font-weight: 700;
+          color: #0f766e;
+          background: #f0fdf4;
+          padding: 2px 8px;
+          border-radius: 10px;
+          border: 1px solid #bbf7d0;
+          display: inline-block;
         }
 
         @media (max-width: 992px) {
           .intro-container, .vision-mission-grid {
             grid-template-columns: 1fr;
           }
-          .values-grid, .team-grid {
-            grid-template-columns: repeat(3, 1fr);
+          .values-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          .founders-grid, .team-leads-grid {
+            grid-template-columns: 1fr 1fr;
           }
         }
 
         @media (max-width: 640px) {
-          .values-grid, .team-grid {
-            grid-template-columns: repeat(2, 1fr);
+          .values-grid, .founders-grid, .team-leads-grid {
+            grid-template-columns: 1fr;
           }
           .intro-stats {
             flex-direction: column;
