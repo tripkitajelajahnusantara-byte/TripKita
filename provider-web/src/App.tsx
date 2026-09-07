@@ -157,7 +157,7 @@ const AppContent: React.FC = () => {
       </div>
     );
   }
-  if (route === 'provider-login') {
+  if (route === 'provider-login' || route === 'admin-login') {
     return (
       <div className="app-wrapper">
         <Header />

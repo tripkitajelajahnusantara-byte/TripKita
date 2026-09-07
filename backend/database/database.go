@@ -59,6 +59,7 @@ func ConnectDB(cfg *config.Config) {
 
 	// Isi data awal (Seeding) jika DB kosong
 	SeedDatabase()
+	EnsureAdminUserExists()
 
 	// Otomatis bersihkan pesanan yang lebih tua dari 3 bulan dan jalankan worker berkala
 	StartPeriodicCleanup()
@@ -508,3 +509,41 @@ func SeedDatabase() {
 
 	fmt.Println("8 Akun mitra dan 8 destinasi awal berhasil disimpan ke database")
 }
+
+func EnsureAdminUserExists() {
+	var count int64
+	DB.Model(&models.Provider{}).Where("email = ?", "admin@tementrip.id").Count(&count)
+	hashedAdminPassword, _ := bcrypt.GenerateFromPassword([]byte("Admin123!"), bcrypt.DefaultCost)
+
+	if count == 0 {
+		admin := models.Provider{
+			BusinessName:        "TemenTrip Admin",
+			BusinessCategory:    "admin",
+			OperationalProvince: "DKI Jakarta",
+			OperationalCity:     "Jakarta Central",
+			Description:         "System Administrator",
+			DocumentUploaded:   true,
+			PicName:             "Admin",
+			Email:               "admin@tementrip.id",
+			PasswordHash:        string(hashedAdminPassword),
+			WhatsApp:            "+62 800 0000 0000",
+			IsVerified:          true,
+			Role:                "ADMIN",
+			Status:              "APPROVED",
+		}
+		if err := DB.Create(&admin).Error; err != nil {
+			log.Printf("[Admin Setup Error] %v", err)
+		} else {
+			fmt.Println("[Admin Setup] Akun default admin@tementrip.id berhasil dibuat.")
+		}
+	} else {
+		DB.Model(&models.Provider{}).Where("email = ?", "admin@tementrip.id").Updates(map[string]interface{}{
+			"password_hash": string(hashedAdminPassword),
+			"role":          "ADMIN",
+			"status":        "APPROVED",
+			"is_verified":   true,
+		})
+		fmt.Println("[Admin Setup] Akun admin@tementrip.id diperbarui & aktif (ADMIN).")
+	}
+}
+

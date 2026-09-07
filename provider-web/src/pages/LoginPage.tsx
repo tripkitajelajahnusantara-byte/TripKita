@@ -4,7 +4,8 @@ import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { request, API_BASE_URL } from '../utils/api';
 
 export const LoginPage: React.FC = () => {
-  const { login, navigateTo } = useNavigation();
+  const { login, navigateTo, route } = useNavigation();
+  const isAdminMode = route === 'admin-login';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -48,61 +49,42 @@ export const LoginPage: React.FC = () => {
       <div className="login-grid-layout">
         {/* Left Side: Brand Highlights & Stats (Dark Teal Panel) */}
         <div className="login-sidebar">
-          {/* Logo Brand Header */}
-          <div className="sidebar-logo">
-            <span className="logo-brand">
-              <span className="logo-icon-svg">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="11" fill="white" />
-                  <path d="M12 6C9.24 6 7 8.24 7 11c0 3.75 5 7 5 7s5-3.25 5-7c0-2.76-2.24-5-5-5zm0 6.75c-.97 0-1.75-.78-1.75-1.75S11.03 9.25 12 9.25s1.75 0.78 1.75 1.75-0.78 1.75-1.75 1.75z" fill="#00a896" />
-                </svg>
-              </span>
-              <span className="logo-text">Trip<span className="accent-text">Kita</span></span>
-              <span className="logo-badge">Partner</span>
-            </span>
+          <div className="sidebar-brand-box">
+            <span className="brand-logo-icon">🛡️</span>
+            <span className="brand-name-text">TemenTrip Admin & Provider</span>
           </div>
 
-          {/* Main Sidebar Hero Section */}
-          <div className="sidebar-content-wrapper">
-            <div className="sidebar-header-box">
-              <h2 className="sidebar-title">
-                Selamat Datang<br />
-                Kembali, Partner!
-              </h2>
-              <p className="sidebar-subtitle">
-                Kelola paket wisata, pantau booking, dan tingkatkan pendapatan bisnis Anda dari satu dashboard terintegrasi.
-              </p>
-            </div>
+          <div className="sidebar-main-content">
+            <h1 className="sidebar-title">
+              {isAdminMode ? 'Portal Administrator TemenTrip' : 'Selamat Datang Kembali, Partner!'}
+            </h1>
+            <p className="sidebar-description">
+              {isAdminMode 
+                ? 'Kelola sistem, verifikasi mitra tour, pantau transaksi sistem, dan kelola saldo secara terpusat.' 
+                : 'Kelola paket wisata, pantau booking, dan tingkatkan pendapatan bisnis Anda dari satu dashboard terintegrasi.'}
+            </p>
 
-            {/* Stats Grid */}
-            <div className="highlights-grid">
-              <div className="highlight-card">
-                <div className="highlight-val">2,500+</div>
-                <div className="highlight-lbl">Provider Aktif</div>
+            <div className="stats-cards-grid">
+              <div className="stat-card-item">
+                <span className="stat-number">2,500+</span>
+                <span className="stat-label">Provider Aktif</span>
               </div>
-              <div className="highlight-card">
-                <div className="highlight-val">850K+</div>
-                <div className="highlight-lbl">Wisatawan</div>
-              </div>
-              <div className="highlight-card">
-                <div className="highlight-val">Rp 28.5M</div>
-                <div className="highlight-lbl">Avg. Pendapatan/bln</div>
-              </div>
-              <div className="highlight-card">
-                <div className="highlight-val">4.9/5</div>
-                <div className="highlight-lbl">Rating Provider</div>
+              <div className="stat-card-item">
+                <span className="stat-number">850K+</span>
+                <span className="stat-label">Wisatawan</span>
               </div>
             </div>
+          </div>
 
-            {/* Security Notice Banner */}
-            <div className="security-notice-banner">
-              <div className="check-icon-circle">
+          <div className="sidebar-footer">
+            <div className="security-badge">
+              <div className="security-icon-circle">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M20 6L9 17L4 12" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
               <span className="security-text">
-                <strong>Keamanan terjamin.</strong> Data dan transaksi Anda dilindungi dengan enkripsi SSL 256-bit.
+                <strong>Keamanan terjamin.</strong> Sistem dilindungi dengan enkripsi SSL 256-bit.
               </span>
             </div>
           </div>
@@ -113,9 +95,25 @@ export const LoginPage: React.FC = () => {
           <div className="form-inner-box">
             <form className="form-body" onSubmit={handleLogin}>
               <div className="form-header">
-                <h2>Masuk ke Dashboard</h2>
-                <p>Masukkan email dan password akun provider Anda</p>
+                <h2>{isAdminMode ? 'Masuk Portal Admin' : 'Masuk ke Dashboard'}</h2>
+                <p>{isAdminMode ? 'Masukkan email dan password akun administrator' : 'Masukkan email dan password akun provider Anda'}</p>
               </div>
+
+              {isAdminMode && (
+                <div style={{ backgroundColor: '#eff6ff', padding: '12px 14px', borderRadius: '10px', border: '1px solid #bfdbfe', marginBottom: '18px', fontSize: '13px', color: '#1e40af' }}>
+                  <div style={{ fontWeight: 700, marginBottom: '4px' }}>🛡️ Testing Login Admin Default:</div>
+                  <div style={{ fontSize: '12px', color: '#3b82f6', marginBottom: '8px' }}>
+                    Email: <strong>admin@tementrip.id</strong> | Pass: <strong>Admin123!</strong>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => { setEmail('admin@tementrip.id'); setPassword('Admin123!'); }}
+                    style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+                  >
+                    ⚡ Isi Akun Admin Otomatis
+                  </button>
+                </div>
+              )}
 
               {error && <div className="error-alert">{error}</div>}
 
@@ -126,7 +124,7 @@ export const LoginPage: React.FC = () => {
                   <Mail size={16} className="field-icon" />
                   <input 
                     type="email" 
-                    placeholder="email@bisnis.com" 
+                    placeholder={isAdminMode ? 'admin@tementrip.id' : 'email@bisnis.com'} 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -138,9 +136,11 @@ export const LoginPage: React.FC = () => {
               <div className="input-group">
                 <div className="label-row">
                   <label className="field-label">Password</label>
-                  <span className="forgot-password-link" onClick={() => alert('Fitur lupa password sedang disiapkan.')}>
-                    Lupa password?
-                  </span>
+                  {!isAdminMode && (
+                    <span className="forgot-password-link" onClick={() => alert('Fitur lupa password sedang disiapkan.')}>
+                      Lupa password?
+                    </span>
+                  )}
                 </div>
                 <div className="input-with-icon">
                   <Lock size={16} className="field-icon" />
@@ -175,67 +175,37 @@ export const LoginPage: React.FC = () => {
 
               {/* Submit Button */}
               <button type="submit" className="submit-form-btn" disabled={isLoading}>
-                {isLoading ? 'Memproses...' : 'Masuk ke Dashboard'} <ArrowRight size={16} className="arrow-btn-icon" />
+                {isLoading ? 'Memproses...' : (isAdminMode ? 'Masuk Portal Admin' : 'Masuk ke Dashboard')} <ArrowRight size={16} className="arrow-btn-icon" />
               </button>
 
-              {/* Separator */}
-              <div className="divider-or">
-                <span>atau</span>
-              </div>
-
-              {/* Google Auth Button (Set type=provider) */}
-              {googleOAuthEnabled ? (
-                <button
-                  type="button"
-                  className="google-signin-btn"
-                  onClick={() => {
-                    window.location.href = `${API_BASE_URL}/public/auth/google?type=provider`;
-                  }}
-                  disabled={isLoading}
-                >
-                  <svg className="google-icon" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-                  </svg>
-                  <span>Masuk dengan Google (Khusus Mitra)</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="google-signin-btn disabled-btn"
-                  disabled
-                  title="Google Sign-In is coming soon"
-                >
-                  <svg className="google-icon grayscale" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-                  </svg>
-                  <span>Masuk dengan Google</span>
-                  <span className="coming-soon-badge">Coming Soon</span>
-                </button>
+              {/* Register Prompt */}
+              {!isAdminMode && (
+                <p className="register-prompt-text">
+                  Belum punya akun Provider? <span onClick={() => navigateTo('provider-register')} className="register-link">Daftar Mitra gratis sekarang</span>
+                </p>
               )}
 
-
-
-              {/* Register Prompt */}
-              <p className="register-prompt-text">
-                Belum punya akun Provider? <span onClick={() => navigateTo('provider-register')} className="register-link">Daftar Mitra gratis sekarang</span>
-              </p>
-
-              <div style={{ marginTop: '16px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '12.5px', color: '#475569' }}>
-                  Bukan Mitra Provider?{' '}
-                </span>
-                <span 
-                  onClick={() => navigateTo('masuk')} 
-                  style={{ color: '#007bff', fontWeight: 700, cursor: 'pointer', fontSize: '12.5px', textDecoration: 'underline' }}
-                >
-                  Masuk sebagai Customer / Traveler
-                </span>
+              {/* Bottom Switcher Links */}
+              <div style={{ marginTop: '18px', backgroundColor: '#f8fafc', padding: '12px 14px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {isAdminMode ? (
+                  <>
+                    <span style={{ fontSize: '12.5px', color: '#475569' }}>
+                      Bukan Admin? <span onClick={() => navigateTo('provider-login')} style={{ color: '#00a896', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Masuk Portal Mitra Provider</span>
+                    </span>
+                    <span style={{ fontSize: '12.5px', color: '#475569' }}>
+                      <span onClick={() => navigateTo('masuk')} style={{ color: '#007bff', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Masuk sebagai Customer / Traveler</span>
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: '12.5px', color: '#475569' }}>
+                      Bukan Mitra Provider? <span onClick={() => navigateTo('masuk')} style={{ color: '#007bff', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Masuk sebagai Customer</span>
+                    </span>
+                    <span style={{ fontSize: '12.5px', color: '#475569' }}>
+                      Pengelola Sistem? <span onClick={() => navigateTo('admin-login')} style={{ color: '#2563eb', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Masuk Portal Administrator</span>
+                    </span>
+                  </>
+                )}
               </div>
             </form>
           </div>
