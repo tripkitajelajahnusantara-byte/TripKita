@@ -34,6 +34,23 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 		return nil, errors.New("provider not found")
 	}
 
+	summary, err := s.GetProviderPayoutSummary(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Amount <= 0 {
+		return nil, errors.New("nominal pencairan harus lebih dari 0")
+	}
+
+	if req.Type == "PELUNASAN_50" && req.Amount > summary.AvailablePelunasan {
+		return nil, errors.New("pencairan pelunasan 50% kedua belum dapat dilakukan karena trip belum selesai")
+	}
+
+	if req.Type == "DP_50" && req.Amount > summary.AvailableDP {
+		return nil, errors.New("saldo DP 50% belum mencukupi untuk dicairkan")
+	}
+
 	// Validate bank details exist
 	bankName := provider.BankName
 	bankAccount := provider.BankAccount
@@ -44,10 +61,6 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 		bankName = "Bank BCA"
 		bankAccount = "1234567890"
 		bankAccountName = provider.PicName
-	}
-
-	if req.Amount <= 0 {
-		return nil, errors.New("nominal pencairan harus lebih dari 0")
 	}
 
 	payout := &models.Payout{
@@ -91,8 +104,8 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 			halfAmount := grossPackagePrice * 0.5
 			dpEligible += halfAmount
 
-			// Check if trip is finished (either status is COMPLETED or tripDate has passed/arrived)
-			isFinished := b.Status == "COMPLETED" || (!b.TripDate.IsZero() && (now.After(b.TripDate) || now.Equal(b.TripDate)))
+			// Check if trip is finished (either status is COMPLETED or tripDate has passed by 24 hours)
+			isFinished := b.Status == "COMPLETED" || (!b.TripDate.IsZero() && now.After(b.TripDate.Add(24*time.Hour)))
 			if isFinished {
 				pelunasanEligible += halfAmount
 			} else {

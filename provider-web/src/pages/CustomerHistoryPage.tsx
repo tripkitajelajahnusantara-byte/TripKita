@@ -637,12 +637,26 @@ export const CustomerHistoryPage: React.FC = () => {
                           </a>
                           
                           {(() => {
-                            const isFinished = booking.status === 'COMPLETED' || (booking.tripDate && new Date(booking.tripDate) <= new Date());
+                            const parseDate = (dStr?: string) => {
+                              if (!dStr) return null;
+                              const d = new Date(dStr);
+                              return !isNaN(d.getTime()) ? d : null;
+                            };
+                            const tripD = parseDate(booking.tripDate);
+                            const isFinished = booking.status === 'COMPLETED' || (
+                              (booking.status === 'PAID' || booking.status === 'CONFIRMED') &&
+                              tripD !== null &&
+                              tripD.getTime() + 24 * 60 * 60 * 1000 <= Date.now()
+                            );
+
                             return (
                               <button
                                 onClick={() => {
                                   if (!isFinished) {
-                                    alert('Tombol ulasan dan penilaian bintang akan aktif secara otomatis begitu jadwal trip Anda selesai.');
+                                    setModalNotice({
+                                      title: 'Ulasan Belum Aktif',
+                                      message: 'Fitur ulasan dan penilaian bintang akan otomatis aktif setelah jadwal perjalanan (trip) Anda selesai dilaksanakan.'
+                                    });
                                     return;
                                   }
                                   setSelectedReviewBooking(booking);
@@ -660,11 +674,12 @@ export const CustomerHistoryPage: React.FC = () => {
                                   borderRadius: '8px',
                                   fontWeight: '700',
                                   fontSize: '13px',
-                                  cursor: 'pointer'
+                                  cursor: isFinished ? 'pointer' : 'not-allowed',
+                                  opacity: isFinished ? 1 : 0.75
                                 }}
                                 title={isFinished ? 'Klik untuk memberikan ulasan' : 'Ulasan dapat diberikan setelah waktu trip berakhir'}
                               >
-                                ⭐ Beri Ulasan {isFinished ? '(Aktif)' : '(Aktif Selesai Trip)'}
+                                ⭐ Beri Ulasan {isFinished ? '(Aktif)' : '(Terkunci)'}
                               </button>
                             );
                           })()}

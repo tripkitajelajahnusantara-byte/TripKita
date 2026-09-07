@@ -74,13 +74,40 @@ export const CustomerConfirmationPage: React.FC = () => {
     const randomCode = `TK-${dateStr}-${randSuffix}`;
 
     try {
-      let parsedTripDate = new Date();
-      if (pkg.bookingDate) {
-        const d = new Date(pkg.bookingDate);
-        if (!isNaN(d.getTime())) {
-          parsedTripDate = d;
+      const parseTripDateToFuture = (dateInput?: string) => {
+        if (dateInput) {
+          const d = new Date(dateInput);
+          if (!isNaN(d.getTime()) && d.getTime() > Date.now()) {
+            return d;
+          }
+
+          const monthsMap: { [key: string]: number } = {
+            jan: 0, januari: 0, feb: 1, februari: 1, mar: 2, maret: 2,
+            apr: 3, april: 3, mei: 4, jun: 5, juni: 5, jul: 6, juli: 6,
+            agu: 7, agustus: 7, sep: 8, september: 8, okt: 9, oktober: 9,
+            nov: 10, november: 10, des: 11, desember: 11
+          };
+
+          const match = dateInput.match(/(\d{1,2})[^\d]+([a-zA-Z]+)[^\d]+(\d{4})/);
+          if (match) {
+            const day = parseInt(match[1], 10);
+            const monthStr = match[2].toLowerCase();
+            const year = parseInt(match[3], 10);
+            if (monthsMap[monthStr] !== undefined) {
+              const parsed = new Date(year, monthsMap[monthStr], day, 8, 0, 0);
+              if (!isNaN(parsed.getTime())) {
+                return parsed;
+              }
+            }
+          }
         }
-      }
+
+        const defaultFuture = new Date();
+        defaultFuture.setDate(defaultFuture.getDate() + 14);
+        return defaultFuture;
+      };
+
+      const parsedTripDate = parseTripDateToFuture(pkg.bookingDate || pkg.schedule);
 
       const rawPkgId = Number(pkg.id);
       const safePackageId = (!isNaN(rawPkgId) && rawPkgId > 0) ? rawPkgId : 1;
