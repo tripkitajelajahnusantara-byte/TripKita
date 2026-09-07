@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HelpCircle, ChevronRight, ChevronLeft, X, Sparkles, LayoutDashboard, Package, CalendarDays, Wallet, User, PlusCircle } from 'lucide-react';
 
 export interface TourStep {
@@ -15,55 +15,91 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'dashboard',
     title: '1. Dashboard Utama',
     menuName: 'Dashboard',
-    icon: <LayoutDashboard size={20} color="#0284c7" />,
-    description: 'Menu ini adalah pusat kendali bisnis Anda untuk memantau ringkasan omset pendapatan bersih, total pesanan masuk, kuota terisi, dan statistik bisnis.',
+    icon: <LayoutDashboard size={18} color="#0284c7" />,
+    description: 'Pusat kendali bisnis Anda untuk memantau ringkasan omset pendapatan bersih, total pesanan masuk, kuota terisi, dan statistik bisnis.',
     tips: 'Cek halaman ini setiap hari untuk melihat perkembangan transaksi terbaru.'
   },
   {
     id: 'kelola-paket',
     title: '2. Kelola Paket Wisata',
     menuName: 'Kelola Paket',
-    icon: <Package size={20} color="#00c9a7" />,
-    description: 'Tempat Anda membuat, melihat, dan mengedit paket wisata. Anda dapat mengatur harga, kuota peserta, lokasi destinasi, serta mengaktifkan/nonaktifkan paket.',
+    icon: <Package size={18} color="#00c9a7" />,
+    description: 'Tempat membuat, melihat, dan mengedit paket wisata. Atur harga, kuota peserta, destinasi, serta status paket.',
     tips: 'Tambahkan foto berkualitas tinggi pada setiap paket untuk menarik calon pembeli.'
   },
   {
     id: 'booking',
     title: '3. Kelola Pesanan (Booking)',
     menuName: 'Booking',
-    icon: <CalendarDays size={20} color="#f59e0b" />,
-    description: 'Menu ini mencatat seluruh pemesanan dari pelanggan. Anda dapat melihat detail pemesan, daftar peserta, verifikasi pembayaran, dan update status trip.',
-    tips: 'Gunakan tombol Export CSV untuk mengunduh rekap laporan pesanan pelanggan ke Excel.'
+    icon: <CalendarDays size={18} color="#f59e0b" />,
+    description: 'Mencatat seluruh pemesanan pelanggan. Lihat detail pemesan, daftar peserta, verifikasi pembayaran, dan update status trip.',
+    tips: 'Gunakan tombol Export CSV untuk mengunduh rekap laporan pesanan ke Excel.'
   },
   {
     id: 'keuangan-provider',
     title: '4. Keuangan & Saldo (Payouts)',
     menuName: 'Keuangan & Saldo',
-    icon: <Wallet size={20} color="#16a34a" />,
-    description: 'Sistem pencairan dana otomatis! Anda dapat mencairkan 50% Uang Muka (DP) di awal saat lunas, dan 50% Pelunasan setelah trip selesai langsung ke rekening Anda.',
-    tips: 'Saldo DP 50% bisa langsung dicairkan saat order lunas, sisa 50% aktif setelah trip selesai.'
+    icon: <Wallet size={18} color="#16a34a" />,
+    description: 'Cairkan 50% DP di awal saat lunas, dan sisa 50% Pelunasan setelah trip selesai langsung ke rekening bank Anda.',
+    tips: 'Saldo DP 50% aktif dicairkan saat order lunas, sisa 50% setelah trip terlaksana.'
   },
   {
     id: 'profil-provider',
     title: '5. Profil & Legalitas Mitra',
     menuName: 'Profil Provider',
-    icon: <User size={20} color="#6366f1" />,
-    description: 'Kelola profil usaha Anda, dokumen legalitas (KTP, NIB, NPWP), serta nomor rekening bank tujuan pencairan dana.',
-    tips: 'Pastikan nama rekening bank sesuai dengan nama pemilik usaha agar verifikasi pencairan cepat.'
+    icon: <User size={18} color="#6366f1" />,
+    description: 'Kelola profil usaha Anda, dokumen legalitas (KTP, NIB, NPWP), serta nomor rekening bank tujuan pencairan saldo.',
+    tips: 'Pastikan nama di rekening bank cocok dengan identitas usaha agar verifikasi cepat.'
   },
   {
     id: 'tambah-paket',
     title: '6. Buat Paket Wisata Baru',
     menuName: 'Tambah Paket',
-    icon: <PlusCircle size={20} color="#ff6b81" />,
-    description: 'Gunakan tombol "+ Tambah Paket" untuk membuat paket wisata baru melalui 5 langkah mudah (Info dasar, Itinerary, Fasilitas, Harga & Upload foto).',
-    tips: 'Isi rencana perjalanan (itinerary) per hari secara rinci agar peserta mantap mendaftar.'
+    icon: <PlusCircle size={18} color="#ff6b81" />,
+    description: 'Gunakan tombol "+ Tambah Paket" untuk membuat paket wisata baru melalui 5 langkah mudah.',
+    tips: 'Isi rencana perjalanan (itinerary) per hari secara rinci agar peserta yakin mendaftar.'
   }
 ];
 
 export const ProviderHintTour: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+
+  const step = TOUR_STEPS[currentStepIndex] || TOUR_STEPS[0];
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const updatePosition = () => {
+      const el = document.getElementById(`tour-step-${step.id}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const cardHeight = 280;
+        let computedTop = rect.top - 8;
+        
+        // Prevent overflowing below screen
+        if (computedTop + cardHeight > window.innerHeight) {
+          computedTop = Math.max(16, window.innerHeight - cardHeight - 20);
+        }
+
+        setCoords({
+          top: Math.max(16, computedTop),
+          left: rect.right + 14,
+        });
+      } else {
+        setCoords({ top: 100, left: 270 });
+      }
+    };
+
+    updatePosition();
+    const timer = setTimeout(updatePosition, 50);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [isOpen, currentStepIndex, step.id]);
 
   const handleOpenTour = () => {
     setCurrentStepIndex(0);
@@ -88,8 +124,6 @@ export const ProviderHintTour: React.FC = () => {
       setCurrentStepIndex(prev => prev - 1);
     }
   };
-
-  const step = TOUR_STEPS[currentStepIndex] || TOUR_STEPS[0];
 
   return (
     <>
@@ -118,26 +152,42 @@ export const ProviderHintTour: React.FC = () => {
         <span>Panduan</span>
       </button>
 
-      {/* Floating Side Card (No Screen-Blocking Dark Overlay!) */}
+      {/* Floating Side Card Aligned Directly Next to Active Menu Item */}
       {isOpen && (
         <div
           style={{
             position: 'fixed',
-            bottom: '24px',
-            right: '24px',
+            top: coords ? `${coords.top}px` : '100px',
+            left: coords ? `${coords.left}px` : '270px',
             zIndex: 99999,
-            width: '360px',
+            width: '310px',
             maxWidth: 'calc(100vw - 32px)',
             backgroundColor: '#ffffff',
-            borderRadius: '20px',
-            padding: '20px',
-            boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(2, 132, 199, 0.15)',
-            animation: 'slideUp 0.25s ease-out'
+            borderRadius: '16px',
+            padding: '14px 16px',
+            boxShadow: '0 12px 32px -8px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(2, 132, 199, 0.18)',
+            animation: 'fadeIn 0.2s ease-out',
+            transition: 'top 0.2s ease, left 0.2s ease'
           }}
         >
-          {/* Header inside Compact Side Card */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <span style={{ fontSize: '11px', fontWeight: '800', backgroundColor: '#e0f2fe', color: '#0284c7', padding: '3px 9px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+          {/* Pointer Arrow pointing left towards sidebar item */}
+          <div
+            style={{
+              position: 'absolute',
+              left: '-7px',
+              top: '18px',
+              width: '0',
+              height: '0',
+              borderTop: '7px solid transparent',
+              borderBottom: '7px solid transparent',
+              borderRight: '7px solid #ffffff',
+              filter: 'drop-shadow(-2px 0 1px rgba(2, 132, 199, 0.12))'
+            }}
+          />
+
+          {/* Card Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '10px', fontWeight: '800', backgroundColor: '#e0f2fe', color: '#0284c7', padding: '2px 7px', borderRadius: '8px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
               Panduan • {currentStepIndex + 1} dari {TOUR_STEPS.length}
             </span>
             
@@ -148,7 +198,7 @@ export const ProviderHintTour: React.FC = () => {
                 border: 'none',
                 color: '#94a3b8',
                 cursor: 'pointer',
-                padding: '3px',
+                padding: '2px',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -156,51 +206,50 @@ export const ProviderHintTour: React.FC = () => {
               }}
               title="Tutup Panduan"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
 
-          {/* Step Icon & Title */}
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
-            <div style={{ backgroundColor: '#f0f9ff', padding: '10px', borderRadius: '12px', border: '1px solid #bae6fd', flexShrink: 0 }}>
+          {/* Icon + Title */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ backgroundColor: '#f0f9ff', padding: '8px', borderRadius: '10px', border: '1px solid #bae6fd', flexShrink: 0 }}>
               {step.icon}
             </div>
             <div>
-              <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: '0 0 2px 0' }}>
+              <h4 style={{ fontSize: '13.5px', fontWeight: '800', color: '#0f172a', margin: '0 0 1px 0' }}>
                 {step.title}
               </h4>
-              <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '600' }}>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
                 Halaman: <strong>{step.menuName}</strong>
               </span>
             </div>
           </div>
 
           {/* Description */}
-          <p style={{ fontSize: '13px', color: '#334155', lineHeight: '1.55', margin: '0 0 14px 0' }}>
+          <p style={{ fontSize: '12px', color: '#334155', lineHeight: '1.45', margin: '0 0 10px 0' }}>
             {step.description}
           </p>
 
-          {/* Compact Tips Box */}
-          <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '10px 12px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-            <Sparkles size={16} color="#d97706" style={{ flexShrink: 0, marginTop: '1px' }} />
-            <div style={{ fontSize: '11.5px', color: '#92400e', lineHeight: '1.45' }}>
+          {/* Tips Box */}
+          <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '8px 10px', marginBottom: '12px', display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+            <Sparkles size={14} color="#d97706" style={{ flexShrink: 0, marginTop: '1px' }} />
+            <div style={{ fontSize: '11px', color: '#92400e', lineHeight: '1.4' }}>
               <strong style={{ color: '#78350f' }}>Tips: </strong>
               {step.tips}
             </div>
           </div>
 
-          {/* Navigation Controls */}
+          {/* Footer Navigation */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-            
             <button
               onClick={handleCloseTour}
               style={{
-                padding: '7px 12px',
+                padding: '5px 10px',
                 backgroundColor: '#ffffff',
                 color: '#64748b',
                 border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                fontSize: '12px',
+                borderRadius: '8px',
+                fontSize: '11.5px',
                 fontWeight: '600',
                 cursor: 'pointer'
               }}
@@ -208,17 +257,17 @@ export const ProviderHintTour: React.FC = () => {
               Skip
             </button>
 
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '5px' }}>
               {currentStepIndex > 0 && (
                 <button
                   onClick={handlePrevStep}
                   style={{
-                    padding: '7px 10px',
+                    padding: '5px 9px',
                     backgroundColor: '#f1f5f9',
                     color: '#334155',
                     border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '12px',
+                    borderRadius: '8px',
+                    fontSize: '11.5px',
                     fontWeight: '600',
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -226,32 +275,31 @@ export const ProviderHintTour: React.FC = () => {
                     gap: '2px'
                   }}
                 >
-                  <ChevronLeft size={14} /> Back
+                  <ChevronLeft size={13} /> Back
                 </button>
               )}
 
               <button
                 onClick={handleNextStep}
                 style={{
-                  padding: '7px 14px',
+                  padding: '5px 12px',
                   backgroundColor: '#0284c7',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '10px',
-                  fontSize: '12px',
+                  borderRadius: '8px',
+                  fontSize: '11.5px',
                   fontWeight: '700',
                   cursor: 'pointer',
-                  boxShadow: '0 3px 10px rgba(2, 132, 199, 0.25)',
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '3px'
                 }}
               >
                 {currentStepIndex === TOUR_STEPS.length - 1 ? 'Selesai 🎉' : 'Next'}
-                {currentStepIndex < TOUR_STEPS.length - 1 && <ChevronRight size={14} />}
+                {currentStepIndex < TOUR_STEPS.length - 1 && <ChevronRight size={13} />}
               </button>
             </div>
-
           </div>
 
         </div>

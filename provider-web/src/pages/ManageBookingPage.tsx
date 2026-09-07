@@ -68,20 +68,22 @@ export const ManageBookingPage: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter]);
 
-  const loadData = async () => {
-    try {
-      const statsData = await request('/provider/dashboard/stats').catch(e => {
-        console.error('Failed to load stats:', e);
-        return null;
-      });
-      if (statsData) setStats(statsData);
+  const [isLoading, setIsLoading] = useState(true);
 
-      const data = await request('/provider/bookings').catch(e => {
-        console.error('Failed to load bookings:', e);
-        return [];
-      });
-      if (Array.isArray(data)) {
-        const mapped = data.map((b: any) => ({
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [statsRes, bookingsRes] = await Promise.allSettled([
+        request('/provider/dashboard/stats'),
+        request('/provider/bookings')
+      ]);
+
+      if (statsRes.status === 'fulfilled' && statsRes.value) {
+        setStats(statsRes.value);
+      }
+
+      if (bookingsRes.status === 'fulfilled' && Array.isArray(bookingsRes.value)) {
+        const mapped = bookingsRes.value.map((b: any) => ({
           id: b.bookingCode || `TK-${b.id}`,
           dbId: b.id, // Keep numeric ID for API requests
           customerName: b.customerName || 'Pelanggan',
@@ -99,6 +101,8 @@ export const ManageBookingPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to load bookings:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -281,73 +285,100 @@ export const ManageBookingPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {paginatedBookings.map((b) => (
-                  <tr key={b.id}>
-                    <td className="booking-id-cell">{b.id}</td>
-                    <td>
-                      <div className="customer-cell">
-                        <span className="customer-avatar">{b.customerInitial}</span>
-                        <span>{b.customerName}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="pkg-name-text">{b.package}</span>
-                    </td>
-                    <td>{b.tripDate}</td>
-                    <td>👥 {b.guests}</td>
-                    <td className="price-cell">{b.totalPrice}</td>
-                    <td>
-                      <div className="dp-cell">
-                        <span className="dp-amount">{b.dpAmount}</span>
-                        <span className="dp-method">{b.paymentMethod}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`status-pill`} style={{
-                        backgroundColor: 
-                          b.status === 'PENDING_PAYMENT' ? '#fef3c7' :
-                          (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#dcfce7' :
-                          b.status === 'COMPLETED' ? '#ecfdf5' :
-                          b.status === 'REFUND_REQUIRED' ? '#fee2e2' : '#f1f5f9',
-                        color:
-                          b.status === 'PENDING_PAYMENT' ? '#d97706' :
-                          (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#15803d' :
-                          b.status === 'COMPLETED' ? '#047857' :
-                          b.status === 'REFUND_REQUIRED' ? '#dc2626' : '#475569',
-                      }}>
-                        {b.status === 'PENDING_PAYMENT' ? 'Menunggu Pembayaran' :
-                         (b.status === 'CONFIRMED' || b.status === 'PAID') ? 'Lunas & Aktif' :
-                         b.status === 'COMPLETED' ? 'Selesai' :
-                         b.status === 'CANCELLED_BY_CUSTOMER' ? 'Batal (Cust)' :
-                         b.status === 'CANCELLED_BY_PROVIDER' ? 'Batal (Mitra)' :
-                         b.status === 'REFUND_REQUIRED' ? 'Butuh Refund' :
-                         b.status === 'REFUNDED' ? 'Refund Selesai' : 'Expired / Dibatalkan'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="actions-cell">
-                        <button className="action-btn" onClick={() => handleAction('detail', b.id)}>
-                          <Eye size={14} />
-                        </button>
-                        {(b.status === 'CONFIRMED' || b.status === 'PAID') && b.dbId && (
-                          <>
-                            <button className="action-btn text-green" title="Selesaikan Perjalanan" onClick={() => handleAction('complete', b.dbId!)}>
-                              <Check size={14} />
-                            </button>
-                            <button className="action-btn text-red" title="Batalkan Perjalanan (Refund)" onClick={() => handleAction('reject', b.dbId!)}>
-                              <X size={14} />
-                            </button>
-                          </>
-                        )}
-                        {b.status === 'PENDING_PAYMENT' && b.paymentUrl && (
-                          <a href={b.paymentUrl} target="_blank" rel="noopener noreferrer" className="action-btn" title="Bayar (Simulasi Xendit)" style={{ color: '#0d9488', borderColor: '#0d9488' }}>
-                            💳
-                          </a>
-                        )}
-                      </div>
+                {isLoading ? (
+                  [1, 2, 3].map((n) => (
+                    <tr key={n} style={{ opacity: 0.6 }}>
+                      <td><span style={{ display: 'inline-block', width: '80px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                      <td>
+                        <div className="customer-cell">
+                          <span className="customer-avatar" style={{ backgroundColor: '#cbd5e1' }}>...</span>
+                          <span style={{ display: 'inline-block', width: '90px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span>
+                        </div>
+                      </td>
+                      <td><span style={{ display: 'inline-block', width: '120px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                      <td><span style={{ display: 'inline-block', width: '70px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                      <td><span style={{ display: 'inline-block', width: '30px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                      <td><span style={{ display: 'inline-block', width: '80px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                      <td><span style={{ display: 'inline-block', width: '60px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                      <td><span style={{ display: 'inline-block', width: '90px', height: '22px', backgroundColor: '#e2e8f0', borderRadius: '12px' }}></span></td>
+                      <td><span style={{ display: 'inline-block', width: '40px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                    </tr>
+                  ))
+                ) : paginatedBookings.length > 0 ? (
+                  paginatedBookings.map((b) => (
+                    <tr key={b.id}>
+                      <td className="booking-id-cell">{b.id}</td>
+                      <td>
+                        <div className="customer-cell">
+                          <span className="customer-avatar">{b.customerInitial}</span>
+                          <span>{b.customerName}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="pkg-name-text">{b.package}</span>
+                      </td>
+                      <td>{b.tripDate}</td>
+                      <td>👥 {b.guests}</td>
+                      <td className="price-cell">{b.totalPrice}</td>
+                      <td>
+                        <div className="dp-cell">
+                          <span className="dp-amount">{b.dpAmount}</span>
+                          <span className="dp-method">{b.paymentMethod}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`status-pill`} style={{
+                          backgroundColor: 
+                            b.status === 'PENDING_PAYMENT' ? '#fef3c7' :
+                            (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#dcfce7' :
+                            b.status === 'COMPLETED' ? '#ecfdf5' :
+                            b.status === 'REFUND_REQUIRED' ? '#fee2e2' : '#f1f5f9',
+                          color:
+                            b.status === 'PENDING_PAYMENT' ? '#d97706' :
+                            (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#15803d' :
+                            b.status === 'COMPLETED' ? '#047857' :
+                            b.status === 'REFUND_REQUIRED' ? '#dc2626' : '#475569',
+                        }}>
+                          {b.status === 'PENDING_PAYMENT' ? 'Menunggu Pembayaran' :
+                           (b.status === 'CONFIRMED' || b.status === 'PAID') ? 'Lunas & Aktif' :
+                           b.status === 'COMPLETED' ? 'Selesai' :
+                           b.status === 'CANCELLED_BY_CUSTOMER' ? 'Batal (Cust)' :
+                           b.status === 'CANCELLED_BY_PROVIDER' ? 'Batal (Mitra)' :
+                           b.status === 'REFUND_REQUIRED' ? 'Butuh Refund' :
+                           b.status === 'REFUNDED' ? 'Refund Selesai' : 'Expired / Dibatalkan'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="actions-cell">
+                          <button className="action-btn" onClick={() => handleAction('detail', b.id)}>
+                            <Eye size={14} />
+                          </button>
+                          {(b.status === 'CONFIRMED' || b.status === 'PAID') && b.dbId && (
+                            <>
+                              <button className="action-btn text-green" title="Selesaikan Perjalanan" onClick={() => handleAction('complete', b.dbId!)}>
+                                <Check size={14} />
+                              </button>
+                              <button className="action-btn text-red" title="Batalkan Perjalanan (Refund)" onClick={() => handleAction('reject', b.dbId!)}>
+                                <X size={14} />
+                              </button>
+                            </>
+                          )}
+                          {b.status === 'PENDING_PAYMENT' && b.paymentUrl && (
+                            <a href={b.paymentUrl} target="_blank" rel="noopener noreferrer" className="action-btn" title="Bayar (Simulasi Xendit)" style={{ color: '#0d9488', borderColor: '#0d9488' }}>
+                              💳
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={9} className="empty-table-row">
+                      Tidak ada booking yang cocok dengan pencarian Anda.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

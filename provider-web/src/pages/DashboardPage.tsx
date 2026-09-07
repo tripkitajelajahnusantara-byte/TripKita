@@ -42,6 +42,7 @@ export const DashboardPage: React.FC = () => {
   const { providerProfile, navigateTo } = useNavigation();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('Semua');
+  const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [popularPackages, setPopularPackages] = useState<any[]>([]);
@@ -79,20 +80,24 @@ export const DashboardPage: React.FC = () => {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
+    let isMounted = true;
     async function loadDashboardData() {
+      setIsLoading(true);
       try {
-        const statsData = await request('/provider/dashboard/stats').catch(e => {
-          console.error('Stats fetch error:', e);
-          return null;
-        });
-        if (statsData) setStats(statsData);
+        const [statsRes, bookingsRes, packagesRes] = await Promise.allSettled([
+          request('/provider/dashboard/stats'),
+          request('/provider/bookings'),
+          request('/provider/packages')
+        ]);
 
-        const bookingsData = await request('/provider/bookings').catch(e => {
-          console.error('Bookings fetch error:', e);
-          return [];
-        });
-        if (Array.isArray(bookingsData)) {
-          const mappedBookings = bookingsData.map((b: any) => ({
+        if (!isMounted) return;
+
+        if (statsRes.status === 'fulfilled' && statsRes.value) {
+          setStats(statsRes.value);
+        }
+
+        if (bookingsRes.status === 'fulfilled' && Array.isArray(bookingsRes.value)) {
+          const mappedBookings = bookingsRes.value.map((b: any) => ({
             id: b.bookingCode || `TK-${b.id}`,
             customerName: b.customerName || 'Pelanggan',
             customerInitial: b.customerInitial || (b.customerName ? b.customerName.charAt(0) : 'P'),
@@ -105,12 +110,8 @@ export const DashboardPage: React.FC = () => {
           setBookings(mappedBookings);
         }
 
-        const packagesData = await request('/provider/packages').catch(e => {
-          console.error('Packages fetch error:', e);
-          return [];
-        });
-        if (Array.isArray(packagesData)) {
-          const sortedPackages = packagesData
+        if (packagesRes.status === 'fulfilled' && Array.isArray(packagesRes.value)) {
+          const sortedPackages = packagesRes.value
             .sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))
             .slice(0, 3)
             .map((pkg: any) => ({
@@ -130,9 +131,12 @@ export const DashboardPage: React.FC = () => {
         }
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
     loadDashboardData();
+    return () => { isMounted = false; };
   }, [providerProfile]);
 
   const handleMarkAllRead = () => {
@@ -397,7 +401,24 @@ export const DashboardPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredBookings.length > 0 ? (
+                  {isLoading ? (
+                    [1, 2, 3].map((n) => (
+                      <tr key={n} style={{ opacity: 0.6 }}>
+                        <td><span style={{ display: 'inline-block', width: '80px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                        <td>
+                          <div className="customer-cell">
+                            <span className="customer-avatar" style={{ backgroundColor: '#cbd5e1' }}>...</span>
+                            <span style={{ display: 'inline-block', width: '90px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span>
+                          </div>
+                        </td>
+                        <td><span style={{ display: 'inline-block', width: '120px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                        <td><span style={{ display: 'inline-block', width: '70px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                        <td><span style={{ display: 'inline-block', width: '30px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                        <td><span style={{ display: 'inline-block', width: '80px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
+                        <td><span style={{ display: 'inline-block', width: '90px', height: '22px', backgroundColor: '#e2e8f0', borderRadius: '12px' }}></span></td>
+                      </tr>
+                    ))
+                  ) : filteredBookings.length > 0 ? (
                     filteredBookings.map((b) => (
                       <tr key={b.id}>
                         <td className="booking-id-cell">{b.id}</td>

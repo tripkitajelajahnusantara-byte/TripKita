@@ -74,6 +74,7 @@ export const Sidebar: React.FC = () => {
           {menuItems.map((item) => (
             <button
               key={item.id}
+              id={`tour-step-${item.id}`}
               className={`menu-btn ${route === item.id ? 'active' : ''}`}
               onClick={() => navigateTo(item.id)}
             >
@@ -84,7 +85,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       <div className="sidebar-bottom">
-        <button className="add-package-btn" onClick={() => { setEditingPackageId(null); navigateTo('tambah-paket'); }}>
+        <button id="tour-step-tambah-paket" className="add-package-btn" onClick={() => { setEditingPackageId(null); navigateTo('tambah-paket'); }}>
           <Plus size={16} /> Tambah Paket
         </button>
         <button className="sidebar-logout-btn" onClick={logout}>
