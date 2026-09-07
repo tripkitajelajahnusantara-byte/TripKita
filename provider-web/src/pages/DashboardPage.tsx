@@ -81,47 +81,59 @@ export const DashboardPage: React.FC = () => {
   useEffect(() => {
     async function loadDashboardData() {
       try {
-        const statsData = await request('/provider/dashboard/stats');
-        setStats(statsData);
+        const statsData = await request('/provider/dashboard/stats').catch(e => {
+          console.error('Stats fetch error:', e);
+          return null;
+        });
+        if (statsData) setStats(statsData);
 
-        const bookingsData = await request('/provider/bookings');
-        // Map backend response fields to React types
-        const mappedBookings = bookingsData.map((b: any) => ({
-          id: b.bookingCode || `TK-${b.id}`,
-          customerName: b.customerName,
-          customerInitial: b.customerInitial || b.customerName.charAt(0),
-          package: b.packageDetails?.name || 'Paket Wisata',
-          tripDate: new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-          guests: b.guests,
-          totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice),
-          status: b.status,
-        }));
-        setBookings(mappedBookings);
-
-        const packagesData = await request('/provider/packages');
-        const sortedPackages = packagesData
-          .sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))
-          .slice(0, 3)
-          .map((pkg: any) => ({
-            name: pkg.name,
-            location: pkg.destination.split(',').pop()?.trim() || pkg.destination,
-            rating: pkg.rating || 5.0,
-            bookings: pkg.quotaUsed || 0,
-            img: pkg.name.toLowerCase().includes('bromo')
-              ? 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=80&q=80'
-              : pkg.name.toLowerCase().includes('baduy')
-              ? 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=80&q=80'
-              : pkg.name.toLowerCase().includes('bandung')
-              ? 'https://images.unsplash.com/photo-1584810359583-96fc3448beaa?auto=format&fit=crop&w=80&q=80'
-              : 'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?auto=format&fit=crop&w=80&q=80',
+        const bookingsData = await request('/provider/bookings').catch(e => {
+          console.error('Bookings fetch error:', e);
+          return [];
+        });
+        if (Array.isArray(bookingsData)) {
+          const mappedBookings = bookingsData.map((b: any) => ({
+            id: b.bookingCode || `TK-${b.id}`,
+            customerName: b.customerName || 'Pelanggan',
+            customerInitial: b.customerInitial || (b.customerName ? b.customerName.charAt(0) : 'P'),
+            package: b.packageDetails?.name || 'Paket Wisata',
+            tripDate: b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
+            guests: b.guests || 1,
+            totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice || 0),
+            status: b.status,
           }));
-        setPopularPackages(sortedPackages);
+          setBookings(mappedBookings);
+        }
+
+        const packagesData = await request('/provider/packages').catch(e => {
+          console.error('Packages fetch error:', e);
+          return [];
+        });
+        if (Array.isArray(packagesData)) {
+          const sortedPackages = packagesData
+            .sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))
+            .slice(0, 3)
+            .map((pkg: any) => ({
+              name: pkg.name,
+              location: pkg.destination ? (pkg.destination.split(',').pop()?.trim() || pkg.destination) : 'Indonesia',
+              rating: pkg.rating || 5.0,
+              bookings: pkg.quotaUsed || 0,
+              img: (pkg.name || '').toLowerCase().includes('bromo')
+                ? 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=80&q=80'
+                : (pkg.name || '').toLowerCase().includes('baduy')
+                ? 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=80&q=80'
+                : (pkg.name || '').toLowerCase().includes('bandung')
+                ? 'https://images.unsplash.com/photo-1584810359583-96fc3448beaa?auto=format&fit=crop&w=80&q=80'
+                : 'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?auto=format&fit=crop&w=80&q=80',
+            }));
+          setPopularPackages(sortedPackages);
+        }
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
       }
     }
     loadDashboardData();
-  }, []);
+  }, [providerProfile]);
 
   const handleMarkAllRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));

@@ -19,7 +19,7 @@ import { getTripImage } from '../utils/tripImages';
 
 
 export const KelolaPaketPage: React.FC = () => {
-  const { navigateTo, setEditingPackageId } = useNavigation();
+  const { navigateTo, setEditingPackageId, providerProfile } = useNavigation();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Semua' | 'Aktif' | 'Draft' | 'Nonaktif'>('Semua');
 
@@ -42,20 +42,25 @@ export const KelolaPaketPage: React.FC = () => {
 
   const loadPackages = async () => {
     try {
-      const data = await request('/provider/packages');
-      const mapped = data.map((pkg: any) => ({
-        id: String(pkg.id),
-        name: pkg.name,
-        category: pkg.category || '',
-        destination: pkg.destination,
-        price: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price),
-        quota: `${pkg.quotaUsed}/${pkg.quotaMax}`,
-        schedule: pkg.schedule,
-        status: pkg.status,
-        rating: pkg.rating > 0 ? pkg.rating : undefined,
-      }));
+      const data = await request('/provider/packages').catch(e => {
+        console.error('Failed to load packages:', e);
+        return [];
+      });
+      if (Array.isArray(data)) {
+        const mapped = data.map((pkg: any) => ({
+          id: String(pkg.id),
+          name: pkg.name,
+          category: pkg.category || '',
+          destination: pkg.destination,
+          price: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price || 0),
+          quota: `${pkg.quotaUsed || 0}/${pkg.quotaMax || 0}`,
+          schedule: pkg.schedule,
+          status: pkg.status,
+          rating: pkg.rating > 0 ? pkg.rating : undefined,
+        }));
 
-      setPackages(mapped);
+        setPackages(mapped);
+      }
     } catch (err) {
       console.error('Failed to load packages:', err);
     }
@@ -63,7 +68,7 @@ export const KelolaPaketPage: React.FC = () => {
 
   useEffect(() => {
     loadPackages();
-  }, []);
+  }, [providerProfile]);
 
   const handleAction = async (type: string, id: string) => {
     if (type === 'delete') {

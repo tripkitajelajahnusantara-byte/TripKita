@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { HelpCircle, ChevronRight, ChevronLeft, X, Sparkles, LayoutDashboard, Package, CalendarDays, Wallet, User, PlusCircle } from 'lucide-react';
-import { useNavigation } from '../context/NavigationContext';
 
 export interface TourStep {
   id: string;
@@ -63,22 +62,11 @@ export const TOUR_STEPS: TourStep[] = [
 ];
 
 export const ProviderHintTour: React.FC = () => {
-  const { route, navigateTo } = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
-  // Sync step index with current route if open
-  useEffect(() => {
-    const idx = TOUR_STEPS.findIndex(s => s.id === route);
-    if (idx !== -1) {
-      setCurrentStepIndex(idx);
-    }
-  }, [route]);
-
   const handleOpenTour = () => {
-    // Determine step from current route or default to 0
-    const idx = TOUR_STEPS.findIndex(s => s.id === route);
-    setCurrentStepIndex(idx !== -1 ? idx : 0);
+    setCurrentStepIndex(0);
     setIsOpen(true);
   };
 
@@ -89,12 +77,7 @@ export const ProviderHintTour: React.FC = () => {
 
   const handleNextStep = () => {
     if (currentStepIndex < TOUR_STEPS.length - 1) {
-      const nextIdx = currentStepIndex + 1;
-      setCurrentStepIndex(nextIdx);
-      const nextStep = TOUR_STEPS[nextIdx];
-      if (nextStep.id !== 'tambah-paket') {
-        navigateTo(nextStep.id as any);
-      }
+      setCurrentStepIndex(prev => prev + 1);
     } else {
       handleCloseTour();
     }
@@ -102,12 +85,7 @@ export const ProviderHintTour: React.FC = () => {
 
   const handlePrevStep = () => {
     if (currentStepIndex > 0) {
-      const prevIdx = currentStepIndex - 1;
-      setCurrentStepIndex(prevIdx);
-      const prevStep = TOUR_STEPS[prevIdx];
-      if (prevStep.id !== 'tambah-paket') {
-        navigateTo(prevStep.id as any);
-      }
+      setCurrentStepIndex(prev => prev - 1);
     }
   };
 
@@ -115,7 +93,7 @@ export const ProviderHintTour: React.FC = () => {
 
   return (
     <>
-      {/* Compact Trigger Button in Top Right Header */}
+      {/* Sleek Compact Trigger Button in Top Right Header */}
       <button
         onClick={handleOpenTour}
         className="hint-tour-trigger-btn"
@@ -123,20 +101,20 @@ export const ProviderHintTour: React.FC = () => {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '6px',
-          padding: '6px 14px',
+          gap: '4px',
+          padding: '3px 9px',
           backgroundColor: '#ffffff',
           color: '#0284c7',
-          border: '1.5px solid #bae6fd',
-          borderRadius: '20px',
-          fontSize: '12px',
+          border: '1px solid #bae6fd',
+          borderRadius: '16px',
+          fontSize: '11px',
           fontWeight: '700',
           cursor: 'pointer',
-          boxShadow: '0 2px 5px rgba(2, 132, 199, 0.1)',
+          boxShadow: '0 1px 3px rgba(2, 132, 199, 0.1)',
           transition: 'all 0.2s ease',
         }}
       >
-        <HelpCircle size={15} color="#0284c7" />
+        <HelpCircle size={13} color="#0284c7" />
         <span>Panduan</span>
       </button>
 

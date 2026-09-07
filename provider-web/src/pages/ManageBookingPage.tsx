@@ -25,7 +25,7 @@ interface DashboardStats {
 }
 
 export const ManageBookingPage: React.FC = () => {
-  const {  } = useNavigation();
+  const { providerProfile } = useNavigation();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('Semua');
 
@@ -70,25 +70,33 @@ export const ManageBookingPage: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const statsData = await request('/provider/dashboard/stats');
-      setStats(statsData);
+      const statsData = await request('/provider/dashboard/stats').catch(e => {
+        console.error('Failed to load stats:', e);
+        return null;
+      });
+      if (statsData) setStats(statsData);
 
-      const data = await request('/provider/bookings');
-      const mapped = data.map((b: any) => ({
-        id: b.bookingCode || `TK-${b.id}`,
-        dbId: b.id, // Keep numeric ID for API requests
-        customerName: b.customerName,
-        customerInitial: b.customerInitial || b.customerName.charAt(0),
-        package: b.packageDetails?.name || 'Paket Wisata',
-        tripDate: new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-        guests: b.guests,
-        totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice),
-        dpAmount: b.dpAmount ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.dpAmount) : '—',
-        paymentMethod: b.paymentMethod || 'Transfer Bank',
-        paymentUrl: b.paymentUrl,
-        status: b.status,
-      }));
-      setBookings(mapped);
+      const data = await request('/provider/bookings').catch(e => {
+        console.error('Failed to load bookings:', e);
+        return [];
+      });
+      if (Array.isArray(data)) {
+        const mapped = data.map((b: any) => ({
+          id: b.bookingCode || `TK-${b.id}`,
+          dbId: b.id, // Keep numeric ID for API requests
+          customerName: b.customerName || 'Pelanggan',
+          customerInitial: b.customerInitial || (b.customerName ? b.customerName.charAt(0) : 'P'),
+          package: b.packageDetails?.name || 'Paket Wisata',
+          tripDate: b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
+          guests: b.guests || 1,
+          totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice || 0),
+          dpAmount: b.dpAmount ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.dpAmount) : '—',
+          paymentMethod: b.paymentMethod || 'Transfer Bank',
+          paymentUrl: b.paymentUrl,
+          status: b.status,
+        }));
+        setBookings(mapped);
+      }
     } catch (err) {
       console.error('Failed to load bookings:', err);
     }
@@ -96,7 +104,7 @@ export const ManageBookingPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [providerProfile]);
 
   const handleAction = async (type: string, id: string | number) => {
     if (type === 'approve') {

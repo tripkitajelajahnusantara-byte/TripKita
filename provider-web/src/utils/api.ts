@@ -5,29 +5,45 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
 
 
 export function getProviderToken(): string | null {
-  return localStorage.getItem('tementrip_partner_token') || localStorage.getItem('tripkita_partner_token');
+  return localStorage.getItem('tementrip_partner_token') ||
+         localStorage.getItem('tripkita_partner_token') ||
+         localStorage.getItem('tripkita_provider_token') ||
+         localStorage.getItem('tripkita_token') ||
+         localStorage.getItem('provider_token') ||
+         localStorage.getItem('token');
 }
 
 export function setProviderToken(token: string) {
   localStorage.setItem('tementrip_partner_token', token);
   localStorage.setItem('tripkita_partner_token', token);
+  localStorage.setItem('tripkita_provider_token', token);
+  localStorage.setItem('tripkita_token', token);
 }
 
 export function removeProviderToken() {
   localStorage.removeItem('tementrip_partner_token');
   localStorage.removeItem('tripkita_partner_token');
+  localStorage.removeItem('tripkita_provider_token');
+  localStorage.removeItem('tripkita_token');
+  localStorage.removeItem('provider_token');
+  localStorage.removeItem('token');
 }
 
 export function getCustomerToken(): string | null {
-  return localStorage.getItem('tementrip_customer_token');
+  return localStorage.getItem('tementrip_customer_token') ||
+         localStorage.getItem('tripkita_customer_token') ||
+         localStorage.getItem('customer_token');
 }
 
 export function setCustomerToken(token: string) {
   localStorage.setItem('tementrip_customer_token', token);
+  localStorage.setItem('tripkita_customer_token', token);
 }
 
 export function removeCustomerToken() {
   localStorage.removeItem('tementrip_customer_token');
+  localStorage.removeItem('tripkita_customer_token');
+  localStorage.removeItem('customer_token');
 }
 
 export function getAuthToken(): string | null {
