@@ -1,7 +1,67 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Route } from '../types';
-import { request, setAuthToken, removeAuthToken, getAuthToken } from '../utils/api';
+import { request, setAuthToken, removeAuthToken, getAuthToken, setProviderToken, setCustomerToken } from '../utils/api';
+
+
+export function getRouteFromHash(): Route {
+  const hash = typeof window !== 'undefined' ? window.location.hash : '';
+  if (!hash || hash === '#/' || hash === '#') return 'beranda';
+  
+  if (hash.includes('/provider/dashboard') || hash.includes('#/dashboard')) return 'dashboard';
+  if (hash.includes('/provider/kelola-paket')) return 'kelola-paket';
+  if (hash.includes('/provider/booking')) return 'booking';
+  if (hash.includes('/provider/keuangan')) return 'keuangan-provider';
+  if (hash.includes('/provider/profil')) return 'profil-provider';
+  if (hash.includes('/provider/tambah-paket')) return 'tambah-paket';
+  if (hash.includes('/provider/login')) return 'provider-login';
+  if (hash.includes('/provider/register')) return 'provider-register';
+  if (hash.includes('/admin/dashboard')) return 'admin-dashboard';
+  
+  if (hash.includes('/riwayat-booking')) return 'riwayat-booking';
+  if (hash.includes('/cari-trip')) return 'cari-trip';
+  if (hash.includes('/customer-checkout')) return 'customer-checkout';
+  if (hash.includes('/customer-confirmation')) return 'customer-confirmation';
+  if (hash.includes('/halaman-pembayaran')) return 'halaman-pembayaran';
+  if (hash.includes('/xendit-checkout')) return 'xendit-checkout';
+  if (hash.includes('/paket-detail')) return 'paket-detail';
+  if (hash.includes('/partner-landing')) return 'partner-landing';
+  if (hash.includes('/tentang-kami')) return 'tentang-kami';
+  if (hash.includes('/bantuan')) return 'bantuan';
+  if (hash.includes('/customer-register') || hash.includes('/daftar')) return 'customer-register';
+  if (hash.includes('/masuk')) return 'masuk';
+
+  return 'beranda';
+}
+
+export function getHashFromRoute(r: Route): string {
+  switch (r) {
+    case 'dashboard': return '#/provider/dashboard';
+    case 'kelola-paket': return '#/provider/kelola-paket';
+    case 'booking': return '#/provider/booking';
+    case 'keuangan-provider': return '#/provider/keuangan';
+    case 'profil-provider': return '#/provider/profil';
+    case 'tambah-paket': return '#/provider/tambah-paket';
+    case 'provider-login': return '#/provider/login';
+    case 'provider-register': return '#/provider/register';
+    case 'admin-dashboard': return '#/admin/dashboard';
+    
+    case 'riwayat-booking': return '#/riwayat-booking';
+    case 'cari-trip': return '#/cari-trip';
+    case 'customer-checkout': return '#/customer-checkout';
+    case 'customer-confirmation': return '#/customer-confirmation';
+    case 'halaman-pembayaran': return '#/halaman-pembayaran';
+    case 'xendit-checkout': return '#/xendit-checkout';
+    case 'paket-detail': return '#/paket-detail';
+    case 'partner-landing': return '#/partner-landing';
+    case 'tentang-kami': return '#/tentang-kami';
+    case 'bantuan': return '#/bantuan';
+    case 'customer-register': return '#/customer-register';
+    case 'masuk': return '#/masuk';
+    default: return '#/';
+  }
+}
+
 
 interface RegisterData {
   businessName: string;
@@ -128,7 +188,7 @@ interface NavigationContextType {
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [route, setRoute] = useState<Route>('beranda');
+  const [route, setRoute] = useState<Route>(() => getRouteFromHash());
   const [registerStep, setRegisterStep] = useState<1 | 2>(1);
   const [isRegistered, setIsRegistered] = useState<boolean>(!!getAuthToken());
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
@@ -136,6 +196,17 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
   const [selectedPackageForDetail, setSelectedPackageForDetail] = useState<any>(null);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<any>(null);
+
+  // Sync hash changes with internal route state
+  useEffect(() => {
+    const handleHashChange = () => {
+      const targetRoute = getRouteFromHash();
+      setRoute(targetRoute);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const [searchParams, setSearchParams] = useState({
     destination: '',
     date: '',
@@ -219,13 +290,14 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     if (token) {
-      setAuthToken(token);
       // Clean query parameters from URL bar
       window.history.replaceState({}, document.title, window.location.pathname);
       fetchProfile().then((profile) => {
         if (profile?.role === 'CUSTOMER') {
+          setCustomerToken(token);
           navigateTo('beranda');
         } else {
+          setProviderToken(token);
           navigateTo('dashboard');
         }
       });
@@ -236,6 +308,10 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
 
   const navigateTo = (newRoute: Route) => {
     setRoute(newRoute);
+    const targetHash = getHashFromRoute(newRoute);
+    if (window.location.hash !== targetHash) {
+      window.location.hash = targetHash;
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -248,7 +324,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    setAuthToken(res.token);
+    setAuthToken(res.token, res.provider?.role);
     setProviderProfile(res.provider);
     setIsRegistered(true);
     if (res.provider.role === 'ADMIN') {
@@ -259,6 +335,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       navigateTo('beranda');
     }
   };
+
 
   const registerCustomer = async (name: string, email: string, password: string, whatsapp: string) => {
     await request('/public/auth/register-customer', {

@@ -3,22 +3,65 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
     ? '/api/v1'
     : 'http://localhost:8080/api/v1');
 
-export function getAuthToken(): string | null {
+
+export function getProviderToken(): string | null {
   return localStorage.getItem('tementrip_partner_token') || localStorage.getItem('tripkita_partner_token');
 }
 
-export function setAuthToken(token: string) {
+export function setProviderToken(token: string) {
   localStorage.setItem('tementrip_partner_token', token);
   localStorage.setItem('tripkita_partner_token', token);
 }
 
-export function removeAuthToken() {
+export function removeProviderToken() {
   localStorage.removeItem('tementrip_partner_token');
   localStorage.removeItem('tripkita_partner_token');
 }
 
+export function getCustomerToken(): string | null {
+  return localStorage.getItem('tementrip_customer_token');
+}
+
+export function setCustomerToken(token: string) {
+  localStorage.setItem('tementrip_customer_token', token);
+}
+
+export function removeCustomerToken() {
+  localStorage.removeItem('tementrip_customer_token');
+}
+
+export function getAuthToken(): string | null {
+  // Check provider token first if on provider route, else customer token
+  const hash = typeof window !== 'undefined' ? window.location.hash : '';
+  if (hash.includes('/provider') || hash.includes('/admin')) {
+    return getProviderToken();
+  }
+  return getCustomerToken() || getProviderToken();
+}
+
+export function setAuthToken(token: string, role?: string) {
+  if (role === 'CUSTOMER') {
+    setCustomerToken(token);
+  } else {
+    setProviderToken(token);
+  }
+}
+
+export function removeAuthToken() {
+  removeProviderToken();
+  removeCustomerToken();
+}
+
 export async function request(endpoint: string, options: RequestInit = {}) {
-  const token = getAuthToken();
+  let token: string | null = null;
+  
+  // Decide which token to attach based on endpoint or URL
+  if (endpoint.startsWith('/provider') || endpoint.startsWith('/admin')) {
+    token = getProviderToken();
+  } else {
+    token = getCustomerToken() || getProviderToken();
+  }
+
   const headers = new Headers(options.headers || {});
 
   if (token) {
@@ -41,3 +84,4 @@ export async function request(endpoint: string, options: RequestInit = {}) {
 
   return response.json().catch(() => ({}));
 }
+
