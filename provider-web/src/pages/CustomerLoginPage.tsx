@@ -475,29 +475,16 @@ export const CustomerLoginPage: React.FC = () => {
           )}
         </div>
 
-        <div style={{ marginTop: '16px', backgroundColor: '#f8fafc', padding: '12px 14px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div>
-            <span style={{ fontSize: '12.5px', color: '#475569' }}>
-              Mitra Provider / Pemilik Tour?{' '}
-            </span>
-            <span 
-              onClick={() => navigateTo('provider-login')} 
-              style={{ color: '#00a896', fontWeight: 700, cursor: 'pointer', fontSize: '12.5px', textDecoration: 'underline' }}
-            >
-              Masuk ke Dashboard Provider
-            </span>
-          </div>
-          <div>
-            <span style={{ fontSize: '12.5px', color: '#475569' }}>
-              Pengelola Sistem?{' '}
-            </span>
-            <span 
-              onClick={() => navigateTo('admin-login')} 
-              style={{ color: '#2563eb', fontWeight: 700, cursor: 'pointer', fontSize: '12.5px', textDecoration: 'underline' }}
-            >
-              Masuk Portal Administrator
-            </span>
-          </div>
+        <div style={{ marginTop: '16px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+          <span style={{ fontSize: '12.5px', color: '#475569' }}>
+            Mitra Provider / Pemilik Tour?{' '}
+          </span>
+          <span 
+            onClick={() => navigateTo('provider-login')} 
+            style={{ color: '#00a896', fontWeight: 700, cursor: 'pointer', fontSize: '12.5px', textDecoration: 'underline' }}
+          >
+            Masuk ke Dashboard Provider
+          </span>
         </div>
 
       </div>

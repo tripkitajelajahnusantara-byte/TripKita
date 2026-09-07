@@ -186,25 +186,15 @@ export const LoginPage: React.FC = () => {
               )}
 
               {/* Bottom Switcher Links */}
-              <div style={{ marginTop: '18px', backgroundColor: '#f8fafc', padding: '12px 14px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ marginTop: '18px', backgroundColor: '#f8fafc', padding: '12px 14px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
                 {isAdminMode ? (
-                  <>
-                    <span style={{ fontSize: '12.5px', color: '#475569' }}>
-                      Bukan Admin? <span onClick={() => navigateTo('provider-login')} style={{ color: '#00a896', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Masuk Portal Mitra Provider</span>
-                    </span>
-                    <span style={{ fontSize: '12.5px', color: '#475569' }}>
-                      <span onClick={() => navigateTo('masuk')} style={{ color: '#007bff', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Masuk sebagai Customer / Traveler</span>
-                    </span>
-                  </>
+                  <span style={{ fontSize: '12.5px', color: '#475569' }}>
+                    Bukan Admin? <span onClick={() => navigateTo('provider-login')} style={{ color: '#00a896', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Masuk Portal Mitra Provider</span>
+                  </span>
                 ) : (
-                  <>
-                    <span style={{ fontSize: '12.5px', color: '#475569' }}>
-                      Bukan Mitra Provider? <span onClick={() => navigateTo('masuk')} style={{ color: '#007bff', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Masuk sebagai Customer</span>
-                    </span>
-                    <span style={{ fontSize: '12.5px', color: '#475569' }}>
-                      Pengelola Sistem? <span onClick={() => navigateTo('admin-login')} style={{ color: '#2563eb', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Masuk Portal Administrator</span>
-                    </span>
-                  </>
+                  <span style={{ fontSize: '12.5px', color: '#475569' }}>
+                    Bukan Mitra Provider? <span onClick={() => navigateTo('masuk')} style={{ color: '#007bff', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Masuk sebagai Customer / Traveler</span>
+                  </span>
                 )}
               </div>
             </form>
