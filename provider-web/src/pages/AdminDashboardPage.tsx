@@ -20,6 +20,8 @@ import {
   Wallet
 } from 'lucide-react';
 import { request } from '../utils/api';
+import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
+
 
 interface ProviderAdminData {
   id: number;
@@ -522,7 +524,7 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   // Categories list
-  const categories = ['Semua Kategori', 'Tour', 'Rental', 'Activities', 'Guide'];
+  const categories = ['Semua Kategori', ...OFFICIAL_CATEGORIES];
   
   // Unique cities list
   const cities = ['Semua Kota', ...Array.from(new Set(providers.map(p => {

@@ -203,9 +203,12 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       setProviderProfile(data);
       setIsRegistered(true);
       return data;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch profile:', err);
-      logout();
+      // Only logout if token is explicitly invalid/unauthorized (401), not on network errors
+      if (err?.message && (err.message.includes('401') || err.message.includes('Unauthorized') || err.message.includes('token'))) {
+        logout();
+      }
       return null;
     } finally {
       setLoadingProfile(false);

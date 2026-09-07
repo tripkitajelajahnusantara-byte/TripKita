@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import type { PackageItem } from '../types';
 import { request } from '../utils/api';
+import { getTripImage } from '../utils/tripImages';
+
 
 export const KelolaPaketPage: React.FC = () => {
   const { navigateTo, setEditingPackageId } = useNavigation();
@@ -44,6 +46,7 @@ export const KelolaPaketPage: React.FC = () => {
       const mapped = data.map((pkg: any) => ({
         id: String(pkg.id),
         name: pkg.name,
+        category: pkg.category || '',
         destination: pkg.destination,
         price: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price),
         quota: `${pkg.quotaUsed}/${pkg.quotaMax}`,
@@ -51,6 +54,7 @@ export const KelolaPaketPage: React.FC = () => {
         status: pkg.status,
         rating: pkg.rating > 0 ? pkg.rating : undefined,
       }));
+
       setPackages(mapped);
     } catch (err) {
       console.error('Failed to load packages:', err);
@@ -195,7 +199,12 @@ export const KelolaPaketPage: React.FC = () => {
                     <tr key={pkg.id}>
                       <td>
                         <div className="pkg-item-cell">
-                          <div className="pkg-thumb">⛰️</div>
+                          <img 
+                            src={getTripImage(Number(pkg.id), pkg.name, (pkg as any).category)} 
+                            alt={pkg.name} 
+                            style={{ width: '42px', height: '42px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} 
+                          />
+
                           <div>
                             <span className="pkg-name-text">{pkg.name}</span>
                             <span className="pkg-id-text">ID: {pkg.id}</span>

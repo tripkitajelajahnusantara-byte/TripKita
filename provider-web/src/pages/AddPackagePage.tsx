@@ -29,20 +29,11 @@ export const INDONESIA_PROVINCES = [
   "Papua", "Papua Barat", "Papua Barat Daya", "Papua Tengah", "Papua Pegunungan", "Papua Selatan"
 ];
 
-export const CATEGORIES = [
-  "City Tour",
-  "Diving & Snorkeling",
-  "Wisata Budaya & Sejarah",
-  "Pantai",
-  "Gunung",
-  "Keluarga Santai"
-];
+import { OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
 
-export const TRIP_TYPES = [
-  "Open Trip",
-  "Private Trip",
-  "Custom Trip"
-];
+
+export const CATEGORIES = OFFICIAL_CATEGORIES;
+export const TRIP_TYPES = OFFICIAL_TRIP_TYPES;
 
 export const AddPackagePage: React.FC = () => {
   const { navigateTo, editingPackageId } = useNavigation();

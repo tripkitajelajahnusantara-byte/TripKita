@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigation } from '../context/NavigationContext';
+import { ProviderHintTour } from './ProviderHintTour';
 import { 
   LayoutDashboard, 
   Package, 
@@ -9,6 +10,7 @@ import {
   LogOut,
   Wallet
 } from 'lucide-react';
+
 
 export const Sidebar: React.FC = () => {
   const { route, navigateTo, logout, providerProfile, setEditingPackageId } = useNavigation();
@@ -61,6 +63,12 @@ export const Sidebar: React.FC = () => {
             <span className="status-badge-verified">✓ Terverifikasi</span>
           </div>
         </div>
+
+        {/* Top Right Floating Hint / Guided Tour Trigger */}
+        <div style={{ position: 'fixed', top: '22px', right: '28px', zIndex: 9999 }}>
+          <ProviderHintTour />
+        </div>
+
 
         <nav className="sidebar-menu">
           {menuItems.map((item) => (

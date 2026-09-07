@@ -212,11 +212,12 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID stri
 		newStatus = "CONFIRMED"
 		booking.PaymentMethod = paymentMethod
 	case "EXPIRED", "FAILED":
+		// If booking is already paid or confirmed, Xendit 24h invoice expiration webhook should NOT downgrade it
 		if oldStatus == "PAID" || oldStatus == "CONFIRMED" || oldStatus == "COMPLETED" {
-			newStatus = "REFUND_REQUIRED"
-		} else {
-			newStatus = "CANCELLED_BY_CUSTOMER"
+			return nil // Retain paid status
 		}
+		newStatus = "CANCELLED_BY_CUSTOMER"
+
 	default:
 		return nil // No changes
 	}

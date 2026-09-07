@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
-import { getTripImage } from '../utils/tripImages';
+import { getTripImage, OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
 import { Search, ShieldCheck, CreditCard, Headset, ThumbsUp, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight } from 'lucide-react';
+
 import heroImage from '../assets/hero.jpg';
 
 interface TripPackage {
@@ -35,18 +36,11 @@ const indonesiaProvinces = [
   'Papua', 'Papua Barat', 'Papua Barat Daya', 'Papua Tengah', 'Papua Pegunungan', 'Papua Selatan'
 ];
 
-// Synced Trip Types & Categories from customer-mobile
-const tripTypesList = ['Semua Tipe', 'Open Trip', 'Private Trip', 'Honeymoon', 'Family', 'Corporate'];
-const categoriesList = [
-  'Semua Kategori',
-  'Gunung',
-  'Pantai',
-  'Curug',
-  'City Tour',
-  'Wisata Budaya & Sejarah',
-  'Keluarga Santai',
-  'Diving & Snorkeling'
-];
+// Synced Trip Types & Categories from official constants
+
+const tripTypesList = ['Semua Tipe', ...OFFICIAL_TRIP_TYPES];
+const categoriesList = ['Semua Kategori', ...OFFICIAL_CATEGORIES];
+
 
 const getTodayIsoDate = () => {
   const d = new Date();
