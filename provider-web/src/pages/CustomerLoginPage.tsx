@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../utils/api';
 import { Mail, Lock, Eye, EyeOff, User, Phone, ArrowRight, UserCheck, AlertCircle } from 'lucide-react';
 
 export const CustomerLoginPage: React.FC = () => {
-  const { login, registerCustomer, navigateTo, isRegistered, providerProfile, logout } = useNavigation();
+  const { login, registerCustomer, navigateTo, customerProfile, logout } = useNavigation();
 
   // Mode state: false = Masuk, true = Daftar
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -100,7 +100,7 @@ export const CustomerLoginPage: React.FC = () => {
     window.location.href = `${API_BASE_URL}/public/auth/google?type=customer`;
   };
 
-  if (isRegistered && providerProfile) {
+  if (customerProfile) {
     return (
       <div style={{ backgroundColor: '#f8fafc', minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', fontFamily: 'Inter, sans-serif' }}>
         <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '40px', width: '100%', maxWidth: '440px', textAlign: 'center', border: '1px solid #e2e8f0', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
@@ -110,7 +110,7 @@ export const CustomerLoginPage: React.FC = () => {
           <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0' }}>Anda Sudah Masuk</h2>
           <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 24px 0', lineHeight: '1.5' }}>
             Anda saat ini telah terhubung sebagai <br />
-            <strong style={{ color: '#0284c7' }}>{providerProfile.picName || providerProfile.businessName}</strong> ({providerProfile.email})
+            <strong style={{ color: '#0284c7' }}>{customerProfile.picName || customerProfile.businessName}</strong> ({customerProfile.email})
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <button

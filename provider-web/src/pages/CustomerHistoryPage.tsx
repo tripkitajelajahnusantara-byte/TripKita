@@ -56,7 +56,7 @@ const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = 
 };
 
 export const CustomerHistoryPage: React.FC = () => {
-  const { navigateTo, providerProfile, setSelectedBookingForInvoice } = useNavigation();
+  const { navigateTo, customerProfile, setSelectedBookingForInvoice } = useNavigation();
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -114,12 +114,12 @@ export const CustomerHistoryPage: React.FC = () => {
     } else {
       fetchHistory();
     }
-  }, [providerProfile]);
+  }, [customerProfile]);
 
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      if (providerProfile && providerProfile.role === 'CUSTOMER') {
+      if (customerProfile && customerProfile.role === 'CUSTOMER') {
         // Authenticated customer: fetch directly from DB
         const data = await request('/customer/bookings');
         setBookings(data || []);
@@ -398,7 +398,7 @@ export const CustomerHistoryPage: React.FC = () => {
 
         {/* History List Header */}
         <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', marginBottom: '20px' }}>
-          {providerProfile && providerProfile.role === 'CUSTOMER' ? 'Riwayat Pemesanan Akun Anda' : 'Detail Status Pemesanan Tiket'}
+          {customerProfile && customerProfile.role === 'CUSTOMER' ? 'Riwayat Pemesanan Akun Anda' : 'Detail Status Pemesanan Tiket'}
         </h1>
 
         {loading ? (
@@ -409,16 +409,16 @@ export const CustomerHistoryPage: React.FC = () => {
           <div style={{ textAlign: 'center', padding: '50px 24px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#64748b' }}>
             <Calendar size={44} color="#007bff" style={{ marginBottom: '14px' }} />
             <h3 style={{ color: '#0f172a', fontSize: '16px', fontWeight: '800', marginBottom: '6px' }}>
-              {providerProfile ? 'Belum Ada Pemesanan Terdaftar' : 'Melacak Tiket Pesanan (Mode Tamu)'}
+              {customerProfile ? 'Belum Ada Pemesanan Terdaftar' : 'Melacak Tiket Pesanan (Mode Tamu)'}
             </h3>
             <p style={{ fontSize: '13.5px', maxWidth: '500px', margin: '0 auto 20px auto', lineHeight: '1.5' }}>
-              {providerProfile 
+              {customerProfile 
                 ? 'Anda belum memiliki riwayat transaksi di akun ini.' 
                 : 'Anda saat ini mengakses tanpa akun. Masukkan Kode Booking yang telah Anda salin pada kolom pencarian di atas untuk melacak pesanan Anda.'}
             </p>
             
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              {!providerProfile && (
+              {!customerProfile && (
                 <button 
                   onClick={() => navigateTo('masuk' as any)}
                   style={{ padding: '11px 22px', backgroundColor: '#007bff', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: '700', fontSize: '13.5px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,123,255,0.25)' }}

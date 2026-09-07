@@ -4,7 +4,7 @@ import { request } from '../utils/api';
 import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle } from 'lucide-react';
 
 export const CustomerConfirmationPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, providerProfile, bookingFormData } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, customerProfile, bookingFormData } = useNavigation();
   const [submitting, setSubmitting] = useState(false);
   
   // Agreement Checkbox state
@@ -103,8 +103,8 @@ export const CustomerConfirmationPage: React.FC = () => {
         }))
       };
 
-      if (providerProfile && providerProfile.role === 'CUSTOMER') {
-        payload.customerId = providerProfile.id;
+      if (customerProfile && customerProfile.role === 'CUSTOMER') {
+        payload.customerId = customerProfile.id;
       }
 
       const response = await request('/public/bookings', {

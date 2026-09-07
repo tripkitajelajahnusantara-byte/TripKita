@@ -11,23 +11,23 @@ interface Participant {
 }
 
 export const CustomerBookingPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, providerProfile, bookingFormData, setBookingFormData } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, customerProfile, bookingFormData, setBookingFormData } = useNavigation();
 
   const currentPackageId = selectedPackageForDetail?.id;
   const activeFormData = (bookingFormData && String(bookingFormData.packageId) === String(currentPackageId)) ? bookingFormData : null;
 
   // Check if user is logged in
-  const isLoggedIn = !!(providerProfile && providerProfile.email);
+  const isLoggedIn = !!(customerProfile && customerProfile.email);
 
-  // Data Pemesan State - initialize with priority: providerProfile (logged in) > activeFormData > defaults
+  // Data Pemesan State - initialize with priority: customerProfile (logged in) > activeFormData > defaults
   const [pemesanName, setPemesanName] = useState(() => 
-    providerProfile?.picName || providerProfile?.businessName || activeFormData?.pemesan?.nama || ''
+    customerProfile?.picName || customerProfile?.businessName || activeFormData?.pemesan?.nama || ''
   );
   const [pemesanEmail, setPemesanEmail] = useState(() => 
-    providerProfile?.email || activeFormData?.pemesan?.email || ''
+    customerProfile?.email || activeFormData?.pemesan?.email || ''
   );
   const [pemesanPhone, setPemesanPhone] = useState(() => 
-    providerProfile?.whatsapp || activeFormData?.pemesan?.whatsapp || ''
+    customerProfile?.whatsapp || activeFormData?.pemesan?.whatsapp || ''
   );
   const [pemesanBirthDate, setPemesanBirthDate] = useState(() => activeFormData?.peserta?.[0]?.tanggalLahir || '1998-05-15');
   const [pemesanGender, setPemesanGender] = useState(() => activeFormData?.peserta?.[0]?.gender || 'Laki-laki');
@@ -61,18 +61,18 @@ export const CustomerBookingPage: React.FC = () => {
 
   // Auto-fill fields if user is logged in (Google OAuth or customer account)
   useEffect(() => {
-    if (providerProfile) {
-      if (providerProfile.picName || providerProfile.businessName) {
-        setPemesanName(providerProfile.picName || providerProfile.businessName || '');
+    if (customerProfile) {
+      if (customerProfile.picName || customerProfile.businessName) {
+        setPemesanName(customerProfile.picName || customerProfile.businessName || '');
       }
-      if (providerProfile.email) {
-        setPemesanEmail(providerProfile.email || '');
+      if (customerProfile.email) {
+        setPemesanEmail(customerProfile.email || '');
       }
-      if (providerProfile.whatsapp) {
-        setPemesanPhone(providerProfile.whatsapp || '');
+      if (customerProfile.whatsapp) {
+        setPemesanPhone(customerProfile.whatsapp || '');
       }
     }
-  }, [providerProfile]);
+  }, [customerProfile]);
 
   // Adjust participants array dynamically whenever guestsCount changes
   useEffect(() => {
@@ -81,8 +81,8 @@ export const CustomerBookingPage: React.FC = () => {
       if (updated.length < guestsCount) {
         for (let i = updated.length; i < guestsCount; i++) {
           updated.push({
-            nama: i === 0 && providerProfile && !bookingFormData ? (providerProfile.picName || '') : '',
-            hp: i === 0 && providerProfile && !bookingFormData ? (providerProfile.whatsapp || '') : '',
+            nama: i === 0 && customerProfile && !bookingFormData ? (customerProfile.picName || '') : '',
+            hp: i === 0 && customerProfile && !bookingFormData ? (customerProfile.whatsapp || '') : '',
             gender: 'Laki-laki',
             tanggalLahir: i === 0 ? pemesanBirthDate : '2000-01-01',
             riwayatPenyakit: 'Tidak Ada'
@@ -93,7 +93,7 @@ export const CustomerBookingPage: React.FC = () => {
       }
       return updated;
     });
-  }, [guestsCount, providerProfile, bookingFormData]);
+  }, [guestsCount, customerProfile, bookingFormData]);
 
   // Sync Peserta 1 with Pemesan when checkbox is toggled or when pemesan data changes
   useEffect(() => {

@@ -31,12 +31,11 @@ export function removeCustomerToken() {
 }
 
 export function getAuthToken(): string | null {
-  // Check provider token first if on provider route, else customer token
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
   if (hash.includes('/provider') || hash.includes('/admin')) {
     return getProviderToken();
   }
-  return getCustomerToken() || getProviderToken();
+  return getCustomerToken();
 }
 
 export function setAuthToken(token: string, role?: string) {
@@ -54,12 +53,18 @@ export function removeAuthToken() {
 
 export async function request(endpoint: string, options: RequestInit = {}) {
   let token: string | null = null;
-  
-  // Decide which token to attach based on endpoint or URL
-  if (endpoint.startsWith('/provider') || endpoint.startsWith('/admin')) {
+  const hash = typeof window !== 'undefined' ? window.location.hash : '';
+  const isProviderRoute = hash.includes('/provider') || hash.includes('/admin');
+
+  // Decide which token to attach based on endpoint or current route
+  if (endpoint.startsWith('/provider/profile')) {
+    token = isProviderRoute ? getProviderToken() : (getCustomerToken() || getProviderToken());
+  } else if (endpoint.startsWith('/provider') || endpoint.startsWith('/admin') || isProviderRoute) {
     token = getProviderToken();
+  } else if (endpoint.startsWith('/customer')) {
+    token = getCustomerToken();
   } else {
-    token = getCustomerToken() || getProviderToken();
+    token = getCustomerToken() || (isProviderRoute ? getProviderToken() : null);
   }
 
   const headers = new Headers(options.headers || {});

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Route } from '../types';
-import { request, setAuthToken, removeAuthToken, getAuthToken, setProviderToken, setCustomerToken } from '../utils/api';
+import { request, setProviderToken, getProviderToken, removeProviderToken, setCustomerToken, getCustomerToken, removeCustomerToken } from '../utils/api';
 
 
 export function getRouteFromHash(): Route {
@@ -155,6 +155,8 @@ interface NavigationContextType {
   updateRegisterData: (fields: Partial<RegisterData>) => void;
   isRegistered: boolean;
   setIsRegistered: (registered: boolean) => void;
+  customerProfile: ProviderProfile | null;
+  setCustomerProfile: (profile: ProviderProfile | null) => void;
   providerProfile: ProviderProfile | null;
   setProviderProfile: (profile: ProviderProfile | null) => void;
   login: (email: string, password: string) => Promise<void>;
@@ -190,22 +192,13 @@ const NavigationContext = createContext<NavigationContextType | undefined>(undef
 export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [route, setRoute] = useState<Route>(() => getRouteFromHash());
   const [registerStep, setRegisterStep] = useState<1 | 2>(1);
-  const [isRegistered, setIsRegistered] = useState<boolean>(!!getAuthToken());
+  const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
+  const [customerProfile, setCustomerProfile] = useState<ProviderProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
   const [selectedPackageForDetail, setSelectedPackageForDetail] = useState<any>(null);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<any>(null);
-
-  // Sync hash changes with internal route state
-  useEffect(() => {
-    const handleHashChange = () => {
-      const targetRoute = getRouteFromHash();
-      setRoute(targetRoute);
-    };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
 
   const [searchParams, setSearchParams] = useState({
     destination: '',
@@ -213,7 +206,9 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     type: 'Semua Tipe',
     category: 'Semua Kategori'
   });
+
   const [bookingFormData, setBookingFormDataState] = useState<{
+    packageId?: number | string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -227,6 +222,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   });
 
   const setBookingFormData: React.Dispatch<React.SetStateAction<{
+    packageId?: number | string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -245,6 +241,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       return next;
     });
   };
+
   const [registerData, setRegisterData] = useState<RegisterData>({
     businessName: '',
     businessCategory: '',
@@ -267,19 +264,61 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     password: '',
   });
 
-  const fetchProfile = async () => {
+  // Sync hash changes with internal route state
+  useEffect(() => {
+    const handleHashChange = () => {
+      const targetRoute = getRouteFromHash();
+      setRoute(targetRoute);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const fetchSessionProfile = async (targetRoute: Route) => {
     setLoadingProfile(true);
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    const isProviderRoute = hash.includes('/provider') || hash.includes('/admin') ||
+      ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard'].includes(targetRoute);
+
     try {
-      const data = await request('/provider/profile');
-      setProviderProfile(data);
-      setIsRegistered(true);
-      return data;
+      if (isProviderRoute) {
+        setCustomerProfile(null);
+        const token = getProviderToken();
+        if (token) {
+          const data = await request('/provider/profile');
+          if (data && (data.role === 'PROVIDER' || data.role === 'ADMIN')) {
+            setProviderProfile(data);
+            setIsRegistered(true);
+            return data;
+          }
+        }
+        setProviderProfile(null);
+        setIsRegistered(false);
+      } else {
+        setProviderProfile(null);
+        const token = getCustomerToken();
+        if (token) {
+          const data = await request('/provider/profile');
+          if (data && data.role === 'CUSTOMER') {
+            setCustomerProfile(data);
+            setIsRegistered(true);
+            return data;
+          }
+        }
+        setCustomerProfile(null);
+        setIsRegistered(false);
+      }
+      return null;
     } catch (err: any) {
       console.error('Failed to fetch profile:', err);
-      // Only logout if token is explicitly invalid/unauthorized (401), not on network errors
-      if (err?.message && (err.message.includes('401') || err.message.includes('Unauthorized') || err.message.includes('token'))) {
-        logout();
+      if (isProviderRoute) {
+        setProviderProfile(null);
+        removeProviderToken();
+      } else {
+        setCustomerProfile(null);
+        removeCustomerToken();
       }
+      setIsRegistered(false);
       return null;
     } finally {
       setLoadingProfile(false);
@@ -289,22 +328,36 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
+    const routeParam = params.get('route');
+
     if (token) {
-      // Clean query parameters from URL bar
       window.history.replaceState({}, document.title, window.location.pathname);
-      fetchProfile().then((profile) => {
-        if (profile?.role === 'CUSTOMER') {
+      // Fetch profile using token
+      request('/provider/profile', {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then((data) => {
+        if (data?.role === 'CUSTOMER') {
           setCustomerToken(token);
+          setCustomerProfile(data);
+          setProviderProfile(null);
+          setIsRegistered(true);
           navigateTo('beranda');
         } else {
           setProviderToken(token);
-          navigateTo('dashboard');
+          setProviderProfile(data);
+          setCustomerProfile(null);
+          setIsRegistered(true);
+          if (routeParam === 'profil-provider') navigateTo('profil-provider');
+          else navigateTo('dashboard');
         }
+      }).catch((err) => {
+        console.error('Token verification failed:', err);
+        fetchSessionProfile(route);
       });
-    } else if (getAuthToken()) {
-      fetchProfile();
+    } else {
+      fetchSessionProfile(route);
     }
-  }, []);
+  }, [route]);
 
   const navigateTo = (newRoute: Route) => {
     setRoute(newRoute);
@@ -324,18 +377,25 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    setAuthToken(res.token, res.provider?.role);
-    setProviderProfile(res.provider);
-    setIsRegistered(true);
-    if (res.provider.role === 'ADMIN') {
-      navigateTo('admin-dashboard');
-    } else if (res.provider.role === 'PROVIDER') {
-      navigateTo('dashboard');
-    } else {
+
+    if (res.provider?.role === 'CUSTOMER') {
+      setCustomerToken(res.token);
+      setCustomerProfile(res.provider);
+      setProviderProfile(null);
+      setIsRegistered(true);
       navigateTo('beranda');
+    } else {
+      setProviderToken(res.token);
+      setProviderProfile(res.provider);
+      setCustomerProfile(null);
+      setIsRegistered(true);
+      if (res.provider?.role === 'ADMIN') {
+        navigateTo('admin-dashboard');
+      } else {
+        navigateTo('dashboard');
+      }
     }
   };
-
 
   const registerCustomer = async (name: string, email: string, password: string, whatsapp: string) => {
     await request('/public/auth/register-customer', {
@@ -375,13 +435,19 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       method: 'PUT',
       body: JSON.stringify(fields),
     });
-    setProviderProfile(updated);
+    if (updated?.role === 'CUSTOMER') {
+      setCustomerProfile(updated);
+    } else {
+      setProviderProfile(updated);
+    }
   };
 
   const logout = () => {
-    removeAuthToken();
+    removeProviderToken();
+    removeCustomerToken();
     setIsRegistered(false);
     setProviderProfile(null);
+    setCustomerProfile(null);
     setRoute('beranda');
     setRegisterStep(1);
     setRegisterData({
@@ -420,6 +486,8 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
         setIsRegistered,
         providerProfile,
         setProviderProfile,
+        customerProfile,
+        setCustomerProfile,
         login,
         registerProvider,
         registerCustomer,

@@ -3,18 +3,20 @@ import { useNavigation } from '../context/NavigationContext';
 import { Menu, X, User } from 'lucide-react';
 
 export const Header: React.FC = () => {
-  const { route, navigateTo, isRegistered, logout, providerProfile } = useNavigation();
+  const { route, navigateTo, logout, providerProfile, customerProfile } = useNavigation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleNav = (targetRoute: 'beranda' | 'tentang-kami' | 'daftar' | 'dashboard' | 'masuk') => {
+  const handleNav = (targetRoute: 'beranda' | 'tentang-kami' | 'partner-landing' | 'bantuan' | 'riwayat-booking' | 'masuk') => {
     navigateTo(targetRoute as any);
     setMobileMenuOpen(false);
   };
 
+  const isProviderRoute = ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard', 'provider-login', 'provider-register'].includes(route);
+
   return (
     <header className="site-header">
       <div className="container header-container">
-        <div className="logo-section" onClick={() => navigateTo('beranda')}>
+        <div className="logo-section" onClick={() => navigateTo(isProviderRoute ? 'dashboard' : 'beranda')}>
           <div className="logo-brand">
             <span className="logo-icon" style={{ display: 'flex', alignItems: 'center' }}>
               <svg width="34" height="34" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -39,12 +41,12 @@ export const Header: React.FC = () => {
               </svg>
             </span>
             <span className="logo-text" style={{ color: '#0284c7', fontWeight: 800, fontSize: '22px', letterSpacing: '-0.5px' }}>Temen<span style={{ color: '#00c9a7' }}>Trip</span><span style={{ color: '#ff6b81', fontSize: '18px' }}>✨</span></span>
-            {isRegistered && providerProfile ? (
+            {isProviderRoute && providerProfile ? (
               providerProfile.role === 'ADMIN' ? (
                 <span className="logo-badge" style={{ backgroundColor: '#fee2e2', color: '#ef4444', borderColor: '#fecaca' }}>Admin</span>
-              ) : providerProfile.role === 'PROVIDER' ? (
+              ) : (
                 <span className="logo-badge">Mitra</span>
-              ) : null
+              )
             ) : null}
           </div>
         </div>
@@ -53,93 +55,115 @@ export const Header: React.FC = () => {
         <nav className="desktop-nav">
           <button 
             className={`nav-link ${route === 'beranda' ? 'active' : ''}`}
-            onClick={() => handleNav('beranda' as any)}
+            onClick={() => handleNav('beranda')}
           >
             Home
           </button>
           <button 
             className={`nav-link ${route === 'riwayat-booking' ? 'active' : ''}`}
-            onClick={() => handleNav('riwayat-booking' as any)}
+            onClick={() => handleNav('riwayat-booking')}
           >
             Cek Booking
           </button>
           <button 
             className={`nav-link ${route === 'partner-landing' ? 'active' : ''}`}
-            onClick={() => handleNav('partner-landing' as any)}
+            onClick={() => handleNav('partner-landing')}
           >
             Jadi Mitra
           </button>
           <button 
             className={`nav-link ${route === 'tentang-kami' ? 'active' : ''}`}
-            onClick={() => handleNav('tentang-kami' as any)}
+            onClick={() => handleNav('tentang-kami')}
           >
             Tentang Kami
           </button>
           <button 
             className={`nav-link ${route === 'bantuan' ? 'active' : ''}`}
-            onClick={() => handleNav('bantuan' as any)}
+            onClick={() => handleNav('bantuan')}
           >
             Bantuan
           </button>
         </nav>
 
         <div className="auth-buttons">
-          {isRegistered && providerProfile ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {providerProfile.role === 'ADMIN' && (
-                <button className="masuk-btn" onClick={() => navigateTo('admin-dashboard')}>Admin Panel</button>
-              )}
-              {providerProfile.role === 'PROVIDER' && (
-                <button className="masuk-btn" onClick={() => navigateTo('dashboard')}>Mitra Panel</button>
-              )}
-              {providerProfile.role === 'CUSTOMER' && (
+          {isProviderRoute ? (
+            providerProfile ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {providerProfile.role === 'ADMIN' ? (
+                  <button className="masuk-btn" onClick={() => navigateTo('admin-dashboard')}>Admin Panel</button>
+                ) : (
+                  <button className="masuk-btn" onClick={() => navigateTo('dashboard')}>Mitra Panel</button>
+                )}
+                <button 
+                  onClick={logout}
+                  style={{ 
+                    padding: '7px 16px', 
+                    backgroundColor: '#fee2e2', 
+                    color: '#ef4444', 
+                    border: '1px solid #fca5a5', 
+                    borderRadius: '20px', 
+                    fontSize: '12.5px', 
+                    fontWeight: '700', 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Keluar
+                </button>
+              </div>
+            ) : (
+              <button className="masuk-btn" onClick={() => navigateTo('provider-login')}>Masuk Mitra</button>
+            )
+          ) : (
+            customerProfile ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#f0f9ff', padding: '6px 14px', borderRadius: '30px', border: '1px solid #bae6fd' }}>
                   <User size={16} color="#0284c7" />
                   <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0369a1' }}>
-                    {providerProfile.picName || providerProfile.businessName || 'Traveler'}
+                    {customerProfile.picName || customerProfile.businessName || customerProfile.email || 'Traveler'}
                   </span>
                 </div>
-              )}
-              <button 
-                onClick={logout}
-                style={{ 
-                  padding: '7px 16px', 
-                  backgroundColor: '#fee2e2', 
-                  color: '#ef4444', 
-                  border: '1px solid #fca5a5', 
-                  borderRadius: '20px', 
-                  fontSize: '12.5px', 
-                  fontWeight: '700', 
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Keluar
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button 
-                onClick={() => navigateTo('masuk')}
-                style={{ 
-                  padding: '8px 22px', 
-                  backgroundColor: '#0284c7', 
-                  color: '#ffffff', 
-                  border: 'none', 
-                  borderRadius: '30px', 
-                  fontSize: '13.5px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: '0 3px 10px rgba(2, 132, 199, 0.2)',
-                  transition: 'all 0.2s'
-                }} 
-              >
-                <User size={15} /> Masuk
-              </button>
-            </div>
+                <button 
+                  onClick={logout}
+                  style={{ 
+                    padding: '7px 16px', 
+                    backgroundColor: '#fee2e2', 
+                    color: '#ef4444', 
+                    border: '1px solid #fca5a5', 
+                    borderRadius: '20px', 
+                    fontSize: '12.5px', 
+                    fontWeight: '700', 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Keluar
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button 
+                  onClick={() => navigateTo('masuk')}
+                  style={{ 
+                    padding: '8px 22px', 
+                    backgroundColor: '#0284c7', 
+                    color: '#ffffff', 
+                    border: 'none', 
+                    borderRadius: '30px', 
+                    fontSize: '13.5px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 3px 10px rgba(2, 132, 199, 0.2)',
+                    transition: 'all 0.2s'
+                  }} 
+                >
+                  <User size={15} /> Masuk
+                </button>
+              </div>
+            )
           )}
         </div>
 
@@ -155,47 +179,47 @@ export const Header: React.FC = () => {
           <nav className="mobile-nav-links">
             <button 
               className={`mobile-nav-link ${route === 'beranda' ? 'active' : ''}`}
-              onClick={() => handleNav('beranda' as any)}
+              onClick={() => handleNav('beranda')}
             >
               Home
             </button>
             <button 
               className={`mobile-nav-link ${route === 'riwayat-booking' ? 'active' : ''}`}
-              onClick={() => handleNav('riwayat-booking' as any)}
+              onClick={() => handleNav('riwayat-booking')}
             >
               Cek Booking
             </button>
             <button 
               className={`mobile-nav-link ${route === 'partner-landing' ? 'active' : ''}`}
-              onClick={() => handleNav('partner-landing' as any)}
+              onClick={() => handleNav('partner-landing')}
             >
               Jadi Mitra
             </button>
             <button 
               className={`mobile-nav-link ${route === 'tentang-kami' ? 'active' : ''}`}
-              onClick={() => handleNav('tentang-kami' as any)}
+              onClick={() => handleNav('tentang-kami')}
             >
               Tentang Kami
             </button>
             <button 
               className={`mobile-nav-link ${route === 'bantuan' ? 'active' : ''}`}
-              onClick={() => handleNav('bantuan' as any)}
+              onClick={() => handleNav('bantuan')}
             >
               Bantuan
             </button>
             <hr className="mobile-divider" />
-            {isRegistered && providerProfile ? (
-              <>
-                {providerProfile.role === 'ADMIN' && (
-                  <button className="mobile-nav-link" onClick={() => { handleNav('admin-dashboard' as any); }}>Admin Panel</button>
-                )}
-                {providerProfile.role === 'PROVIDER' && (
-                  <button className="mobile-nav-link" onClick={() => { handleNav('dashboard' as any); }}>Mitra Panel</button>
-                )}
-                <button className="mobile-action-btn logout-btn" onClick={() => { logout(); setMobileMenuOpen(false); }}>Keluar</button>
-              </>
+            {isProviderRoute ? (
+              providerProfile ? (
+                <button className="mobile-action-btn logout-btn" onClick={() => { logout(); setMobileMenuOpen(false); }}>Keluar Mitra</button>
+              ) : (
+                <button className="mobile-action-btn" onClick={() => handleNav('provider-login' as any)}>Masuk Mitra</button>
+              )
             ) : (
-              <button className="mobile-action-btn" onClick={() => handleNav('masuk')}>Masuk</button>
+              customerProfile ? (
+                <button className="mobile-action-btn logout-btn" onClick={() => { logout(); setMobileMenuOpen(false); }}>Keluar</button>
+              ) : (
+                <button className="mobile-action-btn" onClick={() => handleNav('masuk')}>Masuk</button>
+              )
             )}
           </nav>
         </div>

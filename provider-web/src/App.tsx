@@ -26,10 +26,10 @@ import { CustomerXenditCheckoutPage } from './pages/CustomerXenditCheckoutPage';
 import { ProviderFinancePage } from './pages/ProviderFinancePage';
 
 const AppContent: React.FC = () => {
-  const { route, isRegistered, loadingProfile, providerProfile, navigateTo } = useNavigation();
+  const { route, loadingProfile, providerProfile, navigateTo } = useNavigation();
 
   React.useEffect(() => {
-    const privateRoutes = [
+    const privateProviderRoutes = [
       'dashboard',
       'kelola-paket',
       'booking',
@@ -41,24 +41,21 @@ const AppContent: React.FC = () => {
 
     if (loadingProfile) return;
 
-    // Intercept customer/guest landing on provider booking redirect
-    if (route === 'booking' && (!isRegistered || providerProfile?.role !== 'PROVIDER')) {
-      navigateTo('riwayat-booking');
-      return;
-    }
-
-    if (privateRoutes.includes(route) && !isRegistered) {
-      navigateTo('masuk');
-    } else if (isRegistered && providerProfile) {
-      if (providerProfile.role === 'ADMIN' && route !== 'admin-dashboard') {
-        navigateTo('admin-dashboard');
-      } else if (providerProfile.role === 'PROVIDER' && route === 'admin-dashboard') {
-        navigateTo('dashboard');
-      } else if (providerProfile.role === 'CUSTOMER' && privateRoutes.includes(route)) {
-        navigateTo('riwayat-booking');
+    if (privateProviderRoutes.includes(route)) {
+      const hasProviderToken = typeof window !== 'undefined' && (localStorage.getItem('tementrip_partner_token') || localStorage.getItem('tripkita_partner_token'));
+      if (!hasProviderToken) {
+        navigateTo('provider-login');
+        return;
+      }
+      if (providerProfile) {
+        if (providerProfile.role === 'ADMIN' && route !== 'admin-dashboard') {
+          navigateTo('admin-dashboard');
+        } else if (providerProfile.role === 'PROVIDER' && route === 'admin-dashboard') {
+          navigateTo('dashboard');
+        }
       }
     }
-  }, [route, isRegistered, loadingProfile, providerProfile]);
+  }, [route, loadingProfile, providerProfile]);
 
   if (loadingProfile) {
     return (
