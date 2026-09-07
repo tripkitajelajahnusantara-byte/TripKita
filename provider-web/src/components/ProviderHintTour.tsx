@@ -64,7 +64,7 @@ export const TOUR_STEPS: TourStep[] = [
 export const ProviderHintTour: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number; arrowTop: number } | null>(null);
 
   const step = TOUR_STEPS[currentStepIndex] || TOUR_STEPS[0];
 
@@ -75,20 +75,29 @@ export const ProviderHintTour: React.FC = () => {
       const el = document.getElementById(`tour-step-${step.id}`);
       if (el) {
         const rect = el.getBoundingClientRect();
-        const cardHeight = 280;
+        const cardHeight = 250;
+        const targetCenterY = rect.top + (rect.height / 2);
+        
         let computedTop = rect.top - 8;
         
-        // Prevent overflowing below screen
-        if (computedTop + cardHeight > window.innerHeight) {
-          computedTop = Math.max(16, window.innerHeight - cardHeight - 20);
+        // Prevent card from overflowing viewport bottom
+        if (computedTop + cardHeight > window.innerHeight - 16) {
+          computedTop = window.innerHeight - cardHeight - 16;
         }
 
+        computedTop = Math.max(16, computedTop);
+
+        // Arrow top relative to the card's top, pointing precisely at targetCenterY
+        let computedArrowTop = targetCenterY - computedTop - 7;
+        computedArrowTop = Math.max(14, Math.min(cardHeight - 28, computedArrowTop));
+
         setCoords({
-          top: Math.max(16, computedTop),
+          top: computedTop,
           left: rect.right + 14,
+          arrowTop: computedArrowTop,
         });
       } else {
-        setCoords({ top: 100, left: 270 });
+        setCoords({ top: 100, left: 270, arrowTop: 18 });
       }
     };
 
@@ -170,18 +179,19 @@ export const ProviderHintTour: React.FC = () => {
             transition: 'top 0.2s ease, left 0.2s ease'
           }}
         >
-          {/* Pointer Arrow pointing left towards sidebar item */}
+          {/* Pointer Arrow pointing left towards target sidebar button */}
           <div
             style={{
               position: 'absolute',
               left: '-7px',
-              top: '18px',
+              top: coords ? `${coords.arrowTop}px` : '18px',
               width: '0',
               height: '0',
               borderTop: '7px solid transparent',
               borderBottom: '7px solid transparent',
               borderRight: '7px solid #ffffff',
-              filter: 'drop-shadow(-2px 0 1px rgba(2, 132, 199, 0.12))'
+              filter: 'drop-shadow(-2px 0 1px rgba(2, 132, 199, 0.12))',
+              transition: 'top 0.2s ease'
             }}
           />
 
