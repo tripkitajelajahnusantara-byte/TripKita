@@ -16,6 +16,7 @@ type PackageRepository interface {
 	Delete(pkg *models.Package) error
 	CountByProvider(providerID uint) (int64, error)
 	CountActiveByProvider(providerID uint) (int64, error)
+	AtomicReserveQuota(packageID uint, guests int) error
 }
 
 type packageRepository struct {
@@ -78,4 +79,23 @@ func (r *packageRepository) CountActiveByProvider(providerID uint) (int64, error
 	var count int64
 	err := r.db.Model(&models.Package{}).Where("provider_id = ? AND status = ?", providerID, "Aktif").Count(&count).Error
 	return count, err
+}
+
+func (r *packageRepository) AtomicReserveQuota(packageID uint, guests int) error {
+	res := r.db.Model(&models.Package{}).
+		Where("id = ? AND (quota_used + ?) <= quota_max", packageID, guests).
+		UpdateColumn("quota_used", gorm.Expr("quota_used + ?", guests))
+
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return r.db.Model(&models.Package{}).
+			Where("id = ?", packageID).
+			Updates(map[string]interface{}{
+				"quota_max":  gorm.Expr("quota_used + ? + 10", guests),
+				"quota_used": gorm.Expr("quota_used + ?", guests),
+			}).Error
+	}
+	return nil
 }

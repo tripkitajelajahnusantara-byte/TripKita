@@ -6,7 +6,12 @@ import { request, setProviderToken, getProviderToken, removeProviderToken, setCu
 
 export function getRouteFromHash(): Route {
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
-  if (!hash || hash === '#/' || hash === '#') return 'beranda';
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isMitraDomain = hostname.startsWith('mitra.') || hostname.startsWith('provider.') || hostname.includes('mitra-') || hostname.includes('provider-');
+
+  if (!hash || hash === '#/' || hash === '#') {
+    return isMitraDomain ? 'provider-login' : 'beranda';
+  }
   
   if (hash.includes('/provider/dashboard') || hash.includes('#/dashboard')) return 'dashboard';
   if (hash.includes('/provider/kelola-paket')) return 'kelola-paket';

@@ -155,9 +155,8 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		return err
 	}
 
-	// Instantly reserve quota for package in database during PENDING_PAYMENT
-	pkg.QuotaUsed += booking.Guests
-	_ = s.packageRepo.Update(pkg)
+	// Instantly reserve quota for package in database atomically during PENDING_PAYMENT
+	_ = s.packageRepo.AtomicReserveQuota(booking.PackageID, booking.Guests)
 
 	if booking.PaymentMethod == "Manual Transfer" || booking.PaymentMethod == "" {
 		booking.PaymentMethod = "Manual Transfer"

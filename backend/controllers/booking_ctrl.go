@@ -492,6 +492,15 @@ func (ctrl *BookingController) ProcessMockPayment(c *gin.Context) {
 }
 
 func (ctrl *BookingController) XenditWebhook(c *gin.Context) {
+	// Verify Xendit Callback Token header if XENDIT_WEBHOOK_TOKEN is configured in environment
+	if ctrl.cfg.XenditWebhookToken != "" {
+		callbackToken := c.GetHeader("x-callback-token")
+		if callbackToken != ctrl.cfg.XenditWebhookToken {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Invalid Xendit callback token"})
+			return
+		}
+	}
+
 	var req struct {
 		ID             string `json:"id"`
 		ExternalID     string `json:"external_id"`
