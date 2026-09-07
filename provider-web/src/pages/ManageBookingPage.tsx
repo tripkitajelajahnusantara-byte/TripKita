@@ -147,10 +147,40 @@ export const ManageBookingPage: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const handleExportCSV = () => {
+    if (!bookings || bookings.length === 0) {
+      alert('Belum ada data booking untuk di-export.');
+      return;
+    }
+
+    const headers = ['Kode Booking', 'Nama Pelanggan', 'Paket Wisata', 'Tanggal Trip', 'Jumlah Peserta', 'Total Harga', 'DP', 'Status', 'Metode Pembayaran'];
+    const rows = bookings.map(b => [
+      `"${b.bookingCode || b.id || ''}"`,
+      `"${b.customerName || ''}"`,
+      `"${b.package || ''}"`,
+      `"${b.tripDate || ''}"`,
+      `"${b.guests || 1}"`,
+      `"${b.totalPrice || 0}"`,
+      `"${b.dpAmount || '-'}"`,
+      `"${b.status || ''}"`,
+      `"${b.paymentMethod || ''}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Rekap_Booking_Mitra_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const totalPages = Math.ceil(filteredBookings.length / itemsPerPage) || 1;
   const paginatedBookings = filteredBookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
+
     <div className="dashboard-layout animate-fade-in">
       <Sidebar />
 
@@ -162,14 +192,12 @@ export const ManageBookingPage: React.FC = () => {
             <p>Monitor dan kelola semua pemesanan</p>
           </div>
           <div className="header-actions" style={{ display: 'flex', gap: '12px' }}>
-            <button className="submit-form-btn" onClick={() => setShowSimulateModal(true)} style={{ width: 'auto', padding: '10px 18px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#0d9488' }}>
-              <CalendarDays size={16} /> Simulasi Booking
-            </button>
-            <button className="export-csv-btn" onClick={() => alert('Exporting bookings to CSV...')}>
+            <button className="export-csv-btn" onClick={handleExportCSV}>
               <FileSpreadsheet size={16} /> Export CSV
             </button>
           </div>
         </header>
+
 
         {/* Counters Block */}
         <section className="pkg-stats-row">
