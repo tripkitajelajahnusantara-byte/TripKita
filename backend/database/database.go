@@ -69,6 +69,7 @@ func ConnectDB(cfg *config.Config) {
 	// Isi data awal (Seeding) jika DB kosong
 	SeedDatabase()
 	EnsureAdminUserExists()
+	EnsureAllTestProvidersAndSeats()
 
 	// Otomatis bersihkan pesanan yang lebih tua dari 3 bulan dan jalankan worker berkala
 	StartPeriodicCleanup()
@@ -175,9 +176,9 @@ func SeedDatabase() {
 			Email:               "partner@wisatanusantara.id", // Akun 1: Bromo
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 812 3456 7890",
-			IsVerified:          true,
-			Role:                "PROVIDER",
-			Status:              "APPROVED",
+			IsVerified:           true,
+			Role:                 "PROVIDER",
+			Status:               "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
@@ -193,9 +194,9 @@ func SeedDatabase() {
 			Email:               "partner2@tidung.id", // Akun 2: Tidung
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 813 9876 5432",
-			IsVerified:          true,
-			Role:                "PROVIDER",
-			Status:              "APPROVED",
+			IsVerified:           true,
+			Role:                 "PROVIDER",
+			Status:               "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
@@ -211,9 +212,9 @@ func SeedDatabase() {
 			Email:               "partner3@cilember.id", // Akun 3: Curug Cilember
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 815 1122 3344",
-			IsVerified:          true,
-			Role:                "PROVIDER",
-			Status:              "APPROVED",
+			IsVerified:           true,
+			Role:                 "PROVIDER",
+			Status:               "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
@@ -229,9 +230,9 @@ func SeedDatabase() {
 			Email:               "partner4@bandung.id", // Akun 4: Bandung
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 817 5566 7788",
-			IsVerified:          true,
-			Role:                "PROVIDER",
-			Status:              "APPROVED",
+			IsVerified:           true,
+			Role:                 "PROVIDER",
+			Status:               "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
@@ -247,9 +248,9 @@ func SeedDatabase() {
 			Email:               "partner5@ranukumbolo.id", // Akun 5: Ranu Kumbolo
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 819 9900 1122",
-			IsVerified:          true,
-			Role:                "PROVIDER",
-			Status:              "APPROVED",
+			IsVerified:           true,
+			Role:                 "PROVIDER",
+			Status:               "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
@@ -265,9 +266,9 @@ func SeedDatabase() {
 			Email:               "partner6@baduy.id", // Akun 6: Baduy
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 821 3344 5566",
-			IsVerified:          true,
-			Role:                "PROVIDER",
-			Status:              "APPROVED",
+			IsVerified:           true,
+			Role:                 "PROVIDER",
+			Status:               "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
@@ -283,9 +284,9 @@ func SeedDatabase() {
 			Email:               "partner7@palu.id", // Akun 7: Palu
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 823 7788 9900",
-			IsVerified:          true,
-			Role:                "PROVIDER",
-			Status:              "APPROVED",
+			IsVerified:           true,
+			Role:                 "PROVIDER",
+			Status:               "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
@@ -301,9 +302,9 @@ func SeedDatabase() {
 			Email:               "partner8@jogja.id", // Akun 8: Jogja
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 856 1234 5678",
-			IsVerified:          true,
-			Role:                "PROVIDER",
-			Status:              "APPROVED",
+			IsVerified:           true,
+			Role:                 "PROVIDER",
+			Status:               "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 	}
@@ -340,7 +341,7 @@ func SeedDatabase() {
 			TripType:    "Open Trip",
 			Price:       350000,
 			QuotaMin:    5,
-			QuotaUsed:   3,
+			QuotaUsed:   0,
 			QuotaMax:    15,
 			StartDate:   todayStr,
 			EndDate:     todayStr,
@@ -356,7 +357,7 @@ func SeedDatabase() {
 			TripType:    "Open Trip",
 			Price:       450000,
 			QuotaMin:    4,
-			QuotaUsed:   2,
+			QuotaUsed:   0,
 			QuotaMax:    12,
 			StartDate:   todayStr,
 			EndDate:     todayStr,
@@ -372,7 +373,7 @@ func SeedDatabase() {
 			TripType:    "Open Trip",
 			Price:       275000,
 			QuotaMin:    5,
-			QuotaUsed:   4,
+			QuotaUsed:   0,
 			QuotaMax:    10,
 			StartDate:   todayStr,
 			EndDate:     todayStr,
@@ -404,7 +405,7 @@ func SeedDatabase() {
 			TripType:    "Open Trip",
 			Price:       300000,
 			QuotaMin:    5,
-			QuotaUsed:   5,
+			QuotaUsed:   0,
 			QuotaMax:    15,
 			StartDate:   todayStr,
 			EndDate:     todayStr,
@@ -420,7 +421,7 @@ func SeedDatabase() {
 			TripType:    "Open Trip",
 			Price:       250000,
 			QuotaMin:    4,
-			QuotaUsed:   1,
+			QuotaUsed:   0,
 			QuotaMax:    12,
 			StartDate:   todayStr,
 			EndDate:     todayStr,
@@ -452,7 +453,7 @@ func SeedDatabase() {
 			TripType:    "Open Trip",
 			Price:       220000,
 			QuotaMin:    2,
-			QuotaUsed:   1,
+			QuotaUsed:   0,
 			QuotaMax:    20,
 			StartDate:   todayStr,
 			EndDate:     todayStr,
@@ -571,3 +572,63 @@ func EnsureAdminUserExists() {
 	}
 }
 
+func EnsureAllTestProvidersAndSeats() {
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("demo123"), bcrypt.DefaultCost)
+	passStr := string(hashedPassword)
+
+	testEmails := []struct {
+		Email string
+		Name  string
+		City  string
+		Prov  string
+	}{
+		{"partner@wisatanusantara.id", "Wisata Bromo Nusantara", "Probolinggo", "Jawa Timur"},
+		{"partner2@tidung.id", "Tidung Paradise Tour", "Kepulauan Seribu", "DKI Jakarta"},
+		{"partner3@cilember.id", "Bogor Curug Explorer", "Bogor", "Jawa Barat"},
+		{"partner4@bandung.id", "Bandung Juara Tour", "Bandung", "Jawa Barat"},
+		{"partner5@ranukumbolo.id", "Ranu Kumbolo Trail", "Malang", "Jawa Timur"},
+		{"partner6@baduy.id", "Baduy Cultural Heritage", "Lebak", "Banten"},
+		{"partner7@palu.id", "Palu Bahari Tour", "Palu", "Sulawesi Tengah"},
+		{"partner8@jogja.id", "Jogja Istimewa Tour", "Yogyakarta", "DI Yogyakarta"},
+	}
+
+	for _, item := range testEmails {
+		var count int64
+		DB.Model(&models.Provider{}).Where("email = ?", item.Email).Count(&count)
+		if count == 0 {
+			provider := models.Provider{
+				BusinessName:        item.Name,
+				BusinessCategory:    "tour",
+				OperationalProvince: item.Prov,
+				OperationalCity:     item.City,
+				Description:         "Mitra Provider Resmi TemenTrip",
+				DocumentUploaded:    true,
+				PicName:             item.Name,
+				Email:               item.Email,
+				PasswordHash:        passStr,
+				WhatsApp:            "+62 812 3456 7890",
+				IsVerified:          true,
+				Role:                "PROVIDER",
+				Status:              "APPROVED",
+			}
+			if err := DB.Create(&provider).Error; err != nil {
+				log.Printf("[Provider Seed Error] %v", err)
+			}
+		} else {
+			// Reset password to demo123 and ensure status APPROVED & PROVIDER role
+			DB.Model(&models.Provider{}).Where("email = ?", item.Email).Updates(map[string]interface{}{
+				"password_hash": passStr,
+				"role":          "PROVIDER",
+				"status":        "APPROVED",
+				"is_verified":   true,
+			})
+		}
+	}
+	log.Println("[QA Prep] All 8 Provider test accounts verified and updated with password 'demo123'.")
+
+	// Reset quota_used = 0 on all packages to restore seats for QA testing
+	res := DB.Model(&models.Package{}).Where("1 = 1").Update("quota_used", 0)
+	if res.Error == nil {
+		log.Printf("[QA Prep] Quota used reset to 0 for %d packages (Seat restored to full capacity).", res.RowsAffected)
+	}
+}
