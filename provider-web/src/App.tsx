@@ -24,9 +24,24 @@ import { CustomerConfirmationPage } from './pages/CustomerConfirmationPage';
 import { CustomerPaymentInvoicePage } from './pages/CustomerPaymentInvoicePage';
 import { CustomerXenditCheckoutPage } from './pages/CustomerXenditCheckoutPage';
 import { ProviderFinancePage } from './pages/ProviderFinancePage';
+import { LegalModalContainer, CustomerRegistrationTermsContent } from './components/LegalModals';
 
 const AppContent: React.FC = () => {
-  const { route, loadingProfile, providerProfile, navigateTo } = useNavigation();
+  const { route, loadingProfile, providerProfile, customerProfile, navigateTo } = useNavigation();
+  const [showGlobalCustomerTerms, setShowGlobalCustomerTerms] = React.useState(false);
+
+  React.useEffect(() => {
+    if (customerProfile && customerProfile.role === 'CUSTOMER') {
+      const accepted = localStorage.getItem(`tementrip_customer_terms_accepted_${customerProfile.id}`);
+      if (!accepted) {
+        setShowGlobalCustomerTerms(true);
+      } else {
+        setShowGlobalCustomerTerms(false);
+      }
+    } else {
+      setShowGlobalCustomerTerms(false);
+    }
+  }, [customerProfile]);
 
   React.useEffect(() => {
     const privateProviderRoutes = [
@@ -65,6 +80,46 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // Mandatory Terms Modal Overlay for Google OAuth / First Time Customer Login
+  const renderGlobalTermsModal = () => (
+    <LegalModalContainer
+      isOpen={showGlobalCustomerTerms}
+      onClose={() => {}}
+      title="Persetujuan Syarat & Ketentuan Customer TemenTrip"
+    >
+      <div>
+        <div style={{ backgroundColor: '#e0f2fe', padding: '12px 16px', borderRadius: '10px', color: '#0369a1', fontSize: '13px', fontWeight: '600', marginBottom: '16px', border: '1px solid #bae6fd' }}>
+          Selamat datang di TemenTrip! Sebelum melanjutkan, harap baca dan menyetujui Syarat & Ketentuan Pendaftaran Customer berikut.
+        </div>
+        <CustomerRegistrationTermsContent />
+        <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (customerProfile?.id) {
+                localStorage.setItem(`tementrip_customer_terms_accepted_${customerProfile.id}`, 'true');
+              }
+              setShowGlobalCustomerTerms(false);
+            }}
+            style={{
+              padding: '12px 32px',
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: '800',
+              fontSize: '14px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+            }}
+          >
+            Saya Menyetujui Syarat & Ketentuan & Lanjutkan
+          </button>
+        </div>
+      </div>
+    </LegalModalContainer>
+  );
+
   // Dashboard layout routes (render without standard layout since they have their own sidebar/main structure)
   if (route === 'dashboard') {
     return <DashboardPage />;
@@ -95,6 +150,7 @@ const AppContent: React.FC = () => {
         <Header />
         <CustomerPackageDetailPage />
         <Footer />
+        {renderGlobalTermsModal()}
       </div>
     );
   }
@@ -104,6 +160,7 @@ const AppContent: React.FC = () => {
         <Header />
         <CustomerBookingPage />
         <Footer />
+        {renderGlobalTermsModal()}
       </div>
     );
   }
@@ -113,6 +170,7 @@ const AppContent: React.FC = () => {
         <Header />
         <CustomerConfirmationPage />
         <Footer />
+        {renderGlobalTermsModal()}
       </div>
     );
   }
@@ -122,11 +180,17 @@ const AppContent: React.FC = () => {
         <Header />
         <CustomerPaymentInvoicePage />
         <Footer />
+        {renderGlobalTermsModal()}
       </div>
     );
   }
   if (route === 'xendit-checkout') {
-    return <CustomerXenditCheckoutPage />;
+    return (
+      <>
+        <CustomerXenditCheckoutPage />
+        {renderGlobalTermsModal()}
+      </>
+    );
   }
   if (route === 'riwayat-booking') {
     return (
@@ -134,6 +198,7 @@ const AppContent: React.FC = () => {
         <Header />
         <CustomerHistoryPage />
         <Footer />
+        {renderGlobalTermsModal()}
       </div>
     );
   }
@@ -145,6 +210,7 @@ const AppContent: React.FC = () => {
         <Header />
         <CustomerLoginPage />
         <Footer />
+        {renderGlobalTermsModal()}
       </div>
     );
   }
@@ -154,6 +220,7 @@ const AppContent: React.FC = () => {
         <Header />
         <CustomerRegisterPage />
         <Footer />
+        {renderGlobalTermsModal()}
       </div>
     );
   }
@@ -185,6 +252,7 @@ const AppContent: React.FC = () => {
         {route === 'bantuan' && <CustomerHelpPage />}
       </main>
       <Footer />
+      {renderGlobalTermsModal()}
     </div>
   );
 };

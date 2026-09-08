@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { API_BASE_URL } from '../utils/api';
 import { Mail, Lock, Eye, EyeOff, User, Phone, ArrowRight, UserCheck, AlertCircle } from 'lucide-react';
+import { LegalModalContainer, CustomerRegistrationTermsContent } from '../components/LegalModals';
 
 export const CustomerLoginPage: React.FC = () => {
   const { login, registerCustomer, navigateTo, customerProfile, logout } = useNavigation();
@@ -15,6 +16,8 @@ export const CustomerLoginPage: React.FC = () => {
   const [whatsapp, setWhatsapp] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [showRegTermsModal, setShowRegTermsModal] = useState(false);
 
   // Password visibility states
   const [showPassword, setShowPassword] = useState(false);
@@ -29,6 +32,11 @@ export const CustomerLoginPage: React.FC = () => {
     const errors: { [key: string]: string } = {};
 
     if (isRegisterMode) {
+      // Validate Terms Checkbox
+      if (!agreeTerms) {
+        errors.agreeTerms = 'Anda wajib menyetujui Syarat dan Ketentuan Pendaftaran Customer TemenTrip.';
+      }
+
       // Validate Name
       if (!name || name.trim().length === 0) {
         errors.name = 'Nama lengkap wajib diisi.';
@@ -97,6 +105,11 @@ export const CustomerLoginPage: React.FC = () => {
   };
 
   const handleGoogleSignIn = () => {
+    if (isRegisterMode && !agreeTerms) {
+      setGeneralError('Anda wajib menyetujui Syarat dan Ketentuan Pendaftaran Customer TemenTrip sebelum mendaftar.');
+      setFieldErrors(prev => ({ ...prev, agreeTerms: 'Centang kotak ini untuk menyetujui Syarat dan Ketentuan.' }));
+      return;
+    }
     window.location.href = `${API_BASE_URL}/public/auth/google?type=customer`;
   };
 
@@ -179,7 +192,7 @@ export const CustomerLoginPage: React.FC = () => {
           </div>
         )}
 
-        {/* Google Sign-In Option (Clean text without "(Gmail)") */}
+        {/* Google Sign-In Option */}
         <button
           type="button"
           onClick={handleGoogleSignIn}
@@ -219,7 +232,7 @@ export const CustomerLoginPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          {/* Name Field (Daftar Mode Only - Max 50 Chars) */}
+          {/* Name Field */}
           {isRegisterMode && (
             <div>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -253,7 +266,7 @@ export const CustomerLoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Email Field (No top text label) */}
+          {/* Email Field */}
           <div>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <Mail size={18} color={fieldErrors.email ? '#ef4444' : '#94a3b8'} style={{ position: 'absolute', left: '14px' }} />
@@ -285,7 +298,7 @@ export const CustomerLoginPage: React.FC = () => {
             )}
           </div>
 
-          {/* WhatsApp Field (Daftar Mode Only) */}
+          {/* WhatsApp Field */}
           {isRegisterMode && (
             <div>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -318,7 +331,7 @@ export const CustomerLoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Password Field (With Eye Toggle & Red Error Border) */}
+          {/* Password Field */}
           <div>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <Lock size={18} color={fieldErrors.password ? '#ef4444' : '#94a3b8'} style={{ position: 'absolute', left: '14px' }} />
@@ -365,7 +378,7 @@ export const CustomerLoginPage: React.FC = () => {
             )}
           </div>
 
-          {/* Confirm Password Field (With Eye Toggle & Red Error Border - Daftar Mode Only) */}
+          {/* Confirm Password Field */}
           {isRegisterMode && (
             <div>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -414,6 +427,42 @@ export const CustomerLoginPage: React.FC = () => {
             </div>
           )}
 
+          {/* Mandatory Terms Checkbox (Daftar Mode Only) */}
+          {isRegisterMode && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '4px' }}>
+                <input 
+                  type="checkbox"
+                  id="agreeTermsCustomerLogin"
+                  checked={agreeTerms}
+                  onChange={(e) => {
+                    setAgreeTerms(e.target.checked);
+                    if (fieldErrors.agreeTerms) setFieldErrors(prev => ({ ...prev, agreeTerms: '' }));
+                  }}
+                  style={{ marginTop: '3px', cursor: 'pointer', accentColor: '#0284c7', width: '16px', height: '16px' }}
+                />
+                <label htmlFor="agreeTermsCustomerLogin" style={{ fontSize: '12.5px', color: '#475569', cursor: 'pointer', lineHeight: '1.5' }}>
+                  Saya menyetujui{' '}
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowRegTermsModal(true);
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#0284c7', fontWeight: '700', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                  >
+                    Syarat dan Ketentuan Pendaftaran Customer TemenTrip
+                  </button>
+                </label>
+              </div>
+              {fieldErrors.agreeTerms && (
+                <span style={{ fontSize: '11.5px', color: '#ef4444', fontWeight: '700', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <AlertCircle size={13} /> {fieldErrors.agreeTerms}
+                </span>
+              )}
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
@@ -440,7 +489,7 @@ export const CustomerLoginPage: React.FC = () => {
           </button>
         </form>
 
-        {/* Combined Toggle Link: Belum punya akun? Daftar / Sudah punya akun? Masuk */}
+        {/* Combined Toggle Link */}
         <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid #f1f5f9', textAlign: 'center', fontSize: '13.5px', color: '#64748b' }}>
           {isRegisterMode ? (
             <>
@@ -488,6 +537,16 @@ export const CustomerLoginPage: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Registration Terms Modal */}
+      <LegalModalContainer
+        isOpen={showRegTermsModal}
+        onClose={() => setShowRegTermsModal(false)}
+        title="Syarat & Ketentuan Pendaftaran Customer"
+      >
+        <CustomerRegistrationTermsContent />
+      </LegalModalContainer>
     </div>
   );
 };
+
