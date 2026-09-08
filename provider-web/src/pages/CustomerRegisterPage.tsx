@@ -229,28 +229,72 @@ export const CustomerRegisterPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Mandatory Terms Checkbox */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '4px' }}>
-            <input 
-              type="checkbox"
-              id="agreeTerms"
-              checked={agreeTerms}
-              onChange={(e) => setAgreeTerms(e.target.checked)}
-              style={{ marginTop: '3px', cursor: 'pointer', accentColor: '#007bff', width: '16px', height: '16px' }}
-            />
-            <label htmlFor="agreeTerms" style={{ fontSize: '13px', color: '#475569', cursor: 'pointer', lineHeight: '1.5' }}>
-              Saya menyetujui{' '}
-              <button 
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowRegTermsModal(true);
+          {/* Mandatory Terms Checkbox Card */}
+          <div>
+            <div 
+              style={{ 
+                backgroundColor: error.includes('Syarat') ? '#fef2f2' : '#f8fafc',
+                border: error.includes('Syarat') ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginTop: '4px',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer'
+              }}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).tagName !== 'BUTTON') {
+                  setAgreeTerms(!agreeTerms);
+                }
+              }}
+            >
+              <input 
+                type="checkbox"
+                id="agreeTerms"
+                checked={agreeTerms}
+                onChange={(e) => setAgreeTerms(e.target.checked)}
+                style={{ 
+                  cursor: 'pointer', 
+                  accentColor: '#007bff', 
+                  width: '18px', 
+                  height: '18px',
+                  flexShrink: 0 
                 }}
-                style={{ background: 'none', border: 'none', color: '#007bff', fontWeight: '700', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+              />
+              <label 
+                htmlFor="agreeTerms" 
+                style={{ 
+                  fontSize: '13px', 
+                  color: '#334155', 
+                  cursor: 'pointer', 
+                  lineHeight: '1.4',
+                  margin: 0 
+                }}
               >
-                Syarat dan Ketentuan Pendaftaran Customer TemenTrip
-              </button>
-            </label>
+                Saya menyetujui{' '}
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowRegTermsModal(true);
+                  }}
+                  style={{ 
+                    background: 'none', 
+                    border: 'none', 
+                    color: '#007bff', 
+                    fontWeight: '700', 
+                    cursor: 'pointer', 
+                    padding: 0, 
+                    textDecoration: 'underline',
+                    fontSize: '13px'
+                  }}
+                >
+                  Syarat & Ketentuan Pendaftaran
+                </button>
+              </label>
+            </div>
           </div>
 
           <button

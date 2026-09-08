@@ -427,10 +427,29 @@ export const CustomerLoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Mandatory Terms Checkbox (Daftar Mode Only) */}
+          {/* Mandatory Terms Checkbox Card */}
           {isRegisterMode && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '4px' }}>
+              <div 
+                style={{ 
+                  backgroundColor: fieldErrors.agreeTerms ? '#fef2f2' : '#f8fafc',
+                  border: fieldErrors.agreeTerms ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginTop: '4px',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer'
+                }}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).tagName !== 'BUTTON') {
+                    setAgreeTerms(!agreeTerms);
+                    if (fieldErrors.agreeTerms) setFieldErrors(prev => ({ ...prev, agreeTerms: '' }));
+                  }
+                }}
+              >
                 <input 
                   type="checkbox"
                   id="agreeTermsCustomerLogin"
@@ -439,24 +458,48 @@ export const CustomerLoginPage: React.FC = () => {
                     setAgreeTerms(e.target.checked);
                     if (fieldErrors.agreeTerms) setFieldErrors(prev => ({ ...prev, agreeTerms: '' }));
                   }}
-                  style={{ marginTop: '3px', cursor: 'pointer', accentColor: '#0284c7', width: '16px', height: '16px' }}
+                  style={{ 
+                    cursor: 'pointer', 
+                    accentColor: '#0284c7', 
+                    width: '18px', 
+                    height: '18px',
+                    flexShrink: 0 
+                  }}
                 />
-                <label htmlFor="agreeTermsCustomerLogin" style={{ fontSize: '12.5px', color: '#475569', cursor: 'pointer', lineHeight: '1.5' }}>
+                <label 
+                  htmlFor="agreeTermsCustomerLogin" 
+                  style={{ 
+                    fontSize: '13px', 
+                    color: '#334155', 
+                    cursor: 'pointer', 
+                    lineHeight: '1.4',
+                    margin: 0
+                  }}
+                >
                   Saya menyetujui{' '}
                   <button 
                     type="button"
                     onClick={(e) => {
-                      e.preventDefault();
+                      e.stopPropagation();
                       setShowRegTermsModal(true);
                     }}
-                    style={{ background: 'none', border: 'none', color: '#0284c7', fontWeight: '700', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      color: '#0284c7', 
+                      fontWeight: '700', 
+                      cursor: 'pointer', 
+                      padding: 0, 
+                      textDecoration: 'underline',
+                      fontSize: '13px'
+                    }}
                   >
-                    Syarat dan Ketentuan Pendaftaran Customer TemenTrip
+                    Syarat & Ketentuan Pendaftaran
                   </button>
                 </label>
               </div>
               {fieldErrors.agreeTerms && (
-                <span style={{ fontSize: '11.5px', color: '#ef4444', fontWeight: '700', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '11.5px', color: '#ef4444', fontWeight: '700', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <AlertCircle size={13} /> {fieldErrors.agreeTerms}
                 </span>
               )}
