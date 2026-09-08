@@ -350,7 +350,7 @@ export const ManageBookingPage: React.FC = () => {
                       </td>
                       <td>
                         <div className="actions-cell">
-                          <button className="action-btn" onClick={() => handleAction('detail', b.id)}>
+                          <button className="action-btn" onClick={() => handleAction('detail', b.id)} title="Lihat Detail Booking">
                             <Eye size={14} />
                           </button>
                           {(b.status === 'CONFIRMED' || b.status === 'PAID') && b.dbId && (
@@ -362,11 +362,6 @@ export const ManageBookingPage: React.FC = () => {
                                 <X size={14} />
                               </button>
                             </>
-                          )}
-                          {b.status === 'PENDING_PAYMENT' && b.paymentUrl && (
-                            <a href={b.paymentUrl} target="_blank" rel="noopener noreferrer" className="action-btn" title="Bayar (Simulasi Xendit)" style={{ color: '#0d9488', borderColor: '#0d9488' }}>
-                              💳
-                            </a>
                           )}
                         </div>
                       </td>
