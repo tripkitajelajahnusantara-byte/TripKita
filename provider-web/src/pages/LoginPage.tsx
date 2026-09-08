@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
-import { request, API_BASE_URL } from '../utils/api';
 
 export const LoginPage: React.FC = () => {
   const { login, navigateTo, route } = useNavigation();
@@ -12,19 +11,6 @@ export const LoginPage: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [googleOAuthEnabled, setGoogleOAuthEnabled] = useState(false);
-
-  useEffect(() => {
-    async function checkOauth() {
-      try {
-        const config = await request('/public/auth/config');
-        setGoogleOAuthEnabled(!!config.googleOAuthEnabled);
-      } catch (err) {
-        console.error('Failed to load auth config:', err);
-      }
-    }
-    checkOauth();
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
