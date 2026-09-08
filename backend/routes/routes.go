@@ -22,6 +22,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	packageRepo := repositories.NewPackageRepository(db)
 	bookingRepo := repositories.NewBookingRepository(db)
 	payoutRepo := repositories.NewPayoutRepository(db)
+	reviewRepo := repositories.NewReviewRepository(db)
 
 	// Initialize Services
 	authService := services.NewAuthService(providerRepo, cfg)
@@ -31,6 +32,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	bookingService := services.NewBookingService(bookingRepo, packageRepo, xenditService)
 	dashboardService := services.NewDashboardService(packageRepo, bookingRepo, providerRepo)
 	payoutService := services.NewPayoutService(payoutRepo, providerRepo, bookingRepo)
+	reviewService := services.NewReviewService(reviewRepo, bookingRepo, packageRepo)
 
 	// Initialize Controllers
 	authCtrl := controllers.NewAuthController(authService, cfg)
@@ -41,6 +43,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	uploadCtrl := controllers.NewUploadController()
 	oauthCtrl := controllers.NewOAuthController(db, cfg)
 	payoutCtrl := controllers.NewPayoutController(payoutService)
+	reviewCtrl := controllers.NewReviewController(reviewService)
 
 	// Serve Static Files for uploads
 	r.Static("/uploads", "./uploads")
@@ -53,6 +56,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		{
 			// Packages public endpoint for mobile customers
 			public.GET("/packages", packageCtrl.GetAllPublic)
+
+			// Reviews public read endpoints
+			public.GET("/reviews/package/:packageId", reviewCtrl.GetReviewsByPackage)
+			public.GET("/reviews/booking/:bookingId", reviewCtrl.GetReviewByBooking)
 
 			// Simulation & Webhook routes
 			public.POST("/bookings", bookingCtrl.CreateSimulatedBooking)
@@ -140,6 +147,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		customer.Use(middleware.AuthMiddleware(cfg), middleware.CustomerRequired())
 		{
 			customer.GET("/bookings", bookingCtrl.GetCustomerBookings)
+			customer.POST("/reviews", reviewCtrl.CreateReview)
 		}
 	}
 

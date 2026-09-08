@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"tripkita-provider/database"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
 )
@@ -206,16 +207,17 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID stri
 	oldStatus := booking.Status
 	var newStatus string
 
-	switch xenditStatus {
-	case "PAID":
-		newStatus = "CONFIRMED"
+	switch strings.ToUpper(xenditStatus) {
+	case "PAID", "SETTLED":
+		newStatus = "PAID"
 		booking.PaymentMethod = paymentMethod
+		s.recordFinanceOnPayment(booking)
 	case "EXPIRED", "FAILED":
 		// If booking is already paid or confirmed, Xendit 24h invoice expiration webhook should NOT downgrade it
 		if oldStatus == "PAID" || oldStatus == "CONFIRMED" || oldStatus == "COMPLETED" {
 			return nil // Retain paid status
 		}
-		newStatus = "CANCELLED_BY_CUSTOMER"
+		newStatus = "EXPIRED"
 
 	default:
 		return nil // No changes
@@ -227,10 +229,50 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID stri
 		return err
 	}
 
-	// Adjust package quota
+	// Adjust package quota (EXPIRED will reduce QuotaUsed and return seats)
 	s.adjustQuota(booking, oldStatus, newStatus, booking.ProviderID)
 
 	return nil
+}
+
+func (s *bookingService) recordFinanceOnPayment(booking *models.Booking) {
+	if database.DB == nil || booking == nil {
+		return
+	}
+
+	// 1. Create or update ProviderBalance
+	var balance models.ProviderBalance
+	err := database.DB.Where("provider_id = ?", booking.ProviderID).First(&balance).Error
+	if err != nil {
+		balance = models.ProviderBalance{
+			ProviderID:       booking.ProviderID,
+			AvailableBalance: 0,
+			HeldBalance:      booking.TotalPrice,
+			TotalEarned:      booking.TotalPrice,
+			UpdatedAt:        time.Now(),
+		}
+		database.DB.Create(&balance)
+	} else {
+		balance.HeldBalance += booking.TotalPrice
+		balance.TotalEarned += booking.TotalPrice
+		balance.UpdatedAt = time.Now()
+		database.DB.Save(&balance)
+	}
+
+	// 2. Create HeldSettlement record
+	var existingSettlement models.HeldSettlement
+	err = database.DB.Where("booking_id = ?", booking.ID).First(&existingSettlement).Error
+	if err != nil {
+		settlement := models.HeldSettlement{
+			BookingID:   booking.ID,
+			ProviderID:  booking.ProviderID,
+			Amount:      booking.TotalPrice,
+			Status:      "HELD",
+			ReleaseDate: booking.TripDate.AddDate(0, 0, 1),
+			CreatedAt:   time.Now(),
+		}
+		database.DB.Create(&settlement)
+	}
 }
 
 func (s *bookingService) adjustQuota(booking *models.Booking, oldStatus, newStatus string, providerID uint) {

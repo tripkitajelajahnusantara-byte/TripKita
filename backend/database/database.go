@@ -50,7 +50,16 @@ func ConnectDB(cfg *config.Config) {
 	fmt.Println("Koneksi database berhasil terhubung")
 
 	// Jalankan Auto-Migration
-	err = DB.AutoMigrate(&models.Provider{}, &models.Package{}, &models.Booking{}, &models.ProviderStatusHistory{}, &models.Payout{})
+	err = DB.AutoMigrate(
+		&models.Provider{},
+		&models.Package{},
+		&models.Booking{},
+		&models.ProviderStatusHistory{},
+		&models.Payout{},
+		&models.Review{},
+		&models.ProviderBalance{},
+		&models.HeldSettlement{},
+	)
 	if err != nil {
 		log.Printf("[Catatan Migrasi] %v", err)
 	} else {
@@ -75,15 +84,30 @@ func CleanOldBookings() {
 	}
 }
 
+func AutoCompleteFinishedBookings() {
+	now := time.Now()
+	// Update bookings whose status is PAID or CONFIRMED and trip_date is in the past to COMPLETED
+	res := DB.Model(&models.Booking{}).
+		Where("(status = ? OR status = ?) AND trip_date < ?", "PAID", "CONFIRMED", now).
+		Update("status", "COMPLETED")
+	if res.Error != nil {
+		log.Printf("[Auto Complete Error] %v", res.Error)
+	} else if res.RowsAffected > 0 {
+		log.Printf("[Auto Complete] Berhasil mengubah %d pesanan menjadi COMPLETED", res.RowsAffected)
+	}
+}
+
 func StartPeriodicCleanup() {
 	go func() {
 		// Pembersihan awal saat server baru dinyalakan
 		CleanOldBookings()
+		AutoCompleteFinishedBookings()
 
-		// Jalankan pembersihan berkala di latar belakang setiap 12 jam
-		ticker := time.NewTicker(12 * time.Hour)
+		// Jalankan pembersihan berkala di latar belakang setiap 1 jam
+		ticker := time.NewTicker(1 * time.Hour)
 		for range ticker.C {
 			CleanOldBookings()
+			AutoCompleteFinishedBookings()
 		}
 	}()
 }

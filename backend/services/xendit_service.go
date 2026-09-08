@@ -46,11 +46,16 @@ func (s *xenditService) CreateInvoice(booking *models.Booking, packageName strin
 		customerEmail = fmt.Sprintf("%s@mail.com", sanitized)
 	}
 
+	tripDateStr := ""
+	if !booking.TripDate.IsZero() {
+		tripDateStr = fmt.Sprintf(" - Tanggal Trip: %s", booking.TripDate.Format("02 Jan 2006"))
+	}
+
 	payload := map[string]interface{}{
 		"external_id":          fmt.Sprintf("booking_%d_%d", booking.ID, time.Now().Unix()),
 		"amount":               booking.TotalPrice,
 		"payer_email":          customerEmail,
-		"description":          fmt.Sprintf("Pembayaran Paket Wisata: %s (%d peserta)", packageName, booking.Guests),
+		"description":          fmt.Sprintf("Pembayaran Paket Wisata: %s (%d peserta)%s", packageName, booking.Guests, tripDateStr),
 		"invoice_duration":     86400, // 24 hours
 		"success_redirect_url": fmt.Sprintf("%s/riwayat-booking?payment_status=PAID&booking_id=%d&code=%s", s.cfg.FrontendURL, booking.ID, booking.BookingCode),
 		"failure_redirect_url": fmt.Sprintf("%s/riwayat-booking?payment_status=FAILED&booking_id=%d&code=%s", s.cfg.FrontendURL, booking.ID, booking.BookingCode),

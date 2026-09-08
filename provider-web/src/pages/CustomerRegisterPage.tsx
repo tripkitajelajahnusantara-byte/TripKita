@@ -30,8 +30,6 @@ export const CustomerRegisterPage: React.FC = () => {
     setLoading(true);
     try {
       await registerCustomer(name, email, password, whatsapp);
-      alert('Pendaftaran berhasil! Silakan masuk ke akun baru Anda.');
-      navigateTo('masuk');
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Pendaftaran gagal. Email mungkin sudah terdaftar.');

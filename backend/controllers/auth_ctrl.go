@@ -49,13 +49,18 @@ func (ctrl *AuthController) RegisterCustomer(c *gin.Context) {
 		return
 	}
 
-	customer, err := ctrl.service.RegisterCustomer(&req)
+	res, err := ctrl.service.RegisterCustomer(&req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Customer registration successful", "customer": customer})
+	c.JSON(http.StatusCreated, gin.H{
+		"message":  "Customer registration successful",
+		"token":    res.Token,
+		"customer": res.Provider,
+		"provider": res.Provider,
+	})
 }
 
 func (ctrl *AuthController) Login(c *gin.Context) {

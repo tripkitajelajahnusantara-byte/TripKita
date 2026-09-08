@@ -242,8 +242,10 @@ const DEFAULT_PACKAGES: TripPackage[] = [
       try {
         const data = await request('/public/packages');
         if (Array.isArray(data) && data.length > 0) {
-          const activePkgs = data.filter((p: TripPackage) => p.status === 'Aktif');
-          setPackages(activePkgs.length > 0 ? activePkgs : DEFAULT_PACKAGES);
+          const activePkgs = data.filter((p: TripPackage) => 
+            !p.status || p.status === 'Aktif' || p.status === 'Published' || p.status === 'published'
+          );
+          setPackages(activePkgs.length > 0 ? activePkgs : data);
         } else {
           setPackages(DEFAULT_PACKAGES);
         }

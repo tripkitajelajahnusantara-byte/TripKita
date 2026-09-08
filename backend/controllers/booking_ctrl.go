@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"tripkita-provider/config"
 	"tripkita-provider/models"
@@ -57,10 +59,39 @@ func (ctrl *BookingController) GetCustomerBookings(c *gin.Context) {
 func (ctrl *BookingController) GetPublicStatus(c *gin.Context) {
 	code := c.Param("code")
 	booking, err := ctrl.service.GetBookingByCode(code)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Booking not found"})
+	if err != nil || booking == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Booking tidak ditemukan"})
 		return
 	}
+
+	// Ownership validation: If booking is associated with a customer account
+	if booking.CustomerID != nil && *booking.CustomerID > 0 {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Otentikasi diperlukan untuk mengakses data pesanan ini"})
+			return
+		}
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		token, parseErr := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+			return []byte(ctrl.cfg.JWTSecret), nil
+		})
+		if parseErr != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi Anda telah berakhir, silakan masuk kembali"})
+			return
+		}
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Format sesi tidak valid"})
+			return
+		}
+		callerIDFloat, ok := claims["provider_id"].(float64)
+		callerRole, _ := claims["role"].(string)
+		if !ok || (uint(callerIDFloat) != *booking.CustomerID && callerRole != "ADMIN" && uint(callerIDFloat) != booking.ProviderID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki akses untuk melihat data pesanan ini"})
+			return
+		}
+	}
+
 	c.JSON(http.StatusOK, booking)
 }
 

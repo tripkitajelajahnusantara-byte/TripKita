@@ -171,12 +171,32 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const addOnsList: AddOn[] = getPackageAddOns(pkg.name);
 
-  // Exactly 3 closest available schedules in that month
-  const availableSchedules = [
-    { label: '22–25 Mei 2026 (4 Hari)', dateValue: '2026-05-22' },
-    { label: '26–29 Mei 2026 (4 Hari)', dateValue: '2026-05-26' },
-    { label: '30 Mei–2 Juni 2026 (4 Hari)', dateValue: '2026-05-30' }
-  ];
+  const getActiveSchedules = () => {
+    const today = new Date();
+    const addDays = (d: Date, days: number) => {
+      const copy = new Date(d);
+      copy.setDate(copy.getDate() + days);
+      return copy;
+    };
+    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+    const formatLabel = (start: Date, days: number) => {
+      const end = addDays(start, days - 1);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      return `${start.getDate()} ${months[start.getMonth()]}–${end.getDate()} ${months[end.getMonth()]} ${end.getFullYear()} (${days} Hari)`;
+    };
+
+    const d1 = addDays(today, 3);
+    const d2 = addDays(today, 7);
+    const d3 = addDays(today, 12);
+
+    return [
+      { label: formatLabel(d1, 4), dateValue: formatDate(d1) },
+      { label: formatLabel(d2, 4), dateValue: formatDate(d2) },
+      { label: formatLabel(d3, 4), dateValue: formatDate(d3) }
+    ];
+  };
+
+  const availableSchedules = getActiveSchedules();
 
   // Pre-select schedule date closest to user's selected bookingDate
   const [selectedScheduleDate, setSelectedScheduleDate] = useState(
@@ -690,8 +710,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
                 <span>Jumlah Peserta</span>
-                <span style={{ color: availableSeats > 0 ? '#10b981' : '#ef4444', fontWeight: '800' }}>
-                  Sisa {availableSeats} seat
+                <span style={{ color: (availableSeats - guestsCount) >= 0 ? '#10b981' : '#ef4444', fontWeight: '800' }}>
+                  Sisa {Math.max(0, availableSeats - guestsCount)} seat
                 </span>
               </label>
               

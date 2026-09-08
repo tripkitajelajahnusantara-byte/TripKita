@@ -14,7 +14,7 @@ import (
 
 type AuthService interface {
 	Register(req *models.RegisterRequest) (*models.Provider, error)
-	RegisterCustomer(req *models.RegisterCustomerRequest) (*models.Provider, error)
+	RegisterCustomer(req *models.RegisterCustomerRequest) (*models.LoginResponse, error)
 	Login(req *models.LoginRequest) (*models.LoginResponse, error)
 	GetProfile(providerID uint) (*models.Provider, error)
 	UpdateProfile(providerID uint, req *models.UpdateProfileRequest) (*models.Provider, error)
@@ -82,7 +82,7 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 	return provider, nil
 }
 
-func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*models.Provider, error) {
+func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*models.LoginResponse, error) {
 	// Check if email already exists
 	existing, _ := s.repo.FindByEmail(req.Email)
 	if existing != nil {
@@ -110,7 +110,22 @@ func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*mo
 		return nil, err
 	}
 
-	return customer, nil
+	// Generate JWT Token (30 days persistent login)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"provider_id": customer.ID,
+		"role":        customer.Role,
+		"exp":         time.Now().Add(time.Hour * 24 * 30).Unix(),
+	})
+
+	tokenString, err := token.SignedString([]byte(s.cfg.JWTSecret))
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.LoginResponse{
+		Token:    tokenString,
+		Provider: *customer,
+	}, nil
 }
 
 func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, error) {

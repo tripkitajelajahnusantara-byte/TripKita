@@ -403,10 +403,19 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   const registerCustomer = async (name: string, email: string, password: string, whatsapp: string) => {
-    await request('/public/auth/register-customer', {
+    const res = await request('/public/auth/register-customer', {
       method: 'POST',
       body: JSON.stringify({ name, email, password, whatsapp }),
     });
+
+    if (res && res.token && (res.customer || res.provider)) {
+      const profile = res.customer || res.provider;
+      setCustomerToken(res.token);
+      setCustomerProfile(profile);
+      setProviderProfile(null);
+      setIsRegistered(true);
+      navigateTo('beranda');
+    }
   };
 
   const registerProvider = async () => {

@@ -174,9 +174,56 @@ export const CustomerHistoryPage: React.FC = () => {
     }).format(price);
   };
 
-  // Helper to style status badges
+  const [reviewedMap, setReviewedMap] = useState<{ [id: number]: boolean }>({});
+
+  useEffect(() => {
+    if (bookings.length > 0) {
+      bookings.forEach((b) => {
+        request(`/public/reviews/booking/${b.id}`).then((res) => {
+          if (res && res.reviewed) {
+            setReviewedMap(prev => ({ ...prev, [b.id]: true }));
+          }
+        }).catch(() => {});
+      });
+    }
+  }, [bookings]);
+
+  const handleSendReview = async () => {
+    if (!selectedReviewBooking) return;
+    try {
+      await request('/customer/reviews', {
+        method: 'POST',
+        body: JSON.stringify({
+          bookingId: selectedReviewBooking.id,
+          rating: ratingStars,
+          comment: reviewText
+        })
+      });
+      setReviewedMap(prev => ({ ...prev, [selectedReviewBooking.id]: true }));
+      setSelectedReviewBooking(null);
+      setModalNotice({
+        title: 'Ulasan Berhasil Terkirim!',
+        message: 'Terima kasih! Ulasan dan penilaian bintang Anda telah berhasil dikirim dan tersimpan di database.'
+      });
+    } catch (err: any) {
+      console.error(err);
+      setModalNotice({
+        title: 'Gagal Mengirim Ulasan',
+        message: err.message || 'Gagal menyimpan ulasan ke database.',
+        isError: true
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'COMPLETED':
+        return {
+          label: 'Trip Selesai (Completed)',
+          color: '#10b981',
+          bgColor: '#dcfce7',
+          icon: <CheckCircle2 size={14} color="#10b981" />
+        };
       case 'PAID':
       case 'CONFIRMED':
       case 'Dikonfirmasi':
@@ -204,9 +251,6 @@ export const CustomerHistoryPage: React.FC = () => {
           icon: <Clock size={14} color="#f59e0b" />
         };
       case 'WAITING_CONFIRMATION':
-      case 'PAID':
-      case 'CONFIRMED':
-      case 'Dikonfirmasi':
         return {
           label: 'Lunas & Aktif',
           color: '#10b981',
@@ -637,6 +681,30 @@ export const CustomerHistoryPage: React.FC = () => {
                           </a>
                           
                           {(() => {
+                            const isAlreadyReviewed = reviewedMap[booking.id];
+                            if (isAlreadyReviewed) {
+                              return (
+                                <button
+                                  disabled
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    backgroundColor: '#f1f5f9',
+                                    border: '1px solid #cbd5e1',
+                                    color: '#64748b',
+                                    padding: '8px 16px',
+                                    borderRadius: '8px',
+                                    fontWeight: '700',
+                                    fontSize: '13px',
+                                    cursor: 'not-allowed'
+                                  }}
+                                >
+                                  ✓ Sudah Diulas
+                                </button>
+                              );
+                            }
+
                             const parseDate = (dStr?: string) => {
                               if (!dStr) return null;
                               const d = new Date(dStr);
@@ -739,13 +807,7 @@ export const CustomerHistoryPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedReviewBooking(null);
-                    setModalNotice({
-                      title: 'Ulasan Berhasil Terkirim!',
-                      message: 'Terima kasih! Ulasan dan penilaian bintang Anda telah berhasil dikirim.'
-                    });
-                  }}
+                  onClick={handleSendReview}
                   style={{ padding: '10px 20px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
                 >
                   Kirim Ulasan
