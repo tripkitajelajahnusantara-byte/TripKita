@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { LegalModalContainer, CustomerRegistrationTermsContent } from '../components/LegalModals';
 
 export const CustomerRegisterPage: React.FC = () => {
   const { navigateTo, registerCustomer } = useNavigation();
@@ -10,12 +11,19 @@ export const CustomerRegisterPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [showRegTermsModal, setShowRegTermsModal] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!agreeTerms) {
+      setError('Anda wajib menyetujui Syarat dan Ketentuan Pendaftaran Customer TemenTrip.');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Konfirmasi kata sandi tidak cocok.');
@@ -221,6 +229,30 @@ export const CustomerRegisterPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Mandatory Terms Checkbox */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '4px' }}>
+            <input 
+              type="checkbox"
+              id="agreeTerms"
+              checked={agreeTerms}
+              onChange={(e) => setAgreeTerms(e.target.checked)}
+              style={{ marginTop: '3px', cursor: 'pointer', accentColor: '#007bff', width: '16px', height: '16px' }}
+            />
+            <label htmlFor="agreeTerms" style={{ fontSize: '13px', color: '#475569', cursor: 'pointer', lineHeight: '1.5' }}>
+              Saya menyetujui{' '}
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowRegTermsModal(true);
+                }}
+                style={{ background: 'none', border: 'none', color: '#007bff', fontWeight: '700', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+              >
+                Syarat dan Ketentuan Pendaftaran Customer TemenTrip
+              </button>
+            </label>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -265,6 +297,16 @@ export const CustomerRegisterPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Registration Terms Modal */}
+      <LegalModalContainer
+        isOpen={showRegTermsModal}
+        onClose={() => setShowRegTermsModal(false)}
+        title="Syarat & Ketentuan Pendaftaran Customer"
+      >
+        <CustomerRegistrationTermsContent />
+      </LegalModalContainer>
     </div>
   );
 };
+

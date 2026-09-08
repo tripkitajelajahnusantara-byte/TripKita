@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { LegalModalContainer, GeneralTermsContent, PrivacyPolicyContent } from './LegalModals';
 
 export const Footer: React.FC = () => {
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+
   return (
     <footer className="site-footer">
       <div className="container footer-container">
@@ -34,10 +38,39 @@ export const Footer: React.FC = () => {
           </span>
         </div>
         <div className="footer-right">
-          <a href="#" className="footer-link">Kebijakan Privasi</a>
-          <a href="#" className="footer-link">Syarat & Ketentuan</a>
+          <button 
+            type="button" 
+            onClick={() => setShowPrivacy(true)}
+            className="footer-link-btn"
+          >
+            Kebijakan Privasi
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setShowTerms(true)}
+            className="footer-link-btn"
+          >
+            Syarat & Ketentuan
+          </button>
         </div>
       </div>
+
+      {/* Modals */}
+      <LegalModalContainer
+        isOpen={showTerms}
+        onClose={() => setShowTerms(false)}
+        title="Syarat & Ketentuan Platform TripKita"
+      >
+        <GeneralTermsContent />
+      </LegalModalContainer>
+
+      <LegalModalContainer
+        isOpen={showPrivacy}
+        onClose={() => setShowPrivacy(false)}
+        title="Kebijakan Privasi TemenTrip"
+      >
+        <PrivacyPolicyContent />
+      </LegalModalContainer>
 
       <style>{`
         .site-footer {
@@ -101,14 +134,19 @@ export const Footer: React.FC = () => {
           gap: 20px;
         }
 
-        .footer-link {
+        .footer-link-btn {
+          background: none;
+          border: none;
+          padding: 0;
           font-size: 12px;
           color: #64748b;
-          transition: var(--transition-fast);
+          cursor: pointer;
+          transition: color 0.2s;
         }
 
-        .footer-link:hover {
+        .footer-link-btn:hover {
           color: #007bff;
+          text-decoration: underline;
         }
 
         @media (max-width: 640px) {
@@ -126,3 +164,4 @@ export const Footer: React.FC = () => {
     </footer>
   );
 };
+
