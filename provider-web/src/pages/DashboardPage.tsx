@@ -436,14 +436,17 @@ export const DashboardPage: React.FC = () => {
                           <span className={`status-pill`} style={{
                             backgroundColor: 
                               b.status === 'PENDING_PAYMENT' ? '#fef3c7' :
+                              b.status === 'WAITING_CONFIRMATION' ? '#e0f2fe' :
                               (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#dcfce7' :
                               b.status === 'COMPLETED' ? '#ecfdf5' : '#f1f5f9',
                             color:
                               b.status === 'PENDING_PAYMENT' ? '#d97706' :
+                              b.status === 'WAITING_CONFIRMATION' ? '#0284c7' :
                               (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#15803d' :
                               b.status === 'COMPLETED' ? '#047857' : '#475569',
                           }}>
                             {b.status === 'PENDING_PAYMENT' ? 'Menunggu Pembayaran' :
+                             b.status === 'WAITING_CONFIRMATION' ? 'Menunggu Konfirmasi' :
                              (b.status === 'CONFIRMED' || b.status === 'PAID') ? 'Lunas & Aktif' :
                              b.status === 'COMPLETED' ? 'Selesai' : 'Expired / Dibatalkan'}
                           </span>

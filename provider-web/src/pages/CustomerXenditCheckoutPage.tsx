@@ -18,7 +18,7 @@ export const CustomerXenditCheckoutPage: React.FC = () => {
     packageName: 'Open Trip Gunung Bromo',
     totalPrice: 350000,
     guests: 1,
-    tripDate: '22 Mei 2026',
+    tripDate: new Date(Date.now() + 7*24*60*60*1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
     status: 'PENDING_PAYMENT'
   };
 

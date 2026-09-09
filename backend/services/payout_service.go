@@ -56,11 +56,8 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 	bankAccount := provider.BankAccount
 	bankAccountName := provider.BankAccountName
 
-	if bankName == "" || bankAccount == "" {
-		// Fallback to defaults if empty
-		bankName = "Bank BCA"
-		bankAccount = "1234567890"
-		bankAccountName = provider.PicName
+	if bankName == "" || bankAccount == "" || bankAccountName == "" {
+		return nil, errors.New("rekening bank tujuan belum diatur. Silakan atur informasi bank di menu Profil Provider terlebih dahulu")
 	}
 
 	payout := &models.Payout{

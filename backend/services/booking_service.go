@@ -240,23 +240,33 @@ func (s *bookingService) recordFinanceOnPayment(booking *models.Booking) {
 		return
 	}
 
+	halfAmount := booking.TotalPrice / 2
+	if halfAmount <= 0 {
+		halfAmount = booking.TotalPrice
+	}
+
 	// 1. Create or update ProviderBalance
 	var balance models.ProviderBalance
 	err := database.DB.Where("provider_id = ?", booking.ProviderID).First(&balance).Error
 	if err != nil {
 		balance = models.ProviderBalance{
 			ProviderID:       booking.ProviderID,
-			AvailableBalance: 0,
-			HeldBalance:      booking.TotalPrice,
+			AvailableBalance: halfAmount,
+			HeldBalance:      halfAmount,
 			TotalEarned:      booking.TotalPrice,
 			UpdatedAt:        time.Now(),
 		}
 		database.DB.Create(&balance)
 	} else {
-		balance.HeldBalance += booking.TotalPrice
-		balance.TotalEarned += booking.TotalPrice
-		balance.UpdatedAt = time.Now()
-		database.DB.Save(&balance)
+		// Check if finance was already recorded for this booking to prevent double-counting
+		var existingSettlement models.HeldSettlement
+		if errS := database.DB.Where("booking_id = ?", booking.ID).First(&existingSettlement).Error; errS != nil {
+			balance.AvailableBalance += halfAmount
+			balance.HeldBalance += halfAmount
+			balance.TotalEarned += booking.TotalPrice
+			balance.UpdatedAt = time.Now()
+			database.DB.Save(&balance)
+		}
 	}
 
 	// 2. Create HeldSettlement record
@@ -266,7 +276,7 @@ func (s *bookingService) recordFinanceOnPayment(booking *models.Booking) {
 		settlement := models.HeldSettlement{
 			BookingID:   booking.ID,
 			ProviderID:  booking.ProviderID,
-			Amount:      booking.TotalPrice,
+			Amount:      halfAmount,
 			Status:      "HELD",
 			ReleaseDate: booking.TripDate.AddDate(0, 0, 1),
 			CreatedAt:   time.Now(),
@@ -276,29 +286,20 @@ func (s *bookingService) recordFinanceOnPayment(booking *models.Booking) {
 }
 
 func (s *bookingService) adjustQuota(booking *models.Booking, oldStatus, newStatus string, providerID uint) {
-	isReserved := func(status string) bool {
-		return status == "PENDING_PAYMENT" || status == "WAITING_CONFIRMATION" || status == "PAID" || status == "CONFIRMED" || status == "COMPLETED"
+	if database.DB == nil || booking == nil {
+		return
 	}
-
-	oldReserved := isReserved(oldStatus)
-	newReserved := isReserved(newStatus)
-
-	if !oldReserved && newReserved {
-		pkg, err := s.packageRepo.FindByID(booking.PackageID)
-		if err == nil {
-			pkg.QuotaUsed += booking.Guests
-			_ = s.packageRepo.Update(pkg)
-		}
-	} else if oldReserved && !newReserved {
-		pkg, err := s.packageRepo.FindByID(booking.PackageID)
-		if err == nil {
-			pkg.QuotaUsed -= booking.Guests
-			if pkg.QuotaUsed < 0 {
-				pkg.QuotaUsed = 0
-			}
-			_ = s.packageRepo.Update(pkg)
-		}
-	}
+	// Recalculate package quota_used dynamically from active bookings
+	_ = database.DB.Exec(`
+		UPDATE packages p
+		SET quota_used = COALESCE((
+			SELECT SUM(b.guests)
+			FROM bookings b
+			WHERE b.package_id = p.id
+			AND b.status IN ('PENDING_PAYMENT', 'WAITING_CONFIRMATION', 'PAID', 'CONFIRMED', 'COMPLETED')
+		), 0)
+		WHERE p.id = ?
+	`, booking.PackageID).Error
 }
 
 func (s *bookingService) UploadPaymentProof(id uint, proofPath string) (*models.Booking, error) {
@@ -313,6 +314,7 @@ func (s *bookingService) UploadPaymentProof(id uint, proofPath string) (*models.
 	if err != nil {
 		return nil, err
 	}
+	s.recordFinanceOnPayment(booking)
 	s.adjustQuota(booking, oldStatus, "CONFIRMED", booking.ProviderID)
 	return booking, nil
 }
@@ -333,6 +335,7 @@ func (s *bookingService) AdminConfirmPayment(id uint) (*models.Booking, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.recordFinanceOnPayment(booking)
 	s.adjustQuota(booking, oldStatus, "CONFIRMED", booking.ProviderID)
 	return booking, nil
 }
@@ -346,6 +349,9 @@ func (s *bookingService) PublicUpdateStatus(id uint, status string) (*models.Boo
 	booking.Status = status
 	if err := s.repo.Update(booking); err != nil {
 		return nil, err
+	}
+	if status == "PAID" || status == "CONFIRMED" {
+		s.recordFinanceOnPayment(booking)
 	}
 	s.adjustQuota(booking, oldStatus, status, booking.ProviderID)
 	return booking, nil

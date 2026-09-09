@@ -13,6 +13,9 @@ export const LegalModalContainer: React.FC<ModalProps> = ({ isOpen, onClose, tit
 
   return (
     <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -27,6 +30,7 @@ export const LegalModalContainer: React.FC<ModalProps> = ({ isOpen, onClose, tit
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: '#ffffff',
           borderRadius: '24px',

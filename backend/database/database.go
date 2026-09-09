@@ -87,14 +87,37 @@ func CleanOldBookings() {
 
 func AutoCompleteFinishedBookings() {
 	now := time.Now()
-	// Update bookings whose status is PAID or CONFIRMED and trip_date is in the past to COMPLETED
-	res := DB.Model(&models.Booking{}).
-		Where("(status = ? OR status = ?) AND trip_date < ?", "PAID", "CONFIRMED", now).
-		Update("status", "COMPLETED")
-	if res.Error != nil {
-		log.Printf("[Auto Complete Error] %v", res.Error)
-	} else if res.RowsAffected > 0 {
-		log.Printf("[Auto Complete] Berhasil mengubah %d pesanan menjadi COMPLETED", res.RowsAffected)
+	// Fetch bookings whose status is PAID or CONFIRMED and trip_date is in the past
+	var finishedBookings []models.Booking
+	err := DB.Where("(status = ? OR status = ?) AND trip_date < ?", "PAID", "CONFIRMED", now).Find(&finishedBookings).Error
+	if err == nil && len(finishedBookings) > 0 {
+		for _, b := range finishedBookings {
+			DB.Model(&models.Booking{}).Where("id = ?", b.ID).Update("status", "COMPLETED")
+			
+			// Transition held_settlements from HELD to RELEASED
+			var settlement models.HeldSettlement
+			if errS := DB.Where("booking_id = ? AND status = ?", b.ID, "HELD").First(&settlement).Error; errS == nil {
+				settlement.Status = "RELEASED"
+				DB.Save(&settlement)
+
+				// Move funds from held_balance to available_balance in provider_balances
+				var balance models.ProviderBalance
+				if errB := DB.Where("provider_id = ?", b.ProviderID).First(&balance).Error; errB == nil {
+					halfAmount := b.TotalPrice / 2
+					if halfAmount <= 0 {
+						halfAmount = b.TotalPrice
+					}
+					balance.HeldBalance -= halfAmount
+					if balance.HeldBalance < 0 {
+						balance.HeldBalance = 0
+					}
+					balance.AvailableBalance += halfAmount
+					balance.UpdatedAt = time.Now()
+					DB.Save(&balance)
+				}
+			}
+		}
+		log.Printf("[Auto Complete] Berhasil mengubah %d pesanan menjadi COMPLETED dan mencairkan held settlements.", len(finishedBookings))
 	}
 }
 
@@ -527,8 +550,44 @@ func SeedDatabase() {
 	}
 
 	for i := range bookingsList {
-		if err := DB.Create(&bookingsList[i]).Error; err != nil {
-			log.Printf("Gagal membuat data pesanan: %v", err)
+		if err := DB.Create(&bookingsList[i]).Error; err == nil {
+			b := bookingsList[i]
+			if b.Status == "CONFIRMED" || b.Status == "PAID" || b.Status == "COMPLETED" {
+				halfAmount := b.TotalPrice / 2
+				if halfAmount <= 0 {
+					halfAmount = b.TotalPrice
+				}
+
+				// Create held_settlements record
+				settlement := models.HeldSettlement{
+					BookingID:   b.ID,
+					ProviderID:  b.ProviderID,
+					Amount:      halfAmount,
+					Status:      "HELD",
+					ReleaseDate: b.TripDate.AddDate(0, 0, 1),
+					CreatedAt:   time.Now(),
+				}
+				DB.Create(&settlement)
+
+				// Create or update ProviderBalance
+				var balance models.ProviderBalance
+				if errBal := DB.Where("provider_id = ?", b.ProviderID).First(&balance).Error; errBal != nil {
+					balance = models.ProviderBalance{
+						ProviderID:       b.ProviderID,
+						AvailableBalance: halfAmount,
+						HeldBalance:      halfAmount,
+						TotalEarned:      b.TotalPrice,
+						UpdatedAt:        time.Now(),
+					}
+					DB.Create(&balance)
+				} else {
+					balance.AvailableBalance += halfAmount
+					balance.HeldBalance += halfAmount
+					balance.TotalEarned += b.TotalPrice
+					balance.UpdatedAt = time.Now()
+					DB.Save(&balance)
+				}
+			}
 		}
 	}
 
@@ -615,7 +674,6 @@ func EnsureAllTestProvidersAndSeats() {
 				log.Printf("[Provider Seed Error] %v", err)
 			}
 		} else {
-			// Reset password to demo123 and ensure status APPROVED & PROVIDER role
 			DB.Model(&models.Provider{}).Where("email = ?", item.Email).Updates(map[string]interface{}{
 				"password_hash": passStr,
 				"role":          "PROVIDER",
@@ -623,12 +681,39 @@ func EnsureAllTestProvidersAndSeats() {
 				"is_verified":   true,
 			})
 		}
+
+		var provider models.Provider
+		if err := DB.Where("email = ?", item.Email).First(&provider).Error; err == nil {
+			// Ensure ProviderBalance record exists
+			var balance models.ProviderBalance
+			if errB := DB.Where("provider_id = ?", provider.ID).First(&balance).Error; errB != nil {
+				balance = models.ProviderBalance{
+					ProviderID:       provider.ID,
+					AvailableBalance: 0,
+					HeldBalance:      0,
+					TotalEarned:      0,
+					UpdatedAt:        time.Now(),
+				}
+				DB.Create(&balance)
+			}
+		}
 	}
 	log.Println("[QA Prep] All 8 Provider test accounts verified and updated with password 'demo123'.")
 
-	// Reset quota_used = 0 on all packages to restore seats for QA testing
-	res := DB.Model(&models.Package{}).Where("1 = 1").Update("quota_used", 0)
-	if res.Error == nil {
-		log.Printf("[QA Prep] Quota used reset to 0 for %d packages (Seat restored to full capacity).", res.RowsAffected)
+	// Recalculate quota_used for each package based on active non-cancelled/non-expired bookings
+	err := DB.Exec(`
+		UPDATE packages p
+		SET quota_used = COALESCE((
+			SELECT SUM(b.guests)
+			FROM bookings b
+			WHERE b.package_id = p.id
+			AND b.status IN ('PENDING_PAYMENT', 'WAITING_CONFIRMATION', 'PAID', 'CONFIRMED', 'COMPLETED')
+		), 0)
+	`).Error
+
+	if err == nil {
+		log.Println("[DB Sync] Quota used successfully recalculated from active bookings.")
+	} else {
+		log.Printf("[DB Sync Error] Failed to sync quota used: %v", err)
 	}
 }

@@ -16,7 +16,7 @@ import {
   UploadCloud
 } from 'lucide-react';
 
-import { request } from '../utils/api';
+import { request, API_BASE_URL } from '../utils/api';
 
 export const INDONESIA_PROVINCES = [
   "Aceh", "Sumatera Utara", "Sumatera Barat", "Riau", "Kepulauan Riau", 
@@ -212,13 +212,18 @@ export const AddPackagePage: React.FC = () => {
           body: formData,
         });
         if (res && res.documentPath) {
-          setPackagePhotos(prev => [...prev, `http://localhost:8080${res.documentPath}`]);
+          const baseUrl = API_BASE_URL.replace('/api/v1', '');
+          const fullPhotoUrl = res.documentPath.startsWith('http') 
+            ? res.documentPath 
+            : `${baseUrl}${res.documentPath}`;
+          setPackagePhotos(prev => [...prev, fullPhotoUrl]);
         }
       }
     } catch (err: any) {
       alert(err.message || 'Gagal mengunggah foto');
     } finally {
       setIsUploadingPhoto(false);
+      if (e.target) e.target.value = '';
     }
   };
 

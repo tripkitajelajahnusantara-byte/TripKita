@@ -567,14 +567,23 @@ export const RegisterPage: React.FC = () => {
       </div>
 
       {showTermsModal && (
-        <div className="modal-overlay">
-          <div className="modal-content premium-terms-modal">
+        <div 
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowTermsModal(false);
+          }}
+        >
+          <div className="modal-content premium-terms-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Syarat & Ketentuan dan Kebijakan Privasi TemenTrip</h2>
               <button 
                 type="button"
                 className="close-x-btn" 
-                onClick={() => setShowTermsModal(false)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowTermsModal(false);
+                }}
               >
                 &times;
               </button>
@@ -644,14 +653,20 @@ export const RegisterPage: React.FC = () => {
               <button 
                 type="button" 
                 className="cancel-btn" 
-                onClick={() => setShowTermsModal(false)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowTermsModal(false);
+                }}
               >
                 Tutup
               </button>
               <button 
                 type="button" 
                 className="agree-btn" 
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   updateRegisterData({ agreeToTerms: true });
                   setShowTermsModal(false);
                 }}

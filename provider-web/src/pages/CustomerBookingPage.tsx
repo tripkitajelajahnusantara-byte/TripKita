@@ -625,7 +625,7 @@ export const CustomerBookingPage: React.FC = () => {
               </strong>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569' }}>
                 <Calendar size={15} color="#94a3b8" />
-                <span>22–25 Mei 2026</span>
+                <span>{pkg.bookingDate || pkg.schedule || 'Jadwal Fleksibel'}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569' }}>
                 <Users size={15} color="#94a3b8" />

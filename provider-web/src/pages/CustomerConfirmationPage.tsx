@@ -151,7 +151,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         packageName: pkg.name,
         totalPrice: totalCost,
         guests: guestsCount,
-        tripDate: pkg.bookingDate || '22 Mei 2026',
+        tripDate: pkg.bookingDate || pkg.schedule || parsedTripDate.toISOString().split('T')[0],
         createdAt: response.createdAt || nowIso,
         status: response.status || 'PENDING_PAYMENT',
         paymentUrl: paymentUrl

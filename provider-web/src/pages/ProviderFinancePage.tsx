@@ -71,8 +71,22 @@ export const ProviderFinancePage: React.FC = () => {
     }).format(price);
   };
 
+  const isBankConfigured = !!(providerProfile?.bankName && providerProfile?.bankAccount && providerProfile?.bankAccountName);
+  const bankName = providerProfile?.bankName || '';
+  const bankAccount = providerProfile?.bankAccount || '';
+  const bankAccountName = providerProfile?.bankAccountName || '';
+
   const handleCreatePayoutRequest = async () => {
     if (!summary) return;
+
+    if (!isBankConfigured) {
+      setModalNotice({
+        title: 'Rekening Bank Belum Diatur',
+        message: 'Pengajuan pencairan tidak dapat dilakukan. Anda wajib mengisi data rekening bank tujuan yang valid pada menu Profil Provider terlebih dahulu.',
+        isError: true
+      });
+      return;
+    }
 
     const reqAmount = requestType === 'DP_50' ? summary.availableDp : (summary.availablePelunasan || 0);
 
@@ -114,10 +128,6 @@ export const ProviderFinancePage: React.FC = () => {
       setSubmitting(false);
     }
   };
-
-  const bankName = providerProfile?.bankName || 'Bank BCA';
-  const bankAccount = providerProfile?.bankAccount || '1234567890';
-  const bankAccountName = providerProfile?.bankAccountName || providerProfile?.picName || providerProfile?.businessName || 'Wisata Nusantara';
 
   return (
     <div className="dashboard-layout animate-fade-in" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
@@ -217,11 +227,11 @@ export const ProviderFinancePage: React.FC = () => {
             <span style={{ fontSize: '12px', fontWeight: '800', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Rekening Bank Tujuan Pencairan Dana
             </span>
-            <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '4px 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Building2 size={18} color="#0284c7" /> {bankName} — {bankAccount}
+            <h3 style={{ fontSize: '17px', fontWeight: '800', color: isBankConfigured ? '#0f172a' : '#dc2626', margin: '4px 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Building2 size={18} color={isBankConfigured ? '#0284c7' : '#dc2626'} /> {isBankConfigured ? `${bankName} — ${bankAccount}` : 'Belum Diatur (Wajib Diisi di Profil Provider)'}
             </h3>
             <span style={{ fontSize: '13.5px', color: '#475569' }}>
-              Atas Nama: <strong>{bankAccountName}</strong>
+              Atas Nama: <strong>{isBankConfigured ? bankAccountName : '—'}</strong>
             </span>
           </div>
 

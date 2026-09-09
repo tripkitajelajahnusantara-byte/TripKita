@@ -285,7 +285,11 @@ export const ProfileProviderPage: React.FC = () => {
                 <h3>{providerName}</h3>
                 <p className="tagline">Jelajahi keindahan Indonesia bersama kami</p>
                 <div className="loc-rating">
-                  <span className="loc"><MapPin size={12} /> Sorong, Papua Barat</span>
+                  <span className="loc">
+                    <MapPin size={12} /> {providerProfile?.operationalCity && providerProfile?.operationalProvince 
+                      ? `${providerProfile.operationalCity}, ${providerProfile.operationalProvince}`
+                      : providerProfile?.operationalCity || providerProfile?.operationalProvince || 'Indonesia'}
+                  </span>
                   <span className="rating"><Star size={12} fill="#eab308" color="#eab308" /> 4.92 <span>(284 ulasan)</span></span>
                 </div>
               </div>
