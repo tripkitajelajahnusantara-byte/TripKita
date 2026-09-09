@@ -21,6 +21,8 @@ interface TripPackage {
   status: string;
   rating: number;
   description?: string;
+  image?: string;
+  images?: string;
 }
 
 const getTodayIsoDate = () => {
@@ -92,8 +94,8 @@ export const CustomerSearchPage: React.FC = () => {
     }).format(price);
   };
 
-  const getImageUrl = (pkgId: number, name: string, category: string) => {
-    return getTripImage(pkgId, name, category);
+  const getImageUrl = (pkgId: number, name: string, category: string, uploadedImage?: string) => {
+    return getTripImage(pkgId, name, category, uploadedImage);
   };
 
   const getBadgeColor = (_category: string) => {
@@ -247,7 +249,7 @@ export const CustomerSearchPage: React.FC = () => {
                   {/* Image Left */}
                   <div style={{ height: '180px', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
                     <img 
-                      src={getImageUrl(pkg.id, pkg.name, pkg.category)} 
+                      src={getImageUrl(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image)} 
                       alt={pkg.name} 
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       onError={(e) => {

@@ -138,6 +138,12 @@ export const AddPackagePage: React.FC = () => {
           setQuotaMax(pkg.quotaMax ? String(pkg.quotaMax) : '');
           setSchedule(pkg.schedule || '');
           setDescription(pkg.description || '');
+          if (pkg.images) {
+            const splitImgs = pkg.images.split(',').filter(Boolean);
+            if (splitImgs.length > 0) setPackagePhotos(splitImgs);
+          } else if (pkg.image) {
+            setPackagePhotos([pkg.image]);
+          }
         } catch (err) {
           console.error('Failed to load package details:', err);
         }
@@ -305,6 +311,8 @@ export const AddPackagePage: React.FC = () => {
         endDate: endDate,
         schedule: finalSchedule,
         status: dbStatus,
+        image: packagePhotos[0] || '',
+        images: packagePhotos.join(','),
       };
 
       if (editingPackageId) {

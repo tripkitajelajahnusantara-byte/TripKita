@@ -19,7 +19,11 @@ export const OFFICIAL_TRIP_TYPES = [
 ];
 
 // Centralized mapping of authentic, verified photos for all TripKita packages
-export function getTripImage(id?: number, name: string = '', category: string = ''): string {
+export function getTripImage(id?: number, name: string = '', category: string = '', uploadedImage?: string): string {
+  if (uploadedImage && uploadedImage.trim() !== '') {
+    const firstImg = uploadedImage.split(',')[0].trim();
+    if (firstImg) return firstImg;
+  }
   const nameLower = name.toLowerCase();
   const catLower = category.toLowerCase();
 

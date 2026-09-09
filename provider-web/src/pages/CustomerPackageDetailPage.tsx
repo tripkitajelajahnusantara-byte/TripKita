@@ -54,8 +54,14 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const totalQuotaUsed = pkg.quotaUsed || 0;
   const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
 
-  // 5 High quality photos per destination matching actual trip content
   const getGalleryImages = (name: string) => {
+    if ((pkg as any)?.images && (pkg as any).images.trim() !== '') {
+      const splitImgs = (pkg as any).images.split(',').filter(Boolean);
+      if (splitImgs.length > 0) return splitImgs;
+    }
+    if ((pkg as any)?.image && (pkg as any).image.trim() !== '') {
+      return [(pkg as any).image];
+    }
     const nameLower = name.toLowerCase();
     if (nameLower.includes('bromo')) {
       return [
@@ -874,7 +880,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
           {/* Thumbnail Bar */}
           <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-            {photos.map((img, i) => (
+            {photos.map((img: string, i: number) => (
               <div 
                 key={i} 
                 onClick={() => setLightboxPhotoIdx(i)}

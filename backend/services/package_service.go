@@ -49,6 +49,8 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 		Schedule:    req.Schedule,
 		Status:      req.Status,
 		Rating:      5.0,
+		Image:       req.Image,
+		Images:      req.Images,
 	}
 
 	if err := s.repo.Create(pkg); err != nil {
@@ -114,6 +116,12 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	}
 	if req.Status != "" {
 		pkg.Status = req.Status
+	}
+	if req.Image != "" {
+		pkg.Image = req.Image
+	}
+	if req.Images != "" {
+		pkg.Images = req.Images
 	}
 
 	err = s.repo.Update(pkg)

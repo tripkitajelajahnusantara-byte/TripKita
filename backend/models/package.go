@@ -22,6 +22,8 @@ type Package struct {
 	Schedule    string         `gorm:"size:255;not null" json:"schedule"`
 	Status      string         `gorm:"size:50;default:'Draft'" json:"status"` // Aktif, Draft, Nonaktif
 	Rating      float64        `gorm:"default:0" json:"rating"`
+	Image       string         `gorm:"size:2048" json:"image"`
+	Images      string         `gorm:"size:2048" json:"images"`
 	CreatedAt   time.Time      `json:"createdAt"`
 	UpdatedAt   time.Time      `json:"updatedAt"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
@@ -39,6 +41,8 @@ type CreatePackageRequest struct {
 	EndDate     string `json:"endDate"`
 	Schedule    string `json:"schedule"`
 	Status      string `json:"status" binding:"required"` // Convert to Aktif, Draft, Nonaktif
+	Image       string `json:"image"`
+	Images      string `json:"images"`
 }
 
 type UpdatePackageRequest struct {
@@ -53,4 +57,6 @@ type UpdatePackageRequest struct {
 	EndDate     string `json:"endDate"`
 	Schedule    string `json:"schedule"`
 	Status      string `json:"status"` // Aktif, Draft, Nonaktif
+	Image       string `json:"image"`
+	Images      string `json:"images"`
 }
