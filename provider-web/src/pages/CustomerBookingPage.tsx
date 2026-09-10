@@ -200,6 +200,7 @@ export const CustomerBookingPage: React.FC = () => {
     // Save into NavigationContext for Step 5 Confirmation
     setBookingFormData({
       packageId: currentPackageId,
+      tripDate: pkg.bookingDate || pkg.schedule,
       pemesan: {
         nama: pemesanName,
         email: pemesanEmail,

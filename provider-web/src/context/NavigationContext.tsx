@@ -180,12 +180,14 @@ interface NavigationContextType {
   setSearchParams: React.Dispatch<React.SetStateAction<{ destination: string; date: string; type: string; category: string }>>;
   bookingFormData: {
     packageId?: number | string;
+    tripDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
   } | null;
   setBookingFormData: React.Dispatch<React.SetStateAction<{
     packageId?: number | string;
+    tripDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -214,6 +216,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
 
   const [bookingFormData, setBookingFormDataState] = useState<{
     packageId?: number | string;
+    tripDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -228,6 +231,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
 
   const setBookingFormData: React.Dispatch<React.SetStateAction<{
     packageId?: number | string;
+    tripDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;

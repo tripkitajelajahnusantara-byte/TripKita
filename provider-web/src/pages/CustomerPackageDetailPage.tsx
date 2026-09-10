@@ -191,6 +191,30 @@ export const CustomerPackageDetailPage: React.FC = () => {
       return `${start.getDate()} ${months[start.getMonth()]}–${end.getDate()} ${months[end.getMonth()]} ${end.getFullYear()} (${days} Hari)`;
     };
 
+    // If package has a specific schedule string (e.g. from backend or form)
+    if (pkg.schedule && pkg.schedule.trim() !== '') {
+      const parts = pkg.schedule.split(',').map(s => s.trim()).filter(Boolean);
+      if (parts.length > 0) {
+        return parts.map(part => {
+          // If part contains YYYY-MM-DD format
+          const dateMatch = part.match(/\d{4}-\d{2}-\d{2}/);
+          const dateVal = dateMatch ? dateMatch[0] : (pkg.startDate || formatDate(addDays(today, 3)));
+          return { label: part, dateValue: dateVal };
+        });
+      }
+    }
+
+    if (pkg.startDate) {
+      const start = new Date(pkg.startDate);
+      if (!isNaN(start.getTime())) {
+        const end = pkg.endDate ? new Date(pkg.endDate) : addDays(start, 3);
+        const days = !isNaN(end.getTime()) ? Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1) : 4;
+        return [
+          { label: formatLabel(start, days), dateValue: formatDate(start) }
+        ];
+      }
+    }
+
     const d1 = addDays(today, 3);
     const d2 = addDays(today, 7);
     const d3 = addDays(today, 12);
@@ -206,7 +230,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   // Pre-select schedule date closest to user's selected bookingDate
   const [selectedScheduleDate, setSelectedScheduleDate] = useState(
-    pkg.bookingDate || availableSchedules[0].dateValue
+    pkg.bookingDate || (availableSchedules.length > 0 ? availableSchedules[0].dateValue : '')
   );
 
   useEffect(() => {
@@ -215,8 +239,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
       if (match) {
         setSelectedScheduleDate(match.dateValue);
       }
+    } else if (availableSchedules.length > 0) {
+      setSelectedScheduleDate(availableSchedules[0].dateValue);
     }
-  }, [pkg.bookingDate]);
+  }, [pkg.bookingDate, pkg.schedule]);
 
   const toggleAddOn = (id: string) => {
     setSelectedAddOnIds(prev =>
@@ -685,7 +711,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Jadwal Keberangkatan Dropdown Select (Strictly 3 Closest Schedules) */}
             <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px', border: '1px solid #dbeafe' }}>
               <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-                Jadwal Keberangkatan (3 Terdekat)
+                Jadwal Keberangkatan (Aktif)
               </label>
               
               <select

@@ -41,20 +41,55 @@ func NewBookingService(repo repositories.BookingRepository, packageRepo reposito
 	}
 }
 
+func (s *bookingService) checkAutoExpire(booking *models.Booking) {
+	if booking == nil || database.DB == nil {
+		return
+	}
+	if booking.Status == "PENDING_PAYMENT" && !booking.CreatedAt.IsZero() {
+		// If CreatedAt is older than 24 hours
+		if time.Since(booking.CreatedAt) > 24*time.Hour {
+			oldStatus := booking.Status
+			booking.Status = "EXPIRED"
+			_ = s.repo.Update(booking)
+			s.adjustQuota(booking, oldStatus, "EXPIRED", booking.ProviderID)
+		}
+	}
+}
+
 func (s *bookingService) GetAllBookings(providerID uint) ([]models.Booking, error) {
-	return s.repo.FindAllByProvider(providerID)
+	bookings, err := s.repo.FindAllByProvider(providerID)
+	if err == nil {
+		for i := range bookings {
+			s.checkAutoExpire(&bookings[i])
+		}
+	}
+	return bookings, err
 }
 
 func (s *bookingService) GetBookingByID(id uint) (*models.Booking, error) {
-	return s.repo.FindByID(id)
+	booking, err := s.repo.FindByID(id)
+	if err == nil && booking != nil {
+		s.checkAutoExpire(booking)
+	}
+	return booking, err
 }
 
 func (s *bookingService) GetCustomerBookings(customerID uint) ([]models.Booking, error) {
-	return s.repo.FindAllByCustomer(customerID)
+	bookings, err := s.repo.FindAllByCustomer(customerID)
+	if err == nil {
+		for i := range bookings {
+			s.checkAutoExpire(&bookings[i])
+		}
+	}
+	return bookings, err
 }
 
 func (s *bookingService) GetBookingByCode(code string) (*models.Booking, error) {
-	return s.repo.FindByBookingCode(code)
+	booking, err := s.repo.FindByBookingCode(code)
+	if err == nil && booking != nil {
+		s.checkAutoExpire(booking)
+	}
+	return booking, err
 }
 
 func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status string) (*models.Booking, error) {

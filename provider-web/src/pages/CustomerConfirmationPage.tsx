@@ -107,7 +107,9 @@ export const CustomerConfirmationPage: React.FC = () => {
         return defaultFuture;
       };
 
-      const parsedTripDate = parseTripDateToFuture(pkg.bookingDate || pkg.schedule);
+      const selectedTripSchedule = bookingFormData?.tripDate || pkg.bookingDate || pkg.schedule || '';
+
+      const parsedTripDate = parseTripDateToFuture(selectedTripSchedule);
 
       const rawPkgId = Number(pkg.id);
       const safePackageId = (!isNaN(rawPkgId) && rawPkgId > 0) ? rawPkgId : 1;
@@ -151,7 +153,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         packageName: pkg.name,
         totalPrice: totalCost,
         guests: guestsCount,
-        tripDate: pkg.bookingDate || pkg.schedule || parsedTripDate.toISOString().split('T')[0],
+        tripDate: selectedTripSchedule || parsedTripDate.toISOString().split('T')[0],
         createdAt: response.createdAt || nowIso,
         status: response.status || 'PENDING_PAYMENT',
         paymentUrl: paymentUrl
@@ -271,7 +273,7 @@ export const CustomerConfirmationPage: React.FC = () => {
               </h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>
                 <Calendar size={14} color="#94a3b8" />
-                <span>{pkg.schedule || 'Jadwal Fleksibel'}</span>
+                <span>{bookingFormData?.tripDate || pkg.bookingDate || pkg.schedule || 'Jadwal Fleksibel'}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b' }}>
                 <Users size={14} color="#94a3b8" />

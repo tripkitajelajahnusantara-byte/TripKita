@@ -74,6 +74,17 @@ export const CustomerHistoryPage: React.FC = () => {
   // Custom Notice Modal state
   const [modalNotice, setModalNotice] = useState<{ title: string; message: string; isError?: boolean } | null>(null);
 
+  const handleExpireBooking = async (bId: string | number) => {
+    try {
+      await request(`/public/bookings/${bId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'EXPIRED' })
+      });
+    } catch (e) {
+      console.error('Failed to update expired status to DB:', e);
+    }
+  };
+
   useEffect(() => {
     // Handle return from Xendit payment gateway
     const urlParams = new URLSearchParams(window.location.search);
@@ -83,6 +94,10 @@ export const CustomerHistoryPage: React.FC = () => {
 
     if (paymentStatus === 'PAID' && (bookingId || bookingCode)) {
       const targetId = bookingId || bookingCode;
+      // Clean URL params right away so refresh won't repeat this request
+      if (window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      }
       request(`/public/bookings/${targetId}/status`, {
         method: 'PUT',
         body: JSON.stringify({ status: 'PAID' })
@@ -577,7 +592,7 @@ export const CustomerHistoryPage: React.FC = () => {
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                           <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Transfer Pembayaran:</strong>
-                          <CountdownTimer createdAt={booking.createdAt} onExpire={fetchHistory} />
+                          <CountdownTimer createdAt={booking.createdAt} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
                         </div>
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
