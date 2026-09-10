@@ -193,9 +193,9 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
     // If package has a specific schedule string (e.g. from backend or form)
     if (pkg.schedule && pkg.schedule.trim() !== '') {
-      const parts = pkg.schedule.split(',').map(s => s.trim()).filter(Boolean);
+      const parts = pkg.schedule.split(',').map((s: string) => s.trim()).filter(Boolean);
       if (parts.length > 0) {
-        return parts.map(part => {
+        return parts.map((part: string) => {
           // If part contains YYYY-MM-DD format
           const dateMatch = part.match(/\d{4}-\d{2}-\d{2}/);
           const dateVal = dateMatch ? dateMatch[0] : (pkg.startDate || formatDate(addDays(today, 3)));
@@ -235,7 +235,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (pkg.bookingDate) {
-      const match = availableSchedules.find(s => s.dateValue >= pkg.bookingDate);
+      const match = availableSchedules.find((s: { label: string; dateValue: string }) => s.dateValue >= pkg.bookingDate);
       if (match) {
         setSelectedScheduleDate(match.dateValue);
       }
@@ -730,7 +730,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   cursor: 'pointer'
                 }}
               >
-                {availableSchedules.map((sch) => (
+                {availableSchedules.map((sch: { label: string; dateValue: string }) => (
                   <option key={sch.dateValue} value={sch.dateValue}>
                     {sch.label}
                   </option>
