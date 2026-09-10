@@ -57,36 +57,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const totalQuotaUsed = pkg.quotaUsed || 0;
   const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
 
-  const getGalleryImages = (name: string): string[] => {
-    const formatUrl = (url: string) => {
-      if (!url) return '';
-      const trimmed = url.trim();
-      if (!trimmed) return '';
-      if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
-        return trimmed;
-      }
-      const baseUrl = API_BASE_URL.replace('/api/v1', '');
-      return trimmed.startsWith('/') ? `${baseUrl}${trimmed}` : `${baseUrl}/${trimmed}`;
-    };
-
-    if (Array.isArray((pkg as any)?.images)) {
-      const valid = (pkg as any).images
-        .map((img: any) => (typeof img === 'string' ? formatUrl(img) : ''))
-        .filter(Boolean);
-      if (valid.length > 0) return valid;
-    }
-    if ((pkg as any)?.images && typeof (pkg as any).images === 'string' && (pkg as any).images.trim() !== '') {
-      const splitImgs = (pkg as any).images
-        .split(',')
-        .map((s: string) => formatUrl(s))
-        .filter(Boolean);
-      if (splitImgs.length > 0) return splitImgs;
-    }
-    if ((pkg as any)?.image && typeof (pkg as any).image === 'string' && (pkg as any).image.trim() !== '') {
-      const formatted = formatUrl((pkg as any).image);
-      if (formatted) return [formatted];
-    }
-    const nameLower = name.toLowerCase();
+  const getDestinationDefaults = (nameStr: string): string[] => {
+    const nameLower = nameStr.toLowerCase();
     if (nameLower.includes('bromo')) {
       return [
         'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=1200&q=80',
@@ -166,6 +138,45 @@ export const CustomerPackageDetailPage: React.FC = () => {
       'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80',
       'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1200&q=80'
     ];
+  };
+
+  const getGalleryImages = (name: string): string[] => {
+    const formatUrl = (url: string) => {
+      if (!url) return '';
+      const trimmed = url.trim();
+      if (!trimmed) return '';
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+        return trimmed;
+      }
+      // If it looks like a valid relative path or image file extension
+      if (trimmed.startsWith('/') || trimmed.startsWith('uploads/') || trimmed.startsWith('storage/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(trimmed)) {
+        const baseUrl = API_BASE_URL.replace('/api/v1', '');
+        return trimmed.startsWith('/') ? `${baseUrl}${trimmed}` : `${baseUrl}/${trimmed}`;
+      }
+      // Filter out non-URL junk text like "Sub 2", "Main preview", "thumb", etc.
+      return '';
+    };
+
+    let rawList: string[] = [];
+    if (Array.isArray((pkg as any)?.images)) {
+      rawList = (pkg as any).images.map((img: any) => (typeof img === 'string' ? formatUrl(img) : '')).filter(Boolean);
+    } else if ((pkg as any)?.images && typeof (pkg as any).images === 'string' && (pkg as any).images.trim() !== '') {
+      rawList = (pkg as any).images.split(',').map((s: string) => formatUrl(s)).filter(Boolean);
+    } else if ((pkg as any)?.image && typeof (pkg as any).image === 'string' && (pkg as any).image.trim() !== '') {
+      const formatted = formatUrl((pkg as any).image);
+      if (formatted) rawList = [formatted];
+    }
+
+    if (rawList.length > 0) {
+      const defaults = getDestinationDefaults(name);
+      while (rawList.length < 3) {
+        const fallback = defaults[rawList.length % defaults.length] || FALLBACK_IMAGE;
+        rawList.push(fallback);
+      }
+      return rawList;
+    }
+
+    return getDestinationDefaults(name);
   };
 
   const photos = getGalleryImages(pkg.name);
@@ -973,6 +984,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
               src={photos[lightboxPhotoIdx]} 
               alt={`Gallery ${lightboxPhotoIdx + 1}`}
               style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '12px', objectFit: 'contain', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+              onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
             />
 
             {/* Prev Arrow */}
@@ -1034,7 +1046,12 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   opacity: lightboxPhotoIdx === i ? 1 : 0.6
                 }}
               >
-                <img src={img} alt="thumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img 
+                  src={img} 
+                  alt={`Thumbnail ${i + 1}`} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                />
               </div>
             ))}
           </div>
