@@ -451,7 +451,26 @@ export const AddPackagePage: React.FC = () => {
                   </div>
                   <div className="input-group">
                     <label>Tipe Trip *</label>
-                    <select value={tripType} onChange={(e) => setTripType(e.target.value)}>
+                    <select 
+                      value={tripType} 
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setTripType(val);
+                        if (val === 'Honeymoon' || val === 'Private Trip') {
+                          setQuotaMin('2');
+                          setMinGuests('2');
+                        } else if (val === 'Family') {
+                          setQuotaMin('3');
+                          setMinGuests('3');
+                        } else if (val === 'Corporate') {
+                          setQuotaMin('10');
+                          setMinGuests('10');
+                        } else {
+                          setQuotaMin('1');
+                          setMinGuests('1');
+                        }
+                      }}
+                    >
                       {TRIP_TYPES.map(tt => (
                         <option key={tt} value={tt}>{tt}</option>
                       ))}

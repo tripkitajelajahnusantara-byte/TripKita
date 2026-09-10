@@ -13,7 +13,6 @@ interface AddOn {
 
 export const CustomerPackageDetailPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, setSelectedPackageForDetail } = useNavigation();
-  const [guestsCount, setGuestsCount] = useState(1);
 
   // Photo Lightbox Modal State
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -52,6 +51,33 @@ export const CustomerPackageDetailPage: React.FC = () => {
   }
 
   const pkg = selectedPackageForDetail;
+
+  const minRequiredGuests = pkg.quotaMin || (
+    pkg.tripType === 'Honeymoon' || pkg.tripType === 'Private Trip' ? 2 :
+    pkg.tripType === 'Family' ? 3 :
+    pkg.tripType === 'Corporate' ? 10 : 1
+  );
+
+  const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
+
+  const getH7MinDateIso = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  };
+
+  const h7MinDateStr = getH7MinDateIso();
+
+  const [guestsCount, setGuestsCount] = useState(Math.max(minRequiredGuests, 1));
+  const [customSelectedDate, setCustomSelectedDate] = useState<string>(
+    pkg.bookingDate && pkg.bookingDate >= h7MinDateStr ? pkg.bookingDate : h7MinDateStr
+  );
+
+  useEffect(() => {
+    if (guestsCount < minRequiredGuests) {
+      setGuestsCount(minRequiredGuests);
+    }
+  }, [minRequiredGuests]);
   
   const totalQuotaMax = pkg.quotaMax || 15;
   const totalQuotaUsed = pkg.quotaUsed || 0;
@@ -339,11 +365,20 @@ export const CustomerPackageDetailPage: React.FC = () => {
       alert('Maaf, kuota untuk paket ini telah habis. Silakan pilih paket wisata lain.');
       return;
     }
+    if (guestsCount < minRequiredGuests) {
+      alert(`⚠️ Minimal pemesanan untuk paket ${pkg.tripType || 'ini'} adalah ${minRequiredGuests} orang.`);
+      return;
+    }
+    const finalBookingDate = isOpenTrip ? selectedScheduleDate : customSelectedDate;
+    if (!finalBookingDate) {
+      alert('⚠️ Silakan pilih tanggal keberangkatan terlebih dahulu.');
+      return;
+    }
     const selectedAddOnObjects = addOnsList.filter(a => selectedAddOnIds.includes(a.id));
     const updatedPkg = {
       ...pkg,
       bookingGuests: guestsCount,
-      bookingDate: selectedScheduleDate,
+      bookingDate: finalBookingDate,
       selectedAddOns: selectedAddOnObjects
     };
     setSelectedPackageForDetail(updatedPkg);
@@ -833,35 +868,72 @@ export const CustomerPackageDetailPage: React.FC = () => {
               {formatIDR(pkg.price)}
             </div>
 
-            {/* Jadwal Keberangkatan Dropdown Select (Strictly 3 Closest Schedules) */}
-            <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px', border: '1px solid #dbeafe' }}>
-              <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-                Jadwal Keberangkatan (Aktif)
-              </label>
-              
-              <select
-                value={selectedScheduleDate}
-                onChange={(e) => setSelectedScheduleDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1.5px solid #007bff',
-                  fontSize: '13.5px',
-                  fontWeight: '700',
-                  color: '#0f172a',
-                  backgroundColor: '#ffffff',
-                  outline: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                {availableSchedules.map((sch: { label: string; dateValue: string }) => (
-                  <option key={sch.dateValue} value={sch.dateValue}>
-                    {sch.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Jadwal Keberangkatan (Open Trip Dropdown vs Non-Open Trip Calendar) */}
+            {isOpenTrip ? (
+              <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px', border: '1px solid #dbeafe' }}>
+                <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                  Jadwal Keberangkatan (Open Trip)
+                </label>
+                
+                <select
+                  value={selectedScheduleDate}
+                  onChange={(e) => setSelectedScheduleDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #007bff',
+                    fontSize: '13.5px',
+                    fontWeight: '700',
+                    color: '#0f172a',
+                    backgroundColor: '#ffffff',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {availableSchedules.map((sch: { label: string; dateValue: string }) => (
+                    <option key={sch.dateValue} value={sch.dateValue}>
+                      {sch.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px', border: '1px solid #dbeafe' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase' }}>
+                    Pilih Tanggal ({pkg.tripType})
+                  </label>
+                  <span style={{ fontSize: '11px', color: '#007bff', fontWeight: '700', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px' }}>
+                    Min. H-7
+                  </span>
+                </div>
+                
+                <input
+                  type="date"
+                  min={h7MinDateStr}
+                  max={pkg.endDate || undefined}
+                  value={customSelectedDate}
+                  onChange={(e) => setCustomSelectedDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #007bff',
+                    fontSize: '13.5px',
+                    fontWeight: '700',
+                    color: '#0f172a',
+                    backgroundColor: '#ffffff',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '6px', fontWeight: '500', lineHeight: '1.4' }}>
+                  💡 Pilihan tanggal bebas untuk {pkg.tripType}. Pemesanan dibuka paling cepat H-7 (Mulai: {h7MinDateStr}).
+                </span>
+              </div>
+            )}
 
             {/* Guest Counter (+ / -) */}
             <div style={{ marginBottom: '20px' }}>
@@ -880,9 +952,17 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 
                 <button 
                   type="button"
-                  onClick={() => setGuestsCount((prev) => Math.max(1, prev - 1))}
-                  disabled={guestsCount <= 1 || availableSeats <= 0}
-                  style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: (guestsCount <= 1 || availableSeats <= 0) ? '#e2e8f0' : '#f8fafc', fontWeight: '700', cursor: (guestsCount <= 1 || availableSeats <= 0) ? 'not-allowed' : 'pointer' }}
+                  onClick={() => setGuestsCount((prev) => Math.max(minRequiredGuests, prev - 1))}
+                  disabled={guestsCount <= minRequiredGuests || availableSeats <= 0}
+                  style={{ 
+                    width: '28px', 
+                    height: '28px', 
+                    borderRadius: '6px', 
+                    border: '1px solid #cbd5e1', 
+                    backgroundColor: (guestsCount <= minRequiredGuests || availableSeats <= 0) ? '#e2e8f0' : '#f8fafc', 
+                    fontWeight: '700', 
+                    cursor: (guestsCount <= minRequiredGuests || availableSeats <= 0) ? 'not-allowed' : 'pointer' 
+                  }}
                 >
                   -
                 </button>
@@ -895,6 +975,11 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   +
                 </button>
               </div>
+              {minRequiredGuests > 1 && (
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'block', fontWeight: '500' }}>
+                  * Minimal pemesanan paket {pkg.tripType || 'ini'} adalah {minRequiredGuests} orang.
+                </span>
+              )}
             </div>
 
             {/* Price Total Summary */}

@@ -12,7 +12,6 @@ export const OFFICIAL_CATEGORIES = [
 export const OFFICIAL_TRIP_TYPES = [
   "Open Trip",
   "Private Trip",
-  "Custom Trip",
   "Honeymoon",
   "Family",
   "Corporate"
