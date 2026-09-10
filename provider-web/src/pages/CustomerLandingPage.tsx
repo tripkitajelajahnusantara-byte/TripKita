@@ -743,23 +743,26 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                           <span>{pkg.destination}</span>
                         </div>
 
-                        {/* 3 Key Highlights Chips */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
-                          {getHighlightsForPackage(pkg).map((hl, hIdx) => (
-                            <span 
-                              key={hIdx} 
-                              style={{ 
-                                fontSize: '9.5px', 
-                                fontWeight: '600', 
-                                color: '#0369a1', 
-                                backgroundColor: '#e0f2fe', 
-                                padding: '2px 6px', 
-                                borderRadius: '4px',
-                                whiteSpace: 'nowrap' 
-                              }}
-                            >
-                              {hl}
-                            </span>
+                        {/* 3 Key Highlights - Elegant 1-Line Bullet List */}
+                        <div 
+                          style={{ 
+                            fontSize: '11px', 
+                            color: '#475569', 
+                            fontWeight: '500', 
+                            marginTop: '2px', 
+                            whiteSpace: 'nowrap', 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          {getHighlightsForPackage(pkg).slice(0, 3).map((hl, hIdx) => (
+                            <React.Fragment key={hIdx}>
+                              {hIdx > 0 && <span style={{ color: '#cbd5e1', fontWeight: 'bold' }}>•</span>}
+                              <span style={{ color: '#0f172a', fontWeight: '600', fontSize: '10.5px' }}>{hl}</span>
+                            </React.Fragment>
                           ))}
                         </div>
 

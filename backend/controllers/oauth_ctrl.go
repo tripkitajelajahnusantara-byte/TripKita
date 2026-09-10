@@ -78,15 +78,15 @@ func (ctrl *OAuthController) RedirectToGoogle(c *gin.Context) {
 		return
 	}
 
-	scope := "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile"
-	state := authType
-	googleAuthURL := fmt.Sprintf(
-		"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s",
-		ctrl.cfg.GoogleClientID,
-		url.QueryEscape(ctrl.cfg.GoogleRedirectURI),
-		url.QueryEscape(scope),
-		url.QueryEscape(state),
-	)
+	v := url.Values{}
+	v.Set("client_id", ctrl.cfg.GoogleClientID)
+	v.Set("redirect_uri", ctrl.cfg.GoogleRedirectURI)
+	v.Set("response_type", "code")
+	v.Set("scope", "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile")
+	v.Set("state", authType)
+	v.Set("prompt", "select_account")
+
+	googleAuthURL := "https://accounts.google.com/o/oauth2/v2/auth?" + v.Encode()
 
 	c.Redirect(http.StatusTemporaryRedirect, googleAuthURL)
 }
