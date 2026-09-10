@@ -783,35 +783,56 @@ func EnsureAllTestProvidersAndSeats() {
 	sched3 := fmt.Sprintf("%d %s %d – %d %s %d (3 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 2).Day(), months[now.AddDate(0, 0, 2).Month()-1], now.AddDate(0, 0, 2).Year())
 	sched2 := fmt.Sprintf("%d %s %d – %d %s %d (2 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 1).Day(), months[now.AddDate(0, 0, 1).Month()-1], now.AddDate(0, 0, 1).Year())
 
-	var firstProvider models.Provider
-	DB.Where("role = ?", "PROVIDER").First(&firstProvider)
-	pID := firstProvider.ID
-	if pID == 0 {
-		pID = 1
-	}
+	// Map provider IDs by email
+	var p1, p2, p3, p4, p8 models.Provider
+	DB.Where("email = ?", "partner@wisatanusantara.id").First(&p1)
+	DB.Where("email = ?", "partner2@tidung.id").First(&p2)
+	DB.Where("email = ?", "partner3@cilember.id").First(&p3)
+	DB.Where("email = ?", "partner4@bandung.id").First(&p4)
+	DB.Where("email = ?", "partner8@jogja.id").First(&p8)
+
+	pID1 := p1.ID
+	if pID1 == 0 { pID1 = 1 }
+	pID2 := p2.ID
+	if pID2 == 0 { pID2 = 2 }
+	pID3 := p3.ID
+	if pID3 == 0 { pID3 = 3 }
+	pID4 := p4.ID
+	if pID4 == 0 { pID4 = 4 }
+	pID8 := p8.ID
+	if pID8 == 0 { pID8 = 8 }
 
 	packagesToEnsure := []models.Package{
-		{Name: "Open Trip Gunung Bromo", Destination: "Probolinggo, Jawa Timur", Category: "Gunung", TripType: "Open Trip", Price: 350000, QuotaMin: 1, QuotaMax: 15, StartDate: todayStr, EndDate: todayStr, Schedule: sched3, Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Open Trip Pulau Tidung", Destination: "Kepulauan Seribu, Jakarta", Category: "Pantai", TripType: "Open Trip", Price: 450000, QuotaMin: 1, QuotaMax: 12, StartDate: todayStr, EndDate: todayStr, Schedule: sched3, Status: "Aktif", Rating: 4.7, Image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Trip Curug Cilember", Destination: "Bogor, Jawa Barat", Category: "Curug", TripType: "Open Trip", Price: 275000, QuotaMin: 1, QuotaMax: 10, StartDate: todayStr, EndDate: todayStr, Schedule: sched2, Status: "Aktif", Rating: 4.6, Image: "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Bandung City Tour", Destination: "Bandung, Jawa Barat", Category: "City Tour", TripType: "Open Trip", Price: 420000, QuotaMin: 1, QuotaMax: 15, StartDate: todayStr, EndDate: todayStr, Schedule: sched2, Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Private Trip Bromo Sunrise & Savana", Destination: "Probolinggo, Jawa Timur", Category: "Gunung", TripType: "Private Trip", Price: 1250000, QuotaMin: 1, QuotaMax: 10, StartDate: "2026-09-21", EndDate: "2026-11-30", Schedule: "Operasional: 21-30 Sep, 10-25 Okt, 05-20 Nov 2026", Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Private Trip Wisata Raja Ampat 4D3N", Destination: "Papua Barat", Category: "Diving & Snorkeling", TripType: "Private Trip", Price: 3850000, QuotaMin: 1, QuotaMax: 8, StartDate: "2026-09-18", EndDate: "2026-11-30", Schedule: "Operasional: 18-28 Sep, 01-15 Okt, 10-28 Nov 2026", Status: "Aktif", Rating: 5.0, Image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Honeymoon Romantic Bali Villa 3D2N", Destination: "Bali", Category: "Pantai", TripType: "Honeymoon", Price: 2950000, QuotaMin: 2, QuotaMax: 2, StartDate: "2026-09-17", EndDate: "2026-11-30", Schedule: "Bebas Pilih Tanggal (17 Sep - 30 Nov 2026)", Status: "Aktif", Rating: 5.0, Image: "https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Honeymoon Island Sunset Tidung 3D2N", Destination: "Kepulauan Seribu, Jakarta", Category: "Pantai", TripType: "Honeymoon", Price: 1650000, QuotaMin: 2, QuotaMax: 2, StartDate: "2026-09-20", EndDate: "2026-11-30", Schedule: "Operasional: 20-30 Sep, 05-20 Okt, 01-15 Nov 2026", Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Family Vacation Yogyakarta & Borobudur", Destination: "Yogyakarta, DI Yogyakarta", Category: "Wisata Budaya & Sejarah", TripType: "Family", Price: 850000, QuotaMin: 3, QuotaMax: 15, StartDate: "2026-09-17", EndDate: "2026-11-30", Schedule: "Bebas Pilih Tanggal (Ready 1 Bulan Full & 3 Bulan Kedepan)", Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Family Nature Retreat Cilember 2D1N", Destination: "Bogor, Jawa Barat", Category: "Curug", TripType: "Family", Price: 650000, QuotaMin: 3, QuotaMax: 12, StartDate: "2026-09-17", EndDate: "2026-11-30", Schedule: "Operasional: 17-30 Sep, 15-31 Okt, 10-25 Nov 2026", Status: "Aktif", Rating: 4.7, Image: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Corporate Gathering & Outbound Bandung", Destination: "Bandung, Jawa Barat", Category: "City Tour", TripType: "Corporate", Price: 750000, QuotaMin: 10, QuotaMax: 100, StartDate: "2026-09-25", EndDate: "2026-11-30", Schedule: "Operasional: 25-30 Sep, 15-30 Okt, 15-30 Nov 2026", Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=1200&q=80"},
-		{Name: "Corporate Team Building Bogor 2D1N", Destination: "Bogor, Jawa Barat", Category: "Wisata Budaya & Sejarah", TripType: "Corporate", Price: 680000, QuotaMin: 10, QuotaMax: 80, StartDate: "2026-09-18", EndDate: "2026-11-30", Schedule: "Operasional: 18-30 Sep, 01-31 Okt, 01-30 Nov 2026", Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80"},
+		// Provider 1: Wisata Bromo Nusantara (Bromo & Bali)
+		{ProviderID: pID1, Name: "Open Trip Gunung Bromo", Destination: "Probolinggo, Jawa Timur", Category: "Gunung", TripType: "Open Trip", Price: 350000, QuotaMin: 1, QuotaMax: 15, StartDate: todayStr, EndDate: todayStr, Schedule: sched3, Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=1200&q=80"},
+		{ProviderID: pID1, Name: "Private Trip Bromo Sunrise & Savana", Destination: "Probolinggo, Jawa Timur", Category: "Gunung", TripType: "Private Trip", Price: 1250000, QuotaMin: 1, QuotaMax: 10, StartDate: "2026-09-21", EndDate: "2026-11-30", Schedule: "Operasional: 21-30 Sep, 10-25 Okt, 05-20 Nov 2026", Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80"},
+		{ProviderID: pID1, Name: "Honeymoon Romantic Bali Villa 3D2N", Destination: "Bali", Category: "Pantai", TripType: "Honeymoon", Price: 2950000, QuotaMin: 2, QuotaMax: 2, StartDate: "2026-09-17", EndDate: "2026-11-30", Schedule: "Bebas Pilih Tanggal (17 Sep - 30 Nov 2026)", Status: "Aktif", Rating: 5.0, Image: "https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1200&q=80"},
+
+		// Provider 2: Tidung Paradise Tour (Kepulauan Seribu)
+		{ProviderID: pID2, Name: "Open Trip Pulau Tidung", Destination: "Kepulauan Seribu, Jakarta", Category: "Pantai", TripType: "Open Trip", Price: 450000, QuotaMin: 1, QuotaMax: 12, StartDate: todayStr, EndDate: todayStr, Schedule: sched3, Status: "Aktif", Rating: 4.7, Image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"},
+		{ProviderID: pID2, Name: "Honeymoon Island Sunset Tidung 3D2N", Destination: "Kepulauan Seribu, Jakarta", Category: "Pantai", TripType: "Honeymoon", Price: 1650000, QuotaMin: 2, QuotaMax: 2, StartDate: "2026-09-20", EndDate: "2026-11-30", Schedule: "Operasional: 20-30 Sep, 05-20 Okt, 01-15 Nov 2026", Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"},
+
+		// Provider 3: Bogor Curug Explorer (Bogor & Cilember)
+		{ProviderID: pID3, Name: "Trip Curug Cilember", Destination: "Bogor, Jawa Barat", Category: "Curug", TripType: "Open Trip", Price: 275000, QuotaMin: 1, QuotaMax: 10, StartDate: todayStr, EndDate: todayStr, Schedule: sched2, Status: "Aktif", Rating: 4.6, Image: "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80"},
+		{ProviderID: pID3, Name: "Family Nature Retreat Cilember 2D1N", Destination: "Bogor, Jawa Barat", Category: "Curug", TripType: "Family", Price: 650000, QuotaMin: 3, QuotaMax: 12, StartDate: "2026-09-17", EndDate: "2026-11-30", Schedule: "Operasional: 17-30 Sep, 15-31 Okt, 10-25 Nov 2026", Status: "Aktif", Rating: 4.7, Image: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1200&q=80"},
+		{ProviderID: pID3, Name: "Corporate Team Building Bogor 2D1N", Destination: "Bogor, Jawa Barat", Category: "Wisata Budaya & Sejarah", TripType: "Corporate", Price: 680000, QuotaMin: 10, QuotaMax: 80, StartDate: "2026-09-18", EndDate: "2026-11-30", Schedule: "Operasional: 18-30 Sep, 01-31 Okt, 01-30 Nov 2026", Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80"},
+
+		// Provider 4: Bandung Juara Tour (Bandung)
+		{ProviderID: pID4, Name: "Bandung City Tour", Destination: "Bandung, Jawa Barat", Category: "City Tour", TripType: "Open Trip", Price: 420000, QuotaMin: 1, QuotaMax: 15, StartDate: todayStr, EndDate: todayStr, Schedule: sched2, Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=1200&q=80"},
+		{ProviderID: pID4, Name: "Corporate Gathering & Outbound Bandung", Destination: "Bandung, Jawa Barat", Category: "City Tour", TripType: "Corporate", Price: 750000, QuotaMin: 10, QuotaMax: 100, StartDate: "2026-09-25", EndDate: "2026-11-30", Schedule: "Operasional: 25-30 Sep, 15-30 Okt, 15-30 Nov 2026", Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=1200&q=80"},
+
+		// Provider 5: Jogja Istimewa Tour (Yogyakarta & Raja Ampat)
+		{ProviderID: pID8, Name: "Family Vacation Yogyakarta & Borobudur", Destination: "Yogyakarta, DI Yogyakarta", Category: "Wisata Budaya & Sejarah", TripType: "Family", Price: 850000, QuotaMin: 3, QuotaMax: 15, StartDate: "2026-09-17", EndDate: "2026-11-30", Schedule: "Bebas Pilih Tanggal (Ready 1 Bulan Full & 3 Bulan Kedepan)", Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?auto=format&fit=crop&w=1200&q=80"},
+		{ProviderID: pID8, Name: "Private Trip Wisata Raja Ampat 4D3N", Destination: "Papua Barat", Category: "Diving & Snorkeling", TripType: "Private Trip", Price: 3850000, QuotaMin: 1, QuotaMax: 8, StartDate: "2026-09-18", EndDate: "2026-11-30", Schedule: "Operasional: 18-28 Sep, 01-15 Okt, 10-28 Nov 2026", Status: "Aktif", Rating: 5.0, Image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80"},
 	}
 
 	for _, p := range packagesToEnsure {
 		var existing models.Package
 		if err := DB.Where("name = ?", p.Name).First(&existing).Error; err != nil {
-			p.ProviderID = pID
 			DB.Create(&p)
 		} else {
 			DB.Model(&existing).Updates(map[string]interface{}{
+				"provider_id": p.ProviderID,
 				"trip_type":   p.TripType,
 				"quota_min":   p.QuotaMin,
 				"price":       p.Price,

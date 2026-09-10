@@ -122,7 +122,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   },
   {
     id: 2,
-    providerId: 1,
+    providerId: 2,
     name: "Open Trip Pulau Tidung",
     destination: "Kepulauan Seribu, Jakarta",
     category: "Pantai",
@@ -139,7 +139,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   },
   {
     id: 3,
-    providerId: 1,
+    providerId: 3,
     name: "Trip Curug Cilember",
     destination: "Bogor, Jawa Barat",
     category: "Curug",
@@ -156,7 +156,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   },
   {
     id: 4,
-    providerId: 1,
+    providerId: 4,
     name: "Bandung City Tour",
     destination: "Bandung, Jawa Barat",
     category: "City Tour",
@@ -191,7 +191,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   },
   {
     id: 6,
-    providerId: 1,
+    providerId: 8,
     name: "Private Trip Wisata Raja Ampat 4D3N",
     destination: "Papua Barat",
     category: "Diving & Snorkeling",
@@ -227,7 +227,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   },
   {
     id: 8,
-    providerId: 1,
+    providerId: 2,
     name: "Honeymoon Island Sunset Tidung 3D2N",
     destination: "Kepulauan Seribu, Jakarta",
     category: "Pantai",
@@ -245,7 +245,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   },
   {
     id: 9,
-    providerId: 1,
+    providerId: 8,
     name: "Family Vacation Yogyakarta & Borobudur",
     destination: "Yogyakarta, DI Yogyakarta",
     category: "Wisata Budaya & Sejarah",
@@ -263,7 +263,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   },
   {
     id: 10,
-    providerId: 1,
+    providerId: 3,
     name: "Family Nature Retreat Cilember 2D1N",
     destination: "Bogor, Jawa Barat",
     category: "Curug",
@@ -281,7 +281,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   },
   {
     id: 11,
-    providerId: 1,
+    providerId: 4,
     name: "Corporate Gathering & Outbound Bandung",
     destination: "Bandung, Jawa Barat",
     category: "City Tour",
@@ -299,7 +299,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   },
   {
     id: 12,
-    providerId: 1,
+    providerId: 3,
     name: "Corporate Team Building Bogor 2D1N",
     destination: "Bogor, Jawa Barat",
     category: "Wisata Budaya & Sejarah",

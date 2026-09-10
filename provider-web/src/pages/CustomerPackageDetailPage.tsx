@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare } from 'lucide-react';
 import { API_BASE_URL } from '../utils/api';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
@@ -801,21 +801,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                     <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Diselenggarakan Oleh Mitra Provider
-                    </span>
-                    <span 
-                      style={{ 
-                        backgroundColor: '#dcfce7', 
-                        color: '#166534', 
-                        padding: '3px 10px', 
-                        borderRadius: '20px', 
-                        fontSize: '11px', 
-                        fontWeight: '700',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <ShieldCheck size={13} color="#166534" /> Terverifikasi Resmi
                     </span>
                   </div>
 

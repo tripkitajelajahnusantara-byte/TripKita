@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
-import { ArrowLeft, MapPin, ShieldCheck, Star, Package, MessageSquare, Phone, Award } from 'lucide-react';
+import { ArrowLeft, MapPin, Star, Package, MessageSquare, Award } from 'lucide-react';
 
 interface TripPackage {
   id: number;
@@ -133,8 +133,8 @@ export const ProviderPublicProfilePage: React.FC = () => {
       try {
         const allPkgs = await request('/public/packages');
         if (Array.isArray(allPkgs) && allPkgs.length > 0) {
-          const filtered = allPkgs.filter((p: TripPackage) => p.providerId === pId || pId === 1);
-          setPackages(filtered.length > 0 ? filtered : allPkgs.slice(0, 4));
+          const filtered = allPkgs.filter((p: TripPackage) => p.providerId === pId);
+          setPackages(filtered);
         }
       } catch (err) {
         console.error('Failed to load provider packages:', err);
@@ -249,23 +249,6 @@ export const ProviderPublicProfilePage: React.FC = () => {
                 <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
                   {providerInfo.businessName}
                 </h1>
-                {providerInfo.isVerified && (
-                  <span 
-                    style={{ 
-                      backgroundColor: '#dcfce7', 
-                      color: '#166534', 
-                      padding: '4px 10px', 
-                      borderRadius: '30px', 
-                      fontSize: '12px', 
-                      fontWeight: '700',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <ShieldCheck size={14} color="#166534" /> Terverifikasi Resmi
-                  </span>
-                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: '#64748b', marginBottom: '12px', flexWrap: 'wrap' }}>
@@ -281,30 +264,6 @@ export const ProviderPublicProfilePage: React.FC = () => {
               <p style={{ fontSize: '14px', color: '#475569', margin: '0 0 16px 0', lineHeight: '1.6' }}>
                 {providerInfo.description}
               </p>
-
-              {/* Direct Contact Button */}
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <a 
-                  href={`https://wa.me/${providerInfo.whatsApp.replace(/[^0-9]/g, '')}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    backgroundColor: '#10b981',
-                    color: '#ffffff',
-                    padding: '10px 20px',
-                    borderRadius: '10px',
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    textDecoration: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 12px rgba(16,185,129,0.2)'
-                  }}
-                >
-                  <Phone size={16} /> Hubungi via WhatsApp
-                </a>
-              </div>
             </div>
           </div>
 
