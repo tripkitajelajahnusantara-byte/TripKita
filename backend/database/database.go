@@ -777,6 +777,52 @@ func EnsureAllTestProvidersAndSeats() {
 	}
 	log.Println("[QA Prep] All 8 Provider test accounts verified and updated with password 'demo123'.")
 
+	todayStr := time.Now().Format("2006-01-02")
+	months := []string{"Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"}
+	now := time.Now()
+	sched3 := fmt.Sprintf("%d %s %d – %d %s %d (3 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 2).Day(), months[now.AddDate(0, 0, 2).Month()-1], now.AddDate(0, 0, 2).Year())
+	sched2 := fmt.Sprintf("%d %s %d – %d %s %d (2 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 1).Day(), months[now.AddDate(0, 0, 1).Month()-1], now.AddDate(0, 0, 1).Year())
+
+	var firstProvider models.Provider
+	DB.Where("role = ?", "PROVIDER").First(&firstProvider)
+	pID := firstProvider.ID
+	if pID == 0 {
+		pID = 1
+	}
+
+	packagesToEnsure := []models.Package{
+		{Name: "Open Trip Gunung Bromo", Destination: "Probolinggo, Jawa Timur", Category: "Gunung", TripType: "Open Trip", Price: 350000, QuotaMin: 1, QuotaMax: 15, StartDate: todayStr, EndDate: todayStr, Schedule: sched3, Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Open Trip Pulau Tidung", Destination: "Kepulauan Seribu, Jakarta", Category: "Pantai", TripType: "Open Trip", Price: 450000, QuotaMin: 1, QuotaMax: 12, StartDate: todayStr, EndDate: todayStr, Schedule: sched3, Status: "Aktif", Rating: 4.7, Image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Trip Curug Cilember", Destination: "Bogor, Jawa Barat", Category: "Curug", TripType: "Open Trip", Price: 275000, QuotaMin: 1, QuotaMax: 10, StartDate: todayStr, EndDate: todayStr, Schedule: sched2, Status: "Aktif", Rating: 4.6, Image: "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Bandung City Tour", Destination: "Bandung, Jawa Barat", Category: "City Tour", TripType: "Open Trip", Price: 420000, QuotaMin: 1, QuotaMax: 15, StartDate: todayStr, EndDate: todayStr, Schedule: sched2, Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Private Trip Bromo Sunrise & Savana", Destination: "Probolinggo, Jawa Timur", Category: "Gunung", TripType: "Private Trip", Price: 1250000, QuotaMin: 2, QuotaMax: 10, StartDate: todayStr, EndDate: todayStr, Schedule: "Fleksibel (Pilihan Customer)", Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Private Trip Wisata Raja Ampat 4D3N", Destination: "Papua Barat", Category: "Diving & Snorkeling", TripType: "Private Trip", Price: 3850000, QuotaMin: 2, QuotaMax: 8, StartDate: todayStr, EndDate: todayStr, Schedule: "Fleksibel (Pilihan Customer)", Status: "Aktif", Rating: 5.0, Image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Honeymoon Romantic Bali Villa 3D2N", Destination: "Bali", Category: "Pantai", TripType: "Honeymoon", Price: 2950000, QuotaMin: 2, QuotaMax: 2, StartDate: todayStr, EndDate: todayStr, Schedule: "Fleksibel (Pilihan Customer)", Status: "Aktif", Rating: 5.0, Image: "https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Honeymoon Island Sunset Tidung 3D2N", Destination: "Kepulauan Seribu, Jakarta", Category: "Pantai", TripType: "Honeymoon", Price: 1650000, QuotaMin: 2, QuotaMax: 2, StartDate: todayStr, EndDate: todayStr, Schedule: "Fleksibel (Pilihan Customer)", Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Family Vacation Yogyakarta & Borobudur", Destination: "Yogyakarta, DI Yogyakarta", Category: "Wisata Budaya & Sejarah", TripType: "Family", Price: 850000, QuotaMin: 3, QuotaMax: 15, StartDate: todayStr, EndDate: todayStr, Schedule: "Fleksibel (Pilihan Customer)", Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Family Nature Retreat Cilember 2D1N", Destination: "Bogor, Jawa Barat", Category: "Curug", TripType: "Family", Price: 650000, QuotaMin: 3, QuotaMax: 12, StartDate: todayStr, EndDate: todayStr, Schedule: "Fleksibel (Pilihan Customer)", Status: "Aktif", Rating: 4.7, Image: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Corporate Gathering & Outbound Bandung", Destination: "Bandung, Jawa Barat", Category: "City Tour", TripType: "Corporate", Price: 750000, QuotaMin: 10, QuotaMax: 100, StartDate: todayStr, EndDate: todayStr, Schedule: "Fleksibel (Pilihan Customer)", Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=1200&q=80"},
+		{Name: "Corporate Team Building Bogor 2D1N", Destination: "Bogor, Jawa Barat", Category: "Wisata Budaya & Sejarah", TripType: "Corporate", Price: 680000, QuotaMin: 10, QuotaMax: 80, StartDate: todayStr, EndDate: todayStr, Schedule: "Fleksibel (Pilihan Customer)", Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80"},
+	}
+
+	for _, p := range packagesToEnsure {
+		var existing models.Package
+		if err := DB.Where("name = ?", p.Name).First(&existing).Error; err != nil {
+			p.ProviderID = pID
+			DB.Create(&p)
+		} else {
+			DB.Model(&existing).Updates(map[string]interface{}{
+				"trip_type":   p.TripType,
+				"quota_min":   p.QuotaMin,
+				"price":       p.Price,
+				"category":    p.Category,
+				"destination": p.Destination,
+				"status":      "Aktif",
+				"image":       p.Image,
+			})
+		}
+	}
+
 	// Recalculate quota_used for each package based on active non-cancelled/non-expired bookings
 	err := DB.Exec(`
 		UPDATE packages p

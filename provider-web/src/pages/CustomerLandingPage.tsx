@@ -651,25 +651,32 @@ const DEFAULT_PACKAGES: TripPackage[] = [
           </div>
         ) : (
           <div>
-            {/* Trip Populer Section */}
-            <div style={{ marginBottom: '40px' }}>
+            {/* Trip Populer (Open Trip) Section */}
+            <div style={{ marginBottom: '45px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                  Trip Populer <span style={{ color: '#007bff' }}>✦</span>
-                </h2>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                    Trip Populer (Open Trip) <span style={{ color: '#007bff' }}>✦</span>
+                  </h2>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Paket wisata gabungan hemat & seru dengan jadwal teratur</span>
+                </div>
                 <span 
-                  onClick={() => navigateTo('cari-trip')}
+                  onClick={() => {
+                    setSearchParams({ destination: '', date: '', type: 'Open Trip', category: '' });
+                    navigateTo('cari-trip');
+                  }}
                   style={{ fontSize: '13px', color: '#007bff', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
                 >
                   Lihat semua <ChevronRight size={14} />
                 </span>
               </div>
 
-              {/* 4 Popular Packages */}
+              {/* 4 Open Trip Packages */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))', gap: '20px' }}>
-                {processedPackages.slice(0, 4).map((pkg) => {
+                {processedPackages.filter(p => p.tripType === 'Open Trip' || !p.tripType).slice(0, 4).map((pkg) => {
                   const badge = getBadgeColor(pkg.category);
                   const isFavorite = favorites.includes(pkg.id);
+                  const highlights = getHighlightsForPackage(pkg).slice(0, 3);
                   return (
                     <div 
                       key={pkg.id}
@@ -681,12 +688,15 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         border: '1px solid #e2e8f0',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
                       }}
                       className="trip-card"
                     >
                       {/* Image & Badges */}
-                      <div style={{ position: 'relative', height: '160px', overflow: 'hidden' }}>
+                      <div style={{ position: 'relative', height: '150px', overflow: 'hidden', flexShrink: 0 }}>
                         <img 
                           src={getImageUrl(pkg.id, pkg.name, pkg.category)} 
                           alt={pkg.name} 
@@ -733,40 +743,43 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                       </div>
 
                       {/* Content */}
-                      <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a', margin: 0, minHeight: '36px', lineHeight: '1.3' }}>
-                          {pkg.name}
-                        </h4>
-                        
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b' }}>
-                          <MapPin size={12} color="#94a3b8" />
-                          <span>{pkg.destination}</span>
+                      <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px', flexGrow: 1, justifyContent: 'space-between' }}>
+                        <div>
+                          <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a', margin: 0, minHeight: '36px', lineHeight: '1.3' }}>
+                            {pkg.name}
+                          </h4>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                            <MapPin size={12} color="#94a3b8" />
+                            <span>{pkg.destination}</span>
+                          </div>
+
+                          {/* 3 Key Highlights - Vertical Clean Soft Blue Pills (Exactly 3, Never Cut Off) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', minHeight: '72px' }}>
+                            {highlights.map((hl, hIdx) => (
+                              <div 
+                                key={hIdx} 
+                                style={{ 
+                                  fontSize: '10px', 
+                                  fontWeight: '600', 
+                                  color: '#0284c7', 
+                                  backgroundColor: '#e0f2fe', 
+                                  padding: '3px 8px', 
+                                  borderRadius: '5px',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  maxWidth: '100%',
+                                  boxSizing: 'border-box'
+                                }}
+                              >
+                                {hl}
+                              </div>
+                            ))}
+                          </div>
                         </div>
 
-                        {/* 3 Key Highlights - Elegant 1-Line Bullet List */}
-                        <div 
-                          style={{ 
-                            fontSize: '11px', 
-                            color: '#475569', 
-                            fontWeight: '500', 
-                            marginTop: '2px', 
-                            whiteSpace: 'nowrap', 
-                            overflow: 'hidden', 
-                            textOverflow: 'ellipsis',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                        >
-                          {getHighlightsForPackage(pkg).slice(0, 3).map((hl, hIdx) => (
-                            <React.Fragment key={hIdx}>
-                              {hIdx > 0 && <span style={{ color: '#cbd5e1', fontWeight: 'bold' }}>•</span>}
-                              <span style={{ color: '#0f172a', fontWeight: '600', fontSize: '10.5px' }}>{hl}</span>
-                            </React.Fragment>
-                          ))}
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#f59e0b', fontWeight: '700' }}>
                             <Star size={12} fill="#f59e0b" color="#f59e0b" />
                             <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : '4.8'}</span>
@@ -784,25 +797,31 @@ const DEFAULT_PACKAGES: TripPackage[] = [
               </div>
             </div>
 
-            {/* Rekomendasi Untuk Kamu Section */}
-            <div style={{ marginBottom: '50px' }}>
+            {/* Private Trip & Honeymoon Section */}
+            <div style={{ marginBottom: '45px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                  Rekomendasi untuk kamu
-                </h2>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                    Private Trip & Honeymoon Spesial <span style={{ color: '#e11d48' }}>🌹</span>
+                  </h2>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Jadwal bebas pilih customer (Min 2 Orang) • Fasilitas eksklusif & privat</span>
+                </div>
                 <span 
-                  onClick={() => navigateTo('cari-trip')}
+                  onClick={() => {
+                    setSearchParams({ destination: '', date: '', type: 'Private Trip', category: '' });
+                    navigateTo('cari-trip');
+                  }}
                   style={{ fontSize: '13px', color: '#007bff', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
                 >
                   Lihat semua <ChevronRight size={14} />
                 </span>
               </div>
 
-              {/* 4 Recommended Packages */}
+              {/* 4 Private & Honeymoon Packages */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))', gap: '20px' }}>
-                {processedPackages.slice(4, 8).map((pkg) => {
-                  const badge = getBadgeColor(pkg.category);
+                {processedPackages.filter(p => p.tripType === 'Private Trip' || p.tripType === 'Honeymoon').slice(0, 4).map((pkg) => {
                   const isFavorite = favorites.includes(pkg.id);
+                  const highlights = getHighlightsForPackage(pkg).slice(0, 3);
                   return (
                     <div 
                       key={pkg.id}
@@ -814,12 +833,15 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         border: '1px solid #e2e8f0',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
                       }}
                       className="trip-card"
                     >
                       {/* Image & Badges */}
-                      <div style={{ position: 'relative', height: '160px', overflow: 'hidden' }}>
+                      <div style={{ position: 'relative', height: '150px', overflow: 'hidden', flexShrink: 0 }}>
                         <img 
                           src={getImageUrl(pkg.id, pkg.name, pkg.category)} 
                           alt={pkg.name} 
@@ -853,53 +875,204 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                             position: 'absolute', 
                             bottom: '10px', 
                             left: '10px', 
-                            backgroundColor: badge.bg, 
-                            color: badge.text, 
+                            backgroundColor: pkg.tripType === 'Honeymoon' ? '#e11d48' : '#0284c7', 
+                            color: '#ffffff', 
                             padding: '3px 8px', 
                             borderRadius: '6px', 
                             fontSize: '10px', 
                             fontWeight: '700' 
                           }}
                         >
-                          {pkg.tripType ? `${pkg.tripType} • ${pkg.category}` : pkg.category}
+                          {pkg.tripType} • Min {pkg.quotaMin || 2} Orang
                         </span>
                       </div>
 
                       {/* Content */}
-                      <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a', margin: 0, minHeight: '36px', lineHeight: '1.3' }}>
-                          {pkg.name}
-                        </h4>
-                        
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b' }}>
-                          <MapPin size={12} color="#94a3b8" />
-                          <span>{pkg.destination}</span>
+                      <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px', flexGrow: 1, justifyContent: 'space-between' }}>
+                        <div>
+                          <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a', margin: 0, minHeight: '36px', lineHeight: '1.3' }}>
+                            {pkg.name}
+                          </h4>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                            <MapPin size={12} color="#94a3b8" />
+                            <span>{pkg.destination}</span>
+                          </div>
+
+                          {/* 3 Key Highlights - Vertical Clean Soft Blue Pills (Exactly 3, Never Cut Off) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', minHeight: '72px' }}>
+                            {highlights.map((hl, hIdx) => (
+                              <div 
+                                key={hIdx} 
+                                style={{ 
+                                  fontSize: '10px', 
+                                  fontWeight: '600', 
+                                  color: pkg.tripType === 'Honeymoon' ? '#be123c' : '#0284c7', 
+                                  backgroundColor: pkg.tripType === 'Honeymoon' ? '#ffe4e6' : '#e0f2fe', 
+                                  padding: '3px 8px', 
+                                  borderRadius: '5px',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  maxWidth: '100%',
+                                  boxSizing: 'border-box'
+                                }}
+                              >
+                                {hl}
+                              </div>
+                            ))}
+                          </div>
                         </div>
 
-                        {/* 3 Key Highlights Chips */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
-                          {getHighlightsForPackage(pkg).map((hl, hIdx) => (
-                            <span 
-                              key={hIdx} 
-                              style={{ 
-                                fontSize: '9.5px', 
-                                fontWeight: '600', 
-                                color: '#0369a1', 
-                                backgroundColor: '#e0f2fe', 
-                                padding: '2px 6px', 
-                                borderRadius: '4px',
-                                whiteSpace: 'nowrap' 
-                              }}
-                            >
-                              {hl}
-                            </span>
-                          ))}
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#f59e0b', fontWeight: '700' }}>
                             <Star size={12} fill="#f59e0b" color="#f59e0b" />
-                            <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : '4.7'}</span>
+                            <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : '5.0'}</span>
+                            <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>({getReviewCount(pkg.id)})</span>
+                          </div>
+
+                          <span style={{ fontSize: '13px', fontWeight: '800', color: '#007bff' }}>
+                            {formatIDR(pkg.price)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Family & Corporate Trip Section */}
+            <div style={{ marginBottom: '50px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                    Family & Corporate Gathering <span style={{ color: '#059669' }}>🏢</span>
+                  </h2>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Family (Min 3 orang) • Corporate Gathering (Min 10 orang) • Tanggal Bebas Pilih</span>
+                </div>
+                <span 
+                  onClick={() => {
+                    setSearchParams({ destination: '', date: '', type: 'Corporate', category: '' });
+                    navigateTo('cari-trip');
+                  }}
+                  style={{ fontSize: '13px', color: '#007bff', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
+                >
+                  Lihat semua <ChevronRight size={14} />
+                </span>
+              </div>
+
+              {/* 4 Family & Corporate Packages */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))', gap: '20px' }}>
+                {processedPackages.filter(p => p.tripType === 'Family' || p.tripType === 'Corporate').slice(0, 4).map((pkg) => {
+                  const isFavorite = favorites.includes(pkg.id);
+                  const highlights = getHighlightsForPackage(pkg).slice(0, 3);
+                  return (
+                    <div 
+                      key={pkg.id}
+                      onClick={() => handleSelectPackage(pkg)}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: '14px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
+                      }}
+                      className="trip-card"
+                    >
+                      {/* Image & Badges */}
+                      <div style={{ position: 'relative', height: '150px', overflow: 'hidden', flexShrink: 0 }}>
+                        <img 
+                          src={getImageUrl(pkg.id, pkg.name, pkg.category)} 
+                          alt={pkg.name} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80';
+                          }}
+                        />
+                        <button 
+                          onClick={(e) => toggleFavorite(e, pkg.id)}
+                          style={{ 
+                            position: 'absolute', 
+                            top: '10px', 
+                            right: '10px', 
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)', 
+                            border: 'none', 
+                            borderRadius: '50%', 
+                            width: '28px', 
+                            height: '28px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}
+                        >
+                          <Heart size={14} fill={isFavorite ? '#ef4444' : 'none'} color={isFavorite ? '#ef4444' : '#64748b'} />
+                        </button>
+                        <span 
+                          style={{ 
+                            position: 'absolute', 
+                            bottom: '10px', 
+                            left: '10px', 
+                            backgroundColor: pkg.tripType === 'Corporate' ? '#059669' : '#d97706', 
+                            color: '#ffffff', 
+                            padding: '3px 8px', 
+                            borderRadius: '6px', 
+                            fontSize: '10px', 
+                            fontWeight: '700' 
+                          }}
+                        >
+                          {pkg.tripType} • Min {pkg.quotaMin} Orang
+                        </span>
+                      </div>
+
+                      {/* Content */}
+                      <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px', flexGrow: 1, justifyContent: 'space-between' }}>
+                        <div>
+                          <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a', margin: 0, minHeight: '36px', lineHeight: '1.3' }}>
+                            {pkg.name}
+                          </h4>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                            <MapPin size={12} color="#94a3b8" />
+                            <span>{pkg.destination}</span>
+                          </div>
+
+                          {/* 3 Key Highlights - Vertical Clean Soft Blue/Green Pills (Exactly 3, Never Cut Off) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', minHeight: '72px' }}>
+                            {highlights.map((hl, hIdx) => (
+                              <div 
+                                key={hIdx} 
+                                style={{ 
+                                  fontSize: '10px', 
+                                  fontWeight: '600', 
+                                  color: pkg.tripType === 'Corporate' ? '#047857' : '#b45309', 
+                                  backgroundColor: pkg.tripType === 'Corporate' ? '#d1fae5' : '#fef3c7', 
+                                  padding: '3px 8px', 
+                                  borderRadius: '5px',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  maxWidth: '100%',
+                                  boxSizing: 'border-box'
+                                }}
+                              >
+                                {hl}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#f59e0b', fontWeight: '700' }}>
+                            <Star size={12} fill="#f59e0b" color="#f59e0b" />
+                            <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : '4.9'}</span>
                             <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>({getReviewCount(pkg.id)})</span>
                           </div>
 

@@ -296,26 +296,31 @@ export const CustomerSearchPage: React.FC = () => {
                         <span>{pkg.destination}</span>
                       </div>
 
-                      {/* 3 Key Highlights - Elegant 1-Line Bullet List */}
+                      {/* 3 Key Highlights - Soft Blue Badges */}
                       <div 
                         style={{ 
-                          fontSize: '12px', 
-                          color: '#475569', 
-                          fontWeight: '500', 
-                          marginBottom: '10px', 
-                          whiteSpace: 'nowrap', 
-                          overflow: 'hidden', 
-                          textOverflow: 'ellipsis',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px'
+                          gap: '6px',
+                          marginBottom: '10px',
+                          flexWrap: 'wrap'
                         }}
                       >
                         {getHighlightsForPackage(pkg).slice(0, 3).map((hl, hIdx) => (
-                          <React.Fragment key={hIdx}>
-                            {hIdx > 0 && <span style={{ color: '#cbd5e1', fontWeight: 'bold' }}>•</span>}
-                            <span style={{ color: '#0f172a', fontWeight: '600', fontSize: '11.5px' }}>{hl}</span>
-                          </React.Fragment>
+                          <span 
+                            key={hIdx}
+                            style={{ 
+                              fontSize: '11px', 
+                              fontWeight: '600', 
+                              color: '#0284c7',
+                              backgroundColor: '#e0f2fe',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {hl}
+                          </span>
                         ))}
                       </div>
 
