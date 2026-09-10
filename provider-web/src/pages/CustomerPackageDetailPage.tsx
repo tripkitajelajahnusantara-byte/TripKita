@@ -51,26 +51,34 @@ export const CustomerPackageDetailPage: React.FC = () => {
   }
 
   const pkg = selectedPackageForDetail;
+  const customDateInputRef = React.useRef<HTMLInputElement>(null);
+
+  const formatDateIndoFull = (dateStr: string) => {
+    if (!dateStr) return 'Pilih Tanggal';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  };
+
+  const getTodayIsoStr = () => {
+    const d = new Date();
+    return d.toISOString().split('T')[0];
+  };
 
   const minRequiredGuests = pkg.quotaMin || (
-    pkg.tripType === 'Honeymoon' || pkg.tripType === 'Private Trip' ? 2 :
+    pkg.tripType === 'Honeymoon' ? 2 :
+    pkg.tripType === 'Private Trip' ? 1 :
     pkg.tripType === 'Family' ? 3 :
     pkg.tripType === 'Corporate' ? 10 : 1
   );
 
   const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
-
-  const getH7MinDateIso = () => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().split('T')[0];
-  };
-
-  const h7MinDateStr = getH7MinDateIso();
+  const todayMinDateStr = getTodayIsoStr();
 
   const [guestsCount, setGuestsCount] = useState(Math.max(minRequiredGuests, 1));
   const [customSelectedDate, setCustomSelectedDate] = useState<string>(
-    pkg.bookingDate && pkg.bookingDate >= h7MinDateStr ? pkg.bookingDate : h7MinDateStr
+    pkg.bookingDate && pkg.bookingDate >= todayMinDateStr ? pkg.bookingDate : todayMinDateStr
   );
 
   useEffect(() => {
@@ -905,32 +913,61 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     Pilih Tanggal ({pkg.tripType})
                   </label>
                   <span style={{ fontSize: '11px', color: '#007bff', fontWeight: '700', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px' }}>
-                    Min. H-7
+                    Bebas Pilih
                   </span>
                 </div>
                 
-                <input
-                  type="date"
-                  min={h7MinDateStr}
-                  max={pkg.endDate || undefined}
-                  value={customSelectedDate}
-                  onChange={(e) => setCustomSelectedDate(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #007bff',
-                    fontSize: '13.5px',
-                    fontWeight: '700',
-                    color: '#0f172a',
-                    backgroundColor: '#ffffff',
-                    outline: 'none',
-                    cursor: 'pointer',
-                    boxSizing: 'border-box'
+                <div 
+                  onClick={() => {
+                    if (customDateInputRef.current) {
+                      if (typeof customDateInputRef.current.showPicker === 'function') {
+                        customDateInputRef.current.showPicker();
+                      } else {
+                        customDateInputRef.current.focus();
+                      }
+                    }
                   }}
-                />
+                  style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
+                >
+                  <div
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #007bff',
+                      fontSize: '13.5px',
+                      fontWeight: '700',
+                      color: '#0f172a',
+                      backgroundColor: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span>{formatDateIndoFull(customSelectedDate)}</span>
+                    <Calendar size={18} color="#007bff" />
+                  </div>
+                  <input 
+                    ref={customDateInputRef}
+                    type="date" 
+                    min={todayMinDateStr}
+                    max={pkg.endDate || undefined}
+                    value={customSelectedDate}
+                    onChange={(e) => setCustomSelectedDate(e.target.value)}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0,
+                      cursor: 'pointer'
+                    }}
+                  />
+                </div>
                 <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '6px', fontWeight: '500', lineHeight: '1.4' }}>
-                  💡 Pilihan tanggal bebas untuk {pkg.tripType}. Pemesanan dibuka paling cepat H-7 (Mulai: {h7MinDateStr}).
+                  💡 Pilihan tanggal bebas untuk {pkg.tripType}. Klik untuk memilih tanggal keberangkatan Anda.
                 </span>
               </div>
             )}
