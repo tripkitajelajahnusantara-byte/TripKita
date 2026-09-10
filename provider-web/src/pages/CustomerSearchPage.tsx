@@ -23,6 +23,7 @@ interface TripPackage {
   description?: string;
   image?: string;
   images?: string;
+  highlights?: string[];
 }
 
 const getTodayIsoDate = () => {

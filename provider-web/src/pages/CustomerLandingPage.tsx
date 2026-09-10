@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
-import { getTripImage, OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
+import { getTripImage, getHighlightsForPackage, OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
 import { Search, ShieldCheck, CreditCard, Headset, ThumbsUp, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight } from 'lucide-react';
 
 import heroImage from '../assets/hero.jpg';
@@ -22,6 +22,10 @@ interface TripPackage {
   schedule: string;
   status: string;
   rating: number;
+  description?: string;
+  image?: string;
+  images?: string;
+  highlights?: string[];
 }
 
 // 38 Provinsi Indonesia (Ported 100% from customer-mobile/lib/screens/home_screen.dart)
