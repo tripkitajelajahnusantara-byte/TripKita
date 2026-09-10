@@ -61,10 +61,13 @@ export const CustomerPackageDetailPage: React.FC = () => {
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  const getTodayIsoStr = () => {
+  const getH7MinDateIso = () => {
     const d = new Date();
+    d.setDate(d.getDate() + 7);
     return d.toISOString().split('T')[0];
   };
+
+  const h7MinDateStr = getH7MinDateIso();
 
   const minRequiredGuests = pkg.quotaMin || (
     pkg.tripType === 'Honeymoon' ? 2 :
@@ -74,12 +77,27 @@ export const CustomerPackageDetailPage: React.FC = () => {
   );
 
   const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
-  const todayMinDateStr = getTodayIsoStr();
 
   const [guestsCount, setGuestsCount] = useState(Math.max(minRequiredGuests, 1));
   const [customSelectedDate, setCustomSelectedDate] = useState<string>(
-    pkg.bookingDate && pkg.bookingDate >= todayMinDateStr ? pkg.bookingDate : todayMinDateStr
+    pkg.bookingDate && pkg.bookingDate >= h7MinDateStr ? pkg.bookingDate : h7MinDateStr
   );
+
+  // Booked / Occupied dates per package for database & availability testing
+  const bookedDatesMap: { [key: number]: string[] } = {
+    1: ['2026-09-22', '2026-09-25'],
+    5: ['2026-09-22', '2026-10-15'],
+    6: ['2026-09-25', '2026-10-12'],
+    7: ['2026-09-20', '2026-10-14'],
+    8: ['2026-09-24', '2026-10-08'],
+    9: ['2026-09-22', '2026-09-25', '2026-10-12'], // Family Jogja (Ready 1 Bulan Full, with 3 booked dates for DB testing)
+    10: ['2026-09-26', '2026-10-18'],
+    11: ['2026-09-28', '2026-10-22'],
+    12: ['2026-09-21', '2026-10-16']
+  };
+
+  const currentPkgBookedDates = bookedDatesMap[pkg.id] || ['2026-09-22', '2026-09-25'];
+  const isDateBooked = currentPkgBookedDates.includes(customSelectedDate);
 
   useEffect(() => {
     if (guestsCount < minRequiredGuests) {
@@ -375,6 +393,14 @@ export const CustomerPackageDetailPage: React.FC = () => {
     }
     if (guestsCount < minRequiredGuests) {
       alert(`⚠️ Minimal pemesanan untuk paket ${pkg.tripType || 'ini'} adalah ${minRequiredGuests} orang.`);
+      return;
+    }
+    if (isDateBooked) {
+      alert(`❌ Tanggal ${formatDateIndoFull(customSelectedDate)} sudah TERBOOKING oleh pemesan lain. Silakan pilih tanggal lain yang tersedia.`);
+      return;
+    }
+    if (customSelectedDate < h7MinDateStr) {
+      alert(`⚠️ Pemesanan paket ${pkg.tripType || 'ini'} wajib H-7 sebelum keberangkatan. Tanggal paling awal yang dapat dipesan adalah ${formatDateIndoFull(h7MinDateStr)}.`);
       return;
     }
     const finalBookingDate = isOpenTrip ? selectedScheduleDate : customSelectedDate;
@@ -1048,7 +1074,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     Pilih Tanggal ({pkg.tripType})
                   </label>
                   <span style={{ fontSize: '11px', color: '#007bff', fontWeight: '700', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px' }}>
-                    Bebas Pilih
+                    Min. H-7
                   </span>
                 </div>
                 
@@ -1069,10 +1095,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
                       width: '100%',
                       padding: '10px 12px',
                       borderRadius: '8px',
-                      border: '1.5px solid #007bff',
+                      border: isDateBooked ? '1.5px solid #ef4444' : '1.5px solid #007bff',
                       fontSize: '13.5px',
                       fontWeight: '700',
-                      color: '#0f172a',
+                      color: isDateBooked ? '#ef4444' : '#0f172a',
                       backgroundColor: '#ffffff',
                       display: 'flex',
                       alignItems: 'center',
@@ -1080,13 +1106,13 @@ export const CustomerPackageDetailPage: React.FC = () => {
                       boxSizing: 'border-box'
                     }}
                   >
-                    <span>{formatDateIndoFull(customSelectedDate)}</span>
-                    <Calendar size={18} color="#007bff" />
+                    <span>{formatDateIndoFull(customSelectedDate)} {isDateBooked ? '❌ (TERBOOKING)' : ''}</span>
+                    <Calendar size={18} color={isDateBooked ? '#ef4444' : '#007bff'} />
                   </div>
                   <input 
                     ref={customDateInputRef}
                     type="date" 
-                    min={todayMinDateStr}
+                    min={h7MinDateStr}
                     max={pkg.endDate || undefined}
                     value={customSelectedDate}
                     onChange={(e) => setCustomSelectedDate(e.target.value)}
@@ -1101,9 +1127,16 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     }}
                   />
                 </div>
-                <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '6px', fontWeight: '500', lineHeight: '1.4' }}>
-                  💡 Pilihan tanggal bebas untuk {pkg.tripType}. Klik untuk memilih tanggal keberangkatan Anda.
-                </span>
+
+                {isDateBooked ? (
+                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '8px', lineHeight: '1.4' }}>
+                    ❌ Tanggal <strong>{formatDateIndoFull(customSelectedDate)}</strong> sudah TERBOOKING oleh pelanggan lain (TIDAK TERSEDIA). Silakan pilih tanggal lain.
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '6px', fontWeight: '500', lineHeight: '1.4' }}>
+                    💡 <strong>Jadwal Operasional:</strong> {pkg.schedule || 'Siap melayani 3 bulan kedepan'}. Pemesanan H-7 (Mulai: {formatDateIndoFull(h7MinDateStr)}). Tanggal lewat / terbooking tidak dapat dipesan.
+                  </span>
+                )}
               </div>
             )}
 
