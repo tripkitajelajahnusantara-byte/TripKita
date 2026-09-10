@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,6 +22,33 @@ import (
 type OAuthController struct {
 	db  *gorm.DB
 	cfg *config.Config
+}
+
+func parseGoogleIDToken(idToken string) (string, string) {
+	if idToken == "" {
+		return "", ""
+	}
+	parts := strings.Split(idToken, ".")
+	if len(parts) < 2 {
+		return "", ""
+	}
+	payloadSegment := parts[1]
+	if l := len(payloadSegment) % 4; l > 0 {
+		payloadSegment += strings.Repeat("=", 4-l)
+	}
+	decoded, err := base64.URLEncoding.DecodeString(payloadSegment)
+	if err != nil {
+		decoded, err = base64.StdEncoding.DecodeString(payloadSegment)
+		if err != nil {
+			return "", ""
+		}
+	}
+	var claims struct {
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	}
+	_ = json.Unmarshal(decoded, &claims)
+	return claims.Email, claims.Name
 }
 
 func NewOAuthController(db *gorm.DB, cfg *config.Config) *OAuthController {
@@ -82,7 +110,7 @@ func (ctrl *OAuthController) RedirectToGoogle(c *gin.Context) {
 	v.Set("client_id", ctrl.cfg.GoogleClientID)
 	v.Set("redirect_uri", ctrl.cfg.GoogleRedirectURI)
 	v.Set("response_type", "code")
-	v.Set("scope", "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile")
+	v.Set("scope", "openid email profile")
 	v.Set("state", authType)
 	v.Set("prompt", "select_account")
 
@@ -128,46 +156,55 @@ func (ctrl *OAuthController) GoogleCallback(c *gin.Context) {
 
 	var tokenResponse struct {
 		AccessToken string `json:"access_token"`
+		IDToken     string `json:"id_token"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse token response"})
 		return
 	}
 
-	// 2. Fetch UserInfo from Google
-	userInfoURL := "https://www.googleapis.com/oauth2/v2/userinfo"
-	req, err := http.NewRequest("GET", userInfoURL, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request for user info"})
-		return
-	}
-	req.Header.Set("Authorization", "Bearer "+tokenResponse.AccessToken)
-
-	client := &http.Client{}
-	userResp, err := client.Do(req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to request user info: " + err.Error()})
-		return
-	}
-	defer userResp.Body.Close()
-
-	if userResp.StatusCode != http.StatusOK {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to fetch user info: status %d", userResp.StatusCode)})
-		return
+	// 2. Retrieve user info from id_token or fallback to Google v3 UserInfo endpoint
+	var userEmail, userName string
+	if tokenResponse.IDToken != "" {
+		userEmail, userName = parseGoogleIDToken(tokenResponse.IDToken)
 	}
 
-	var googleProfile struct {
-		Email string `json:"email"`
-		Name  string `json:"name"`
+	if userEmail == "" && tokenResponse.AccessToken != "" {
+		userInfoURL := "https://www.googleapis.com/oauth2/v3/userinfo"
+		req, err := http.NewRequest("GET", userInfoURL, nil)
+		if err == nil {
+			req.Header.Set("Authorization", "Bearer "+tokenResponse.AccessToken)
+			client := &http.Client{Timeout: 10 * time.Second}
+			userResp, err := client.Do(req)
+			if err == nil {
+				defer userResp.Body.Close()
+				if userResp.StatusCode == http.StatusOK {
+					var googleProfile struct {
+						Email string `json:"email"`
+						Name  string `json:"name"`
+					}
+					if err := json.NewDecoder(userResp.Body).Decode(&googleProfile); err == nil {
+						userEmail = googleProfile.Email
+						if userName == "" {
+							userName = googleProfile.Name
+						}
+					}
+				}
+			}
+		}
 	}
-	if err := json.NewDecoder(userResp.Body).Decode(&googleProfile); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse Google user profile"})
+
+	if userEmail == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Google authentication did not return a valid user email address"})
 		return
 	}
 
-	if googleProfile.Email == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Google profile did not contain an email address"})
-		return
+	googleProfile := struct {
+		Email string
+		Name  string
+	}{
+		Email: userEmail,
+		Name:  userName,
 	}
 
 	// 3. Find or register provider/customer by email
