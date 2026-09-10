@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare, ShieldCheck } from 'lucide-react';
 import { API_BASE_URL } from '../utils/api';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
@@ -12,7 +12,7 @@ interface AddOn {
 }
 
 export const CustomerPackageDetailPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, setSelectedPackageForDetail } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, setSelectedPackageForDetail, setSelectedProviderId } = useNavigation();
 
   // Photo Lightbox Modal State
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -741,6 +741,141 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 })}
               </div>
             </div>
+
+            {/* Profil Provider Penyelenggara Section */}
+            {(() => {
+              const pId = pkg.providerId || 1;
+              const providerNames: { [key: number]: string } = {
+                1: 'Wisata Bromo Nusantara',
+                2: 'Tidung Paradise Tour',
+                3: 'Bogor Curug Explorer',
+                4: 'Bandung Juara Tour',
+                8: 'Jogja Istimewa Tour',
+              };
+              const providerCities: { [key: number]: string } = {
+                1: 'Probolinggo, Jawa Timur',
+                2: 'Kepulauan Seribu, Jakarta',
+                3: 'Bogor, Jawa Barat',
+                4: 'Bandung, Jawa Barat',
+                8: 'Yogyakarta, DI Yogyakarta',
+              };
+              const currentProviderName = providerNames[pId] || 'Wisata Bromo Nusantara';
+              const currentProviderCity = providerCities[pId] || 'Indonesia';
+
+              return (
+                <div 
+                  style={{ 
+                    backgroundColor: '#ffffff', 
+                    borderRadius: '16px', 
+                    padding: '24px', 
+                    border: '1.5px solid #e2e8f0',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Diselenggarakan Oleh Mitra Provider
+                    </span>
+                    <span 
+                      style={{ 
+                        backgroundColor: '#dcfce7', 
+                        color: '#166534', 
+                        padding: '3px 10px', 
+                        borderRadius: '20px', 
+                        fontSize: '11px', 
+                        fontWeight: '700',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <ShieldCheck size={13} color="#166534" /> Terverifikasi Resmi
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    {/* Logo Avatar */}
+                    <div 
+                      onClick={() => {
+                        if (setSelectedProviderId) setSelectedProviderId(pId);
+                        navigateTo('provider-public-profile');
+                      }}
+                      style={{ 
+                        width: '56px', 
+                        height: '56px', 
+                        borderRadius: '14px', 
+                        backgroundColor: '#007bff', 
+                        color: '#ffffff', 
+                        fontWeight: '900', 
+                        fontSize: '22px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        cursor: 'pointer',
+                        flexShrink: 0
+                      }}
+                    >
+                      {currentProviderName.charAt(0)}
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: '1 1 200px' }}>
+                      <h3 
+                        onClick={() => {
+                          if (setSelectedProviderId) setSelectedProviderId(pId);
+                          navigateTo('provider-public-profile');
+                        }}
+                        style={{ 
+                          fontSize: '16px', 
+                          fontWeight: '800', 
+                          color: '#0f172a', 
+                          margin: '0 0 4px 0', 
+                          cursor: 'pointer',
+                          display: 'inline-block' 
+                        }}
+                      >
+                        {currentProviderName}
+                      </h3>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#64748b', flexWrap: 'wrap' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <MapPin size={13} color="#007bff" /> {currentProviderCity}
+                        </span>
+                        <span>•</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: '700' }}>
+                          <Star size={13} fill="#f59e0b" color="#f59e0b" /> 4.9 / 5.0 (120 Ulasan)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* View Profile Action Button */}
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        if (setSelectedProviderId) setSelectedProviderId(pId);
+                        navigateTo('provider-public-profile');
+                      }}
+                      style={{
+                        backgroundColor: '#f0f7ff',
+                        color: '#007bff',
+                        border: '1px solid #bfdbfe',
+                        padding: '10px 18px',
+                        borderRadius: '10px',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      Lihat Profil & Paket <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Ulasan & Rating Pengunjung Section (Paged) */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>

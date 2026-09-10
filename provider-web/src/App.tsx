@@ -24,6 +24,7 @@ import { CustomerConfirmationPage } from './pages/CustomerConfirmationPage';
 import { CustomerPaymentInvoicePage } from './pages/CustomerPaymentInvoicePage';
 import { CustomerXenditCheckoutPage } from './pages/CustomerXenditCheckoutPage';
 import { ProviderFinancePage } from './pages/ProviderFinancePage';
+import { ProviderPublicProfilePage } from './pages/ProviderPublicProfilePage';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from './components/LegalModals';
 
 const AppContent: React.FC = () => {
@@ -149,6 +150,16 @@ const AppContent: React.FC = () => {
       <div className="app-wrapper">
         <Header />
         <CustomerPackageDetailPage />
+        <Footer />
+        {renderGlobalTermsModal()}
+      </div>
+    );
+  }
+  if (route === 'provider-public-profile') {
+    return (
+      <div className="app-wrapper">
+        <Header />
+        <ProviderPublicProfilePage />
         <Footer />
         {renderGlobalTermsModal()}
       </div>

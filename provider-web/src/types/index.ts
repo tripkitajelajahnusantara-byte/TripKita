@@ -22,6 +22,7 @@ export type Route =
   | 'customer-confirmation'
   | 'halaman-pembayaran'
   | 'xendit-checkout'
+  | 'provider-public-profile'
   | 'admin-login';
 
 export interface Booking {

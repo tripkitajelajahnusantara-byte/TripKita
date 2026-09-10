@@ -33,6 +33,7 @@ export function getRouteFromHash(): Route {
   if (hash.includes('/partner-landing')) return 'partner-landing';
   if (hash.includes('/tentang-kami')) return 'tentang-kami';
   if (hash.includes('/bantuan')) return 'bantuan';
+  if (hash.includes('/provider-profile')) return 'provider-public-profile';
   if (hash.includes('/customer-register') || hash.includes('/daftar')) return 'customer-register';
   if (hash.includes('/masuk')) return 'masuk';
 
@@ -61,6 +62,7 @@ export function getHashFromRoute(r: Route): string {
     case 'partner-landing': return '#/partner-landing';
     case 'tentang-kami': return '#/tentang-kami';
     case 'bantuan': return '#/bantuan';
+    case 'provider-public-profile': return '#/provider-profile';
     case 'customer-register': return '#/customer-register';
     case 'masuk': return '#/masuk';
     default: return '#/';
@@ -174,6 +176,8 @@ interface NavigationContextType {
   setEditingPackageId: (id: string | null) => void;
   selectedPackageForDetail: any;
   setSelectedPackageForDetail: (pkg: any) => void;
+  selectedProviderId: number | null;
+  setSelectedProviderId: (id: number | null) => void;
   selectedBookingForInvoice: any;
   setSelectedBookingForInvoice: (booking: any) => void;
   searchParams: { destination: string; date: string; type: string; category: string };
@@ -205,6 +209,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
   const [selectedPackageForDetail, setSelectedPackageForDetail] = useState<any>(null);
+  const [selectedProviderId, setSelectedProviderId] = useState<number | null>(1);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<any>(null);
 
   const [searchParams, setSearchParams] = useState({
@@ -516,6 +521,8 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
         setEditingPackageId,
         selectedPackageForDetail,
         setSelectedPackageForDetail,
+        selectedProviderId,
+        setSelectedProviderId,
         selectedBookingForInvoice,
         setSelectedBookingForInvoice,
         searchParams,
