@@ -236,38 +236,38 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 
 	// 2. Data Legal & Rekening updates (Pending approval workflow)
 	legalChanged := false
-	if req.NPWP != "" && req.NPWP != provider.NPWP {
+	if req.NPWP != "" && (req.NPWP != provider.NPWP || req.NPWP != provider.PendingNPWP || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
 		legalChanged = true
 	}
-	if req.BankName != "" && req.BankName != provider.BankName {
+	if req.BankName != "" && (req.BankName != provider.BankName || req.BankName != provider.PendingBankName || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
 		legalChanged = true
 	}
-	if req.BankAccount != "" && req.BankAccount != provider.BankAccount {
+	if req.BankAccount != "" && (req.BankAccount != provider.BankAccount || req.BankAccount != provider.PendingBankAccount || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
 		legalChanged = true
 	}
-	if req.BankAccountName != "" && req.BankAccountName != provider.BankAccountName {
+	if req.BankAccountName != "" && (req.BankAccountName != provider.BankAccountName || req.BankAccountName != provider.PendingBankAccountName || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
 		legalChanged = true
 	}
 
 	if legalChanged {
 		if req.NPWP != "" {
 			provider.PendingNPWP = req.NPWP
-		} else {
+		} else if provider.PendingNPWP == "" {
 			provider.PendingNPWP = provider.NPWP
 		}
 		if req.BankName != "" {
 			provider.PendingBankName = req.BankName
-		} else {
+		} else if provider.PendingBankName == "" {
 			provider.PendingBankName = provider.BankName
 		}
 		if req.BankAccount != "" {
 			provider.PendingBankAccount = req.BankAccount
-		} else {
+		} else if provider.PendingBankAccount == "" {
 			provider.PendingBankAccount = provider.BankAccount
 		}
 		if req.BankAccountName != "" {
 			provider.PendingBankAccountName = req.BankAccountName
-		} else {
+		} else if provider.PendingBankAccountName == "" {
 			provider.PendingBankAccountName = provider.BankAccountName
 		}
 		provider.LegalVerificationStatus = "PENDING"

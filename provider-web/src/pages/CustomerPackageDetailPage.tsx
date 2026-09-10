@@ -54,13 +54,17 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const totalQuotaUsed = pkg.quotaUsed || 0;
   const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
 
-  const getGalleryImages = (name: string) => {
-    if ((pkg as any)?.images && (pkg as any).images.trim() !== '') {
-      const splitImgs = (pkg as any).images.split(',').filter(Boolean);
+  const getGalleryImages = (name: string): string[] => {
+    if (Array.isArray((pkg as any)?.images)) {
+      const valid = (pkg as any).images.filter((img: any) => typeof img === 'string' && img.trim() !== '');
+      if (valid.length > 0) return valid;
+    }
+    if ((pkg as any)?.images && typeof (pkg as any).images === 'string' && (pkg as any).images.trim() !== '') {
+      const splitImgs = (pkg as any).images.split(',').map((s: string) => s.trim()).filter(Boolean);
       if (splitImgs.length > 0) return splitImgs;
     }
-    if ((pkg as any)?.image && (pkg as any).image.trim() !== '') {
-      return [(pkg as any).image];
+    if ((pkg as any)?.image && typeof (pkg as any).image === 'string' && (pkg as any).image.trim() !== '') {
+      return [(pkg as any).image.trim()];
     }
     const nameLower = name.toLowerCase();
     if (nameLower.includes('bromo')) {
@@ -340,93 +344,117 @@ export const CustomerPackageDetailPage: React.FC = () => {
       {/* Main Container */}
       <div className="container" style={{ maxWidth: '1120px', margin: '0 auto' }}>
         
-        {/* Tiket.com Style 5-Photo Grid Gallery (Clean without overlay badges) */}
-        <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
-          <div className="detail-gallery-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
-            
-            {/* Photo 1 (Main Big Left) */}
-            <div 
-              onClick={() => openLightbox(0)}
-              style={{ gridColumn: '1 / 2', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden', position: 'relative' }}
-            >
-              <img 
-                src={photos[0]} 
-                alt="Main preview" 
-                style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }}
-                onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80'; }}
-              />
-            </div>
+        {/* Dynamic Photo Gallery Grid */}
+        {(() => {
+          const count = photos.length;
+          if (count === 0) return null;
 
-            {/* Photo 2 (Top Middle) */}
-            <div 
-              onClick={() => openLightbox(1)}
-              style={{ gridColumn: '2 / 3', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}
-            >
-              <img 
-                src={photos[1]} 
-                alt="Sub 1" 
-                style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }}
-                onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80'; }}
-              />
-            </div>
+          if (count === 1) {
+            return (
+              <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)', height: '378px' }}>
+                <div onClick={() => openLightbox(0)} style={{ width: '100%', height: '100%', cursor: 'pointer', overflow: 'hidden' }}>
+                  <img 
+                    src={photos[0]} 
+                    alt="Main preview" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }}
+                  />
+                </div>
+              </div>
+            );
+          }
 
-            {/* Photo 3 (Bottom Middle) */}
-            <div 
-              onClick={() => openLightbox(2)}
-              style={{ gridColumn: '2 / 3', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden' }}
-            >
-              <img 
-                src={photos[2]} 
-                alt="Sub 2" 
-                style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }}
-                onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80'; }}
-              />
-            </div>
+          if (count === 2) {
+            return (
+              <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
+                  {photos.map((imgUrl, idx) => (
+                    <div key={idx} onClick={() => openLightbox(idx)} style={{ cursor: 'pointer', overflow: 'hidden' }}>
+                      <img src={imgUrl} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
 
-            {/* Photo 4 (Top Right) */}
-            <div 
-              onClick={() => openLightbox(3)}
-              style={{ gridColumn: '3 / 4', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}
-            >
-              <img 
-                src={photos[3]} 
-                alt="Sub 3" 
-                style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }}
-                onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80'; }}
-              />
-            </div>
+          if (count === 3) {
+            return (
+              <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
+                  <div onClick={() => openLightbox(0)} style={{ gridColumn: '1 / 2', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
+                    <img src={photos[0]} alt="Main preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                  <div onClick={() => openLightbox(1)} style={{ gridColumn: '2 / 3', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
+                    <img src={photos[1]} alt="Sub 1" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                  <div onClick={() => openLightbox(2)} style={{ gridColumn: '2 / 3', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden' }}>
+                    <img src={photos[2]} alt="Sub 2" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                </div>
+              </div>
+            );
+          }
 
-            {/* Photo 5 (Bottom Right with "Lihat semua foto" overlay) */}
-            <div 
-              onClick={() => openLightbox(4)}
-              style={{ gridColumn: '3 / 4', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden', position: 'relative' }}
-            >
-              <img 
-                src={photos[4]} 
-                alt="Sub 4" 
-                style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }}
-                onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?auto=format&fit=crop&w=1200&q=80'; }}
-              />
-              <div 
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  backgroundColor: 'rgba(15, 23, 42, 0.5)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#ffffff',
-                  fontWeight: '700',
-                  fontSize: '13px',
-                  gap: '6px'
-                }}
-              >
-                <Layers size={16} /> Lihat semua foto
+          if (count === 4) {
+            return (
+              <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
+                  <div onClick={() => openLightbox(0)} style={{ gridColumn: '1 / 2', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
+                    <img src={photos[0]} alt="Main preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                  <div onClick={() => openLightbox(1)} style={{ gridColumn: '2 / 3', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
+                    <img src={photos[1]} alt="Sub 1" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                  <div onClick={() => openLightbox(2)} style={{ gridColumn: '2 / 3', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden' }}>
+                    <img src={photos[2]} alt="Sub 2" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                  <div onClick={() => openLightbox(3)} style={{ gridColumn: '3 / 4', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
+                    <img src={photos[3]} alt="Sub 3" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // 5 or more photos
+          return (
+            <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
+              <div className="detail-gallery-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
+                <div onClick={() => openLightbox(0)} style={{ gridColumn: '1 / 2', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
+                  <img src={photos[0]} alt="Main preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+                <div onClick={() => openLightbox(1)} style={{ gridColumn: '2 / 3', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
+                  <img src={photos[1]} alt="Sub 1" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+                <div onClick={() => openLightbox(2)} style={{ gridColumn: '2 / 3', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden' }}>
+                  <img src={photos[2]} alt="Sub 2" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+                <div onClick={() => openLightbox(3)} style={{ gridColumn: '3 / 4', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
+                  <img src={photos[3]} alt="Sub 3" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+                <div onClick={() => openLightbox(4)} style={{ gridColumn: '3 / 4', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
+                  <img src={photos[4]} alt="Sub 4" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundColor: 'rgba(15, 23, 42, 0.5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      gap: '6px'
+                    }}
+                  >
+                    <Layers size={16} /> Lihat semua foto ({photos.length})
+                  </div>
+                </div>
               </div>
             </div>
-
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Content Layout: Left Details, Right Fixed Booking Card */}
         <style>{`

@@ -76,10 +76,10 @@ export const ProfileProviderPage: React.FC = () => {
         website: providerProfile.website || '',
         instagram: providerProfile.instagram || '',
         tiktok: providerProfile.tiktok || '',
-        npwp: providerProfile.npwp || '',
-        bankName: providerProfile.bankName || '',
-        bankAccount: providerProfile.bankAccount || '',
-        bankAccountName: providerProfile.bankAccountName || '',
+        npwp: providerProfile.pendingNpwp || providerProfile.npwp || '',
+        bankName: providerProfile.pendingBankName || providerProfile.bankName || '',
+        bankAccount: providerProfile.pendingBankAccount || providerProfile.bankAccount || '',
+        bankAccountName: providerProfile.pendingBankAccountName || providerProfile.bankAccountName || '',
       });
       setActiveModalTab('bisnis');
       setIsEditModalOpen(true);
