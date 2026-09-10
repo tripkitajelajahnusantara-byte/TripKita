@@ -17,6 +17,49 @@ export const OFFICIAL_TRIP_TYPES = [
   "Corporate"
 ];
 
+// Helper to get 3 highlights for package card UI
+export function getHighlightsForPackage(pkg: { name?: string; tripType?: string; category?: string; highlights?: string[] }): string[] {
+  if (pkg.highlights && pkg.highlights.length >= 3) {
+    return pkg.highlights.slice(0, 3);
+  }
+  const nameLower = (pkg.name || '').toLowerCase();
+  const typeLower = (pkg.tripType || '').toLowerCase();
+  const catLower = (pkg.category || '').toLowerCase();
+
+  if (nameLower.includes('bromo')) {
+    return ['🌋 Golden Sunrise Bromo', '🚙 Hardtop Jeep 4x4', '☕ Kopi Klotok Pasuruan'];
+  }
+  if (nameLower.includes('jogja') || nameLower.includes('yogyakarta')) {
+    return ['🏛️ Candi Borobudur', '🏰 Tamansari & Malioboro', '☕ Kopi Klotok & Gudeg'];
+  }
+  if (nameLower.includes('bali') || typeLower.includes('honeymoon')) {
+    return ['👩‍❤️‍👨 Floating Breakfast', '🏡 Private Pool Villa', '🌅 Candlelight Dinner'];
+  }
+  if (nameLower.includes('tidung') || nameLower.includes('pantai') || nameLower.includes('palu')) {
+    return ['🪸 Snorkeling Terumbu Karang', '📸 Free Foto Underwater', '🚴 Sepeda Keliling Pulau'];
+  }
+  if (nameLower.includes('baduy')) {
+    return ['🌾 Suku Baduy Dalam', '🏡 Menginap di Saung Tradisional', '☕ Minum Kopi Khas Baduy'];
+  }
+  if (nameLower.includes('ranu') || nameLower.includes('kumbolo')) {
+    return ['🏕️ Camping Ranu Kumbolo', '🌌 Stargazing Milky Way', '🍲 Full Board Catering'];
+  }
+  if (nameLower.includes('cilember') || catLower.includes('curug')) {
+    return ['🌊 7 Tingkat Air Terjun', '🌲 Hutan Pinus Asri', '🔥 Api Unggun Malam'];
+  }
+  if (typeLower.includes('family') || catLower.includes('keluarga')) {
+    return ['👨‍👩‍👧‍👦 Ramah Anak & Lansia', '🚌 Van Executive AC', '🏨 Hotel Bintang 4'];
+  }
+  if (typeLower.includes('corporate')) {
+    return ['🎯 Outbound Team Building', '🚌 Bus Luxury VIP', '🍢 Gala Dinner & BBQ'];
+  }
+  if (typeLower.includes('private')) {
+    return ['🚗 Mobil Private & Driver', '📸 Pemandu & Dokum Pro', '⏱️ Jam Trip Fleksibel'];
+  }
+
+  return ['⭐ Tour Guide Berlisensi', '📸 Dokumentasi Lengkap', '🚗 Armada Transport AC'];
+}
+
 // Centralized mapping of authentic, verified photos for all TripKita packages
 export function getTripImage(id?: number, name: string = '', category: string = '', uploadedImage?: string): string {
   if (uploadedImage && uploadedImage.trim() !== '') {

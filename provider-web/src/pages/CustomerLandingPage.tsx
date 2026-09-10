@@ -170,70 +170,146 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   {
     id: 5,
     providerId: 1,
-    name: "Wisata Budaya Suku Baduy",
-    destination: "Lebak, Banten",
-    category: "Wisata Budaya & Sejarah",
-    tripType: "Open Trip",
-    price: 380000,
-    quotaMin: 5,
-    quotaUsed: 2,
-    quotaMax: 15,
+    name: "Private Trip Bromo Sunrise & Savana",
+    destination: "Probolinggo, Jawa Timur",
+    category: "Gunung",
+    tripType: "Private Trip",
+    price: 1250000,
+    quotaMin: 2,
+    quotaUsed: 1,
+    quotaMax: 10,
     startDate: getTodayIsoDate(),
     endDate: getTodayIsoDate(),
-    schedule: getDynamicScheduleStr(0, 3),
+    schedule: "Fleksibel (Pilihan Customer)",
     status: "Aktif",
-    rating: 4.8
+    rating: 4.9,
+    highlights: ['🌋 Golden Sunrise Bromo', '🚙 Hardtop Jeep 4x4', '☕ Kopi Klotok Pasuruan']
   },
   {
     id: 6,
     providerId: 1,
-    name: "Open Trip Ranu Kumbolo",
-    destination: "Malang, Jawa Timur",
-    category: "Gunung",
-    tripType: "Open Trip",
-    price: 550000,
-    quotaMin: 6,
-    quotaUsed: 4,
-    quotaMax: 15,
+    name: "Private Trip Wisata Raja Ampat 4D3N",
+    destination: "Papua Barat",
+    category: "Diving & Snorkeling",
+    tripType: "Private Trip",
+    price: 3850000,
+    quotaMin: 2,
+    quotaUsed: 0,
+    quotaMax: 8,
     startDate: getTodayIsoDate(),
     endDate: getTodayIsoDate(),
-    schedule: getDynamicScheduleStr(0, 4),
+    schedule: "Fleksibel (Pilihan Customer)",
     status: "Aktif",
-    rating: 4.9
+    rating: 5.0,
+    highlights: ['🪸 Diving Wayag & Piaynemo', '🛥️ Speedboat Charter', '🏨 Resort Ocean View']
   },
   {
     id: 7,
     providerId: 1,
-    name: "Wisata Pantai Tanjung Karang Palu",
-    destination: "Palu, Sulawesi Tengah",
+    name: "Honeymoon Romantic Bali Villa 3D2N",
+    destination: "Bali",
     category: "Pantai",
-    tripType: "Open Trip",
-    price: 850000,
-    quotaMin: 4,
+    tripType: "Honeymoon",
+    price: 2950000,
+    quotaMin: 2,
     quotaUsed: 2,
-    quotaMax: 10,
+    quotaMax: 2,
     startDate: getTodayIsoDate(),
     endDate: getTodayIsoDate(),
-    schedule: getDynamicScheduleStr(0, 4),
+    schedule: "Fleksibel (Pilihan Customer)",
     status: "Aktif",
-    rating: 4.7
+    rating: 5.0,
+    highlights: ['👩‍❤️‍👨 Floating Breakfast', '🏡 Private Pool Villa', '🌅 Candlelight Sunset']
   },
   {
     id: 8,
     providerId: 1,
-    name: "Yogyakarta City Tour",
+    name: "Honeymoon Island Sunset Tidung 3D2N",
+    destination: "Kepulauan Seribu, Jakarta",
+    category: "Pantai",
+    tripType: "Honeymoon",
+    price: 1650000,
+    quotaMin: 2,
+    quotaUsed: 2,
+    quotaMax: 2,
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: "Fleksibel (Pilihan Customer)",
+    status: "Aktif",
+    rating: 4.8,
+    highlights: ['👩‍❤️‍👨 Cottage Over the Sea', '🌅 Sunset Bridge Walk', '⛵ Private Boat & Dinner']
+  },
+  {
+    id: 9,
+    providerId: 1,
+    name: "Family Vacation Yogyakarta & Borobudur",
     destination: "Yogyakarta, DI Yogyakarta",
-    category: "City Tour",
-    tripType: "Open Trip",
-    price: 490000,
-    quotaMin: 4,
+    category: "Wisata Budaya & Sejarah",
+    tripType: "Family",
+    price: 850000,
+    quotaMin: 3,
     quotaUsed: 3,
     quotaMax: 15,
     startDate: getTodayIsoDate(),
     endDate: getTodayIsoDate(),
-    schedule: getDynamicScheduleStr(0, 3),
+    schedule: "Fleksibel (Pilihan Customer)",
     status: "Aktif",
-    rating: 4.8
+    rating: 4.9,
+    highlights: ['🏛️ Candi Borobudur Pro', '👨‍👩‍👧‍👦 Ramah Anak & Lansia', '🚌 Mobil Family AC Private']
+  },
+  {
+    id: 10,
+    providerId: 1,
+    name: "Family Nature Retreat Cilember 2D1N",
+    destination: "Bogor, Jawa Barat",
+    category: "Curug",
+    tripType: "Family",
+    price: 650000,
+    quotaMin: 3,
+    quotaUsed: 3,
+    quotaMax: 12,
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: "Fleksibel (Pilihan Customer)",
+    status: "Aktif",
+    rating: 4.7,
+    highlights: ['🌊 7 Tingkat Air Terjun', '🌲 Hutan Pinus Asri', '🔥 Campfire Family BBQ']
+  },
+  {
+    id: 11,
+    providerId: 1,
+    name: "Corporate Gathering & Outbound Bandung",
+    destination: "Bandung, Jawa Barat",
+    category: "City Tour",
+    tripType: "Corporate",
+    price: 750000,
+    quotaMin: 10,
+    quotaUsed: 15,
+    quotaMax: 100,
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: "Fleksibel (Pilihan Customer)",
+    status: "Aktif",
+    rating: 4.9,
+    highlights: ['🎯 Outbound Team Building', '🚌 Bus Luxury VIP AC', '🍢 Gala Dinner & Music']
+  },
+  {
+    id: 12,
+    providerId: 1,
+    name: "Corporate Team Building Bogor 2D1N",
+    destination: "Bogor, Jawa Barat",
+    category: "Wisata Budaya & Sejarah",
+    tripType: "Corporate",
+    price: 680000,
+    quotaMin: 10,
+    quotaUsed: 20,
+    quotaMax: 80,
+    startDate: getTodayIsoDate(),
+    endDate: getTodayIsoDate(),
+    schedule: "Fleksibel (Pilihan Customer)",
+    status: "Aktif",
+    rating: 4.8,
+    highlights: ['🏆 Team Bonding Games', '🏨 Hotel Bintang 4 Resort', '🎤 Gala Night & BBQ']
   }
 ];
 
@@ -648,7 +724,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                             fontWeight: '700' 
                           }}
                         >
-                          {pkg.category}
+                          {pkg.tripType ? `${pkg.tripType} • ${pkg.category}` : pkg.category}
                         </span>
                       </div>
 
@@ -661,6 +737,26 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b' }}>
                           <MapPin size={12} color="#94a3b8" />
                           <span>{pkg.destination}</span>
+                        </div>
+
+                        {/* 3 Key Highlights Chips */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                          {getHighlightsForPackage(pkg).map((hl, hIdx) => (
+                            <span 
+                              key={hIdx} 
+                              style={{ 
+                                fontSize: '9.5px', 
+                                fontWeight: '600', 
+                                color: '#0369a1', 
+                                backgroundColor: '#e0f2fe', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px',
+                                whiteSpace: 'nowrap' 
+                              }}
+                            >
+                              {hl}
+                            </span>
+                          ))}
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '6px' }}>
@@ -758,7 +854,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                             fontWeight: '700' 
                           }}
                         >
-                          {pkg.category}
+                          {pkg.tripType ? `${pkg.tripType} • ${pkg.category}` : pkg.category}
                         </span>
                       </div>
 
@@ -771,6 +867,26 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b' }}>
                           <MapPin size={12} color="#94a3b8" />
                           <span>{pkg.destination}</span>
+                        </div>
+
+                        {/* 3 Key Highlights Chips */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                          {getHighlightsForPackage(pkg).map((hl, hIdx) => (
+                            <span 
+                              key={hIdx} 
+                              style={{ 
+                                fontSize: '9.5px', 
+                                fontWeight: '600', 
+                                color: '#0369a1', 
+                                backgroundColor: '#e0f2fe', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px',
+                                whiteSpace: 'nowrap' 
+                              }}
+                            >
+                              {hl}
+                            </span>
+                          ))}
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '6px' }}>

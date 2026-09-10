@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
-import { getTripImage } from '../utils/tripImages';
+import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
 import { Star, MapPin, Calendar, ChevronRight, ArrowLeft } from 'lucide-react';
 
 interface TripPackage {
@@ -273,7 +273,7 @@ export const CustomerSearchPage: React.FC = () => {
                             fontWeight: '700' 
                           }}
                         >
-                          {pkg.category}
+                          {pkg.tripType ? `${pkg.tripType} • ${pkg.category}` : pkg.category}
                         </span>
 
                         <div style={{ textAlign: 'right' }}>
@@ -290,9 +290,29 @@ export const CustomerSearchPage: React.FC = () => {
                       </h3>
 
                       {/* Location */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: '#64748b', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>
                         <MapPin size={14} color="#94a3b8" />
                         <span>{pkg.destination}</span>
+                      </div>
+
+                      {/* 3 Key Highlights Chips */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                        {getHighlightsForPackage(pkg).map((hl, hIdx) => (
+                          <span 
+                            key={hIdx} 
+                            style={{ 
+                              fontSize: '11px', 
+                              fontWeight: '600', 
+                              color: '#0369a1', 
+                              backgroundColor: '#e0f2fe', 
+                              padding: '3px 8px', 
+                              borderRadius: '6px',
+                              whiteSpace: 'nowrap' 
+                            }}
+                          >
+                            {hl}
+                          </span>
+                        ))}
                       </div>
 
                       {/* Description */}
