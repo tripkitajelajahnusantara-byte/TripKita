@@ -51,7 +51,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
   }
 
   const pkg = selectedPackageForDetail;
-  const customDateInputRef = React.useRef<HTMLInputElement>(null);
 
   const formatDateIndoFull = (dateStr: string) => {
     if (!dateStr) return 'Pilih Tanggal';
@@ -79,9 +78,41 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
 
   const [guestsCount, setGuestsCount] = useState(Math.max(minRequiredGuests, 1));
-  const [customSelectedDate, setCustomSelectedDate] = useState<string>(
-    pkg.bookingDate && pkg.bookingDate >= h7MinDateStr ? pkg.bookingDate : h7MinDateStr
+
+  const getAddDaysIso = (baseIso: string, days: number) => {
+    const d = new Date(baseIso);
+    if (isNaN(d.getTime())) return baseIso;
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+  };
+
+  const getDefaultDurationDays = (nameStr: string): number => {
+    const lower = nameStr.toLowerCase();
+    if (lower.includes('4d3n')) return 3;
+    if (lower.includes('3d2n')) return 2;
+    if (lower.includes('2d1n')) return 1;
+    return 2;
+  };
+
+  const defaultDuration = getDefaultDurationDays(pkg.name || '');
+
+  const [customStartDate, setCustomStartDate] = useState<string>(
+    pkg.bookingDate && pkg.bookingDate.length === 10 && pkg.bookingDate >= h7MinDateStr ? pkg.bookingDate : h7MinDateStr
   );
+
+  const [customEndDate, setCustomEndDate] = useState<string>(
+    getAddDaysIso(customStartDate, defaultDuration)
+  );
+
+  const customStartDateInputRef = React.useRef<HTMLInputElement>(null);
+  const customEndDateInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleStartDateChange = (newStart: string) => {
+    setCustomStartDate(newStart);
+    if (newStart > customEndDate) {
+      setCustomEndDate(getAddDaysIso(newStart, defaultDuration));
+    }
+  };
 
   // Booked / Occupied dates per package for database & availability testing
   const bookedDatesMap: { [key: number]: string[] } = {
@@ -97,7 +128,30 @@ export const CustomerPackageDetailPage: React.FC = () => {
   };
 
   const currentPkgBookedDates = bookedDatesMap[pkg.id] || ['2026-09-22', '2026-09-25'];
-  const isDateBooked = currentPkgBookedDates.includes(customSelectedDate);
+
+  const checkRangeOverlap = (startIso: string, endIso: string, bookedList: string[]) => {
+    const start = new Date(startIso).getTime();
+    const end = new Date(endIso).getTime();
+    for (const bStr of bookedList) {
+      const bTime = new Date(bStr).getTime();
+      if (bTime >= start && bTime <= end) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const isRangeBooked = checkRangeOverlap(customStartDate, customEndDate, currentPkgBookedDates);
+
+  const getDurationDisplay = (startIso: string, endIso: string) => {
+    const start = new Date(startIso);
+    const end = new Date(endIso);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.max(1, Math.round(diffTime / (1000 * 3600 * 24)) + 1);
+    const nights = Math.max(0, diffDays - 1);
+    return `${diffDays} Hari ${nights > 0 ? `${nights} Malam` : ''}`;
+  };
 
   useEffect(() => {
     if (guestsCount < minRequiredGuests) {
@@ -395,15 +449,22 @@ export const CustomerPackageDetailPage: React.FC = () => {
       alert(`⚠️ Minimal pemesanan untuk paket ${pkg.tripType || 'ini'} adalah ${minRequiredGuests} orang.`);
       return;
     }
-    if (isDateBooked) {
-      alert(`❌ Tanggal ${formatDateIndoFull(customSelectedDate)} sudah TERBOOKING oleh pemesan lain. Silakan pilih tanggal lain yang tersedia.`);
+    if (guestsCount > availableSeats) {
+      alert(`⚠️ Jumlah peserta (${guestsCount} orang) melebihi sisa kuota yang tersedia (${availableSeats} seat).`);
       return;
     }
-    if (customSelectedDate < h7MinDateStr) {
+    if (!isOpenTrip && isRangeBooked) {
+      alert(`❌ Rentang tanggal ${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)} sudah TERBOOKING oleh pemesan lain. Silakan pilih rentang tanggal lain.`);
+      return;
+    }
+    if (!isOpenTrip && customStartDate < h7MinDateStr) {
       alert(`⚠️ Pemesanan paket ${pkg.tripType || 'ini'} wajib H-7 sebelum keberangkatan. Tanggal paling awal yang dapat dipesan adalah ${formatDateIndoFull(h7MinDateStr)}.`);
       return;
     }
-    const finalBookingDate = isOpenTrip ? selectedScheduleDate : customSelectedDate;
+    const finalBookingDate = isOpenTrip 
+      ? selectedScheduleDate 
+      : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`;
+    
     if (!finalBookingDate) {
       alert('⚠️ Silakan pilih tanggal keberangkatan terlebih dahulu.');
       return;
@@ -1054,72 +1115,111 @@ export const CustomerPackageDetailPage: React.FC = () => {
               </div>
             ) : (
               <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px', border: '1px solid #dbeafe' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase' }}>
-                    Pilih Tanggal ({pkg.tripType})
+                    Pilih Tanggal Trip ({pkg.tripType})
                   </label>
                   <span style={{ fontSize: '11px', color: '#007bff', fontWeight: '700', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px' }}>
                     Min. H-7
                   </span>
                 </div>
                 
-                <div 
-                  onClick={() => {
-                    if (customDateInputRef.current) {
-                      if (typeof customDateInputRef.current.showPicker === 'function') {
-                        customDateInputRef.current.showPicker();
-                      } else {
-                        customDateInputRef.current.focus();
-                      }
-                    }
-                  }}
-                  style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
-                >
-                  <div
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: isDateBooked ? '1.5px solid #ef4444' : '1.5px solid #007bff',
-                      fontSize: '13.5px',
-                      fontWeight: '700',
-                      color: isDateBooked ? '#ef4444' : '#0f172a',
-                      backgroundColor: '#ffffff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <span>{formatDateIndoFull(customSelectedDate)} {isDateBooked ? '❌ (TERBOOKING)' : ''}</span>
-                    <Calendar size={18} color={isDateBooked ? '#ef4444' : '#007bff'} />
+                {/* 2 Date Pickers: Tanggal Mulai & Tanggal Selesai */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                  {/* Tanggal Mulai */}
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      Tanggal Mulai
+                    </label>
+                    <div 
+                      onClick={() => customStartDateInputRef.current?.showPicker ? customStartDateInputRef.current.showPicker() : customStartDateInputRef.current?.focus()}
+                      style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
+                    >
+                      <div
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          border: isRangeBooked ? '1.5px solid #ef4444' : '1.5px solid #007bff',
+                          fontSize: '12.5px',
+                          fontWeight: '700',
+                          color: '#0f172a',
+                          backgroundColor: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <span style={{ fontSize: '11.5px' }}>{formatDateIndoFull(customStartDate)}</span>
+                        <Calendar size={14} color="#007bff" />
+                      </div>
+                      <input 
+                        ref={customStartDateInputRef}
+                        type="date" 
+                        min={h7MinDateStr}
+                        value={customStartDate}
+                        onChange={(e) => handleStartDateChange(e.target.value)}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                      />
+                    </div>
                   </div>
-                  <input 
-                    ref={customDateInputRef}
-                    type="date" 
-                    min={h7MinDateStr}
-                    max={pkg.endDate || undefined}
-                    value={customSelectedDate}
-                    onChange={(e) => setCustomSelectedDate(e.target.value)}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      opacity: 0,
-                      cursor: 'pointer'
-                    }}
-                  />
+
+                  {/* Tanggal Selesai */}
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      Tanggal Selesai
+                    </label>
+                    <div 
+                      onClick={() => customEndDateInputRef.current?.showPicker ? customEndDateInputRef.current.showPicker() : customEndDateInputRef.current?.focus()}
+                      style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
+                    >
+                      <div
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          border: isRangeBooked ? '1.5px solid #ef4444' : '1.5px solid #007bff',
+                          fontSize: '12.5px',
+                          fontWeight: '700',
+                          color: '#0f172a',
+                          backgroundColor: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <span style={{ fontSize: '11.5px' }}>{formatDateIndoFull(customEndDate)}</span>
+                        <Calendar size={14} color="#007bff" />
+                      </div>
+                      <input 
+                        ref={customEndDateInputRef}
+                        type="date" 
+                        min={customStartDate}
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                {isDateBooked ? (
+                {/* Duration Badge */}
+                <div style={{ backgroundColor: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #bfdbfe', fontSize: '12px', fontWeight: '700', color: '#0369a1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>🗓️ Durasi Trip:</span>
+                  <span style={{ backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px', color: '#0284c7' }}>
+                    {getDurationDisplay(customStartDate, customEndDate)}
+                  </span>
+                </div>
+
+                {isRangeBooked ? (
                   <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '8px', lineHeight: '1.4' }}>
-                    ❌ Tanggal <strong>{formatDateIndoFull(customSelectedDate)}</strong> sudah TERBOOKING oleh pelanggan lain (TIDAK TERSEDIA). Silakan pilih tanggal lain.
+                    ❌ Rentang tanggal <strong>{formatDateIndoFull(customStartDate)} - {formatDateIndoFull(customEndDate)}</strong> menabrak jadwal terbooking! Silakan pilih rentang tanggal lain.
                   </div>
                 ) : (
                   <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '6px', fontWeight: '500', lineHeight: '1.4' }}>
-                    💡 <strong>Jadwal Operasional:</strong> {pkg.schedule || 'Siap melayani 3 bulan kedepan'}. Pemesanan H-7 (Mulai: {formatDateIndoFull(h7MinDateStr)}). Tanggal lewat / terbooking tidak dapat dipesan.
+                    💡 <strong>Jadwal Operasional:</strong> {pkg.schedule || 'Siap melayani 3 bulan kedepan'}. Pemesanan H-7. Tanggal lewat / terbooking tidak dapat dipesan.
                   </span>
                 )}
               </div>
@@ -1129,8 +1229,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
                 <span>Jumlah Peserta</span>
-                <span style={{ color: (availableSeats - guestsCount) >= 0 ? '#10b981' : '#ef4444', fontWeight: '800' }}>
-                  Sisa {Math.max(0, availableSeats - guestsCount)} seat
+                <span style={{ color: availableSeats > 0 && guestsCount <= availableSeats ? '#10b981' : '#ef4444', fontWeight: '800' }}>
+                  {availableSeats <= 0 ? 'Sisa 0 seat (Habis)' : `Sisa ${availableSeats} seat`}
                 </span>
               </label>
               
@@ -1194,22 +1294,24 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
             <button
               onClick={handleBookNow}
-              disabled={availableSeats <= 0}
+              disabled={availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)}
               style={{
                 width: '100%',
                 padding: '14px',
-                backgroundColor: availableSeats <= 0 ? '#94a3b8' : '#007bff',
+                backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? '#94a3b8' : '#007bff',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '15px',
                 fontWeight: '700',
-                cursor: availableSeats <= 0 ? 'not-allowed' : 'pointer',
-                boxShadow: availableSeats <= 0 ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
+                cursor: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'not-allowed' : 'pointer',
+                boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
                 transition: 'all 0.2s'
               }}
             >
-              {availableSeats <= 0 ? 'Kuota Habis (Tidak Bisa Dipesan)' : 'Pesan Sekarang'}
+              {availableSeats <= 0 ? 'Kuota Habis (Tidak Bisa Dipesan)' :
+               guestsCount > availableSeats ? 'Peserta Melebihi Kuota' :
+               (!isOpenTrip && isRangeBooked) ? 'Tanggal Terbooking (Tidak Tersedia)' : 'Pesan Sekarang'}
             </button>
           </div>
 

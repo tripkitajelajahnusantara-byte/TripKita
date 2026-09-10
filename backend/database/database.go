@@ -806,11 +806,11 @@ func EnsureAllTestProvidersAndSeats() {
 		// Provider 1: Wisata Bromo Nusantara (Bromo & Bali)
 		{ProviderID: pID1, Name: "Open Trip Gunung Bromo", Destination: "Probolinggo, Jawa Timur", Category: "Gunung", TripType: "Open Trip", Price: 350000, QuotaMin: 1, QuotaMax: 15, StartDate: todayStr, EndDate: todayStr, Schedule: sched3, Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=1200&q=80"},
 		{ProviderID: pID1, Name: "Private Trip Bromo Sunrise & Savana", Destination: "Probolinggo, Jawa Timur", Category: "Gunung", TripType: "Private Trip", Price: 1250000, QuotaMin: 1, QuotaMax: 10, StartDate: "2026-09-21", EndDate: "2026-11-30", Schedule: "Operasional: 21-30 Sep, 10-25 Okt, 05-20 Nov 2026", Status: "Aktif", Rating: 4.9, Image: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80"},
-		{ProviderID: pID1, Name: "Honeymoon Romantic Bali Villa 3D2N", Destination: "Bali", Category: "Pantai", TripType: "Honeymoon", Price: 2950000, QuotaMin: 2, QuotaMax: 2, StartDate: "2026-09-17", EndDate: "2026-11-30", Schedule: "Bebas Pilih Tanggal (17 Sep - 30 Nov 2026)", Status: "Aktif", Rating: 5.0, Image: "https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1200&q=80"},
+		{ProviderID: pID1, Name: "Honeymoon Romantic Bali Villa 3D2N", Destination: "Bali", Category: "Pantai", TripType: "Honeymoon", Price: 2950000, QuotaMin: 2, QuotaMax: 10, StartDate: "2026-09-17", EndDate: "2026-11-30", Schedule: "Bebas Pilih Tanggal (17 Sep - 30 Nov 2026)", Status: "Aktif", Rating: 5.0, Image: "https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1200&q=80"},
 
 		// Provider 2: Tidung Paradise Tour (Kepulauan Seribu)
 		{ProviderID: pID2, Name: "Open Trip Pulau Tidung", Destination: "Kepulauan Seribu, Jakarta", Category: "Pantai", TripType: "Open Trip", Price: 450000, QuotaMin: 1, QuotaMax: 12, StartDate: todayStr, EndDate: todayStr, Schedule: sched3, Status: "Aktif", Rating: 4.7, Image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"},
-		{ProviderID: pID2, Name: "Honeymoon Island Sunset Tidung 3D2N", Destination: "Kepulauan Seribu, Jakarta", Category: "Pantai", TripType: "Honeymoon", Price: 1650000, QuotaMin: 2, QuotaMax: 2, StartDate: "2026-09-20", EndDate: "2026-11-30", Schedule: "Operasional: 20-30 Sep, 05-20 Okt, 01-15 Nov 2026", Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"},
+		{ProviderID: pID2, Name: "Honeymoon Island Sunset Tidung 3D2N", Destination: "Kepulauan Seribu, Jakarta", Category: "Pantai", TripType: "Honeymoon", Price: 1650000, QuotaMin: 2, QuotaMax: 10, StartDate: "2026-09-20", EndDate: "2026-11-30", Schedule: "Operasional: 20-30 Sep, 05-20 Okt, 01-15 Nov 2026", Status: "Aktif", Rating: 4.8, Image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"},
 
 		// Provider 3: Bogor Curug Explorer (Bogor & Cilember)
 		{ProviderID: pID3, Name: "Trip Curug Cilember", Destination: "Bogor, Jawa Barat", Category: "Curug", TripType: "Open Trip", Price: 275000, QuotaMin: 1, QuotaMax: 10, StartDate: todayStr, EndDate: todayStr, Schedule: sched2, Status: "Aktif", Rating: 4.6, Image: "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80"},
@@ -835,6 +835,7 @@ func EnsureAllTestProvidersAndSeats() {
 				"provider_id": p.ProviderID,
 				"trip_type":   p.TripType,
 				"quota_min":   p.QuotaMin,
+				"quota_max":   p.QuotaMax,
 				"price":       p.Price,
 				"category":    p.Category,
 				"destination": p.Destination,
