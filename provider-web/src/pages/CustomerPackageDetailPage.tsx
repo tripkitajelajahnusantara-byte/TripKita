@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare } from 'lucide-react';
+import { API_BASE_URL } from '../utils/api';
+
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
 
 interface AddOn {
   id: string;
@@ -55,16 +58,33 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
 
   const getGalleryImages = (name: string): string[] => {
+    const formatUrl = (url: string) => {
+      if (!url) return '';
+      const trimmed = url.trim();
+      if (!trimmed) return '';
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+        return trimmed;
+      }
+      const baseUrl = API_BASE_URL.replace('/api/v1', '');
+      return trimmed.startsWith('/') ? `${baseUrl}${trimmed}` : `${baseUrl}/${trimmed}`;
+    };
+
     if (Array.isArray((pkg as any)?.images)) {
-      const valid = (pkg as any).images.filter((img: any) => typeof img === 'string' && img.trim() !== '');
+      const valid = (pkg as any).images
+        .map((img: any) => (typeof img === 'string' ? formatUrl(img) : ''))
+        .filter(Boolean);
       if (valid.length > 0) return valid;
     }
     if ((pkg as any)?.images && typeof (pkg as any).images === 'string' && (pkg as any).images.trim() !== '') {
-      const splitImgs = (pkg as any).images.split(',').map((s: string) => s.trim()).filter(Boolean);
+      const splitImgs = (pkg as any).images
+        .split(',')
+        .map((s: string) => formatUrl(s))
+        .filter(Boolean);
       if (splitImgs.length > 0) return splitImgs;
     }
     if ((pkg as any)?.image && typeof (pkg as any).image === 'string' && (pkg as any).image.trim() !== '') {
-      return [(pkg as any).image.trim()];
+      const formatted = formatUrl((pkg as any).image);
+      if (formatted) return [formatted];
     }
     const nameLower = name.toLowerCase();
     if (nameLower.includes('bromo')) {
@@ -357,6 +377,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     src={photos[0]} 
                     alt="Main preview" 
                     style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }}
+                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
                   />
                 </div>
               </div>
@@ -369,7 +390,12 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
                   {photos.map((imgUrl, idx) => (
                     <div key={idx} onClick={() => openLightbox(idx)} style={{ cursor: 'pointer', overflow: 'hidden' }}>
-                      <img src={imgUrl} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img 
+                        src={imgUrl} 
+                        alt={`Preview ${idx + 1}`} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                      />
                     </div>
                   ))}
                 </div>
@@ -382,13 +408,28 @@ export const CustomerPackageDetailPage: React.FC = () => {
               <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
                   <div onClick={() => openLightbox(0)} style={{ gridColumn: '1 / 2', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img src={photos[0]} alt="Main preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img 
+                      src={photos[0]} 
+                      alt="Main preview" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    />
                   </div>
                   <div onClick={() => openLightbox(1)} style={{ gridColumn: '2 / 3', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img src={photos[1]} alt="Sub 1" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img 
+                      src={photos[1]} 
+                      alt="Sub 1" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    />
                   </div>
                   <div onClick={() => openLightbox(2)} style={{ gridColumn: '2 / 3', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img src={photos[2]} alt="Sub 2" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img 
+                      src={photos[2]} 
+                      alt="Sub 2" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    />
                   </div>
                 </div>
               </div>
@@ -400,16 +441,36 @@ export const CustomerPackageDetailPage: React.FC = () => {
               <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
                   <div onClick={() => openLightbox(0)} style={{ gridColumn: '1 / 2', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img src={photos[0]} alt="Main preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img 
+                      src={photos[0]} 
+                      alt="Main preview" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    />
                   </div>
                   <div onClick={() => openLightbox(1)} style={{ gridColumn: '2 / 3', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img src={photos[1]} alt="Sub 1" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img 
+                      src={photos[1]} 
+                      alt="Sub 1" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    />
                   </div>
                   <div onClick={() => openLightbox(2)} style={{ gridColumn: '2 / 3', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img src={photos[2]} alt="Sub 2" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img 
+                      src={photos[2]} 
+                      alt="Sub 2" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    />
                   </div>
                   <div onClick={() => openLightbox(3)} style={{ gridColumn: '3 / 4', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img src={photos[3]} alt="Sub 3" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img 
+                      src={photos[3]} 
+                      alt="Sub 3" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    />
                   </div>
                 </div>
               </div>
@@ -421,19 +482,44 @@ export const CustomerPackageDetailPage: React.FC = () => {
             <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
               <div className="detail-gallery-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
                 <div onClick={() => openLightbox(0)} style={{ gridColumn: '1 / 2', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                  <img src={photos[0]} alt="Main preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img 
+                    src={photos[0]} 
+                    alt="Main preview" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                  />
                 </div>
                 <div onClick={() => openLightbox(1)} style={{ gridColumn: '2 / 3', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
-                  <img src={photos[1]} alt="Sub 1" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img 
+                    src={photos[1]} 
+                    alt="Sub 1" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                  />
                 </div>
                 <div onClick={() => openLightbox(2)} style={{ gridColumn: '2 / 3', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                  <img src={photos[2]} alt="Sub 2" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img 
+                    src={photos[2]} 
+                    alt="Sub 2" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                  />
                 </div>
                 <div onClick={() => openLightbox(3)} style={{ gridColumn: '3 / 4', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
-                  <img src={photos[3]} alt="Sub 3" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img 
+                    src={photos[3]} 
+                    alt="Sub 3" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                  />
                 </div>
                 <div onClick={() => openLightbox(4)} style={{ gridColumn: '3 / 4', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
-                  <img src={photos[4]} alt="Sub 4" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img 
+                    src={photos[4]} 
+                    alt="Sub 4" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                  />
                   <div 
                     style={{
                       position: 'absolute',

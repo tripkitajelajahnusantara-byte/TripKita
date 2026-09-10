@@ -200,6 +200,10 @@ export const AddPackagePage: React.FC = () => {
 
   // Photos helper actions
   const triggerPhotoUpload = () => {
+    if (packagePhotos.length >= 20) {
+      alert('⚠️ Jumlah foto paket telah mencapai batas maksimal 20 foto.');
+      return;
+    }
     document.getElementById('photo-file-input')?.click();
   };
 
@@ -207,10 +211,31 @@ export const AddPackagePage: React.FC = () => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const maxFileSize = 2 * 1024 * 1024; // 2 MB
+    const allowedExtensions = ['jpg', 'jpeg', 'png'];
+    const newPhotos: string[] = [];
+
     setIsUploadingPhoto(true);
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+
+        if (packagePhotos.length + newPhotos.length >= 20) {
+          alert('⚠️ Jumlah foto paket telah mencapai batas maksimal 20 foto.');
+          break;
+        }
+
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (!ext || !allowedExtensions.includes(ext)) {
+          alert(`⚠️ Format file "${file.name}" tidak didukung. Hanya format JPG, JPEG, dan PNG yang diperbolehkan.`);
+          continue;
+        }
+
+        if (file.size > maxFileSize) {
+          alert(`⚠️ Ukuran foto "${file.name}" melebihi 2 MB (Ukuran: ${(file.size / (1024 * 1024)).toFixed(2)} MB). Harap unggah foto maksimal 2 MB.`);
+          continue;
+        }
+
         const formData = new FormData();
         formData.append('file', file);
         const res = await request('/provider/upload', {
@@ -222,8 +247,12 @@ export const AddPackagePage: React.FC = () => {
           const fullPhotoUrl = res.documentPath.startsWith('http') 
             ? res.documentPath 
             : `${baseUrl}${res.documentPath}`;
-          setPackagePhotos(prev => [...prev, fullPhotoUrl]);
+          newPhotos.push(fullPhotoUrl);
         }
+      }
+
+      if (newPhotos.length > 0) {
+        setPackagePhotos(prev => [...prev, ...newPhotos]);
       }
     } catch (err: any) {
       alert(err.message || 'Gagal mengunggah foto');
@@ -286,6 +315,11 @@ export const AddPackagePage: React.FC = () => {
       }
       if (startDate < todayStr) {
         alert('⚠️ Tanggal mulai keberangkatan tidak boleh memilih tanggal yang sudah lewat dari hari ini!');
+        return;
+      }
+      if (packagePhotos.length < 3) {
+        alert(`⚠️ Foto masih kurang! Minimal 3 foto wajib diunggah (Saat ini baru ada ${packagePhotos.length} foto).`);
+        setActiveStep('photos');
         return;
       }
     } else {
@@ -767,24 +801,37 @@ export const AddPackagePage: React.FC = () => {
 
             {activeStep === 'photos' && (
               <div className="form-section-body animate-fade-in">
-                <h3>Galeri Foto Paket</h3>
-                <p className="section-subtitle">Unggah foto-foto terbaik destinasi untuk menarik minat pelanggan</p>
+                <h3>Galeri Foto Paket ({packagePhotos.length}/20 Foto)</h3>
+                <p className="section-subtitle">Unggah foto-foto terbaik destinasi untuk menarik minat pelanggan. Minimal 3 foto, maksimal 20 foto.</p>
                 
+                {packagePhotos.length < 3 && (
+                  <div style={{ backgroundColor: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '10px', padding: '14px 18px', color: '#dc2626', fontWeight: 600, fontSize: '13.5px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <XCircle size={20} color="#ef4444" style={{ flexShrink: 0 }} />
+                    <div>
+                      <strong>Foto masih kurang, minimal 3 foto</strong>
+                      <div style={{ fontSize: '12px', fontWeight: 500, marginTop: '2px', color: '#b91c1c' }}>
+                        Saat ini baru ada {packagePhotos.length} foto. Wajib mengunggah minimal 3 foto (maksimal 20 foto).
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="photos-tab-layout">
                   <div 
                     className="photos-upload-dropzone"
                     onClick={triggerPhotoUpload}
+                    style={{ borderColor: packagePhotos.length < 3 ? '#fecaca' : undefined }}
                   >
                     <UploadCloud size={32} color="var(--color-accent)" />
                     <div>
                       <strong>{isUploadingPhoto ? 'Mengunggah...' : 'Klik untuk Unggah Foto'}</strong>
-                      <p>Format JPG, PNG. Maksimal 5MB.</p>
+                      <p>Format JPG, JPEG, PNG. Maksimal 2MB per foto (Batas: {packagePhotos.length}/20 foto).</p>
                     </div>
                     <input 
                       type="file" 
                       id="photo-file-input" 
                       style={{ display: 'none' }}
-                      accept="image/*"
+                      accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                       multiple
                       onChange={handlePhotoUpload}
                     />
@@ -793,7 +840,7 @@ export const AddPackagePage: React.FC = () => {
                   <div className="photos-gallery-grid">
                     {packagePhotos.map((url, idx) => (
                       <div key={idx} className="gallery-photo-card">
-                        <img src={url} alt={`Gallery ${idx + 1}`} />
+                        <img src={url} alt={`Gallery ${idx + 1}`} onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80'; }} />
                         <button 
                           type="button"
                           className="delete-photo-btn"
