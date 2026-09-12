@@ -67,6 +67,15 @@ export function removeAuthToken() {
   removeCustomerToken();
 }
 
+export function getAuthHeaders(): Record<string, string> {
+  const token = getProviderToken() || getCustomerToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export async function request(endpoint: string, options: RequestInit = {}) {
   let token: string | null = null;
   const hash = typeof window !== 'undefined' ? window.location.hash : '';

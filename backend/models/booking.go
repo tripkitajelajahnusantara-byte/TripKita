@@ -12,6 +12,8 @@ type Booking struct {
 	Package         Package   `gorm:"foreignKey:PackageID" json:"packageDetails,omitempty"`
 	CustomerID      *uint     `gorm:"index" json:"customerId,omitempty"`
 	CustomerName    string    `gorm:"size:255;not null" json:"customerName"`
+	CustomerPhone   string    `gorm:"size:50" json:"customerPhone"`
+	CustomerEmail   string    `gorm:"size:255" json:"customerEmail"`
 	CustomerInitial string    `gorm:"size:10" json:"customerInitial"`
 	TripDate        time.Time `gorm:"not null" json:"tripDate"`
 	Guests          int       `gorm:"not null" json:"guests"`

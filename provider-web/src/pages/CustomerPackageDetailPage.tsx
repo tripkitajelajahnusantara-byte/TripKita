@@ -696,8 +696,29 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 Deskripsi Paket Wisata
               </h2>
               <p style={{ fontSize: '14px', color: '#475569', lineHeight: '1.7', margin: 0 }}>
-                Nikmati petualangan tak terlupakan bersama tim pemandu profesional TripKita di {pkg.destination}. Didesain untuk memberikan pengalaman liburan yang aman, nyaman, dan menyenangkan bersama teman maupun keluarga.
+                {pkg.description || `Nikmati petualangan tak terlupakan bersama tim pemandu profesional TripKita di ${pkg.destination}. Didesain untuk memberikan pengalaman liburan yang aman, nyaman, dan menyenangkan bersama teman maupun keluarga.`}
               </p>
+            </div>
+
+            {/* Titik Kumpul / Google Maps Embed */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
+              <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MapPin size={18} color="#0284c7" /> Lokasi Titik Kumpul (Meeting Point)
+              </h2>
+              <p style={{ fontSize: '14px', color: '#475569', marginBottom: '16px' }}>
+                📍 <strong>{pkg.meetingPoint || pkg.destination}</strong>
+              </p>
+              <div style={{ borderRadius: '12px', overflow: 'hidden', height: '280px', border: '1px solid #cbd5e1' }}>
+                <iframe
+                  title="Titik Kumpul Map"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  allowFullScreen
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(pkg.meetingPoint || pkg.destination)}&t=m&z=15&output=embed`}
+                />
+              </div>
             </div>
 
             {/* Itinerary */}
@@ -1057,6 +1078,34 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
           {/* Right Fixed Booking Card with 3 Jadwal Keberangkatan Dropdown */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '20px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.04)', position: 'sticky', top: '90px' }}>
+            
+            {/* Detail Tur Summary Card */}
+            <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '16px', marginBottom: '18px', border: '1px solid #e2e8f0' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Detail Tur
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>🗓️ Tanggal Terdekat:</span>
+                  <strong style={{ color: '#0f172a' }}>{availableSchedules[0]?.label.split(' (')[0] || 'Sesuai Jadwal'}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>📍 Meeting Point:</span>
+                  <strong style={{ color: '#0284c7', maxWidth: '170px', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {pkg.meetingPoint || pkg.destination}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>⏱️ Durasi:</span>
+                  <strong style={{ color: '#0f172a' }}>{pkg.schedule || `${defaultDuration} Hari`}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>👥 Minimal Peserta:</span>
+                  <strong style={{ color: '#0f172a' }}>{minRequiredGuests} Orang</strong>
+                </div>
+              </div>
+            </div>
+
             <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Harga per orang</span>
             <div style={{ fontSize: '24px', fontWeight: '800', color: '#007bff', marginBottom: '18px' }}>
               {formatIDR(pkg.price)}

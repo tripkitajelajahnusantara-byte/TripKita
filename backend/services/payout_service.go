@@ -18,13 +18,17 @@ type payoutService struct {
 	payoutRepo   repositories.PayoutRepository
 	providerRepo repositories.ProviderRepository
 	bookingRepo  repositories.BookingRepository
+	emailService *EmailService
+	notifService *NotificationService
 }
 
-func NewPayoutService(payoutRepo repositories.PayoutRepository, providerRepo repositories.ProviderRepository, bookingRepo repositories.BookingRepository) PayoutService {
+func NewPayoutService(payoutRepo repositories.PayoutRepository, providerRepo repositories.ProviderRepository, bookingRepo repositories.BookingRepository, emailService *EmailService, notifService *NotificationService) PayoutService {
 	return &payoutService{
 		payoutRepo:   payoutRepo,
 		providerRepo: providerRepo,
 		bookingRepo:  bookingRepo,
+		emailService: emailService,
+		notifService: notifService,
 	}
 }
 

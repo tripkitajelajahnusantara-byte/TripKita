@@ -58,6 +58,7 @@ func ConnectDB(cfg *config.Config) {
 		&models.Payout{},
 		&models.Review{},
 		&models.ProviderBalance{},
+		&models.Notification{},
 		&models.HeldSettlement{},
 	)
 	if err != nil {

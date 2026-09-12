@@ -25,13 +25,18 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	reviewRepo := repositories.NewReviewRepository(db)
 
 	// Initialize Services
+	pdfService := services.NewPDFService()
+	emailService := services.NewEmailService(cfg, pdfService)
+	excelService := services.NewExcelService()
+	notifService := services.NewNotificationService(db)
+
 	authService := services.NewAuthService(providerRepo, cfg)
 	adminService := services.NewAdminService(providerRepo)
 	packageService := services.NewPackageService(packageRepo)
 	xenditService := services.NewXenditService(cfg)
-	bookingService := services.NewBookingService(bookingRepo, packageRepo, xenditService)
+	bookingService := services.NewBookingService(bookingRepo, packageRepo, xenditService, emailService, notifService)
 	dashboardService := services.NewDashboardService(packageRepo, bookingRepo, providerRepo)
-	payoutService := services.NewPayoutService(payoutRepo, providerRepo, bookingRepo)
+	payoutService := services.NewPayoutService(payoutRepo, providerRepo, bookingRepo, emailService, notifService)
 	reviewService := services.NewReviewService(reviewRepo, bookingRepo, packageRepo)
 
 	// Initialize Controllers
@@ -42,8 +47,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	dashboardCtrl := controllers.NewDashboardController(dashboardService)
 	uploadCtrl := controllers.NewUploadController()
 	oauthCtrl := controllers.NewOAuthController(db, cfg)
-	payoutCtrl := controllers.NewPayoutController(payoutService)
+	payoutCtrl := controllers.NewPayoutController(payoutService, excelService, pdfService, providerRepo, bookingRepo, payoutRepo)
 	reviewCtrl := controllers.NewReviewController(reviewService)
+	notifCtrl := controllers.NewNotificationController(notifService)
 
 	// Serve Static Files for uploads
 	r.Static("/uploads", "./uploads")
@@ -60,6 +66,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			// Reviews public read endpoints
 			public.GET("/reviews/package/:packageId", reviewCtrl.GetReviewsByPackage)
 			public.GET("/reviews/booking/:bookingId", reviewCtrl.GetReviewByBooking)
+
+			// PDF Receipt / Voucher endpoints
+			public.GET("/payouts/:id/pdf-receipt", payoutCtrl.GetPayoutPDFReceipt)
 
 			// Simulation & Webhook routes
 			public.POST("/bookings", bookingCtrl.CreateSimulatedBooking)
@@ -83,12 +92,16 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			}
 		}
 
-		// AUTHENTICATED PROFILE ROUTES (Accessible by any authenticated user: CUSTOMER, PROVIDER, ADMIN)
+		// AUTHENTICATED PROFILE & NOTIFICATION ROUTES (Accessible by logged in users)
 		authProfile := apiV1.Group("/provider")
 		authProfile.Use(middleware.AuthMiddleware(cfg))
 		{
 			authProfile.GET("/profile", authCtrl.GetProfile)
 			authProfile.PUT("/profile", authCtrl.UpdateProfile)
+
+			// Notification Center endpoints
+			authProfile.GET("/notifications", notifCtrl.GetUserNotifications)
+			authProfile.PUT("/notifications/:id/read", notifCtrl.MarkAsRead)
 		}
 
 		// PROVIDER SPECIFIC ROUTES (Auth + Provider Role Required)
@@ -117,6 +130,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			// Payouts / Keuangan Mitra
 			provider.GET("/payouts/summary", payoutCtrl.GetProviderPayoutSummary)
 			provider.POST("/payouts/request", payoutCtrl.RequestPayout)
+			provider.GET("/payouts/export-excel", payoutCtrl.ExportExcel)
 
 			// Dashboard Stats
 			provider.GET("/dashboard/stats", dashboardCtrl.GetStats)
@@ -148,6 +162,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		{
 			customer.GET("/bookings", bookingCtrl.GetCustomerBookings)
 			customer.POST("/reviews", reviewCtrl.CreateReview)
+			customer.GET("/notifications", notifCtrl.GetUserNotifications)
+			customer.PUT("/notifications/:id/read", notifCtrl.MarkAsRead)
 		}
 	}
 

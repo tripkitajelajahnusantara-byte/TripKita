@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { Sidebar } from '../components/Sidebar';
-import { request } from '../utils/api';
+import { request, API_BASE_URL, getAuthHeaders } from '../utils/api';
 import { 
   Wallet, 
   DollarSign, 
@@ -11,7 +11,9 @@ import {
   Building2, 
   HelpCircle,
   TrendingUp,
-  Lock
+  Lock,
+  Download,
+  FileText
 } from 'lucide-react';
 
 interface PayoutItem {
@@ -69,6 +71,29 @@ export const ProviderFinancePage: React.FC = () => {
       currency: 'IDR',
       minimumFractionDigits: 0
     }).format(price);
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/provider/payouts/export-excel`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error('Gagal mengunduh laporan excel');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Laporan_Keuangan_Provider_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err: any) {
+      alert(err.message || 'Gagal mendownload laporan Excel');
+    }
+  };
+
+  const handleDownloadPDF = (id: number) => {
+    window.open(`${API_BASE_URL}/public/payouts/${id}/pdf-receipt`, '_blank');
   };
 
   const isBankConfigured = !!(providerProfile?.bankName && providerProfile?.bankAccount && providerProfile?.bankAccountName);
@@ -136,18 +161,41 @@ export const ProviderFinancePage: React.FC = () => {
       <main className="dashboard-main" style={{ padding: '32px' }}>
         
         {/* Page Header */}
-        <div style={{ marginBottom: '28px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <div style={{ backgroundColor: '#e0f2fe', width: '38px', height: '38px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Wallet size={20} color="#0284c7" />
+        <div style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+              <div style={{ backgroundColor: '#e0f2fe', width: '38px', height: '38px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Wallet size={20} color="#0284c7" />
+              </div>
+              <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+                Keuangan & Saldo Mitra
+              </h1>
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-              Keuangan & Saldo Mitra
-            </h1>
+            <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
+              Sistem pencairan 50% DP di awal dan 50% Pelunasan setelah trip selesai langsung ke rekening bank Mitra Anda.
+            </p>
           </div>
-          <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-            Sistem pencairan 50% DP di awal dan 50% Pelunasan setelah trip selesai langsung ke rekening bank Mitra Anda.
-          </p>
+
+          <button
+            onClick={handleExportExcel}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: '#10b981',
+              color: '#ffffff',
+              padding: '10px 18px',
+              borderRadius: '10px',
+              fontSize: '13.5px',
+              fontWeight: '700',
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 3px 10px rgba(16, 185, 129, 0.2)',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Download size={16} /> Unduh Laporan Excel (.xlsx / CSV)
+          </button>
         </div>
 
         {/* 4 Summary Cards Grid */}
@@ -329,6 +377,7 @@ export const ProviderFinancePage: React.FC = () => {
                     <th style={{ padding: '12px' }}>Bank Tujuan</th>
                     <th style={{ padding: '12px' }}>Status</th>
                     <th style={{ padding: '12px' }}>Catatan Admin</th>
+                    <th style={{ padding: '12px' }}>Bukti Transfer</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -362,6 +411,30 @@ export const ProviderFinancePage: React.FC = () => {
                       </td>
                       <td style={{ padding: '14px 12px', color: '#64748b', fontSize: '13px' }}>
                         {p.notes || '-'}
+                      </td>
+                      <td style={{ padding: '14px 12px' }}>
+                        {p.status === 'APPROVED' ? (
+                          <button
+                            onClick={() => handleDownloadPDF(p.id)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '6px 12px',
+                              backgroundColor: '#e0f2fe',
+                              color: '#0284c7',
+                              border: '1px solid #bae6fd',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <FileText size={14} /> Bukti PDF
+                          </button>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: '12px' }}>-</span>
+                        )}
                       </td>
                     </tr>
                   ))}

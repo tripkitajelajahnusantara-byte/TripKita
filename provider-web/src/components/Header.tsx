@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { Menu, X, User } from 'lucide-react';
+import { NotificationCenter } from './NotificationCenter';
 
 export const Header: React.FC = () => {
   const { route, navigateTo, logout, providerProfile, customerProfile } = useNavigation();
@@ -67,6 +68,7 @@ export const Header: React.FC = () => {
           {isProviderRoute ? (
             providerProfile ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <NotificationCenter />
                 {providerProfile.role === 'ADMIN' ? (
                   <button className="masuk-btn" onClick={() => navigateTo('admin-dashboard')}>Admin Panel</button>
                 ) : (
@@ -95,6 +97,7 @@ export const Header: React.FC = () => {
           ) : (
             customerProfile ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <NotificationCenter />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#f0f9ff', padding: '6px 14px', borderRadius: '30px', border: '1px solid #bae6fd' }}>
                   <User size={16} color="#0284c7" />
                   <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0369a1' }}>

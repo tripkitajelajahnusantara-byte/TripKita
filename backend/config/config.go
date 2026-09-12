@@ -25,6 +25,11 @@ type Config struct {
 	BackendURL         string
 	XenditAPIKey       string
 	XenditWebhookToken string
+	SMTPHost           string
+	SMTPPort           string
+	SMTPUser           string
+	SMTPPass           string
+	SMTPFrom           string
 }
 
 func LoadConfig() *Config {
@@ -53,6 +58,11 @@ func LoadConfig() *Config {
 		BackendURL:         getEnv("BACKEND_URL", "https://tripkita-production.up.railway.app"),
 		XenditAPIKey:       xenditKey,
 		XenditWebhookToken: getEnv("XENDIT_WEBHOOK_TOKEN", ""),
+		SMTPHost:           getEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:           getEnv("SMTP_PORT", "587"),
+		SMTPUser:           getEnv("SMTP_USER", "tripkitajelajahnusantara@gmail.com"),
+		SMTPPass:           getEnv("SMTP_PASS", "hgsywivcgccyucuw"),
+		SMTPFrom:           getEnv("SMTP_FROM", "tripkitajelajahnusantara@gmail.com"),
 	}
 }
 

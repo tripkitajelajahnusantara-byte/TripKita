@@ -134,6 +134,7 @@ export const AddPackagePage: React.FC = () => {
           const pkg = await request(`/provider/packages/${editingPackageId}`);
           setPackageName(pkg.name || '');
           setLocation(pkg.destination || '');
+          setMeetPoint(pkg.meetingPoint || '');
           setPrice(pkg.price ? String(pkg.price) : '');
           setQuotaMax(pkg.quotaMax ? String(pkg.quotaMax) : '');
           setSchedule(pkg.schedule || '');
@@ -336,6 +337,7 @@ export const AddPackagePage: React.FC = () => {
       const payload = {
         name: packageName,
         destination: location,
+        meetingPoint: meetPoint,
         category: category,
         tripType: tripType,
         price: parseInt(price, 10) || 0,

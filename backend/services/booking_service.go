@@ -31,13 +31,17 @@ type bookingService struct {
 	repo          repositories.BookingRepository
 	packageRepo   repositories.PackageRepository
 	xenditService XenditService
+	emailService  *EmailService
+	notifService  *NotificationService
 }
 
-func NewBookingService(repo repositories.BookingRepository, packageRepo repositories.PackageRepository, xenditService XenditService) BookingService {
+func NewBookingService(repo repositories.BookingRepository, packageRepo repositories.PackageRepository, xenditService XenditService, emailService *EmailService, notifService *NotificationService) BookingService {
 	return &bookingService{
 		repo:          repo,
 		packageRepo:   packageRepo,
 		xenditService: xenditService,
+		emailService:  emailService,
+		notifService:  notifService,
 	}
 }
 
