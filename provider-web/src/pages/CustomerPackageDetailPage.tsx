@@ -68,16 +68,16 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const h7MinDateStr = getH7MinDateIso();
 
-  const minRequiredGuests = pkg.quotaMin || (
+  const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
+
+  const minRequiredGuests = isOpenTrip ? 1 : (
     pkg.tripType === 'Honeymoon' ? 2 :
     pkg.tripType === 'Private Trip' ? 1 :
     pkg.tripType === 'Family' ? 3 :
     pkg.tripType === 'Corporate' ? 10 : 1
   );
 
-  const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
-
-  const [guestsCount, setGuestsCount] = useState(Math.max(minRequiredGuests, 1));
+  const [guestsCount, setGuestsCount] = useState(1);
 
   const getAddDaysIso = (baseIso: string, days: number) => {
     const d = new Date(baseIso);
@@ -1092,19 +1092,18 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   ))}
                 </select>
 
-                {/* Open Trip Quota Status Card */}
+                {/* Open Trip Quota Status Card (Hidden if quota is already fulfilled) */}
                 {(() => {
                   const quotaMin = pkg.quotaMin || 4;
                   const quotaUsed = totalQuotaUsed;
                   const quotaShortage = Math.max(0, quotaMin - quotaUsed);
                   const isConfirmedDeparture = quotaUsed >= quotaMin;
 
-                  return isConfirmedDeparture ? (
-                    <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '11.5px', color: '#166534', fontWeight: '700', lineHeight: '1.4' }}>
-                      <strong>PASTI BERANGKAT!</strong><br/>
-                      • Kuota minimal ({quotaMin} pax) telah <strong>TERPENUHI</strong> ({quotaUsed}/{totalQuotaMax} seat terisi).
-                    </div>
-                  ) : (
+                  if (isConfirmedDeparture) {
+                    return null;
+                  }
+
+                  return (
                     <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fffbebfb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '11.5px', color: '#92400e', fontWeight: '700', lineHeight: '1.4' }}>
                       <strong>Status Kuota Open Trip:</strong><br/>
                       • Terisi: <strong>{quotaUsed}/{quotaMin} Orang (Min. Kuota: {quotaMin} pax)</strong><br/>
