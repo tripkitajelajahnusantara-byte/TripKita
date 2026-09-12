@@ -10,27 +10,7 @@ export const Footer: React.FC = () => {
       <div className="container footer-container">
         <div className="footer-left">
           <div className="logo-brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg width="28" height="28" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="36" height="36" rx="12" fill="url(#cute-tementrip-ftr-grad)"/>
-              <path d="M18 5C12.4772 5 8 9.47715 8 15C8 21.6 18 30 18 30C18 30 28 21.6 28 15C28 9.47715 23.5228 5 18 5Z" fill="white"/>
-              <circle cx="18" cy="14" r="6" fill="#F8FAFC"/>
-              <circle cx="15" cy="13.5" r="1.3" fill="#0F172A"/>
-              <circle cx="21" cy="13.5" r="1.3" fill="#0F172A"/>
-              <circle cx="15.4" cy="13" r="0.4" fill="white"/>
-              <circle cx="21.4" cy="13" r="0.4" fill="white"/>
-              <circle cx="13" cy="15.2" r="1.2" fill="#FF8E8E" opacity="0.8"/>
-              <circle cx="23" cy="15.2" r="1.2" fill="#FF8E8E" opacity="0.8"/>
-              <path d="M16 15.5C16 16.6 16.9 17.5 18 17.5C19.1 17.5 20 16.6 20 15.5" stroke="#0F172A" strokeWidth="1.2" strokeLinecap="round"/>
-              <path d="M27 5L28.2 7.8L31 9L28.2 10.2L27 13L25.8 10.2L23 9L25.8 7.8L27 5Z" fill="#FFD166"/>
-              <defs>
-                <linearGradient id="cute-tementrip-ftr-grad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#0284C7"/>
-                  <stop offset="0.55" stopColor="#00C9A7"/>
-                  <stop offset="1" stopColor="#FF6B81"/>
-                </linearGradient>
-              </defs>
-            </svg>
-            <span className="logo-text" style={{ color: '#0284c7', fontWeight: 800, fontSize: '18px', letterSpacing: '-0.5px' }}>Temen<span style={{ color: '#00c9a7' }}>Trip</span><span style={{ color: '#ff6b81', fontSize: '15px' }}>✨</span></span>
+            <img src="/tementrip_official_logo.jpg" alt="TemenTrip" style={{ height: '30px', objectFit: 'contain', mixBlendMode: 'multiply' }} />
             <span className="logo-badge">Partner</span>
           </div>
           <span className="copyright-text">

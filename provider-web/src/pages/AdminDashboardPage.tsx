@@ -545,17 +545,9 @@ export const AdminDashboardPage: React.FC = () => {
       {/* Sidebar Panel */}
       <aside className="admin-sidebar">
         <div>
-          <div className="sidebar-brand" onClick={() => navigateTo('beranda')} style={{ cursor: 'pointer' }}>
-            {/* Blue pin logo */}
-            <div className="logo-icon-container">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z" fill="#3b82f6"/>
-              </svg>
-            </div>
-            <div>
-              <span className="logo-text">Trip<span>Kita</span></span>
-              <span className="logo-subtext">Admin Panel</span>
-            </div>
+          <div className="sidebar-brand" onClick={() => navigateTo('beranda')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <img src="/tementrip_official_logo.jpg" alt="TemenTrip" style={{ height: '36px', objectFit: 'contain', mixBlendMode: 'multiply' }} />
+            <span className="logo-subtext" style={{ fontSize: '12px', color: '#ef4444', fontWeight: 700, backgroundColor: '#fee2e2', padding: '2px 8px', borderRadius: '10px' }}>Admin Panel</span>
           </div>
 
           <nav className="sidebar-menu">
