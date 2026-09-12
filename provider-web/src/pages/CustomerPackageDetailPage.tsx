@@ -162,7 +162,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
     12: ['2026-09-21', '2026-10-16']
   };
 
-  const currentPkgBookedDates = bookedDatesMap[pkg.id] || ['2026-09-22', '2026-09-25'];
+  const currentPkgBookedDates = bookedDatesMap[pkg.id] || [];
 
   const checkRangeOverlap = (startIso: string, endIso: string, bookedList: string[]) => {
     const start = new Date(startIso).getTime();
@@ -1332,6 +1332,37 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     ❌ Rentang tanggal menabrak jadwal terbooking! Silakan pilih rentang tanggal lain.
                   </div>
                 )}
+
+                {/* Strikethrough Booked Dates Visual Indicator */}
+                {currentPkgBookedDates.length > 0 && (
+                  <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '6px' }}>
+                      🚫 Tanggal Terbooking Pemesan Lain:
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {currentPkgBookedDates.map((bDate, idx) => (
+                        <span 
+                          key={idx} 
+                          style={{ 
+                            backgroundColor: '#fee2e2', 
+                            color: '#ef4444', 
+                            fontSize: '11px', 
+                            fontWeight: '700', 
+                            padding: '3px 8px', 
+                            borderRadius: '4px', 
+                            textDecoration: 'line-through',
+                            border: '1px solid #fca5a5',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <s>{formatDateIndoFull(bDate)}</s>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1421,41 +1452,13 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 fontWeight: '700',
                 cursor: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'not-allowed' : 'pointer',
                 boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
-                transition: 'all 0.2s',
-                marginBottom: '16px'
+                transition: 'all 0.2s'
               }}
             >
               {availableSeats <= 0 ? 'Kuota Habis (Tidak Bisa Dipesan)' :
                guestsCount > availableSeats ? 'Peserta Melebihi Kuota' :
                (!isOpenTrip && isRangeBooked) ? 'Tanggal Terbooking (Tidak Tersedia)' : 'Pesan Sekarang'}
             </button>
-
-            {/* Detail Tur Summary Card (Positioned below Pesan Sekarang button) */}
-            <div style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '14px', border: '1px solid #e2e8f0' }}>
-              <h4 style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Informasi Tur
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                  <span>🗓️ Tanggal Terdekat:</span>
-                  <strong style={{ color: '#0f172a' }}>{availableSchedules[0]?.label.split(' (')[0] || 'Sesuai Jadwal'}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                  <span>📍 Meeting Point:</span>
-                  <strong title={activeMeetingPoint} style={{ color: '#0284c7', maxWidth: '160px', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {activeMeetingPoint}
-                  </strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                  <span>⏱️ Durasi:</span>
-                  <strong style={{ color: '#0f172a' }}>{pkg.schedule || `${defaultDuration} Hari`}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                  <span>👥 Minimal Peserta:</span>
-                  <strong style={{ color: '#0f172a' }}>{minRequiredGuests} Orang</strong>
-                </div>
-              </div>
-            </div>
 
           </div>
 
