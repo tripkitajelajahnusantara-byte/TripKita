@@ -1220,27 +1220,23 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   const quotaMin = pkg.quotaMin || 4;
                   const quotaUsed = totalQuotaUsed;
                   const quotaShortage = Math.max(0, quotaMin - quotaUsed);
-                  const isConfirmedDeparture = quotaUsed >= quotaMin;
+
+                  // If quota is fulfilled (e.g. 4/4 or 5/4), hide notification completely
+                  if (quotaUsed >= quotaMin) return null;
 
                   return (
                     <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fffbebfb', border: '1px solid #fde68a', borderRadius: '10px', fontSize: '12px', color: '#92400e', fontWeight: '700', lineHeight: '1.5' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                        <span>👥 Minimal Kuota Open Trip:</span>
+                        <span>Minimal Kuota Open Trip:</span>
                         <strong style={{ color: '#0f172a' }}>{quotaMin} Pax</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                        <span>📊 Status Kuota Terisi:</span>
+                        <span>Status Kuota Terisi:</span>
                         <strong style={{ color: '#0284c7' }}>{quotaUsed} / {quotaMin} Pax</strong>
                       </div>
-                      {isConfirmedDeparture ? (
-                        <div style={{ color: '#166534', backgroundColor: '#dcfce7', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', marginTop: '4px', textAlign: 'center' }}>
-                          ✅ Kuota Terpenuhi! Trip PASTI BERANGKAT.
-                        </div>
-                      ) : (
-                        <div style={{ color: '#92400e', backgroundColor: '#fef3c7', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', marginTop: '4px', textAlign: 'center' }}>
-                          ⚠️ Kurang {quotaShortage} orang lagi agar trip PASTI BERANGKAT!
-                        </div>
-                      )}
+                      <div style={{ color: '#92400e', backgroundColor: '#fef3c7', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', marginTop: '4px', textAlign: 'center' }}>
+                        Kurang {quotaShortage} orang lagi agar trip PASTI BERANGKAT!
+                      </div>
                     </div>
                   );
                 })()}

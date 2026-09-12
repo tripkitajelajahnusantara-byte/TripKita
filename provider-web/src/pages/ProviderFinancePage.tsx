@@ -217,7 +217,7 @@ export const ProviderFinancePage: React.FC = () => {
               {formatIDR(summary?.netEarnings || 0)}
             </strong>
             <span style={{ fontSize: '11.5px', color: '#16a34a', fontWeight: '600' }}>
-              Omset Paket (Tanpa potong biaya platform Rp 4rb)
+              Net 85% Paket (Setelah komisi platform 15% & Biaya Admin Rp 5rb)
             </span>
           </div>
 

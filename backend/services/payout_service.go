@@ -90,7 +90,9 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 	bookings, _ := s.bookingRepo.FindAllByProvider(providerID)
 	payouts, _ := s.payoutRepo.GetByProviderID(providerID)
 
-	var totalEarnings float64 = 0
+	var grossOmset float64 = 0
+	var totalPlatformFee float64 = 0
+	var totalNetEarnings float64 = 0
 	var dpEligible float64 = 0
 	var pelunasanEligible float64 = 0
 	var heldSettlement float64 = 0
@@ -99,10 +101,21 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 
 	for _, b := range bookings {
 		if b.Status == "CONFIRMED" || b.Status == "PAID" || b.Status == "COMPLETED" {
-			grossPackagePrice := float64(b.TotalPrice)
-			totalEarnings += grossPackagePrice
+			totalCustomerPaid := float64(b.TotalPrice)
+			adminFee := 5000.0
+			if totalCustomerPaid < adminFee {
+				adminFee = 0.0
+			}
 
-			halfAmount := grossPackagePrice * 0.5
+			packageGross := totalCustomerPaid - adminFee
+			platformFee := (packageGross * 0.15) + adminFee
+			netProviderEarning := packageGross * 0.85
+
+			grossOmset += totalCustomerPaid
+			totalPlatformFee += platformFee
+			totalNetEarnings += netProviderEarning
+
+			halfAmount := netProviderEarning * 0.5
 			dpEligible += halfAmount
 
 			// Check if trip is finished (either status is COMPLETED or tripDate has passed by 24 hours)
@@ -138,9 +151,6 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 		}
 	}
 
-	netEarnings := totalEarnings // 100% net package revenue for provider
-	platformFee := 0.0           // Customer service fee (Rp 4.000) is paid by customer and excluded from provider
-
 	availableDP := dpEligible - dpPaidOut
 	if availableDP < 0 {
 		availableDP = 0
@@ -152,9 +162,9 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 	}
 
 	return &models.PayoutSummary{
-		TotalEarnings:      totalEarnings,
-		PlatformFee:        platformFee,
-		NetEarnings:        netEarnings,
+		TotalEarnings:      grossOmset,
+		PlatformFee:        totalPlatformFee,
+		NetEarnings:        totalNetEarnings,
 		AvailableDP:        availableDP,
 		AvailablePelunasan: availablePelunasan,
 		HeldSettlement:     heldSettlement,

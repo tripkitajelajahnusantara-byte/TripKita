@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
-import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck } from 'lucide-react';
 
 export const CustomerConfirmationPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, customerProfile, bookingFormData } = useNavigation();
@@ -31,7 +31,7 @@ export const CustomerConfirmationPage: React.FC = () => {
   const selectedAddOns = pkg.selectedAddOns || bookingFormData?.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
   const baseCost = pkg.price * guestsCount;
-  const serviceFee = 0;
+  const serviceFee = 5000;
   const totalCost = baseCost + addOnsTotal + serviceFee;
 
   const formatIDR = (price: number) => {
@@ -297,7 +297,7 @@ export const CustomerConfirmationPage: React.FC = () => {
 
               {serviceFee > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Biaya Layanan</span>
+                  <span>Biaya Admin</span>
                   <span style={{ color: '#0f172a', fontWeight: '600' }}>{formatIDR(serviceFee)}</span>
                 </div>
               )}
@@ -312,7 +312,7 @@ export const CustomerConfirmationPage: React.FC = () => {
           {/* Cancellation Policy Banner */}
           <div style={{ backgroundColor: '#f0f9ff', borderRadius: '16px', padding: '16px 20px', border: '1px solid #bae6fd', marginBottom: '16px' }}>
             <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '800', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              🛡️ Kebijakan Pembatalan Strict H-7 TripKita
+              <ShieldCheck size={16} color="#0369a1" /> Kebijakan Pembatalan Strict H-7 TripKita
             </h4>
             <p style={{ margin: 0, fontSize: '12px', color: '#0c4a6e', lineHeight: '1.5' }}>
               • Pembatalan <strong>≥ 7 hari sebelum trip</strong> berhak pengembalian dana <strong>100% Full Refund</strong>.<br/>
