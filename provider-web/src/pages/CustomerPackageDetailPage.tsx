@@ -1227,12 +1227,21 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
             {/* Guest Counter (+ / -) */}
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
-                <span>Jumlah Peserta</span>
-                <span style={{ color: availableSeats > 0 && guestsCount <= availableSeats ? '#10b981' : '#ef4444', fontWeight: '800' }}>
-                  {availableSeats <= 0 ? 'Sisa 0 seat (Habis)' : `Sisa ${availableSeats} seat`}
-                </span>
-              </label>
+              {(() => {
+                const remainingAfterSelect = Math.max(0, availableSeats - guestsCount);
+                return (
+                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
+                    <span>Jumlah Peserta</span>
+                    <span style={{ color: availableSeats > 0 && guestsCount <= availableSeats ? '#10b981' : '#ef4444', fontWeight: '800' }}>
+                      {availableSeats <= 0 
+                        ? 'Sisa 0 seat (Habis)' 
+                        : guestsCount > availableSeats 
+                        ? `⚠️ Melebihi Kuota (Tersedia ${availableSeats} seat)` 
+                        : `Sisa ${remainingAfterSelect} seat`}
+                    </span>
+                  </label>
+                );
+              })()}
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '8px 14px' }}>
                 <Users size={18} color="#94a3b8" />
