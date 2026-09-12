@@ -412,7 +412,7 @@ export const CustomerSearchPage: React.FC = () => {
                       {/* Schedule */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: '500' }}>
                         <Calendar size={14} color="#94a3b8" />
-                        <span>Jadwal tersedia: <strong>22–25 Mei 2026 • 23–26 Mei 2026</strong></span>
+                        <span>Jadwal tersedia: <strong>{pkg.schedule || getDynamicScheduleStr(0, 3)}</strong></span>
                       </div>
                     </div>
 
@@ -422,7 +422,7 @@ export const CustomerSearchPage: React.FC = () => {
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: '700' }}>
                           <Star size={14} fill="#f59e0b" color="#f59e0b" /> {pkg.rating > 0 ? pkg.rating.toFixed(1) : '4.8'}
                         </span>
-                        <span style={{ color: '#94a3b8' }}>(120 ulasan)</span>
+                        <span style={{ color: '#94a3b8' }}>({(pkg.id * 17) % 50 + 80} ulasan)</span>
                         <span style={{ color: '#cbd5e1' }}>|</span>
                         <span style={{ color: availableSeats < 5 ? '#ef4444' : '#10b981', fontWeight: '700' }}>
                           Sisa {availableSeats > 0 ? availableSeats : 4} seat

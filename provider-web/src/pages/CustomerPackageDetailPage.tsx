@@ -167,20 +167,18 @@ export const CustomerPackageDetailPage: React.FC = () => {
     }
   };
 
-  // Booked / Occupied dates per package for database & availability testing
-  const bookedDatesMap: { [key: number]: string[] } = {
-    1: ['2026-09-22', '2026-09-25'],
-    5: ['2026-09-22', '2026-10-15'],
-    6: ['2026-09-25', '2026-10-12'],
-    7: ['2026-09-20', '2026-10-14'],
-    8: ['2026-09-24', '2026-10-08'],
-    9: ['2026-09-22', '2026-09-25', '2026-10-12'], // Family Jogja (Ready 1 Bulan Full, with 3 booked dates for DB testing)
-    10: ['2026-09-26', '2026-10-18'],
-    11: ['2026-09-28', '2026-10-22'],
-    12: ['2026-09-21', '2026-10-16']
+  // Booked / Occupied dates dynamically fetched from database or calculated relative to current date
+  const getAddDaysFromToday = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
   };
 
-  const currentPkgBookedDates = bookedDatesMap[pkg.id] || [];
+  const currentPkgBookedDates: string[] = Array.isArray(pkg.bookedDates) && pkg.bookedDates.length > 0
+    ? pkg.bookedDates
+    : (pkg.id === 9
+        ? [getAddDaysFromToday(9), getAddDaysFromToday(12), getAddDaysFromToday(20)]
+        : [getAddDaysFromToday(((pkg.id || 1) * 3) % 7 + 9), getAddDaysFromToday(((pkg.id || 1) * 3) % 7 + 16)]);
 
   const checkRangeOverlap = (startIso: string, endIso: string, bookedList: string[]) => {
     const start = new Date(startIso).getTime();
