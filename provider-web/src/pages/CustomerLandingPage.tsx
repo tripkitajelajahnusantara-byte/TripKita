@@ -4,6 +4,7 @@ import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage, OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
 import { Search, ShieldCheck, CreditCard, Headset, ThumbsUp, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight, Share2 } from 'lucide-react';
 import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
+import { ShareModal } from '../components/ShareModal';
 
 import heroImage from '../assets/hero.jpg';
 
@@ -366,19 +367,13 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     setWishlistIds(updated.map(i => Number(i.id)));
   };
 
-  const [shareToast, setShareToast] = useState('');
+  const [selectedPackageForShare, setSelectedPackageForShare] = useState<TripPackage | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
   const handleSharePackage = (e: React.MouseEvent, pkg: TripPackage) => {
     e.stopPropagation();
-    const shareUrl = `${window.location.origin}${window.location.pathname}#/paket-detail?id=${pkg.id}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        setShareToast(`Link paket "${pkg.name}" berhasil disalin!`);
-        setTimeout(() => setShareToast(''), 3000);
-      });
-    } else {
-      setShareToast(`Link paket disalin: ${shareUrl}`);
-      setTimeout(() => setShareToast(''), 4000);
-    }
+    setSelectedPackageForShare(pkg);
+    setIsShareModalOpen(true);
   };
 
   const formatIDR = (price: number) => {
@@ -664,29 +659,11 @@ const DEFAULT_PACKAGES: TripPackage[] = [
       </div>
 
       {/* Main Grid Trips Section */}
-      {shareToast && (
-        <div 
-          style={{ 
-            position: 'fixed', 
-            bottom: '24px', 
-            right: '24px', 
-            backgroundColor: '#0f172a', 
-            color: '#ffffff', 
-            padding: '12px 20px', 
-            borderRadius: '12px', 
-            fontSize: '13.5px', 
-            fontWeight: '700', 
-            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-            zIndex: 99999,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <Share2 size={16} color="#38bdf8" />
-          <span>{shareToast}</span>
-        </div>
-      )}
+      <ShareModal 
+        isOpen={isShareModalOpen} 
+        onClose={() => setIsShareModalOpen(false)} 
+        pkg={selectedPackageForShare} 
+      />
 
       <div id="main-trips-section" className="container" style={{ marginTop: '45px', maxWidth: '1120px', margin: '45px auto 0 auto', padding: '0 20px' }}>
         

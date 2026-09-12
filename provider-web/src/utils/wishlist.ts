@@ -1,3 +1,6 @@
+import { getTripImage } from './tripImages';
+import { request, getCustomerToken } from './api';
+
 export interface WishlistItem {
   id: number;
   name: string;
@@ -38,6 +41,13 @@ export const toggleWishlistStorage = (pkg: any): WishlistItem[] => {
     if (exists) {
       updated = list.filter(item => Number(item.id) !== pkgId);
     } else {
+      const resolvedImg = getTripImage(
+        pkgId,
+        pkg.name || '',
+        pkg.category || '',
+        pkg.image || pkg.images || pkg.imageUrl
+      );
+
       const wishItem: WishlistItem = {
         id: pkgId,
         name: pkg.name || 'Paket TripKita',
@@ -46,7 +56,7 @@ export const toggleWishlistStorage = (pkg: any): WishlistItem[] => {
         tripType: pkg.tripType || 'Open Trip',
         price: pkg.price || 0,
         rating: pkg.rating || 4.8,
-        image: pkg.image || pkg.imageUrl,
+        image: resolvedImg,
         schedule: pkg.schedule,
         quotaMin: pkg.quotaMin,
         quotaMax: pkg.quotaMax
@@ -56,6 +66,16 @@ export const toggleWishlistStorage = (pkg: any): WishlistItem[] => {
 
     localStorage.setItem('tripkita_customer_wishlist', JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('tripkita_wishlist_updated', { detail: updated }));
+
+    // Sync wishlist to database if logged in as customer
+    const token = getCustomerToken();
+    if (token) {
+      request('/provider/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ wishlistData: JSON.stringify(updated) })
+      }).catch((err) => console.log('Wishlist DB sync skipped:', err));
+    }
+
     return updated;
   } catch (e) {
     console.error('Error updating wishlist storage:', e);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { request } from '../utils/api';
+import { getTripImage } from '../utils/tripImages';
 import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin } from 'lucide-react';
 
 export const CustomerSettingsPage: React.FC = () => {
@@ -438,7 +439,14 @@ export const CustomerSettingsPage: React.FC = () => {
                     {wishlistItems.map((pkg: any) => (
                       <div key={pkg.id} style={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
                         <div style={{ height: '160px', overflow: 'hidden', position: 'relative' }}>
-                          <img src={pkg.image || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80'} alt={pkg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img 
+                            src={getTripImage(pkg.id, pkg.name || '', pkg.category || '', pkg.image)} 
+                            alt={pkg.name} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            onError={(e) => {
+                              e.currentTarget.src = getTripImage(pkg.id, pkg.name || '', pkg.category || '');
+                            }}
+                          />
                           <button
                             onClick={() => handleRemoveWishlist(pkg.id)}
                             style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(255, 255, 255, 0.9)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}

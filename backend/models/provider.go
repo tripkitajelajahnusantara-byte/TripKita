@@ -39,6 +39,7 @@ type Provider struct {
 	BankAccountName         string     `gorm:"size:255" json:"bankAccountName"`
 	Gender                  string     `gorm:"size:20" json:"gender"`
 	BirthDate               string     `gorm:"size:50" json:"birthDate"`
+	WishlistData            string     `gorm:"type:text" json:"wishlistData"`
 	ContactLastUpdatedAt    *time.Time `json:"contactLastUpdatedAt"`
 
 	// Pending bank details & legal verification status

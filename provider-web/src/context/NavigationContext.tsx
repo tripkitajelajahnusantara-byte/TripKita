@@ -124,6 +124,7 @@ interface ProviderProfile {
   website?: string;
   gender?: string;
   birthDate?: string;
+  wishlistData?: string;
   npwp?: string;
   bankName?: string;
   bankAccount?: string;
@@ -327,6 +328,14 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
           if (data && data.role === 'CUSTOMER') {
             setCustomerProfile(data);
             setIsRegistered(true);
+            if (data.wishlistData) {
+              try {
+                localStorage.setItem('tripkita_customer_wishlist', data.wishlistData);
+                window.dispatchEvent(new CustomEvent('tripkita_wishlist_updated', { detail: JSON.parse(data.wishlistData) }));
+              } catch (e) {
+                console.error('Error parsing DB wishlistData:', e);
+              }
+            }
             return data;
           }
         }

@@ -4,6 +4,7 @@ import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
 import { Star, MapPin, Calendar, ChevronRight, ArrowLeft, Heart, Share2 } from 'lucide-react';
 import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
+import { ShareModal } from '../components/ShareModal';
 
 interface TripPackage {
   id: number;
@@ -106,19 +107,13 @@ export const CustomerSearchPage: React.FC = () => {
     setWishlistIds(updated.map(i => Number(i.id)));
   };
 
-  const [shareToast, setShareToast] = useState('');
+  const [selectedPackageForShare, setSelectedPackageForShare] = useState<TripPackage | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
   const handleSharePackage = (e: React.MouseEvent, pkg: TripPackage) => {
     e.stopPropagation();
-    const shareUrl = `${window.location.origin}${window.location.pathname}#/paket-detail?id=${pkg.id}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        setShareToast(`Link detail paket "${pkg.name}" berhasil disalin!`);
-        setTimeout(() => setShareToast(''), 3500);
-      });
-    } else {
-      setShareToast(`Link paket disalin: ${shareUrl}`);
-      setTimeout(() => setShareToast(''), 4000);
-    }
+    setSelectedPackageForShare(pkg);
+    setIsShareModalOpen(true);
   };
 
   const formatIDR = (price: number) => {
@@ -245,29 +240,11 @@ export const CustomerSearchPage: React.FC = () => {
         </div>
 
         {/* List of Landscape Package Cards */}
-        {shareToast && (
-          <div 
-            style={{ 
-              position: 'fixed', 
-              bottom: '24px', 
-              right: '24px', 
-              backgroundColor: '#0f172a', 
-              color: '#ffffff', 
-              padding: '12px 20px', 
-              borderRadius: '12px', 
-              fontSize: '13.5px', 
-              fontWeight: '700', 
-              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-              zIndex: 99999,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <Share2 size={16} color="#38bdf8" />
-            <span>{shareToast}</span>
-          </div>
-        )}
+        <ShareModal 
+          isOpen={isShareModalOpen} 
+          onClose={() => setIsShareModalOpen(false)} 
+          pkg={selectedPackageForShare} 
+        />
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
