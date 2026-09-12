@@ -8,8 +8,7 @@ import {
   Mail, 
   PhoneCall, 
   ChevronDown, 
-  Search,
-  CheckCircle2
+  Search
 } from 'lucide-react';
 
 interface FAQItem {
@@ -53,7 +52,7 @@ export const CustomerHelpPage: React.FC = () => {
       id: 'faq-5',
       category: 'tiket',
       question: 'Bagaimana jika saya tidak sengaja lupa atau kehilangan Kode Booking?',
-      answer: 'Jangan khawatir! Anda dapat masuk (login) ke akun Customer Anda untuk melihat seluruh e-voucher dan riwayat transaksi. Atau Anda dapat menghubungi tim Customer Service kami melalui email support@tementrip.id.'
+      answer: 'Jangan khawatir! Anda dapat masuk (login) ke akun Customer Anda untuk melihat seluruh e-voucher dan riwayat transaksi. Atau Anda dapat menghubungi tim Customer Service kami melalui email support@tripkita.id.'
     },
     {
       id: 'faq-6',
@@ -172,9 +171,9 @@ export const CustomerHelpPage: React.FC = () => {
         <div className="container contact-container">
           <div className="contact-card-main">
             <div className="contact-info-left">
-              <span className="contact-badge">KONTAK BANTUAN TEMENTRIP</span>
+              <span className="contact-badge">KONTAK BANTUAN TRIPKITA</span>
               <h2>Butuh Bantuan Lebih Lanjut?</h2>
-              <p>Tim Customer Support TemenTrip siap membantu Anda 24 jam setiap hari untuk memastikan liburan Anda berjalan lancar tanpa kendala.</p>
+              <p>Tim Customer Support TripKita siap membantu Anda 24 jam setiap hari untuk memastikan liburan Anda berjalan lancar tanpa kendala.</p>
 
               <div className="contact-methods-list">
                 <div className="contact-method-item">
@@ -183,7 +182,7 @@ export const CustomerHelpPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="method-label">Email Dukungan Pelanggan Resmi:</span>
-                    <a href="mailto:support@tementrip.id" className="method-value">support@tementrip.id</a>
+                    <a href="mailto:support@tripkita.id" className="method-value">support@tripkita.id</a>
                   </div>
                 </div>
 
@@ -193,7 +192,7 @@ export const CustomerHelpPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="method-label">WhatsApp Fast Response CS:</span>
-                    <a href="https://wa.me/6280000000000" target="_blank" rel="noreferrer" className="method-value">+62 800 0000 0000</a>
+                    <a href="https://wa.me/628132008875" target="_blank" rel="noreferrer" className="method-value">+62 813 2008 875</a>
                   </div>
                 </div>
 
@@ -206,17 +205,6 @@ export const CustomerHelpPage: React.FC = () => {
                     <span className="method-value-text">24 Jam / 7 Hari Seminggu (Senin - Minggu)</span>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="contact-guarantee-right">
-              <div className="guarantee-box">
-                <CheckCircle2 size={32} color="#10b981" style={{ marginBottom: '12px' }} />
-                <h3>Jaminan Respon Cepat</h3>
-                <p>Setiap pesan email dan WhatsApp akan dibalas oleh tim Customer Service profesional dalam waktu kurang dari 15 menit pada jam operasional.</p>
-                <button className="contact-action-btn" onClick={() => window.location.href = 'mailto:support@tementrip.id'}>
-                  Kirim Email ke support@tementrip.id
-                </button>
               </div>
             </div>
           </div>
@@ -421,9 +409,8 @@ export const CustomerHelpPage: React.FC = () => {
           border-radius: 24px;
           border: 1px solid #e2e8f0;
           padding: 40px;
-          display: grid;
-          grid-template-columns: 1.2fr 0.8fr;
-          gap: 40px;
+          max-width: 640px;
+          margin: 0 auto;
           box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
         }
 
