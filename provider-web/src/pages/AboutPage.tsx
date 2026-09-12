@@ -27,6 +27,7 @@ export const AboutPage: React.FC = () => {
   const teamMembers = [
     { name: 'Evan', role: 'Co-Founder & Product/Project Lead', initial: 'EV', bg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', dept: 'Co-Founder & Product' },
     { name: 'Garry', role: 'Co-Founder & Tech Strategy Lead', initial: 'GA', bg: 'linear-gradient(135deg, #00c9a7 0%, #0f766e 100%)', dept: 'Co-Founder & Tech' },
+    { name: 'Liviani', role: 'Finance & Investor Relations Lead', initial: 'LI', bg: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', dept: 'Finance & Investor Relations' },
     { name: 'Kris', role: 'Provider & Partnership Lead', initial: 'KR', bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', dept: 'Partnership' },
     { name: 'Bakri', role: 'Legal & Compliance Lead', initial: 'BA', bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', dept: 'Legal' },
     { name: 'Cindy', role: 'Business Analyst Lead', initial: 'CI', bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', dept: 'Analytics' },

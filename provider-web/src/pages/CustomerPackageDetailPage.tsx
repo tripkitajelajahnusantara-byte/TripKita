@@ -332,39 +332,18 @@ export const CustomerPackageDetailPage: React.FC = () => {
       return `${start.getDate()} ${months[start.getMonth()]}–${end.getDate()} ${months[end.getMonth()]} ${end.getFullYear()} (${days} Hari)`;
     };
 
-    // If package has a specific schedule string (e.g. from backend or form)
-    if (pkg.schedule && pkg.schedule.trim() !== '') {
-      const parts = pkg.schedule.split(',').map((s: string) => s.trim()).filter(Boolean);
-      if (parts.length > 0) {
-        return parts.map((part: string) => {
-          // If part contains YYYY-MM-DD format
-          const dateMatch = part.match(/\d{4}-\d{2}-\d{2}/);
-          const dateVal = dateMatch ? dateMatch[0] : (pkg.startDate || formatDate(addDays(today, 3)));
-          return { label: part, dateValue: dateVal };
-        });
-      }
+    // Generate active schedules for 3 full months ahead (12 departure dates)
+    const baseStart = pkg.startDate ? new Date(pkg.startDate) : addDays(today, 3);
+    const validStart = !isNaN(baseStart.getTime()) ? baseStart : addDays(today, 3);
+    const schedules = [];
+    for (let i = 0; i < 12; i++) {
+      const tripStart = addDays(validStart, i * 7);
+      schedules.push({
+        label: formatLabel(tripStart, 3),
+        dateValue: formatDate(tripStart)
+      });
     }
-
-    if (pkg.startDate) {
-      const start = new Date(pkg.startDate);
-      if (!isNaN(start.getTime())) {
-        const end = pkg.endDate ? new Date(pkg.endDate) : addDays(start, 3);
-        const days = !isNaN(end.getTime()) ? Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1) : 4;
-        return [
-          { label: formatLabel(start, days), dateValue: formatDate(start) }
-        ];
-      }
-    }
-
-    const d1 = addDays(today, 3);
-    const d2 = addDays(today, 7);
-    const d3 = addDays(today, 12);
-
-    return [
-      { label: formatLabel(d1, 4), dateValue: formatDate(d1) },
-      { label: formatLabel(d2, 4), dateValue: formatDate(d2) },
-      { label: formatLabel(d3, 4), dateValue: formatDate(d3) }
-    ];
+    return schedules;
   };
 
   const availableSchedules = getActiveSchedules();
@@ -1122,14 +1101,14 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
                   return isConfirmedDeparture ? (
                     <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '11.5px', color: '#166534', fontWeight: '700', lineHeight: '1.4' }}>
-                      🟢 <strong>PASTI BERANGKAT!</strong><br/>
+                      <strong>PASTI BERANGKAT!</strong><br/>
                       • Kuota minimal ({quotaMin} pax) telah <strong>TERPENUHI</strong> ({quotaUsed}/{totalQuotaMax} seat terisi).
                     </div>
                   ) : (
                     <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fffbebfb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '11.5px', color: '#92400e', fontWeight: '700', lineHeight: '1.4' }}>
-                      📊 <strong>Status Kuota Open Trip:</strong><br/>
-                      • Terisi: <strong>{quotaUsed}/{quotaMin} Orang</strong> (Min. Kuota: {quotaMin} pax)<br/>
-                      • ⏳ <strong>Kurang {quotaShortage} orang lagi</strong> agar trip <strong>PASTI BERANGKAT</strong>!
+                      <strong>Status Kuota Open Trip:</strong><br/>
+                      • Terisi: <strong>{quotaUsed}/{quotaMin} Orang (Min. Kuota: {quotaMin} pax)</strong><br/>
+                      • <strong>Kurang {quotaShortage} orang lagi agar trip PASTI BERANGKAT!</strong>
                     </div>
                   );
                 })()}
