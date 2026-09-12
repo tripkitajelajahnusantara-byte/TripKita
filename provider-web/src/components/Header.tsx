@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { Menu, X, User } from 'lucide-react';
+import { Menu, X, User, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { NotificationCenter } from './NotificationCenter';
 
 export const Header: React.FC = () => {
   const { route, navigateTo, logout, providerProfile, customerProfile, openAuthModal } = useNavigation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const handleNav = (targetRoute: 'beranda' | 'tentang-kami' | 'partner-landing' | 'bantuan' | 'riwayat-booking' | 'masuk') => {
+  const handleNav = (targetRoute: 'beranda' | 'tentang-kami' | 'partner-landing' | 'bantuan' | 'riwayat-booking' | 'masuk' | 'pengaturan') => {
     navigateTo(targetRoute as any);
     setMobileMenuOpen(false);
   };
@@ -30,41 +31,44 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Desktop Nav */}
-        <nav className="desktop-nav">
-          <button 
-            className={`nav-link ${route === 'beranda' ? 'active' : ''}`}
-            onClick={() => handleNav('beranda')}
-          >
-            Home
-          </button>
-          <button 
-            className={`nav-link ${route === 'riwayat-booking' ? 'active' : ''}`}
-            onClick={() => handleNav('riwayat-booking')}
-          >
-            Cek Booking
-          </button>
-          <button 
-            className={`nav-link ${route === 'partner-landing' ? 'active' : ''}`}
-            onClick={() => handleNav('partner-landing')}
-          >
-            Jadi Mitra
-          </button>
-          <button 
-            className={`nav-link ${route === 'tentang-kami' ? 'active' : ''}`}
-            onClick={() => handleNav('tentang-kami')}
-          >
-            Tentang Kami
-          </button>
-          <button 
-            className={`nav-link ${route === 'bantuan' ? 'active' : ''}`}
-            onClick={() => handleNav('bantuan')}
-          >
-            Bantuan
-          </button>
-        </nav>
+        {/* Navigation links */}
+        {!isProviderRoute && (
+          <nav className="main-nav desktop-only">
+            <button 
+              className={`nav-link ${route === 'beranda' ? 'active' : ''}`}
+              onClick={() => handleNav('beranda')}
+            >
+              Home
+            </button>
+            <button 
+              className={`nav-link ${route === 'riwayat-booking' ? 'active' : ''}`}
+              onClick={() => handleNav('riwayat-booking')}
+            >
+              Cek Booking
+            </button>
+            <button 
+              className={`nav-link ${route === 'partner-landing' ? 'active' : ''}`}
+              onClick={() => handleNav('partner-landing')}
+            >
+              Jadi Mitra
+            </button>
+            <button 
+              className={`nav-link ${route === 'tentang-kami' ? 'active' : ''}`}
+              onClick={() => handleNav('tentang-kami')}
+            >
+              Tentang Kami
+            </button>
+            <button 
+              className={`nav-link ${route === 'bantuan' ? 'active' : ''}`}
+              onClick={() => handleNav('bantuan')}
+            >
+              Bantuan
+            </button>
+          </nav>
+        )}
 
-        <div className="auth-buttons">
+        {/* User Account / Auth Actions */}
+        <div className="header-actions">
           {isProviderRoute ? (
             providerProfile ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -98,28 +102,107 @@ export const Header: React.FC = () => {
             customerProfile ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <NotificationCenter />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#f0f9ff', padding: '6px 14px', borderRadius: '30px', border: '1px solid #bae6fd' }}>
-                  <User size={16} color="#0284c7" />
-                  <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0369a1' }}>
-                    {customerProfile.picName || customerProfile.businessName || customerProfile.email || 'Traveler'}
-                  </span>
+                <div style={{ position: 'relative' }}>
+                  <button 
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px', 
+                      backgroundColor: '#f0f9ff', 
+                      padding: '6px 14px', 
+                      borderRadius: '30px', 
+                      border: '1.5px solid #bae6fd',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <User size={16} color="#0284c7" />
+                    <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0369a1' }}>
+                      {customerProfile.picName || customerProfile.businessName || customerProfile.email || 'Traveler'}
+                    </span>
+                    <ChevronDown size={14} color="#0284c7" />
+                  </button>
+
+                  {showUserMenu && (
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 8px)',
+                        right: 0,
+                        backgroundColor: '#ffffff',
+                        borderRadius: '16px',
+                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
+                        border: '1px solid #e2e8f0',
+                        minWidth: '220px',
+                        zIndex: 9999,
+                        overflow: 'hidden',
+                        padding: '6px 0',
+                        animation: 'fadeIn 0.15s ease-out'
+                      }}
+                    >
+                      <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
+                        <span style={{ display: 'block', fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>
+                          {customerProfile.picName || 'Pelanggan TripKita'}
+                        </span>
+                        <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>
+                          {customerProfile.email || ''}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          navigateTo('pengaturan');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          color: '#334155',
+                          fontSize: '13.5px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <Settings size={16} color="#0284c7" /> Pengaturan (Akun & Favorit)
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          logout();
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          color: '#ef4444',
+                          fontSize: '13.5px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          borderTop: '1px solid #f1f5f9'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <LogOut size={16} color="#ef4444" /> Keluar
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <button 
-                  onClick={logout}
-                  style={{ 
-                    padding: '7px 16px', 
-                    backgroundColor: '#fee2e2', 
-                    color: '#ef4444', 
-                    border: '1px solid #fca5a5', 
-                    borderRadius: '20px', 
-                    fontSize: '12.5px', 
-                    fontWeight: '700', 
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Keluar
-                </button>
               </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -188,6 +271,14 @@ export const Header: React.FC = () => {
             >
               Bantuan
             </button>
+            {customerProfile && (
+              <button 
+                className={`mobile-nav-link ${route === 'pengaturan' ? 'active' : ''}`}
+                onClick={() => handleNav('pengaturan')}
+              >
+                Pengaturan (Akun & Favorit)
+              </button>
+            )}
             <hr className="mobile-divider" />
             {isProviderRoute ? (
               providerProfile ? (

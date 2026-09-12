@@ -23,7 +23,8 @@ export type Route =
   | 'halaman-pembayaran'
   | 'xendit-checkout'
   | 'provider-public-profile'
-  | 'admin-login';
+  | 'admin-login'
+  | 'pengaturan';
 
 export interface Booking {
   id: string;

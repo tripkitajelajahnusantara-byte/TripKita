@@ -25,6 +25,7 @@ import { CustomerPaymentInvoicePage } from './pages/CustomerPaymentInvoicePage';
 import { CustomerXenditCheckoutPage } from './pages/CustomerXenditCheckoutPage';
 import { ProviderFinancePage } from './pages/ProviderFinancePage';
 import { ProviderPublicProfilePage } from './pages/ProviderPublicProfilePage';
+import { CustomerSettingsPage } from './pages/CustomerSettingsPage';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from './components/LegalModals';
 
 const AppContent: React.FC = () => {
@@ -87,6 +88,7 @@ const AppContent: React.FC = () => {
       isOpen={showGlobalCustomerTerms}
       onClose={() => {}}
       title="Persetujuan Syarat & Ketentuan Customer TemenTrip"
+      hideCloseButton={true}
     >
       <div>
         <div style={{ backgroundColor: '#e0f2fe', padding: '12px 16px', borderRadius: '10px', color: '#0369a1', fontSize: '13px', fontWeight: '600', marginBottom: '16px', border: '1px solid #bae6fd' }}>
@@ -261,6 +263,7 @@ const AppContent: React.FC = () => {
         {route === 'partner-landing' && <ProviderLandingPage />}
         {route === 'tentang-kami' && <AboutPage />}
         {route === 'bantuan' && <CustomerHelpPage />}
+        {route === 'pengaturan' && <CustomerSettingsPage />}
       </main>
       <Footer />
       {renderGlobalTermsModal()}

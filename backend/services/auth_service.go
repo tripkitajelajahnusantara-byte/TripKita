@@ -178,6 +178,26 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 		return nil, err
 	}
 
+	if provider.Role == "CUSTOMER" {
+		if req.PicName != "" {
+			provider.PicName = req.PicName
+		}
+		if req.Name != "" {
+			provider.PicName = req.Name
+		}
+		if req.WhatsApp != "" {
+			provider.WhatsApp = req.WhatsApp
+		}
+		if req.Gender != "" {
+			provider.Gender = req.Gender
+		}
+		if req.BirthDate != "" {
+			provider.BirthDate = req.BirthDate
+		}
+		err = s.repo.Update(provider)
+		return provider, err
+	}
+
 	// 1. Validation for Contact & Social Media changes (Max 1 update in 7 days)
 	contactChanged := false
 	if req.PicName != "" && req.PicName != provider.PicName {

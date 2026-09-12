@@ -1182,7 +1182,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 </div>
               </div>
               <span style={{ backgroundColor: '#e0f2fe', color: '#0284c7', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>
-                {pkg.tripType || 'Open Trip'}
+                {pkg.tripType || 'Open Trip'} • Min. {pkg.quotaMin || 4} Pax
               </span>
             </div>
 

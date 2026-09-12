@@ -37,6 +37,8 @@ type Provider struct {
 	BankName                string     `gorm:"size:100" json:"bankName"`
 	BankAccount             string     `gorm:"size:100" json:"bankAccount"`
 	BankAccountName         string     `gorm:"size:255" json:"bankAccountName"`
+	Gender                  string     `gorm:"size:20" json:"gender"`
+	BirthDate               string     `gorm:"size:50" json:"birthDate"`
 	ContactLastUpdatedAt    *time.Time `json:"contactLastUpdatedAt"`
 
 	// Pending bank details & legal verification status
@@ -139,6 +141,9 @@ type UpdateProfileRequest struct {
 	BankName            string `json:"bankName"`
 	BankAccount         string `json:"bankAccount"`
 	BankAccountName     string `json:"bankAccountName"`
+	Name                string `json:"name"`
+	Gender              string `json:"gender"`
+	BirthDate           string `json:"birthDate"`
 }
 
 type LoginResponse struct {

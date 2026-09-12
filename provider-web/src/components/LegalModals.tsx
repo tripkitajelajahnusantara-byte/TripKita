@@ -6,15 +6,16 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  hideCloseButton?: boolean;
 }
 
-export const LegalModalContainer: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+export const LegalModalContainer: React.FC<ModalProps> = ({ isOpen, onClose, title, children, hideCloseButton = false }) => {
   if (!isOpen) return null;
 
   return (
     <div
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (!hideCloseButton && e.target === e.currentTarget) onClose();
       }}
       style={{
         position: 'fixed',
@@ -90,35 +91,37 @@ export const LegalModalContainer: React.FC<ModalProps> = ({ isOpen, onClose, tit
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '50%',
-              width: '38px',
-              height: '38px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: '#64748b',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#fee2e2';
-              e.currentTarget.style.color = '#ef4444';
-              e.currentTarget.style.borderColor = '#fca5a5';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#f8fafc';
-              e.currentTarget.style.color = '#64748b';
-              e.currentTarget.style.borderColor = '#e2e8f0';
-            }}
-          >
-            <X size={20} />
-          </button>
+          {!hideCloseButton && (
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '50%',
+                width: '38px',
+                height: '38px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#fee2e2';
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.borderColor = '#fca5a5';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#f8fafc';
+                e.currentTarget.style.color = '#64748b';
+                e.currentTarget.style.borderColor = '#e2e8f0';
+              }}
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
 
         {/* Content Body */}
@@ -135,7 +138,7 @@ export const LegalModalContainer: React.FC<ModalProps> = ({ isOpen, onClose, tit
           {children}
         </div>
 
-        {/* Footer Close Button */}
+        {/* Footer */}
         <div
           style={{
             padding: '16px 28px',
@@ -151,24 +154,26 @@ export const LegalModalContainer: React.FC<ModalProps> = ({ isOpen, onClose, tit
             <span>Terlindungi oleh Kebijakan Resmi TemenTrip</span>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: '10px 24px',
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '12px',
-              fontWeight: '700',
-              fontSize: '13.5px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            Tutup Dokumen
-          </button>
+          {!hideCloseButton && (
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '10px 24px',
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                fontWeight: '700',
+                fontSize: '13.5px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Tutup Dokumen
+            </button>
+          )}
         </div>
       </div>
     </div>

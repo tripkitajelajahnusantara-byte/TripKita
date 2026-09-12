@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck } from 'lucide-react';
+import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsContent } from '../components/LegalModals';
 
 export const CustomerConfirmationPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, customerProfile, bookingFormData } = useNavigation();
@@ -10,6 +11,9 @@ export const CustomerConfirmationPage: React.FC = () => {
   // Agreement Checkbox state
   const [isAgreed, setIsAgreed] = useState(false);
   const [agreementError, setAgreementError] = useState('');
+
+  // Legal Modals state
+  const [activeLegalModal, setActiveLegalModal] = useState<'terms' | 'cancellation' | null>(null);
 
   // Confirmation Modal Popup state (YES / NO)
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -166,8 +170,8 @@ export const CustomerConfirmationPage: React.FC = () => {
       localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
       sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
-      // Direct external redirect to Xendit Invoice URL!
-      window.location.href = paymentUrl;
+      // Direct external redirect to Xendit Invoice URL (using replace so back button doesn't loop)!
+      window.location.replace(paymentUrl);
 
     } catch (err: any) {
       console.error('[Booking Error]', err);
@@ -178,25 +182,14 @@ export const CustomerConfirmationPage: React.FC = () => {
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '80px', paddingTop: '24px', fontFamily: 'Inter, sans-serif' }}>
-      <div className="container" style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 20px' }}>
         
         {/* Back Button */}
         <button 
           onClick={() => navigateTo('customer-checkout')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'none',
-            border: 'none',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: '#475569',
-            cursor: 'pointer',
-            marginBottom: '24px'
-          }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'transparent', border: 'none', color: '#0284c7', fontWeight: '700', fontSize: '14px', cursor: 'pointer', marginBottom: '20px' }}
         >
-          <ArrowLeft size={16} /> Ubah Data Pemesan & Peserta
+          <ArrowLeft size={18} /> Ubah Data Pemesan & Peserta
         </button>
 
         <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0f172a', marginBottom: '30px' }}>
@@ -331,7 +324,23 @@ export const CustomerConfirmationPage: React.FC = () => {
                 style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: '#0284c7', cursor: 'pointer' }}
               />
               <span style={{ fontSize: '13px', color: '#334155', lineHeight: '1.5' }}>
-                Saya telah membaca dan menyetujui <strong style={{ color: '#0284c7' }}>Syarat & Ketentuan</strong> serta <strong style={{ color: '#0284c7' }}>Kebijakan Pembatalan Strict H-7 TripKita</strong>. Seluruh data peserta yang diisikan adalah benar.
+                Saya telah membaca dan menyetujui{' '}
+                <button 
+                  type="button" 
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveLegalModal('terms'); }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: '#0284c7', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
+                >
+                  Syarat & Ketentuan
+                </button>
+                {' '}serta{' '}
+                <button 
+                  type="button" 
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveLegalModal('cancellation'); }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: '#0284c7', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
+                >
+                  Kebijakan Pembatalan Strict H-7 TripKita
+                </button>
+                . Seluruh data peserta yang diisikan adalah benar.
               </span>
             </label>
             {agreementError && (
@@ -448,6 +457,23 @@ export const CustomerConfirmationPage: React.FC = () => {
         </div>
       )}
 
+      {/* Syarat & Ketentuan Modal */}
+      <LegalModalContainer
+        isOpen={activeLegalModal === 'terms'}
+        onClose={() => setActiveLegalModal(null)}
+        title="Syarat & Ketentuan Customer TemenTrip"
+      >
+        <GeneralTermsContent />
+      </LegalModalContainer>
+
+      {/* Kebijakan Pembatalan Strict H-7 Modal */}
+      <LegalModalContainer
+        isOpen={activeLegalModal === 'cancellation'}
+        onClose={() => setActiveLegalModal(null)}
+        title="Kebijakan Pembatalan Strict H-7 TripKita"
+      >
+        <CustomerRegistrationTermsContent />
+      </LegalModalContainer>
     </div>
   );
 };
