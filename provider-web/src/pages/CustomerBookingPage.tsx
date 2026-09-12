@@ -19,6 +19,13 @@ export const CustomerBookingPage: React.FC = () => {
   // Check if user is logged in
   const isLoggedIn = !!(customerProfile && customerProfile.email);
 
+  useEffect(() => {
+    if (!customerProfile) {
+      alert('🔒 Silakan masuk / daftar akun terlebih dahulu untuk melakukan pemesanan paket wisata ini.');
+      navigateTo('masuk');
+    }
+  }, [customerProfile, navigateTo]);
+
   // Data Pemesan State - initialize with priority: customerProfile (logged in) > activeFormData > defaults
   const [pemesanName, setPemesanName] = useState(() => 
     customerProfile?.picName || customerProfile?.businessName || activeFormData?.pemesan?.nama || ''

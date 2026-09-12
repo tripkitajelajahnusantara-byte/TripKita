@@ -12,7 +12,7 @@ interface AddOn {
 }
 
 export const CustomerPackageDetailPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, setSelectedPackageForDetail, setSelectedProviderId } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, setSelectedPackageForDetail, setSelectedProviderId, customerProfile } = useNavigation();
 
   // Photo Lightbox Modal State
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -494,6 +494,11 @@ export const CustomerPackageDetailPage: React.FC = () => {
   };
 
   const handleBookNow = () => {
+    if (!customerProfile) {
+      alert('🔒 Silakan masuk / daftar akun terlebih dahulu untuk melanjutkan pemesanan paket wisata ini.');
+      navigateTo('masuk');
+      return;
+    }
     if (availableSeats <= 0) {
       alert('Maaf, kuota untuk paket ini telah habis. Silakan pilih paket wisata lain.');
       return;
