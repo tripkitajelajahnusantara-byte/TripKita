@@ -35,22 +35,27 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 	}
 
 	pkg := &models.Package{
-		ProviderID:  providerID,
-		Name:        req.Name,
-		Destination: req.Destination,
-		Category:    req.Category,
-		TripType:    req.TripType,
-		Price:       req.Price,
-		QuotaMin:    req.QuotaMin,
-		QuotaUsed:   0,
-		QuotaMax:    req.QuotaMax,
-		StartDate:   req.StartDate,
-		EndDate:     req.EndDate,
-		Schedule:    req.Schedule,
-		Status:      req.Status,
-		Rating:      5.0,
-		Image:       req.Image,
-		Images:      req.Images,
+		ProviderID:         providerID,
+		Name:               req.Name,
+		Destination:        req.Destination,
+		MeetingPoint:       req.MeetingPoint,
+		Category:           req.Category,
+		TripType:           req.TripType,
+		Price:              req.Price,
+		QuotaMin:           req.QuotaMin,
+		QuotaUsed:          0,
+		QuotaMax:           req.QuotaMax,
+		StartDate:          req.StartDate,
+		EndDate:            req.EndDate,
+		Schedule:           req.Schedule,
+		Status:             req.Status,
+		Rating:             5.0,
+		Description:        req.Description,
+		IncludedFacilities: req.IncludedFacilities,
+		ExcludedFacilities: req.ExcludedFacilities,
+		Itinerary:          req.Itinerary,
+		Image:              req.Image,
+		Images:             req.Images,
 	}
 
 	if err := s.repo.Create(pkg); err != nil {
@@ -84,6 +89,9 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	if req.Destination != "" {
 		pkg.Destination = req.Destination
 	}
+	if req.MeetingPoint != "" {
+		pkg.MeetingPoint = req.MeetingPoint
+	}
 	if req.Category != "" {
 		pkg.Category = req.Category
 	}
@@ -116,6 +124,18 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	}
 	if req.Status != "" {
 		pkg.Status = req.Status
+	}
+	if req.Description != "" {
+		pkg.Description = req.Description
+	}
+	if req.IncludedFacilities != "" {
+		pkg.IncludedFacilities = req.IncludedFacilities
+	}
+	if req.ExcludedFacilities != "" {
+		pkg.ExcludedFacilities = req.ExcludedFacilities
+	}
+	if req.Itinerary != "" {
+		pkg.Itinerary = req.Itinerary
 	}
 	if req.Image != "" {
 		pkg.Image = req.Image

@@ -67,8 +67,12 @@ func ConnectDB(cfg *config.Config) {
 		fmt.Println("Migrasi database selesai")
 	}
 
-	// Pastikan kolom meeting_point, customer_email, dan customer_phone ada di database Supabase
+	// Pastikan kolom meeting_point, customer_email, customer_phone, description, included_facilities, excluded_facilities, itinerary ada di database Supabase
 	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS meeting_point TEXT;`)
+	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS description TEXT;`)
+	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS included_facilities TEXT;`)
+	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS excluded_facilities TEXT;`)
+	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS itinerary TEXT;`)
 	DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT;`)
 	DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT;`)
 

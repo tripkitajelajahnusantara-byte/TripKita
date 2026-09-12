@@ -138,7 +138,17 @@ export const AddPackagePage: React.FC = () => {
           setPrice(pkg.price ? String(pkg.price) : '');
           setQuotaMax(pkg.quotaMax ? String(pkg.quotaMax) : '');
           setSchedule(pkg.schedule || '');
-          setDescription(pkg.description || '');
+          if (pkg.description) setDescription(pkg.description);
+          if (pkg.includedFacilities) setIncludedFacilities(pkg.includedFacilities.split('\n').filter(Boolean));
+          if (pkg.excludedFacilities) setExcludedFacilities(pkg.excludedFacilities.split('\n').filter(Boolean));
+          if (pkg.itinerary) {
+            try {
+              const parsed = JSON.parse(pkg.itinerary);
+              if (Array.isArray(parsed) && parsed.length > 0) setItineraries(parsed);
+            } catch (e) {
+              // ignore
+            }
+          }
           if (pkg.images) {
             const splitImgs = pkg.images.split(',').filter(Boolean);
             if (splitImgs.length > 0) setPackagePhotos(splitImgs);
@@ -347,6 +357,10 @@ export const AddPackagePage: React.FC = () => {
         endDate: endDate,
         schedule: finalSchedule,
         status: dbStatus,
+        description: description,
+        includedFacilities: includedFacilities.join('\n'),
+        excludedFacilities: excludedFacilities.join('\n'),
+        itinerary: JSON.stringify(itineraries),
         image: packagePhotos[0] || '',
         images: packagePhotos.join(','),
       };

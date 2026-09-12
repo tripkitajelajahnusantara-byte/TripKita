@@ -408,28 +408,69 @@ export const CustomerPackageDetailPage: React.FC = () => {
     return sum + (item ? item.price : 0);
   }, 0);
 
-  const mockItinerary = [
-    { day: 'Hari 1', title: 'Kedatangan & Check-in Awal', desc: 'Penjemputan di meeting point oleh tim pemandu lokal TripKita. Briefing perjalanan dan pembagian kamar.' },
-    { day: 'Hari 2', title: 'Eksplorasi Destinasi Utama & Sesi Foto', desc: 'Perjalanan seharian menjelajahi spot-spot ikonik. Makan siang bersama di spot alam dengan pemandangan menakjubkan.' },
-    { day: 'Hari 3', title: 'Wisata Kuliner & Kepulangan', desc: 'Berburu oleh-oleh khas lokal, makan siang santai, lalu diantar kembali menuju titik kumpul awal kepulangan.' }
-  ];
+  const getDynamicItinerary = () => {
+    if (pkg.itinerary) {
+      try {
+        const parsed = JSON.parse(pkg.itinerary);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const list: { day: string; title: string; desc: string }[] = [];
+          parsed.forEach((item: any) => {
+            const dayLabel = `Hari ${item.day}`;
+            if (Array.isArray(item.activities)) {
+              item.activities.forEach((act: any) => {
+                list.push({
+                  day: dayLabel,
+                  title: act.time ? `${act.time} — ${act.title}` : act.title,
+                  desc: `Aktivitas perjalanan Hari ${item.day} bersama tim pemandu profesional TemenTrip.`
+                });
+              });
+            }
+          });
+          if (list.length > 0) return list;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    return [
+      { day: 'Hari 1', title: 'Kedatangan & Check-in Awal', desc: 'Penjemputan di meeting point oleh tim pemandu lokal TemenTrip. Briefing perjalanan dan pembagian kamar.' },
+      { day: 'Hari 2', title: 'Eksplorasi Destinasi Utama & Sesi Foto', desc: 'Perjalanan seharian menjelajahi spot-spot ikonik. Makan siang bersama di spot alam dengan pemandangan menakjubkan.' },
+      { day: 'Hari 3', title: 'Wisata Kuliner & Kepulangan', desc: 'Berburu oleh-oleh khas lokal, makan siang santai, lalu diantar kembali menuju titik kumpul awal kepulangan.' }
+    ];
+  };
 
-  const mockIncludedFacilities = [
-    'Penginapan / Homestay AC Berstandar',
-    'Transportasi Lokal AC Selama Trip',
-    'Makan Sesuai Program Trip (3x Sehari)',
-    'Tiket Masuk Semua Objek Wisata',
-    'Tour Guide Lokal Berpengalaman & Lisensi',
-    'Dokumentasi Foto Selama Perjalanan',
-    'Air Mineral & Snack Perjalanan'
-  ];
+  const getDynamicIncludedFacilities = () => {
+    if (pkg.includedFacilities && pkg.includedFacilities.trim()) {
+      const list = pkg.includedFacilities.split('\n').map((s: string) => s.trim()).filter(Boolean);
+      if (list.length > 0) return list;
+    }
+    return [
+      'Penginapan / Homestay AC Berstandar',
+      'Transportasi Lokal AC Selama Trip',
+      'Makan Sesuai Program Trip (3x Sehari)',
+      'Tiket Masuk Semua Objek Wisata',
+      'Tour Guide Lokal Berpengalaman & Lisensi',
+      'Dokumentasi Foto Selama Perjalanan',
+      'Air Mineral & Snack Perjalanan'
+    ];
+  };
 
-  const mockExcludedFacilities = [
-    'Tiket Pesawat / Kereta menuju Meeting Point',
-    'Pengeluaran Pribadi & Belanja Souvenir',
-    'Obat-obatan Pribadi Khusus',
-    'Tipping Sukarela Guide & Driver'
-  ];
+  const getDynamicExcludedFacilities = () => {
+    if (pkg.excludedFacilities && pkg.excludedFacilities.trim()) {
+      const list = pkg.excludedFacilities.split('\n').map((s: string) => s.trim()).filter(Boolean);
+      if (list.length > 0) return list;
+    }
+    return [
+      'Tiket Pesawat / Kereta menuju Meeting Point',
+      'Pengeluaran Pribadi & Belanja Souvenir',
+      'Obat-obatan Pribadi Khusus',
+      'Tipping Sukarela Guide & Driver'
+    ];
+  };
+
+  const displayItinerary = getDynamicItinerary();
+  const displayIncludedFacilities = getDynamicIncludedFacilities();
+  const displayExcludedFacilities = getDynamicExcludedFacilities();
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -739,7 +780,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 Rencana Perjalanan (Itinerary)
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {mockItinerary.map((item, idx) => (
+                {displayItinerary.map((item, idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                     <span style={{ backgroundColor: '#e0f2fe', color: '#007bff', fontSize: '12px', fontWeight: '700', padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                       {item.day}
@@ -766,7 +807,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     <CheckCircle2 size={16} /> Fasilitas Termasuk
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {mockIncludedFacilities.map((fac, idx) => (
+                    {displayIncludedFacilities.map((fac: string, idx: number) => (
                       <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: '#334155' }}>
                         <CheckCircle2 size={15} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
                         <span>{fac}</span>
@@ -781,7 +822,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     <XCircle size={16} /> Fasilitas Tidak Termasuk
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {mockExcludedFacilities.map((fac, idx) => (
+                    {displayExcludedFacilities.map((fac: string, idx: number) => (
                       <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: '#64748b' }}>
                         <XCircle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
                         <span>{fac}</span>
