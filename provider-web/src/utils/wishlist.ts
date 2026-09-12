@@ -50,16 +50,16 @@ export const toggleWishlistStorage = (pkg: any): WishlistItem[] => {
 
       const wishItem: WishlistItem = {
         id: pkgId,
-        name: pkg.name || 'Paket TripKita',
-        destination: pkg.destination || 'Indonesia',
-        category: pkg.category || 'Wisata',
-        tripType: pkg.tripType || 'Open Trip',
+        name: pkg.name || '',
+        destination: pkg.destination || '',
+        category: pkg.category || '',
+        tripType: pkg.tripType || '',
         price: pkg.price || 0,
-        rating: pkg.rating || 4.8,
+        rating: pkg.rating || 0,
         image: resolvedImg,
-        schedule: pkg.schedule,
-        quotaMin: pkg.quotaMin,
-        quotaMax: pkg.quotaMax
+        schedule: pkg.schedule || '',
+        quotaMin: pkg.quotaMin || 0,
+        quotaMax: pkg.quotaMax || 0
       };
       updated = [wishItem, ...list];
     }

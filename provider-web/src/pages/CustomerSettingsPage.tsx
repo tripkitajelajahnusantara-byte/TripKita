@@ -57,16 +57,7 @@ export const CustomerSettingsPage: React.FC = () => {
       if (storedReviews) {
         setReviewItems(JSON.parse(storedReviews));
       } else {
-        // Mock review if none saved
-        setReviewItems([
-          {
-            id: 1,
-            packageName: 'Open Trip Gunung Bromo',
-            rating: 5,
-            comment: 'Pengalaman trip luar biasa! Pemandunya sangat ramah, ramah anak, dan tepat waktu. Pemandangan sunrise Bromo tiada duanya.',
-            date: '2026-08-20'
-          }
-        ]);
+        setReviewItems([]);
       }
     } catch (e) {
       console.error(e);
