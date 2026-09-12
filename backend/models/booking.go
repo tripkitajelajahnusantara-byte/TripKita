@@ -22,8 +22,13 @@ type Booking struct {
 	XenditInvoiceID string    `gorm:"size:255" json:"xenditInvoiceId"`
 	PaymentURL      string    `gorm:"size:1024" json:"paymentUrl"`
 	PaymentProof    string    `gorm:"size:1024" json:"paymentProof"`
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
+	CancellationReason string     `gorm:"size:255" json:"cancellationReason,omitempty"`
+	RefundAmount       int64      `json:"refundAmount"`
+	RescheduleCount    int        `gorm:"default:0" json:"rescheduleCount"`
+	OriginalTripDate   *time.Time `json:"originalTripDate,omitempty"`
+	RescheduleDate     *time.Time `json:"rescheduleDate,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
 }
 
 const (
@@ -36,8 +41,11 @@ const (
 	StatusCancelledByProvider = "CANCELLED_BY_PROVIDER"
 	StatusRefundRequired      = "REFUND_REQUIRED"
 	StatusRefunded            = "REFUNDED"
+	StatusRescheduleOffered   = "RESCHEDULE_OFFERED"
 )
 
 type UpdateBookingStatusRequest struct {
-	Status string `json:"status" binding:"required"` 
+	Status             string `json:"status" binding:"required"`
+	CancellationReason string `json:"cancellationReason,omitempty"`
+	RescheduleDate     string `json:"rescheduleDate,omitempty"` // YYYY-MM-DD format if offering reschedule
 }

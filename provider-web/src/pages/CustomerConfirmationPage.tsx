@@ -307,6 +307,18 @@ export const CustomerConfirmationPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Cancellation Policy Banner */}
+          <div style={{ backgroundColor: '#f0f9ff', borderRadius: '16px', padding: '16px 20px', border: '1px solid #bae6fd', marginBottom: '16px' }}>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '800', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              🛡️ Kebijakan Pembatalan Strict H-7 TripKita
+            </h4>
+            <p style={{ margin: 0, fontSize: '12px', color: '#0c4a6e', lineHeight: '1.5' }}>
+              • Pembatalan <strong>≥ 7 hari sebelum trip</strong> berhak pengembalian dana <strong>100% Full Refund</strong>.<br/>
+              • Pembatalan <strong>&lt; 7 hari sebelum trip (H-6 s/d Hari H)</strong> dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>).<br/>
+              • Jika trip dibatalkan oleh Provider/Cuaca/Kuota Kurang, Pemesan berhak atas <strong>100% Refund</strong> atau <strong>Reschedule Maks 1x</strong>.
+            </p>
+          </div>
+
           {/* Agreement Checkbox Card */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px 24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
@@ -317,7 +329,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                 style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: '#0284c7', cursor: 'pointer' }}
               />
               <span style={{ fontSize: '13px', color: '#334155', lineHeight: '1.5' }}>
-                Saya telah membaca dan menyetujui <strong style={{ color: '#0284c7' }}>Syarat & Ketentuan</strong> serta <strong style={{ color: '#0284c7' }}>Kebijakan Pembatalan TripKita</strong>. Seluruh data peserta yang diisikan adalah benar.
+                Saya telah membaca dan menyetujui <strong style={{ color: '#0284c7' }}>Syarat & Ketentuan</strong> serta <strong style={{ color: '#0284c7' }}>Kebijakan Pembatalan Strict H-7 TripKita</strong>. Seluruh data peserta yang diisikan adalah benar.
               </span>
             </label>
             {agreementError && (

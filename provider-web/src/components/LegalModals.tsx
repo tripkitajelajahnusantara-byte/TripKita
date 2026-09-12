@@ -270,10 +270,24 @@ export const GeneralTermsContent: React.FC = () => (
       <p style={{ margin: 0 }}>4.3 Customer wajib mematuhi aturan perjalanan dan petunjuk yang ditetapkan oleh Provider.</p>
     </LegalSection>
 
-    <LegalSection number="5" title="BOOKING, PEMBAYARAN & REFUND">
-      <p style={{ margin: '0 0 8px 0' }}>5.1 Pembayaran dilakukan melalui Payment Gateway resmi yang tersedia di Platform (Xendit).</p>
-      <p style={{ margin: '0 0 8px 0' }}>5.2 Ketentuan pembatalan dan pengembalian dana (refund) mengikuti kebijakan masing-masing paket trip.</p>
-      <p style={{ margin: 0 }}>5.3 Proses refund diselesaikan dalam jangka waktu maksimal 3 hari kerja setelah disetujui.</p>
+    <LegalSection number="5" title="PEMBATALAN, REFUND & RESCHEDULE">
+      <p style={{ margin: '0 0 8px 0' }}>
+        5.1 <strong>Pembatalan oleh Customer (Strict H-7 Policy):</strong>
+      </p>
+      <ul style={{ paddingLeft: '20px', margin: '0 0 8px 0' }}>
+        <li>Pembatalan dilakukan <strong>≥ 7 hari sebelum keberangkatan (H-7 atau lebih lama)</strong>: Customer berhak menerima pengembalian dana <strong>100% (Full Refund)</strong>.</li>
+        <li>Pembatalan dilakukan <strong>&lt; 7 hari sebelum keberangkatan (H-6 s/d H-0)</strong>: Dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>). Uang DP/pembayaran diteruskan ke Provider sebagai ganti rugi slot operasional.</li>
+      </ul>
+      <p style={{ margin: '0 0 8px 0' }}>
+        5.2 <strong>Pembatalan oleh Provider / Cuaca Buruk / Kuota Tidak Terpenuhi:</strong>
+      </p>
+      <ul style={{ paddingLeft: '20px', margin: '0 0 8px 0' }}>
+        <li>Jika trip dibatalkan oleh Provider karena cuaca buruk (Force Majeure) atau kuota minimal Open Trip belum terpenuhi di H-3, Customer berhak memilih <strong>Full Refund 100%</strong> atau <strong>Pindah Jadwal (Reschedule)</strong>.</li>
+        <li>Penjadwalan ulang (Reschedule) akibat kuota kurang berlaku <strong>maksimal 1 (satu) kali</strong>. Jika pada jadwal pengganti kuota masih tidak terpenuhi di H-3, sistem akan melakukan Full Refund 100% otomatis.</li>
+      </ul>
+      <p style={{ margin: 0 }}>
+        5.3 <strong>Pengamanan DP 50% (Escrow System):</strong> Pembayaran DP ditahan di sistem TripKita. Uang DP 50% langsung dicairkan ke Provider begitu kuota minimal trip terpenuhi atau saat trip dikonfirmasi di H-3.
+      </p>
     </LegalSection>
   </div>
 );
@@ -339,7 +353,7 @@ export const CustomerRegistrationTermsContent: React.FC = () => (
         SYARAT & KETENTUAN PENDAFTARAN CUSTOMER
       </h2>
       <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b' }}>
-        Dokumen persetujuan pendaftaran akun Customer pada platform TemenTrip.
+        Dokumen persetujuan pendaftaran akun Customer pada platform TemenTrip / TripKita.
       </p>
     </div>
 
@@ -355,10 +369,10 @@ export const CustomerRegistrationTermsContent: React.FC = () => (
       <p style={{ margin: 0 }}>2.2 Customer wajib menjaga kerahasiaan kata sandi dan keamanan akun masing-masing.</p>
     </LegalSection>
 
-    <LegalSection number="3" title="Larangan Penggunaan">
-      <p style={{ margin: 0 }}>
-        Customer dilarang menggunakan akun TemenTrip untuk tindakan penipuan, manipulasi promo/sistem, atau kegiatan melanggar hukum.
-      </p>
+    <LegalSection number="3" title="Kebijakan Pembatalan & Refund (Strict H-7)">
+      <p style={{ margin: '0 0 6px 0' }}>3.1 Pembatalan oleh Pemesan ≥ 7 hari sebelum keberangkatan berhak atas <strong>100% Full Refund</strong>.</p>
+      <p style={{ margin: '0 0 6px 0' }}>3.2 Pembatalan oleh Pemesan &lt; 7 hari (H-6 s/d H-0) berstatus <strong>0% Refund (Uang Hangus)</strong>.</p>
+      <p style={{ margin: 0 }}>3.3 Jika trip dibatalkan oleh Provider/Cuaca/Kuota Kurang, Pemesan berhak atas <strong>100% Refund</strong> atau <strong>Reschedule Maks 1x</strong>.</p>
     </LegalSection>
 
     <LegalSection number="4" title="Persetujuan Elektronik">

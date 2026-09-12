@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"fmt"
+
 	"gorm.io/gorm"
 
 	"tripkita-provider/models"
@@ -82,20 +84,18 @@ func (r *packageRepository) CountActiveByProvider(providerID uint) (int64, error
 }
 
 func (r *packageRepository) AtomicReserveQuota(packageID uint, guests int) error {
+	var pkg models.Package
+	if err := r.db.First(&pkg, packageID).Error; err != nil {
+		return err
+	}
+
+	if pkg.QuotaUsed+guests > pkg.QuotaMax && pkg.QuotaMax > 0 {
+		return fmt.Errorf("kuota paket tidak mencukupi (sisa kuota: %d seat)", pkg.QuotaMax-pkg.QuotaUsed)
+	}
+
 	res := r.db.Model(&models.Package{}).
-		Where("id = ? AND (quota_used + ?) <= quota_max", packageID, guests).
+		Where("id = ?", packageID).
 		UpdateColumn("quota_used", gorm.Expr("quota_used + ?", guests))
 
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return r.db.Model(&models.Package{}).
-			Where("id = ?", packageID).
-			Updates(map[string]interface{}{
-				"quota_max":  gorm.Expr("quota_used + ? + 10", guests),
-				"quota_used": gorm.Expr("quota_used + ?", guests),
-			}).Error
-	}
-	return nil
+	return res.Error
 }

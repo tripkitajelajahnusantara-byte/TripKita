@@ -99,12 +99,48 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 	}
 
 	oldStatus := booking.Status
-	booking.Status = status
 
-	// If customer or provider cancels a paid/confirmed booking, it moves to REFUND_REQUIRED
-	if (status == "CANCELLED_BY_CUSTOMER" || status == "CANCELLED_BY_PROVIDER" || status == "REFUND_REQUIRED") && 
-		(oldStatus == "PAID" || oldStatus == "CONFIRMED" || oldStatus == "COMPLETED") {
+	// Handle Cancellation & Reschedule logic according to strict rules
+	if status == "CANCELLED_BY_CUSTOMER" {
+		daysUntilTrip := int(time.Until(booking.TripDate).Hours() / 24)
+		if daysUntilTrip >= 7 {
+			// >= 7 Days: 100% Refund
+			booking.Status = "REFUND_REQUIRED"
+			booking.RefundAmount = booking.TotalPrice
+			booking.CancellationReason = "Dibatalkan oleh pelanggan (≥ 7 hari sebelum trip - Refund 100%)"
+		} else {
+			// < 7 Days: 0% Refund (Forfeited deposit goes to Provider)
+			booking.Status = "CANCELLED_BY_CUSTOMER"
+			booking.RefundAmount = 0
+			booking.CancellationReason = "Dibatalkan oleh pelanggan (< 7 hari sebelum trip - Refund 0%)"
+			
+			// Release held funds to Provider available balance as compensation
+			if database.DB != nil {
+				var settlement models.HeldSettlement
+				if errS := database.DB.Where("booking_id = ?", booking.ID).First(&settlement).Error; errS == nil {
+					settlement.Status = "RELEASED"
+					database.DB.Save(&settlement)
+					database.DB.Exec("UPDATE provider_balances SET available_balance = available_balance + ?, held_balance = GREATEST(held_balance - ?, 0) WHERE provider_id = ?", settlement.Amount, settlement.Amount, booking.ProviderID)
+				}
+			}
+		}
+	} else if status == "CANCELLED_BY_PROVIDER" || status == "REFUND_REQUIRED" {
+		// Provider / Weather / Quota cancellation is ALWAYS 100% Refund
 		booking.Status = "REFUND_REQUIRED"
+		booking.RefundAmount = booking.TotalPrice
+		if booking.CancellationReason == "" {
+			booking.CancellationReason = "Dibatalkan oleh Provider / Kendala Cuaca / Kuota Minimal (Refund 100%)"
+		}
+	} else if status == "RESCHEDULE_OFFERED" {
+		if booking.RescheduleCount >= 1 {
+			return nil, fmt.Errorf("penjadwalan ulang (reschedule) hanya diperbolehkan maksimal 1 kali. Harap pilih opsi pembatalan untuk 100%% Full Refund")
+		}
+		booking.Status = "RESCHEDULE_OFFERED"
+		booking.RescheduleCount += 1
+		orig := booking.TripDate
+		booking.OriginalTripDate = &orig
+	} else {
+		booking.Status = status
 	}
 
 	err = s.repo.Update(booking)
@@ -146,9 +182,9 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		}
 	}
 
-	// Validate quota (auto-expand quota for seamless customer experience)
-	if pkg.QuotaUsed+booking.Guests > pkg.QuotaMax {
-		pkg.QuotaMax = pkg.QuotaUsed + booking.Guests + 10
+	// Validate quota
+	if pkg.QuotaMax > 0 && pkg.QuotaUsed+booking.Guests > pkg.QuotaMax {
+		return fmt.Errorf("kuota paket tidak mencukupi (tersisa %d seat)", pkg.QuotaMax-pkg.QuotaUsed)
 	}
 
 	booking.ProviderID = pkg.ProviderID
@@ -335,6 +371,27 @@ func (s *bookingService) adjustQuota(booking *models.Booking, oldStatus, newStat
 		), 0)
 		WHERE p.id = ?
 	`, booking.PackageID).Error
+
+	// Check if package quota_used >= quota_min to promote PAID -> CONFIRMED and release DP 50%
+	var pkg models.Package
+	if err := database.DB.First(&pkg, booking.PackageID).Error; err == nil {
+		if pkg.QuotaUsed >= pkg.QuotaMin && pkg.QuotaMin > 0 {
+			// Auto-confirm bookings and release DP 50%
+			var paidBookings []models.Booking
+			database.DB.Where("package_id = ? AND status = ?", pkg.ID, "PAID").Find(&paidBookings)
+			for _, b := range paidBookings {
+				database.DB.Model(&models.Booking{}).Where("id = ?", b.ID).Update("status", "CONFIRMED")
+				
+				// Release DP 50% settlement if held
+				var settlement models.HeldSettlement
+				if errS := database.DB.Where("booking_id = ? AND status = ?", b.ID, "HELD").First(&settlement).Error; errS == nil {
+					settlement.Status = "RELEASED"
+					database.DB.Save(&settlement)
+					database.DB.Exec("UPDATE provider_balances SET available_balance = available_balance + ?, held_balance = GREATEST(held_balance - ?, 0) WHERE provider_id = ?", settlement.Amount, settlement.Amount, b.ProviderID)
+				}
+			}
+		}
+	}
 }
 
 func (s *bookingService) UploadPaymentProof(id uint, proofPath string) (*models.Booking, error) {

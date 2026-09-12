@@ -660,6 +660,28 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           _buildTextInfoRow('Jumlah Pax', '${booking.guests} Pax'),
           const Divider(height: 20),
           _buildTextInfoRow('Total Transaksi', currencyFormatter.format(booking.totalPrice), isBoldValue: true, valueColor: const Color(0xFF0F8B8D)),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F9FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBAE6FD)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Icon(Icons.shield_outlined, size: 16, color: Color(0xFF0284C7)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Aturan Pembatalan Strict H-7:\n• ≥ 7 Hari sebelum trip: Full Refund 100%\n• < 7 Hari sebelum trip: 0% Refund (Uang Hangus)\n• Pembatalan oleh Provider/Cuaca: 100% Refund / Reschedule',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF0369A1), height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

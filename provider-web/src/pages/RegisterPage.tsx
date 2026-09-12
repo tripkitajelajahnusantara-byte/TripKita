@@ -613,14 +613,15 @@ export const RegisterPage: React.FC = () => {
               3.3 Komunikasi dengan Pengguna: Mitra wajib berkomunikasi dengan pengguna akhir secara sopan, cepat, dan profesional melalui sarana komunikasi yang disetujui.<br/>
               3.4 Larangan Transaksi di Luar Platform: Mitra dilarang keras mengarahkan pengguna akhir untuk melakukan transaksi pembayaran di luar platform TemenTrip. Pelanggaran terhadap ketentuan ini dapat mengakibatkan penangguhan atau pemutusan akun Mitra secara permanen.</p>
 
-              <strong>4. BIAYA DAN PEMBAYARAN</strong>
-              <p>4.1 Biaya Layanan: TemenTrip mengenakan biaya komisi sebesar 10% (sepuluh persen) dari setiap transaksi pembayaran paket wisata yang berhasil dilakukan melalui platform. Biaya ini akan dipotong sebelum pencairan dana ke Mitra.<br/>
-              4.2 Pencairan Dana: Dana hasil penjualan paket wisata akan dicairkan ke rekening bank terdaftar milik Mitra setelah program wisata selesai dilaksanakan dan dikonfirmasi oleh pengguna akhir. Proses pencairan dana membutuhkan waktu 1-3 hari kerja.</p>
+              <strong>4. BIAYA DAN PENCAIRAN DANA (ESCROW SYSTEM)</strong>
+              <p>4.1 Biaya Layanan: TemenTrip mengenakan biaya komisi sebesar 10% dari setiap transaksi pembayaran paket wisata yang berhasil dilakukan melalui platform.<br/>
+              4.2 Pencairan DP 50% Open Trip: Pembayaran DP dari pengguna ditahan sementara oleh sistem. DP 50% dapat dicairkan langsung ke saldo Mitra setelah Kuota Minimal paket Open Trip terpenuhi (misal 4/4 orang terisi) atau saat trip dikonfirmasi pada H-3 untuk biaya persiapan operasional (DP kapal/homestay). Sisa pembayaran diselesaikan setelah trip selesai.<br/>
+              4.3 Batas Waktu Kuota H-3: Jika pada H-3 kuota minimal belum terpenuhi, Mitra diberikan wewenang di dashboard untuk memilih [Tetap Berangkat] (DP 50% dicairkan) atau [Buka Reschedule / Batalkan].</p>
 
-              <strong>5. PEMBATALAN DAN PENGEMBALIAN DANA (REFUND)</strong>
-              <p>5.1 Pembatalan oleh Pengguna: Pengembalian dana akibat pembatalan oleh pengguna tunduk pada kebijakan pembatalan masing-masing paket wisata yang ditetapkan oleh Mitra.<br/>
-              5.2 Pembatalan oleh Mitra: Jika Mitra membatalkan keberangkatan program wisata secara sepihak, Mitra wajib mengembalikan dana 100% kepada pengguna akhir melalui platform, dan TemenTrip berhak mengenakan denda administrasi kepada Mitra.<br/>
-              5.3 Kebijakan Refund Khusus: Dalam hal terjadi force majeure, pengembalian dana akan didasarkan pada kesepakatan bersama antara Mitra, Pengguna, dan TemenTrip.</p>
+              <strong>5. PEMBATALAN, REFUND & RESCHEDULE</strong>
+              <p>5.1 Pembatalan oleh Pengguna (Strict H-7 Policy): Pembatalan oleh pengguna ≥ 7 hari sebelum keberangkatan berhak menerima 100% Full Refund. Pembatalan pengguna &lt; 7 hari (H-6 s/d H-0) dikenakan biaya pembatalan 100% (0% Refund / Uang Hangus) dan uang pembayaran diteruskan ke saldo Mitra sebagai kompensasi ganti rugi slot operasional.<br/>
+              5.2 Pembatalan oleh Mitra / Cuaca Buruk (Force Majeure): Jika trip dibatalkan oleh Mitra akibat cuaca buruk/bencana atau kuota minimal Open Trip belum terpenuhi di H-3, pengguna berhak memilih 100% Full Refund atau Pindah Jadwal (Reschedule).<br/>
+              5.3 Batas Reschedule: Penjadwalan ulang akibat kuota kurang berlaku maksimal 1 (satu) kali. Jika pada jadwal pengganti kuota masih tidak terpenuhi di H-3, sistem akan melakukan Full Refund 100% otomatis.</p>
 
               <strong>6. PERNYATAAN DAN JAMINAN</strong>
               <p>6.1 Legalitas Usaha: Mitra menyatakan dan menjamin bahwa ia memiliki seluruh perizinan dan lisensi usaha yang sah untuk menjalankan jasa pariwisata yang ditawarkan.<br/>
