@@ -1222,11 +1222,25 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   const quotaShortage = Math.max(0, quotaMin - quotaUsed);
                   const isConfirmedDeparture = quotaUsed >= quotaMin;
 
-                  if (isConfirmedDeparture) return null;
-
                   return (
-                    <div style={{ marginTop: '10px', padding: '8px 10px', backgroundColor: '#fffbebfb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '11.5px', color: '#92400e', fontWeight: '700', lineHeight: '1.4' }}>
-                      • <strong>Terisi: {quotaUsed}/{quotaMin} pax</strong> (Kurang {quotaShortage} orang lagi agar PASTI BERANGKAT!)
+                    <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fffbebfb', border: '1px solid #fde68a', borderRadius: '10px', fontSize: '12px', color: '#92400e', fontWeight: '700', lineHeight: '1.5' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span>👥 Minimal Kuota Open Trip:</span>
+                        <strong style={{ color: '#0f172a' }}>{quotaMin} Pax</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span>📊 Status Kuota Terisi:</span>
+                        <strong style={{ color: '#0284c7' }}>{quotaUsed} / {quotaMin} Pax</strong>
+                      </div>
+                      {isConfirmedDeparture ? (
+                        <div style={{ color: '#166534', backgroundColor: '#dcfce7', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', marginTop: '4px', textAlign: 'center' }}>
+                          ✅ Kuota Terpenuhi! Trip PASTI BERANGKAT.
+                        </div>
+                      ) : (
+                        <div style={{ color: '#92400e', backgroundColor: '#fef3c7', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', marginTop: '4px', textAlign: 'center' }}>
+                          ⚠️ Kurang {quotaShortage} orang lagi agar trip PASTI BERANGKAT!
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -1415,6 +1429,11 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   +
                 </button>
               </div>
+              {minRequiredGuests > 1 && (
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'block', fontWeight: '600' }}>
+                  * Minimal pemesanan paket {pkg.tripType || 'ini'} adalah {minRequiredGuests} orang.
+                </span>
+              )}
             </div>
 
             {/* Total Summary */}

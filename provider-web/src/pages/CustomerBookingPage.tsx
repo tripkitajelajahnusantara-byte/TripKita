@@ -40,13 +40,13 @@ export const CustomerBookingPage: React.FC = () => {
   const [pemesanBirthDate, setPemesanBirthDate] = useState(() => activeFormData?.peserta?.[0]?.tanggalLahir || '1998-05-15');
   const [pemesanGender, setPemesanGender] = useState(() => activeFormData?.peserta?.[0]?.gender || 'Laki-laki');
 
-  // Checkbox state: Peserta 1 sama dengan Pemesan
+  // Checkbox state: Peserta 1 sama dengan Pemesan (Do NOT auto-check!)
   const [isSameAsPemesan, setIsSameAsPemesan] = useState(() => {
     if (activeFormData?.peserta && activeFormData.peserta.length > 0) {
       const p0 = activeFormData.peserta[0];
       return p0.nama === activeFormData.pemesan.nama && p0.hp === activeFormData.pemesan.whatsapp;
     }
-    return true; // Default to true so logged-in user details auto-populate Peserta 1!
+    return false; // Do NOT auto-check by default!
   });
 
   // Data Peserta Dynamic State
@@ -89,10 +89,10 @@ export const CustomerBookingPage: React.FC = () => {
       if (updated.length < guestsCount) {
         for (let i = updated.length; i < guestsCount; i++) {
           updated.push({
-            nama: i === 0 && customerProfile && !bookingFormData ? (customerProfile.picName || '') : '',
-            hp: i === 0 && customerProfile && !bookingFormData ? (customerProfile.whatsapp || '') : '',
+            nama: '',
+            hp: '',
             gender: 'Laki-laki',
-            tanggalLahir: i === 0 ? pemesanBirthDate : '2000-01-01',
+            tanggalLahir: '2000-01-01',
             riwayatPenyakit: 'Tidak Ada'
           });
         }
@@ -101,7 +101,7 @@ export const CustomerBookingPage: React.FC = () => {
       }
       return updated;
     });
-  }, [guestsCount, customerProfile, bookingFormData]);
+  }, [guestsCount, bookingFormData]);
 
   // Sync Peserta 1 with Pemesan when checkbox is toggled or when pemesan data changes
   useEffect(() => {

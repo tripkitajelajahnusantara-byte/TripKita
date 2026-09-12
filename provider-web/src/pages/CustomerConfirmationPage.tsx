@@ -31,7 +31,7 @@ export const CustomerConfirmationPage: React.FC = () => {
   const selectedAddOns = pkg.selectedAddOns || bookingFormData?.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
   const baseCost = pkg.price * guestsCount;
-  const serviceFee = 4000;
+  const serviceFee = 0;
   const totalCost = baseCost + addOnsTotal + serviceFee;
 
   const formatIDR = (price: number) => {
@@ -295,10 +295,12 @@ export const CustomerConfirmationPage: React.FC = () => {
                 </div>
               ))}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Biaya Layanan</span>
-                <span style={{ color: '#0f172a', fontWeight: '600' }}>{formatIDR(serviceFee)}</span>
-              </div>
+              {serviceFee > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Biaya Layanan</span>
+                  <span style={{ color: '#0f172a', fontWeight: '600' }}>{formatIDR(serviceFee)}</span>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1.5px dashed #cbd5e1' }}>
