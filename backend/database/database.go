@@ -67,6 +67,20 @@ func ConnectDB(cfg *config.Config) {
 		fmt.Println("Migrasi database selesai")
 	}
 
+	// Pastikan kolom meeting_point, customer_email, dan customer_phone ada di database Supabase
+	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS meeting_point TEXT;`)
+	DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT;`)
+	DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT;`)
+
+	// Update data titik kumpul spesifik untuk paket yang belum memiliki meeting_point
+	DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Bandung Door Selatan, Jl. Stasiun Barat No.1, Pasirkaliki, Kota Bandung, Jawa Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bandung%'`)
+	DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Malang Kota Baru (Door Depan Utama), Jl. Trunojoyo No.10, Klojen, Kota Malang, Jawa Timur' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bromo%'`)
+	DB.Exec(`UPDATE packages SET meeting_point = 'Dermaga 16 Marina Ancol, Jl. Lodan Timur No.7, Pademangan, Jakarta Utara' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Tidung%'`)
+	DB.Exec(`UPDATE packages SET meeting_point = 'Alfamart Melati Indah, Cengkareng / Rest Area Ciawi Km.45, Bogor, Jawa Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Cilember%'`)
+	DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Tugu Yogyakarta (Door Timur), Sosromenduran, Gedongtengen, Kota Yogyakarta, DI Yogyakarta' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Yogyakarta%'`)
+	DB.Exec(`UPDATE packages SET meeting_point = 'Bandara Marinda Waisai, Kabupaten Raja Ampat, Papua Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Raja Ampat%'`)
+	DB.Exec(`UPDATE packages SET meeting_point = 'Bandara Internasional I Gusti Ngurah Rai (Door Kedatangan Domestik), Badung, Bali' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bali%'`)
+
 	// Isi data awal (Seeding) jika DB kosong
 	SeedDatabase()
 	EnsureAdminUserExists()

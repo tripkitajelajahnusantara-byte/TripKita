@@ -52,6 +52,39 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const pkg = selectedPackageForDetail;
 
+  const getSpecificMeetingPoint = (pkgObj: any) => {
+    if (pkgObj && pkgObj.meetingPoint && pkgObj.meetingPoint.trim().length > 3) {
+      return pkgObj.meetingPoint.trim();
+    }
+    const dest = (pkgObj?.destination || '').toLowerCase();
+    const name = (pkgObj?.name || '').toLowerCase();
+
+    if (name.includes('bromo') || dest.includes('probolinggo') || dest.includes('malang')) {
+      return 'Stasiun Malang Kota Baru (Door Depan Utama), Jl. Trunojoyo No.10, Klojen, Kota Malang, Jawa Timur';
+    }
+    if (name.includes('tidung') || dest.includes('seribu') || dest.includes('jakarta')) {
+      return 'Dermaga 16 Marina Ancol, Jl. Lodan Timur No.7, Pademangan, Jakarta Utara';
+    }
+    if (name.includes('cilember') || dest.includes('bogor')) {
+      return 'Alfamart Melati Indah, Cengkareng / Rest Area Ciawi Km.45, Bogor, Jawa Barat';
+    }
+    if (name.includes('bandung') || dest.includes('bandung')) {
+      return 'Stasiun Bandung Door Selatan, Jl. Stasiun Barat No.1, Pasirkaliki, Kota Bandung, Jawa Barat';
+    }
+    if (name.includes('jogja') || name.includes('yogyakarta') || dest.includes('yogyakarta')) {
+      return 'Stasiun Tugu Yogyakarta (Door Timur), Sosromenduran, Gedongtengen, Kota Yogyakarta, DI Yogyakarta';
+    }
+    if (name.includes('raja ampat') || dest.includes('papua')) {
+      return 'Bandara Marinda Waisai, Kabupaten Raja Ampat, Papua Barat';
+    }
+    if (name.includes('bali') || dest.includes('bali')) {
+      return 'Bandara Internasional I Gusti Ngurah Rai (Door Kedatangan Domestik), Badung, Bali';
+    }
+    return pkgObj?.destination || 'Alfamart Melati Indah, Cengkareng, Jawa Barat';
+  };
+
+  const activeMeetingPoint = getSpecificMeetingPoint(pkg);
+
   const formatDateIndoFull = (dateStr: string) => {
     if (!dateStr) return 'Pilih Tanggal';
     const d = new Date(dateStr);
@@ -700,27 +733,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Titik Kumpul / Google Maps Embed */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
-              <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MapPin size={18} color="#0284c7" /> Lokasi Titik Kumpul (Meeting Point)
-              </h2>
-              <p style={{ fontSize: '14px', color: '#475569', marginBottom: '16px' }}>
-                📍 <strong>{pkg.meetingPoint || pkg.destination}</strong>
-              </p>
-              <div style={{ borderRadius: '12px', overflow: 'hidden', height: '280px', border: '1px solid #cbd5e1' }}>
-                <iframe
-                  title="Titik Kumpul Map"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  allowFullScreen
-                  src={`https://maps.google.com/maps?q=${encodeURIComponent(pkg.meetingPoint || pkg.destination)}&t=m&z=15&output=embed`}
-                />
-              </div>
-            </div>
-
             {/* Itinerary */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 20px 0' }}>
@@ -826,6 +838,27 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     </label>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Titik Kumpul / Google Maps Embed (Posisi Tepat Dibawah Layanan Tambahan) */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
+              <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MapPin size={18} color="#0284c7" /> Lokasi Titik Kumpul (Meeting Point)
+              </h2>
+              <p style={{ fontSize: '14px', color: '#334155', marginBottom: '16px', lineHeight: '1.6' }}>
+                📍 <strong>{activeMeetingPoint}</strong>
+              </p>
+              <div style={{ borderRadius: '12px', overflow: 'hidden', height: '300px', border: '1px solid #cbd5e1' }}>
+                <iframe
+                  title="Titik Kumpul Map"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  allowFullScreen
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(activeMeetingPoint)}&t=m&z=16&output=embed`}
+                />
               </div>
             </div>
 
@@ -1091,8 +1124,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                   <span>📍 Meeting Point:</span>
-                  <strong style={{ color: '#0284c7', maxWidth: '170px', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {pkg.meetingPoint || pkg.destination}
+                  <strong title={activeMeetingPoint} style={{ color: '#0284c7', maxWidth: '170px', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activeMeetingPoint}
                   </strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
