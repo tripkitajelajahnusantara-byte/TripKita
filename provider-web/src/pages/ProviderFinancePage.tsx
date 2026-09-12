@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
+import { useCustomAlert } from '../components/CustomAlertModal';
 import { Sidebar } from '../components/Sidebar';
 import { request, API_BASE_URL, getAuthHeaders } from '../utils/api';
 import { 
@@ -42,6 +43,7 @@ interface PayoutSummary {
 
 export const ProviderFinancePage: React.FC = () => {
   const { providerProfile } = useNavigation();
+  const { showAlert } = useCustomAlert();
   const [summary, setSummary] = useState<PayoutSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -88,7 +90,7 @@ export const ProviderFinancePage: React.FC = () => {
       a.click();
       document.body.removeChild(a);
     } catch (err: any) {
-      alert(err.message || 'Gagal mendownload laporan Excel');
+      showAlert({ type: 'error', message: err.message || 'Gagal mendownload laporan Excel' });
     }
   };
 

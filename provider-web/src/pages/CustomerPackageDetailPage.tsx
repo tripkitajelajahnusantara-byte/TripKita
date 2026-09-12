@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
+import { useCustomAlert } from '../components/CustomAlertModal';
 import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare } from 'lucide-react';
 import { API_BASE_URL } from '../utils/api';
 
@@ -12,7 +13,8 @@ interface AddOn {
 }
 
 export const CustomerPackageDetailPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, setSelectedPackageForDetail, setSelectedProviderId, customerProfile } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, setSelectedPackageForDetail, setSelectedProviderId, customerProfile, openAuthModal } = useNavigation();
+  const { showAlert } = useCustomAlert();
 
   // Photo Lightbox Modal State
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -495,28 +497,30 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const handleBookNow = () => {
     if (!customerProfile) {
-      alert('🔒 Silakan masuk / daftar akun terlebih dahulu untuk melanjutkan pemesanan paket wisata ini.');
-      navigateTo('masuk');
+      openAuthModal('login', () => {
+        // Automatically proceed after successful login in AuthModal
+        handleBookNow();
+      });
       return;
     }
     if (availableSeats <= 0) {
-      alert('Maaf, kuota untuk paket ini telah habis. Silakan pilih paket wisata lain.');
+      showAlert({ type: 'warning', title: 'Kuota Habis', message: 'Maaf, kuota untuk paket ini telah habis. Silakan pilih paket wisata lain.' });
       return;
     }
     if (guestsCount < minRequiredGuests) {
-      alert(`⚠️ Minimal pemesanan untuk paket ${pkg.tripType || 'ini'} adalah ${minRequiredGuests} orang.`);
+      showAlert({ type: 'warning', title: 'Jumlah Peserta Kurang', message: `Minimal pemesanan untuk paket ${pkg.tripType || 'ini'} adalah ${minRequiredGuests} orang.` });
       return;
     }
     if (guestsCount > availableSeats) {
-      alert(`⚠️ Jumlah peserta (${guestsCount} orang) melebihi sisa kuota yang tersedia (${availableSeats} seat).`);
+      showAlert({ type: 'warning', title: 'Melebihi Sisa Kuota', message: `Jumlah peserta (${guestsCount} orang) melebihi sisa kuota yang tersedia (${availableSeats} seat).` });
       return;
     }
     if (!isOpenTrip && isRangeBooked) {
-      alert(`❌ Rentang tanggal ${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)} sudah TERBOOKING oleh pemesan lain. Silakan pilih rentang tanggal lain.`);
+      showAlert({ type: 'error', title: 'Jadwal Terbooking', message: `Rentang tanggal ${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)} sudah TERBOOKING oleh pemesan lain. Silakan pilih rentang tanggal lain.` });
       return;
     }
     if (!isOpenTrip && customStartDate < h7MinDateStr) {
-      alert(`⚠️ Pemesanan paket ${pkg.tripType || 'ini'} wajib H-7 sebelum keberangkatan. Tanggal paling awal yang dapat dipesan adalah ${formatDateIndoFull(h7MinDateStr)}.`);
+      showAlert({ type: 'warning', title: 'Pemesanan Wajib H-7', message: `Pemesanan paket ${pkg.tripType || 'ini'} wajib H-7 sebelum keberangkatan. Tanggal paling awal yang dapat dipesan adalah ${formatDateIndoFull(h7MinDateStr)}.` });
       return;
     }
     const finalBookingDate = isOpenTrip 
@@ -524,7 +528,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
       : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`;
     
     if (!finalBookingDate) {
-      alert('⚠️ Silakan pilih tanggal keberangkatan terlebih dahulu.');
+      showAlert({ type: 'warning', title: 'Pilih Tanggal Keberangkatan', message: 'Silakan pilih tanggal keberangkatan terlebih dahulu.' });
       return;
     }
     const selectedAddOnObjects = addOnsList.filter(a => selectedAddOnIds.includes(a.id));
@@ -1155,44 +1159,36 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
           </div>
 
-          {/* Right Fixed Booking Card with 3 Jadwal Keberangkatan Dropdown */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '20px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.04)', position: 'sticky', top: '90px' }}>
-            
-            {/* Detail Tur Summary Card */}
-            <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '16px', marginBottom: '18px', border: '1px solid #e2e8f0' }}>
-              <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Detail Tur
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                  <span>🗓️ Tanggal Terdekat:</span>
-                  <strong style={{ color: '#0f172a' }}>{availableSchedules[0]?.label.split(' (')[0] || 'Sesuai Jadwal'}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                  <span>📍 Meeting Point:</span>
-                  <strong title={activeMeetingPoint} style={{ color: '#0284c7', maxWidth: '170px', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {activeMeetingPoint}
-                  </strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                  <span>⏱️ Durasi:</span>
-                  <strong style={{ color: '#0f172a' }}>{pkg.schedule || `${defaultDuration} Hari`}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                  <span>👥 Minimal Peserta:</span>
-                  <strong style={{ color: '#0f172a' }}>{minRequiredGuests} Orang</strong>
+          {/* Right Fixed Booking Card */}
+          <div 
+            style={{ 
+              backgroundColor: '#ffffff', 
+              borderRadius: '20px', 
+              padding: '24px', 
+              border: '1px solid #e2e8f0', 
+              boxShadow: '0 4px 16px rgba(0,0,0,0.04)', 
+              position: 'sticky', 
+              top: '90px',
+              maxHeight: 'calc(100vh - 110px)',
+              overflowY: 'auto'
+            }}
+          >
+            {/* Price Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+              <div>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', display: 'block' }}>Harga per orang</span>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#007bff' }}>
+                  {formatIDR(pkg.price)}
                 </div>
               </div>
+              <span style={{ backgroundColor: '#e0f2fe', color: '#0284c7', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>
+                {pkg.tripType || 'Open Trip'}
+              </span>
             </div>
 
-            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Harga per orang</span>
-            <div style={{ fontSize: '24px', fontWeight: '800', color: '#007bff', marginBottom: '18px' }}>
-              {formatIDR(pkg.price)}
-            </div>
-
-            {/* Jadwal Keberangkatan (Open Trip Dropdown vs Non-Open Trip Calendar) */}
+            {/* Jadwal Keberangkatan */}
             {isOpenTrip ? (
-              <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px', border: '1px solid #dbeafe' }}>
+              <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', border: '1px solid #dbeafe' }}>
                 <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
                   Jadwal Keberangkatan (Open Trip)
                 </label>
@@ -1220,28 +1216,23 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   ))}
                 </select>
 
-                {/* Open Trip Quota Status Card (Hidden if quota is already fulfilled) */}
                 {(() => {
                   const quotaMin = pkg.quotaMin || 4;
                   const quotaUsed = totalQuotaUsed;
                   const quotaShortage = Math.max(0, quotaMin - quotaUsed);
                   const isConfirmedDeparture = quotaUsed >= quotaMin;
 
-                  if (isConfirmedDeparture) {
-                    return null;
-                  }
+                  if (isConfirmedDeparture) return null;
 
                   return (
-                    <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fffbebfb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '11.5px', color: '#92400e', fontWeight: '700', lineHeight: '1.4' }}>
-                      <strong>Status Kuota Open Trip:</strong><br/>
-                      • Terisi: <strong>{quotaUsed}/{quotaMin} Orang (Min. Kuota: {quotaMin} pax)</strong><br/>
-                      • <strong>Kurang {quotaShortage} orang lagi agar trip PASTI BERANGKAT!</strong>
+                    <div style={{ marginTop: '10px', padding: '8px 10px', backgroundColor: '#fffbebfb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '11.5px', color: '#92400e', fontWeight: '700', lineHeight: '1.4' }}>
+                      • <strong>Terisi: {quotaUsed}/{quotaMin} pax</strong> (Kurang {quotaShortage} orang lagi agar PASTI BERANGKAT!)
                     </div>
                   );
                 })()}
               </div>
             ) : (
-              <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px', border: '1px solid #dbeafe' }}>
+              <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', border: '1px solid #dbeafe' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase' }}>
                     Pilih Tanggal Trip ({pkg.tripType})
@@ -1251,9 +1242,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   </span>
                 </div>
                 
-                {/* 2 Date Pickers: Tanggal Mulai & Tanggal Selesai */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                  {/* Tanggal Mulai */}
                   <div>
                     <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>
                       Tanggal Mulai
@@ -1292,7 +1281,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Tanggal Selesai */}
                   <div>
                     <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>
                       Tanggal Selesai
@@ -1332,38 +1320,33 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Duration Badge */}
-                <div style={{ backgroundColor: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #bfdbfe', fontSize: '12px', fontWeight: '700', color: '#0369a1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ backgroundColor: '#ffffff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #bfdbfe', fontSize: '11.5px', fontWeight: '700', color: '#0369a1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>🗓️ Durasi Trip:</span>
                   <span style={{ backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px', color: '#0284c7' }}>
                     {getDurationDisplay(customStartDate, customEndDate)}
                   </span>
                 </div>
 
-                {isRangeBooked ? (
-                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '8px 12px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '8px', lineHeight: '1.4' }}>
-                    ❌ Rentang tanggal <strong>{formatDateIndoFull(customStartDate)} - {formatDateIndoFull(customEndDate)}</strong> menabrak jadwal terbooking! Silakan pilih rentang tanggal lain.
+                {isRangeBooked && (
+                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '8px 10px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '8px', lineHeight: '1.4' }}>
+                    ❌ Rentang tanggal menabrak jadwal terbooking! Silakan pilih rentang tanggal lain.
                   </div>
-                ) : (
-                  <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '6px', fontWeight: '500', lineHeight: '1.4' }}>
-                    💡 <strong>Jadwal Operasional:</strong> {pkg.schedule || 'Siap melayani 3 bulan kedepan'}. Pemesanan H-7. Tanggal lewat / terbooking tidak dapat dipesan.
-                  </span>
                 )}
               </div>
             )}
 
-            {/* Guest Counter (+ / -) */}
-            <div style={{ marginBottom: '20px' }}>
+            {/* Guest Counter */}
+            <div style={{ marginBottom: '16px' }}>
               {(() => {
                 const remainingAfterSelect = Math.max(0, availableSeats - guestsCount);
                 return (
-                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
                     <span>Jumlah Peserta</span>
                     <span style={{ color: availableSeats > 0 && guestsCount <= availableSeats ? '#10b981' : '#ef4444', fontWeight: '800' }}>
                       {availableSeats <= 0 
-                        ? 'Sisa 0 seat (Habis)' 
+                        ? 'Sisa 0 seat' 
                         : guestsCount > availableSeats 
-                        ? `⚠️ Melebihi Kuota (Tersedia ${availableSeats} seat)` 
+                        ? `Melebihi Kuota (${availableSeats} seat)` 
                         : `Sisa ${remainingAfterSelect} seat`}
                     </span>
                   </label>
@@ -1401,33 +1384,29 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   +
                 </button>
               </div>
-              {minRequiredGuests > 1 && (
-                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'block', fontWeight: '500' }}>
-                  * Minimal pemesanan paket {pkg.tripType || 'ini'} adalah {minRequiredGuests} orang.
-                </span>
-              )}
             </div>
 
-            {/* Price Total Summary */}
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '14px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
+            {/* Total Summary */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: '#64748b', marginBottom: '4px' }}>
                 <span>Paket ({guestsCount}x)</span>
                 <span>{formatIDR(pkg.price * guestsCount)}</span>
               </div>
               
               {totalAddOnsCost > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#007bff', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: '#007bff', marginBottom: '4px' }}>
                   <span>Add-On Tambahan</span>
                   <span>+{formatIDR(totalAddOnsCost)}</span>
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '800', color: '#0f172a', borderTop: '1px solid #e2e8f0', paddingTop: '10px', marginTop: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '800', color: '#0f172a', borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '4px' }}>
                 <span>Total Estimasi</span>
                 <span style={{ color: '#007bff' }}>{formatIDR(pkg.price * guestsCount + totalAddOnsCost)}</span>
               </div>
             </div>
 
+            {/* Pesan Sekarang Button (Directly Visible!) */}
             <button
               onClick={handleBookNow}
               disabled={availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)}
@@ -1442,17 +1421,100 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 fontWeight: '700',
                 cursor: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'not-allowed' : 'pointer',
                 boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                marginBottom: '16px'
               }}
             >
               {availableSeats <= 0 ? 'Kuota Habis (Tidak Bisa Dipesan)' :
                guestsCount > availableSeats ? 'Peserta Melebihi Kuota' :
                (!isOpenTrip && isRangeBooked) ? 'Tanggal Terbooking (Tidak Tersedia)' : 'Pesan Sekarang'}
             </button>
+
+            {/* Detail Tur Summary Card (Positioned below Pesan Sekarang button) */}
+            <div style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '14px', border: '1px solid #e2e8f0' }}>
+              <h4 style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Informasi Tur
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>🗓️ Tanggal Terdekat:</span>
+                  <strong style={{ color: '#0f172a' }}>{availableSchedules[0]?.label.split(' (')[0] || 'Sesuai Jadwal'}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>📍 Meeting Point:</span>
+                  <strong title={activeMeetingPoint} style={{ color: '#0284c7', maxWidth: '160px', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activeMeetingPoint}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>⏱️ Durasi:</span>
+                  <strong style={{ color: '#0f172a' }}>{pkg.schedule || `${defaultDuration} Hari`}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>👥 Minimal Peserta:</span>
+                  <strong style={{ color: '#0f172a' }}>{minRequiredGuests} Orang</strong>
+                </div>
+              </div>
+            </div>
+
           </div>
 
         </div>
       </div>
+
+      {/* MOBILE FIXED BOTTOM BOOKING BAR */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          backgroundColor: '#ffffff',
+          padding: '12px 20px',
+          borderTop: '1px solid #cbd5e1',
+          boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}
+        className="mobile-only-bottom-bar"
+      >
+        <div>
+          <span style={{ fontSize: '11px', color: '#64748b', display: 'block', fontWeight: '600' }}>Total ({guestsCount}x)</span>
+          <span style={{ fontSize: '17px', fontWeight: '800', color: '#007bff' }}>
+            {formatIDR(pkg.price * guestsCount + totalAddOnsCost)}
+          </span>
+        </div>
+
+        <button
+          onClick={handleBookNow}
+          disabled={availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? '#94a3b8' : '#007bff',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '12px',
+            fontSize: '14.5px',
+            fontWeight: '700',
+            cursor: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'not-allowed' : 'pointer',
+            boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {availableSeats <= 0 ? 'Kuota Habis' : 'Pesan Sekarang'}
+        </button>
+      </div>
+
+      <style>{`
+        @media (min-width: 769px) {
+          .mobile-only-bottom-bar {
+            display: none !important;
+          }
+        }
+      `}</style>
 
       {/* PHOTO LIGHTBOX MODAL */}
       {isLightboxOpen && (

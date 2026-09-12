@@ -268,11 +268,15 @@ const AppContent: React.FC = () => {
   );
 };
 
+import { CustomAlertProvider } from './components/CustomAlertModal';
+
 function App() {
   return (
-    <NavigationProvider>
-      <AppContent />
-    </NavigationProvider>
+    <CustomAlertProvider>
+      <NavigationProvider>
+        <AppContent />
+      </NavigationProvider>
+    </CustomAlertProvider>
   );
 }
 

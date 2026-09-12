@@ -4,6 +4,8 @@ import type { Route } from '../types';
 import { request, setProviderToken, getProviderToken, removeProviderToken, setCustomerToken, getCustomerToken, removeCustomerToken } from '../utils/api';
 
 
+import { AuthModal } from '../components/AuthModal';
+
 export function getRouteFromHash(): Route {
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -196,6 +198,11 @@ interface NavigationContextType {
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
   } | null>>;
+  isAuthModalOpen: boolean;
+  authModalMode: 'login' | 'register';
+  openAuthModal: (mode?: 'login' | 'register', onSuccess?: () => void) => void;
+  closeAuthModal: () => void;
+  authSuccessCallback?: () => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -496,6 +503,24 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   };
 
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+  const [authSuccessCallback, setAuthSuccessCallback] = useState<(() => void) | undefined>(undefined);
+
+  const openAuthModal = (mode: 'login' | 'register' = 'login', onSuccess?: () => void) => {
+    setAuthModalMode(mode);
+    if (onSuccess) {
+      setAuthSuccessCallback(() => onSuccess);
+    } else {
+      setAuthSuccessCallback(undefined);
+    }
+    setIsAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setIsAuthModalOpen(false);
+  };
+
   return (
     <NavigationContext.Provider
       value={{
@@ -529,9 +554,20 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
         setSearchParams,
         bookingFormData,
         setBookingFormData,
+        isAuthModalOpen,
+        authModalMode,
+        openAuthModal,
+        closeAuthModal,
+        authSuccessCallback,
       }}
     >
       {children}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        initialMode={authModalMode}
+        onSuccess={authSuccessCallback}
+      />
     </NavigationContext.Provider>
   );
 };

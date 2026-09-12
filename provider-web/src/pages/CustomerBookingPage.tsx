@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
+import { useCustomAlert } from '../components/CustomAlertModal';
 import { ArrowLeft, User, Mail, Phone, Calendar, Users, ShieldAlert, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface Participant {
@@ -11,7 +12,8 @@ interface Participant {
 }
 
 export const CustomerBookingPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, customerProfile, bookingFormData, setBookingFormData } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, customerProfile, setBookingFormData, bookingFormData, openAuthModal } = useNavigation();
+  const { showAlert } = useCustomAlert();
 
   const currentPackageId = selectedPackageForDetail?.id;
   const activeFormData = (bookingFormData && String(bookingFormData.packageId) === String(currentPackageId)) ? bookingFormData : null;
@@ -21,10 +23,9 @@ export const CustomerBookingPage: React.FC = () => {
 
   useEffect(() => {
     if (!customerProfile) {
-      alert('🔒 Silakan masuk / daftar akun terlebih dahulu untuk melakukan pemesanan paket wisata ini.');
-      navigateTo('masuk');
+      openAuthModal('login');
     }
-  }, [customerProfile, navigateTo]);
+  }, [customerProfile]);
 
   // Data Pemesan State - initialize with priority: customerProfile (logged in) > activeFormData > defaults
   const [pemesanName, setPemesanName] = useState(() => 
@@ -200,7 +201,7 @@ export const CustomerBookingPage: React.FC = () => {
     e.preventDefault();
 
     if (!validateForm()) {
-      alert('Terdapat data yang belum sesuai kriteria. Silakan periksa pesan peringatan di form.');
+      showAlert({ type: 'warning', title: 'Periksa Form', message: 'Terdapat data yang belum sesuai kriteria. Silakan periksa pesan peringatan di form.' });
       return;
     }
 

@@ -4,7 +4,7 @@ import { Menu, X, User } from 'lucide-react';
 import { NotificationCenter } from './NotificationCenter';
 
 export const Header: React.FC = () => {
-  const { route, navigateTo, logout, providerProfile, customerProfile } = useNavigation();
+  const { route, navigateTo, logout, providerProfile, customerProfile, openAuthModal } = useNavigation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleNav = (targetRoute: 'beranda' | 'tentang-kami' | 'partner-landing' | 'bantuan' | 'riwayat-booking' | 'masuk') => {
@@ -124,7 +124,7 @@ export const Header: React.FC = () => {
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button 
-                  onClick={() => navigateTo('masuk')}
+                  onClick={() => openAuthModal('login')}
                   style={{ 
                     padding: '8px 22px', 
                     backgroundColor: '#0284c7', 
