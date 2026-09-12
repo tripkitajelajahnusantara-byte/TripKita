@@ -204,7 +204,7 @@ export const RegisterPage: React.FC = () => {
         <div className="register-sidebar">
           <div className="sidebar-logo">
             <span className="logo-brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src="/tementrip_official_logo.jpg" alt="TemenTrip" style={{ height: '36px', objectFit: 'contain', mixBlendMode: 'multiply' }} />
+              <img src="/tementrip_official_logo.jpg" alt="TemenTrip" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
               <span className="logo-badge">Partner</span>
             </span>
           </div>
