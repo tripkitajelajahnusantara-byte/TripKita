@@ -10,7 +10,7 @@ export const Footer: React.FC = () => {
       <div className="container footer-container">
         <div className="footer-left">
           <div className="logo-brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="/tementrip_official_logo.jpg" alt="TemenTrip" style={{ height: '34px', width: 'auto', objectFit: 'contain' }} />
+            <img src="/tementrip_official_logo.png" alt="TemenTrip" style={{ height: '30px', width: 'auto', objectFit: 'contain' }} />
             <span className="logo-badge">Partner</span>
           </div>
           <span className="copyright-text">

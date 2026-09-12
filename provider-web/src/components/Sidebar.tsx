@@ -28,7 +28,7 @@ export const Sidebar: React.FC = () => {
     <aside className="dashboard-sidebar">
       <div>
         <div className="sidebar-brand" onClick={() => navigateTo('beranda')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src="/tementrip_official_logo.jpg" alt="TemenTrip" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
+          <img src="/tementrip_official_logo.png" alt="TemenTrip" style={{ height: '34px', width: 'auto', objectFit: 'contain' }} />
           <span className="logo-subtext" style={{ fontSize: '12px', color: '#00c9a7', fontWeight: 700, backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '10px' }}>Partner Hub</span>
         </div>
 

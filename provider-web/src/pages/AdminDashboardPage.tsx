@@ -546,7 +546,7 @@ export const AdminDashboardPage: React.FC = () => {
       <aside className="admin-sidebar">
         <div>
           <div className="sidebar-brand" onClick={() => navigateTo('beranda')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="/tementrip_official_logo.jpg" alt="TemenTrip" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
+            <img src="/tementrip_official_logo.png" alt="TemenTrip" style={{ height: '34px', width: 'auto', objectFit: 'contain' }} />
             <span className="logo-subtext" style={{ fontSize: '12px', color: '#ef4444', fontWeight: 700, backgroundColor: '#fee2e2', padding: '2px 8px', borderRadius: '10px' }}>Admin Panel</span>
           </div>
 

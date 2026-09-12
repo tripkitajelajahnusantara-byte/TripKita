@@ -18,7 +18,7 @@ export const Header: React.FC = () => {
       <div className="container header-container">
         <div className="logo-section" onClick={() => navigateTo(isProviderRoute ? 'dashboard' : 'beranda')}>
           <div className="logo-brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="/tementrip_official_logo.jpg" alt="TemenTrip" style={{ height: '42px', width: 'auto', objectFit: 'contain' }} />
+            <img src="/tementrip_official_logo.png" alt="TemenTrip" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
             {isProviderRoute && providerProfile ? (
               providerProfile.role === 'ADMIN' ? (
                 <span className="logo-badge" style={{ backgroundColor: '#fee2e2', color: '#ef4444', borderColor: '#fecaca' }}>Admin</span>
