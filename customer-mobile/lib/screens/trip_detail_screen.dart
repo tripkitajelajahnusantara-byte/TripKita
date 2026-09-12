@@ -408,6 +408,31 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
                     ),
                   ),
 
+                  // Open Trip Quota Info Box
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 18, color: Color(0xFFD97706)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Status Open Trip: Min. Kuota ${package.quotaMin > 0 ? package.quotaMin : 4} pax. '
+                            'Terisi: ${package.quotaUsed}/${package.quotaMin > 0 ? package.quotaMin : 4} pax '
+                            '${(package.quotaMin > 0 ? package.quotaMin : 4) > package.quotaUsed ? "(Kurang ${(package.quotaMin > 0 ? package.quotaMin : 4) - package.quotaUsed} pax lagi agar PASTI BERANGKAT)" : "(PASTI BERANGKAT)"}',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF92400E), fontWeight: FontWeight.bold, height: 1.3),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   // Participant selector
                   const SizedBox(height: 24),
                   Container(

@@ -1112,6 +1112,27 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
+
+                {/* Open Trip Quota Status Card */}
+                {(() => {
+                  const quotaMin = pkg.quotaMin || 4;
+                  const quotaUsed = totalQuotaUsed;
+                  const quotaShortage = Math.max(0, quotaMin - quotaUsed);
+                  const isConfirmedDeparture = quotaUsed >= quotaMin;
+
+                  return isConfirmedDeparture ? (
+                    <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '11.5px', color: '#166534', fontWeight: '700', lineHeight: '1.4' }}>
+                      🟢 <strong>PASTI BERANGKAT!</strong><br/>
+                      • Kuota minimal ({quotaMin} pax) telah <strong>TERPENUHI</strong> ({quotaUsed}/{totalQuotaMax} seat terisi).
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fffbebfb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '11.5px', color: '#92400e', fontWeight: '700', lineHeight: '1.4' }}>
+                      📊 <strong>Status Kuota Open Trip:</strong><br/>
+                      • Terisi: <strong>{quotaUsed}/{quotaMin} Orang</strong> (Min. Kuota: {quotaMin} pax)<br/>
+                      • ⏳ <strong>Kurang {quotaShortage} orang lagi</strong> agar trip <strong>PASTI BERANGKAT</strong>!
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px', border: '1px solid #dbeafe' }}>
