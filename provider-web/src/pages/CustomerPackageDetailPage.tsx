@@ -39,12 +39,30 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const totalReviewPages = Math.ceil(reviewsList.length / reviewsPerPage);
   const currentReviews = reviewsList.slice((reviewPage - 1) * reviewsPerPage, reviewPage * reviewsPerPage);
 
-
+  // Auto load package from URL hash deep-link (e.g. #/paket-detail?id=3)
+  useEffect(() => {
+    const hash = window.location.hash;
+    const match = hash.match(/id=(\d+)/);
+    if (match && match[1]) {
+      const targetId = Number(match[1]);
+      if (!selectedPackageForDetail || Number(selectedPackageForDetail.id) !== targetId) {
+        API_BASE_URL && fetch(`${API_BASE_URL}/public/packages`)
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) {
+              const found = data.find((p: any) => Number(p.id) === targetId);
+              if (found) setSelectedPackageForDetail(found);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, []);
 
   if (!selectedPackageForDetail) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
-        <p>Paket tidak ditemukan. Silakan kembali ke halaman utama.</p>
+        <p>Sedang memuat detail paket wisata...</p>
         <button onClick={() => navigateTo('beranda')} style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
           Kembali ke Beranda
         </button>
@@ -1343,11 +1361,89 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Strikethrough Booked Dates Visual Indicator */}
+                {/* Interactive Visual Calendar Grid for Date Selection */}
+                <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={13} color="#007bff" /> Pilihan Tanggal Keberangkatan:
+                    </span>
+                    <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                      Pilih salah satu tanggal
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '6px' }}>
+                    {Array.from({ length: 14 }, (_, i) => {
+                      const d = new Date(h7MinDateStr);
+                      d.setDate(d.getDate() + i);
+                      const dateIso = d.toISOString().split('T')[0];
+                      const isBooked = currentPkgBookedDates.includes(dateIso);
+                      const isSelected = customStartDate === dateIso;
+
+                      const monthsIndo = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                      const displayStr = `${d.getDate()} ${monthsIndo[d.getMonth()]}`;
+
+                      if (isBooked) {
+                        return (
+                          <button
+                            key={dateIso}
+                            type="button"
+                            disabled={true}
+                            style={{
+                              padding: '6px 4px',
+                              borderRadius: '6px',
+                              border: '1.5px dashed #fca5a5',
+                              backgroundColor: '#fee2e2',
+                              color: '#ef4444',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'not-allowed',
+                              pointerEvents: 'none',
+                              opacity: 0.8,
+                              textAlign: 'center',
+                              lineHeight: '1.2'
+                            }}
+                          >
+                            <s style={{ textDecoration: 'line-through' }}>{displayStr}</s>
+                            <span style={{ display: 'block', fontSize: '9px', fontWeight: '800', color: '#dc2626' }}>Terbooking</span>
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={dateIso}
+                          type="button"
+                          onClick={() => handleStartDateChange(dateIso)}
+                          style={{
+                            padding: '6px 4px',
+                            borderRadius: '6px',
+                            border: isSelected ? '1.5px solid #007bff' : '1px solid #cbd5e1',
+                            backgroundColor: isSelected ? '#007bff' : '#ffffff',
+                            color: isSelected ? '#ffffff' : '#0f172a',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                            lineHeight: '1.2',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          {displayStr}
+                          <span style={{ display: 'block', fontSize: '9px', color: isSelected ? '#e0f2fe' : '#10b981', fontWeight: '700' }}>
+                            {isSelected ? 'Terpilih' : 'Tersedia'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Strikethrough Booked Dates Visual Indicator Banner */}
                 {currentPkgBookedDates.length > 0 && (
-                  <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '6px' }}>
-                      🚫 Tanggal Terbooking Pemesan Lain:
+                  <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fff1f2', borderRadius: '8px', border: '1px solid #fecdd3' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#be123c', display: 'block', marginBottom: '6px' }}>
+                      🚫 Tanggal Sudah Terbooking (Gabisa Diklik / Tercoret):
                     </span>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       {currentPkgBookedDates.map((bDate, idx) => (
@@ -1360,14 +1456,16 @@ export const CustomerPackageDetailPage: React.FC = () => {
                             fontWeight: '700', 
                             padding: '3px 8px', 
                             borderRadius: '4px', 
-                            textDecoration: 'line-through',
                             border: '1px solid #fca5a5',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px'
+                            gap: '4px',
+                            cursor: 'not-allowed',
+                            pointerEvents: 'none'
                           }}
                         >
-                          <s>{formatDateIndoFull(bDate)}</s>
+                          <s style={{ textDecoration: 'line-through' }}>{formatDateIndoFull(bDate)}</s>
+                          <span style={{ fontSize: '9.5px', backgroundColor: '#ef4444', color: '#fff', padding: '1px 4px', borderRadius: '3px' }}>Penuh</span>
                         </span>
                       ))}
                     </div>

@@ -33,15 +33,22 @@ export const CustomerSettingsPage: React.FC = () => {
   }, [customerProfile]);
 
   useEffect(() => {
-    // Load Wishlist from local storage
-    try {
-      const storedWishlist = localStorage.getItem('tripkita_customer_wishlist');
-      if (storedWishlist) {
-        setWishlistItems(JSON.parse(storedWishlist));
+    const loadWishlist = () => {
+      try {
+        const storedWishlist = localStorage.getItem('tripkita_customer_wishlist');
+        if (storedWishlist) {
+          setWishlistItems(JSON.parse(storedWishlist));
+        } else {
+          setWishlistItems([]);
+        }
+      } catch (e) {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
-    }
+    };
+
+    loadWishlist();
+
+    window.addEventListener('tripkita_wishlist_updated', loadWishlist);
 
     // Load Reviews
     try {
@@ -63,6 +70,8 @@ export const CustomerSettingsPage: React.FC = () => {
     } catch (e) {
       console.error(e);
     }
+
+    return () => window.removeEventListener('tripkita_wishlist_updated', loadWishlist);
   }, []);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -130,9 +139,10 @@ export const CustomerSettingsPage: React.FC = () => {
   };
 
   const handleRemoveWishlist = (id: number | string) => {
-    const updated = wishlistItems.filter(item => item.id !== id);
+    const updated = wishlistItems.filter(item => Number(item.id) !== Number(id));
     setWishlistItems(updated);
     localStorage.setItem('tripkita_customer_wishlist', JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('tripkita_wishlist_updated', { detail: updated }));
     showAlert({ type: 'success', message: 'Paket berhasil dihapus dari Favorit.' });
   };
 

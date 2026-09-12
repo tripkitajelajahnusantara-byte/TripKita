@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
-import { Star, MapPin, Calendar, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Star, MapPin, Calendar, ChevronRight, ArrowLeft, Heart, Share2 } from 'lucide-react';
+import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 
 interface TripPackage {
   id: number;
@@ -86,6 +87,39 @@ export const CustomerSearchPage: React.FC = () => {
     };
     fetchPackages();
   }, []);
+
+  const [wishlistIds, setWishlistIds] = useState<number[]>(() => 
+    getWishlistStorage().map(item => Number(item.id))
+  );
+
+  useEffect(() => {
+    const handleWishlistUpdate = () => {
+      setWishlistIds(getWishlistStorage().map(item => Number(item.id)));
+    };
+    window.addEventListener('tripkita_wishlist_updated', handleWishlistUpdate);
+    return () => window.removeEventListener('tripkita_wishlist_updated', handleWishlistUpdate);
+  }, []);
+
+  const toggleFavorite = (e: React.MouseEvent, pkg: TripPackage) => {
+    e.stopPropagation();
+    const updated = toggleWishlistStorage(pkg);
+    setWishlistIds(updated.map(i => Number(i.id)));
+  };
+
+  const [shareToast, setShareToast] = useState('');
+  const handleSharePackage = (e: React.MouseEvent, pkg: TripPackage) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}${window.location.pathname}#/paket-detail?id=${pkg.id}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setShareToast(`Link detail paket "${pkg.name}" berhasil disalin!`);
+        setTimeout(() => setShareToast(''), 3500);
+      });
+    } else {
+      setShareToast(`Link paket disalin: ${shareUrl}`);
+      setTimeout(() => setShareToast(''), 4000);
+    }
+  };
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -211,6 +245,30 @@ export const CustomerSearchPage: React.FC = () => {
         </div>
 
         {/* List of Landscape Package Cards */}
+        {shareToast && (
+          <div 
+            style={{ 
+              position: 'fixed', 
+              bottom: '24px', 
+              right: '24px', 
+              backgroundColor: '#0f172a', 
+              color: '#ffffff', 
+              padding: '12px 20px', 
+              borderRadius: '12px', 
+              fontSize: '13.5px', 
+              fontWeight: '700', 
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+              zIndex: 99999,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <Share2 size={16} color="#38bdf8" />
+            <span>{shareToast}</span>
+          </div>
+        )}
+
         {loading ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
             <p>Memuat daftar paket wisata...</p>
@@ -229,6 +287,7 @@ export const CustomerSearchPage: React.FC = () => {
               const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
 
               const badge = getBadgeColor(pkg.category);
+              const isFavorite = wishlistIds.includes(Number(pkg.id));
 
               return (
                 <div 
@@ -257,6 +316,27 @@ export const CustomerSearchPage: React.FC = () => {
                         e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80';
                       }}
                     />
+                    <button 
+                      onClick={(e) => toggleFavorite(e, pkg)}
+                      style={{ 
+                        position: 'absolute', 
+                        top: '10px', 
+                        right: '10px', 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                        border: 'none', 
+                        borderRadius: '50%', 
+                        width: '34px', 
+                        height: '34px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Heart size={18} fill={isFavorite ? '#ef4444' : 'none'} color={isFavorite ? '#ef4444' : '#64748b'} />
+                    </button>
                   </div>
 
                   {/* Content Right */}
@@ -336,8 +416,8 @@ export const CustomerSearchPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Bottom Row: Rating + Seats & Action Button */}
-                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {/* Bottom Row: Rating + Seats & Action Buttons (Share & Detail) */}
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: '700' }}>
                           <Star size={14} fill="#f59e0b" color="#f59e0b" /> {pkg.rating > 0 ? pkg.rating.toFixed(1) : '4.8'}
@@ -349,33 +429,64 @@ export const CustomerSearchPage: React.FC = () => {
                         </span>
                       </div>
 
-                      <button 
-                        onClick={() => handleSelectPackage(pkg)}
-                        style={{
-                          backgroundColor: '#ffffff',
-                          border: '1.5px solid #0284c7',
-                          color: '#0284c7',
-                          padding: '9px 20px',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.backgroundColor = '#0284c7';
-                          e.currentTarget.style.color = '#ffffff';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.backgroundColor = '#ffffff';
-                          e.currentTarget.style.color = '#0284c7';
-                        }}
-                      >
-                        Lihat Detail <ChevronRight size={15} />
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {/* Share Button (Gambar 3) */}
+                        <button
+                          onClick={(e) => handleSharePackage(e, pkg)}
+                          style={{
+                            backgroundColor: '#f1f5f9',
+                            border: '1px solid #cbd5e1',
+                            color: '#334155',
+                            padding: '9px 14px',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.backgroundColor = '#e2e8f0';
+                            e.currentTarget.style.color = '#0f172a';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f1f5f9';
+                            e.currentTarget.style.color = '#334155';
+                          }}
+                        >
+                          <Share2 size={14} /> Bagikan
+                        </button>
+
+                        <button 
+                          onClick={() => handleSelectPackage(pkg)}
+                          style={{
+                            backgroundColor: '#ffffff',
+                            border: '1.5px solid #0284c7',
+                            color: '#0284c7',
+                            padding: '9px 20px',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.backgroundColor = '#0284c7';
+                            e.currentTarget.style.color = '#ffffff';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.backgroundColor = '#ffffff';
+                            e.currentTarget.style.color = '#0284c7';
+                          }}
+                        >
+                          Lihat Detail <ChevronRight size={15} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

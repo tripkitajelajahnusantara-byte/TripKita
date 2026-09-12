@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage, OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
-import { Search, ShieldCheck, CreditCard, Headset, ThumbsUp, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight } from 'lucide-react';
+import { Search, ShieldCheck, CreditCard, Headset, ThumbsUp, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight, Share2 } from 'lucide-react';
+import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 
 import heroImage from '../assets/hero.jpg';
 
@@ -81,7 +82,6 @@ export const CustomerLandingPage: React.FC = () => {
   const [searchType, setSearchType] = useState('Open Trip');   
   const [searchCategory, setSearchCategory] = useState('Semua Kategori');
 
-  const [favorites, setFavorites] = useState<number[]>([]);
   const [dateError, setDateError] = useState('');
 
   // Minimum date for date picker (today - no backdates)
@@ -339,6 +339,18 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     fetchPackages();
   }, []);
 
+  const [wishlistIds, setWishlistIds] = useState<number[]>(() => 
+    getWishlistStorage().map(item => Number(item.id))
+  );
+
+  useEffect(() => {
+    const handleWishlistUpdate = () => {
+      setWishlistIds(getWishlistStorage().map(item => Number(item.id)));
+    };
+    window.addEventListener('tripkita_wishlist_updated', handleWishlistUpdate);
+    return () => window.removeEventListener('tripkita_wishlist_updated', handleWishlistUpdate);
+  }, []);
+
   const handleSelectPackage = (pkg: TripPackage) => {
     const updatedPkg = {
       ...pkg,
@@ -348,11 +360,25 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     navigateTo('paket-detail');
   };
 
-  const toggleFavorite = (e: React.MouseEvent, id: number) => {
+  const toggleFavorite = (e: React.MouseEvent, pkg: TripPackage) => {
     e.stopPropagation();
-    setFavorites(prev => 
-      prev.includes(id) ? prev.filter(fId => fId !== id) : [...prev, id]
-    );
+    const updated = toggleWishlistStorage(pkg);
+    setWishlistIds(updated.map(i => Number(i.id)));
+  };
+
+  const [shareToast, setShareToast] = useState('');
+  const handleSharePackage = (e: React.MouseEvent, pkg: TripPackage) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}${window.location.pathname}#/paket-detail?id=${pkg.id}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setShareToast(`Link paket "${pkg.name}" berhasil disalin!`);
+        setTimeout(() => setShareToast(''), 3000);
+      });
+    } else {
+      setShareToast(`Link paket disalin: ${shareUrl}`);
+      setTimeout(() => setShareToast(''), 4000);
+    }
   };
 
   const formatIDR = (price: number) => {
@@ -638,6 +664,30 @@ const DEFAULT_PACKAGES: TripPackage[] = [
       </div>
 
       {/* Main Grid Trips Section */}
+      {shareToast && (
+        <div 
+          style={{ 
+            position: 'fixed', 
+            bottom: '24px', 
+            right: '24px', 
+            backgroundColor: '#0f172a', 
+            color: '#ffffff', 
+            padding: '12px 20px', 
+            borderRadius: '12px', 
+            fontSize: '13.5px', 
+            fontWeight: '700', 
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <Share2 size={16} color="#38bdf8" />
+          <span>{shareToast}</span>
+        </div>
+      )}
+
       <div id="main-trips-section" className="container" style={{ marginTop: '45px', maxWidth: '1120px', margin: '45px auto 0 auto', padding: '0 20px' }}>
         
         {loading ? (
@@ -675,7 +725,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))', gap: '20px' }}>
                 {processedPackages.filter(p => p.tripType === 'Open Trip' || !p.tripType).slice(0, 4).map((pkg) => {
                   const badge = getBadgeColor(pkg.category);
-                  const isFavorite = favorites.includes(pkg.id);
+                  const isFavorite = wishlistIds.includes(Number(pkg.id));
                   const highlights = getHighlightsForPackage(pkg).slice(0, 3);
                   return (
                     <div 
@@ -705,26 +755,47 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                             e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80';
                           }}
                         />
-                        <button 
-                          onClick={(e) => toggleFavorite(e, pkg.id)}
-                          style={{ 
-                            position: 'absolute', 
-                            top: '10px', 
-                            right: '10px', 
-                            backgroundColor: 'rgba(255, 255, 255, 0.9)', 
-                            border: 'none', 
-                            borderRadius: '50%', 
-                            width: '28px', 
-                            height: '28px', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                          }}
-                        >
-                          <Heart size={14} fill={isFavorite ? '#ef4444' : 'none'} color={isFavorite ? '#ef4444' : '#64748b'} />
-                        </button>
+                        <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px' }}>
+                          <button 
+                            onClick={(e) => handleSharePackage(e, pkg)}
+                            title="Bagikan Paket"
+                            style={{ 
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                              border: 'none', 
+                              borderRadius: '50%', 
+                              width: '32px', 
+                              height: '32px', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <Share2 size={15} color="#334155" />
+                          </button>
+
+                          <button 
+                            onClick={(e) => toggleFavorite(e, pkg)}
+                            title="Simpan ke Favorit"
+                            style={{ 
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                              border: 'none', 
+                              borderRadius: '50%', 
+                              width: '32px', 
+                              height: '32px', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <Heart size={16} fill={isFavorite ? '#ef4444' : 'none'} color={isFavorite ? '#ef4444' : '#64748b'} />
+                          </button>
+                        </div>
                         <span 
                           style={{ 
                             position: 'absolute', 
@@ -820,7 +891,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
               {/* 4 Private & Honeymoon Packages */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))', gap: '20px' }}>
                 {processedPackages.filter(p => p.tripType === 'Private Trip' || p.tripType === 'Honeymoon').slice(0, 4).map((pkg) => {
-                  const isFavorite = favorites.includes(pkg.id);
+                  const isFavorite = wishlistIds.includes(Number(pkg.id));
                   const highlights = getHighlightsForPackage(pkg).slice(0, 3);
                   return (
                     <div 
@@ -850,26 +921,47 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                             e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80';
                           }}
                         />
-                        <button 
-                          onClick={(e) => toggleFavorite(e, pkg.id)}
-                          style={{ 
-                            position: 'absolute', 
-                            top: '10px', 
-                            right: '10px', 
-                            backgroundColor: 'rgba(255, 255, 255, 0.9)', 
-                            border: 'none', 
-                            borderRadius: '50%', 
-                            width: '28px', 
-                            height: '28px', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                          }}
-                        >
-                          <Heart size={14} fill={isFavorite ? '#ef4444' : 'none'} color={isFavorite ? '#ef4444' : '#64748b'} />
-                        </button>
+                        <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px' }}>
+                          <button 
+                            onClick={(e) => handleSharePackage(e, pkg)}
+                            title="Bagikan Paket"
+                            style={{ 
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                              border: 'none', 
+                              borderRadius: '50%', 
+                              width: '32px', 
+                              height: '32px', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <Share2 size={15} color="#334155" />
+                          </button>
+
+                          <button 
+                            onClick={(e) => toggleFavorite(e, pkg)}
+                            title="Simpan ke Favorit"
+                            style={{ 
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                              border: 'none', 
+                              borderRadius: '50%', 
+                              width: '32px', 
+                              height: '32px', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <Heart size={16} fill={isFavorite ? '#ef4444' : 'none'} color={isFavorite ? '#ef4444' : '#64748b'} />
+                          </button>
+                        </div>
                         <span 
                           style={{ 
                             position: 'absolute', 
@@ -965,7 +1057,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
               {/* 4 Family & Corporate Packages */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))', gap: '20px' }}>
                 {processedPackages.filter(p => p.tripType === 'Family' || p.tripType === 'Corporate').slice(0, 4).map((pkg) => {
-                  const isFavorite = favorites.includes(pkg.id);
+                  const isFavorite = wishlistIds.includes(Number(pkg.id));
                   const highlights = getHighlightsForPackage(pkg).slice(0, 3);
                   return (
                     <div 
@@ -996,24 +1088,25 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                           }}
                         />
                         <button 
-                          onClick={(e) => toggleFavorite(e, pkg.id)}
+                          onClick={(e) => toggleFavorite(e, pkg)}
                           style={{ 
                             position: 'absolute', 
                             top: '10px', 
                             right: '10px', 
-                            backgroundColor: 'rgba(255, 255, 255, 0.9)', 
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)', 
                             border: 'none', 
                             borderRadius: '50%', 
-                            width: '28px', 
-                            height: '28px', 
+                            width: '32px', 
+                            height: '32px', 
                             display: 'flex', 
                             alignItems: 'center', 
                             justifyContent: 'center', 
                             cursor: 'pointer',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            transition: 'all 0.2s'
                           }}
                         >
-                          <Heart size={14} fill={isFavorite ? '#ef4444' : 'none'} color={isFavorite ? '#ef4444' : '#64748b'} />
+                          <Heart size={16} fill={isFavorite ? '#ef4444' : 'none'} color={isFavorite ? '#ef4444' : '#64748b'} />
                         </button>
                         <span 
                           style={{ 
