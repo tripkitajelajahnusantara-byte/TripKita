@@ -237,7 +237,7 @@ func (s *EmailService) SendCancelledEmail(b *models.Booking) error {
 	}
 
 	packageName := "Paket Wisata"
-	if b.Package != nil && b.Package.Name != "" {
+	if b.Package.Name != "" {
 		packageName = b.Package.Name
 	}
 
@@ -276,7 +276,7 @@ func (s *EmailService) SendRescheduleEmail(b *models.Booking) error {
 	}
 
 	packageName := "Paket Wisata"
-	if b.Package != nil && b.Package.Name != "" {
+	if b.Package.Name != "" {
 		packageName = b.Package.Name
 	}
 
