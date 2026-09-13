@@ -824,23 +824,28 @@ func EnsureAllTestProvidersAndSeats() {
 	sched2 := fmt.Sprintf("%d %s %d – %d %s %d (2 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 1).Day(), months[now.AddDate(0, 0, 1).Month()-1], now.AddDate(0, 0, 1).Year())
 
 	// Map provider IDs by email
-	var p1, p2, p3, p4, p8 models.Provider
+	var p1, p2, p3, p4, p5, p6, p7, p8 models.Provider
 	DB.Where("email = ?", "partner@wisatanusantara.id").First(&p1)
 	DB.Where("email = ?", "partner2@tidung.id").First(&p2)
 	DB.Where("email = ?", "partner3@cilember.id").First(&p3)
 	DB.Where("email = ?", "partner4@bandung.id").First(&p4)
+	DB.Where("email = ?", "partner5@ranukumbolo.id").First(&p5)
+	DB.Where("email = ?", "partner6@baduy.id").First(&p6)
+	DB.Where("email = ?", "partner7@palu.id").First(&p7)
 	DB.Where("email = ?", "partner8@jogja.id").First(&p8)
 
-	pID1 := p1.ID
-	if pID1 == 0 { pID1 = 1 }
-	pID2 := p2.ID
-	if pID2 == 0 { pID2 = 2 }
-	pID3 := p3.ID
-	if pID3 == 0 { pID3 = 3 }
-	pID4 := p4.ID
-	if pID4 == 0 { pID4 = 4 }
-	pID8 := p8.ID
-	if pID8 == 0 { pID8 = 8 }
+	var defaultProv models.Provider
+	DB.Where("role = ?", "PROVIDER").Order("id asc").First(&defaultProv)
+	fallbackID := defaultProv.ID
+
+	pID1 := p1.ID; if pID1 == 0 { pID1 = fallbackID }
+	pID2 := p2.ID; if pID2 == 0 { pID2 = fallbackID }
+	pID3 := p3.ID; if pID3 == 0 { pID3 = fallbackID }
+	pID4 := p4.ID; if pID4 == 0 { pID4 = fallbackID }
+	pID5 := p5.ID; if pID5 == 0 { pID5 = fallbackID }
+	pID6 := p6.ID; if pID6 == 0 { pID6 = fallbackID }
+	pID7 := p7.ID; if pID7 == 0 { pID7 = fallbackID }
+	pID8 := p8.ID; if pID8 == 0 { pID8 = fallbackID }
 
 	packagesToEnsure := []models.Package{
 		// Provider 1: Wisata Bromo Nusantara (Bromo & Bali)
