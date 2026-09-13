@@ -3,6 +3,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare } from 'lucide-react';
 import { API_BASE_URL } from '../utils/api';
+import { TravelokaCalendarModal } from '../components/TravelokaCalendarModal';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
 
@@ -15,6 +16,9 @@ interface AddOn {
 export const CustomerPackageDetailPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, setSelectedPackageForDetail, setSelectedProviderId, customerProfile, openAuthModal } = useNavigation();
   const { showAlert } = useCustomAlert();
+
+  // Traveloka Calendar Modal State
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
 
   // Photo Lightbox Modal State
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -156,16 +160,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const [customEndDate, setCustomEndDate] = useState<string>(
     getAddDaysIso(customStartDate, defaultDuration)
   );
-
-  const customStartDateInputRef = React.useRef<HTMLInputElement>(null);
-  const customEndDateInputRef = React.useRef<HTMLInputElement>(null);
-
-  const handleStartDateChange = (newStart: string) => {
-    setCustomStartDate(newStart);
-    if (newStart > customEndDate) {
-      setCustomEndDate(getAddDaysIso(newStart, defaultDuration));
-    }
-  };
 
   // Booked / Occupied dates dynamically fetched from database or calculated relative to current date
   const getAddDaysFromToday = (days: number) => {
@@ -1268,85 +1262,45 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   </span>
                 </div>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                  <div>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>
-                      Tanggal Mulai
-                    </label>
-                    <div 
-                      onClick={() => customStartDateInputRef.current?.showPicker ? customStartDateInputRef.current.showPicker() : customStartDateInputRef.current?.focus()}
-                      style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
-                    >
-                      <div
-                        style={{
-                          width: '100%',
-                          padding: '8px 10px',
-                          borderRadius: '8px',
-                          border: isRangeBooked ? '1.5px solid #ef4444' : '1.5px solid #007bff',
-                          fontSize: '12.5px',
-                          fontWeight: '700',
-                          color: '#0f172a',
-                          backgroundColor: '#ffffff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          boxSizing: 'border-box'
-                        }}
-                      >
-                        <span style={{ fontSize: '11.5px' }}>{formatDateIndoFull(customStartDate)}</span>
-                        <Calendar size={14} color="#007bff" />
-                      </div>
-                      <input 
-                        ref={customStartDateInputRef}
-                        type="date" 
-                        min={h7MinDateStr}
-                        value={customStartDate}
-                        onChange={(e) => handleStartDateChange(e.target.value)}
-                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                      />
-                    </div>
+                {/* Trigger Button to Open Traveloka Calendar Month Grid (Gambar 1) */}
+                <button
+                  type="button"
+                  onClick={() => setIsCalendarModalOpen(true)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: '10px',
+                    backgroundColor: '#ffffff',
+                    border: isRangeBooked ? '2px solid #ef4444' : '2px solid #007bff',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,123,255,0.08)',
+                    transition: 'all 0.15s',
+                    marginBottom: '10px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#007bff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Calendar size={15} color="#007bff" /> Buka Kalender Tanggal Menginap
+                    </span>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#007bff', backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>
+                      Ubah Tanggal &gt;
+                    </span>
                   </div>
 
-                  <div>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>
-                      Tanggal Selesai
-                    </label>
-                    <div 
-                      onClick={() => customEndDateInputRef.current?.showPicker ? customEndDateInputRef.current.showPicker() : customEndDateInputRef.current?.focus()}
-                      style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
-                    >
-                      <div
-                        style={{
-                          width: '100%',
-                          padding: '8px 10px',
-                          borderRadius: '8px',
-                          border: isRangeBooked ? '1.5px solid #ef4444' : '1.5px solid #007bff',
-                          fontSize: '12.5px',
-                          fontWeight: '700',
-                          color: '#0f172a',
-                          backgroundColor: '#ffffff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          boxSizing: 'border-box'
-                        }}
-                      >
-                        <span style={{ fontSize: '11.5px' }}>{formatDateIndoFull(customEndDate)}</span>
-                        <Calendar size={14} color="#007bff" />
-                      </div>
-                      <input 
-                        ref={customEndDateInputRef}
-                        type="date" 
-                        min={customStartDate}
-                        value={customEndDate}
-                        onChange={(e) => setCustomEndDate(e.target.value)}
-                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                      />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#f8fafc', padding: '8px 10px', borderRadius: '8px' }}>
+                    <div>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Check-In</span>
+                      <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Check-Out</span>
+                      <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
                     </div>
                   </div>
-                </div>
+                </button>
 
-                <div style={{ backgroundColor: '#ffffff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #bfdbfe', fontSize: '11.5px', fontWeight: '700', color: '#0369a1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ backgroundColor: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #bfdbfe', fontSize: '12px', fontWeight: '700', color: '#0369a1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>🗓️ Durasi Trip:</span>
                   <span style={{ backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px', color: '#0284c7' }}>
                     {getDurationDisplay(customStartDate, customEndDate)}
@@ -1355,93 +1309,15 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
                 {isRangeBooked && (
                   <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '8px 10px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '8px', lineHeight: '1.4' }}>
-                    ❌ Rentang tanggal menabrak jadwal terbooking! Silakan pilih rentang tanggal lain.
+                    ❌ Rentang tanggal menabrak jadwal terbooking! Silakan klik kalender di atas untuk memilih rentang tanggal lain.
                   </div>
                 )}
-
-                {/* Interactive Visual Calendar Grid for Date Selection */}
-                <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Calendar size={13} color="#007bff" /> Pilihan Tanggal Keberangkatan:
-                    </span>
-                    <span style={{ fontSize: '10.5px', color: '#64748b' }}>
-                      Pilih salah satu tanggal
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '6px' }}>
-                    {Array.from({ length: 14 }, (_, i) => {
-                      const d = new Date(h7MinDateStr);
-                      d.setDate(d.getDate() + i);
-                      const dateIso = d.toISOString().split('T')[0];
-                      const isBooked = currentPkgBookedDates.includes(dateIso);
-                      const isSelected = customStartDate === dateIso;
-
-                      const monthsIndo = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-                      const displayStr = `${d.getDate()} ${monthsIndo[d.getMonth()]}`;
-
-                      if (isBooked) {
-                        return (
-                          <button
-                            key={dateIso}
-                            type="button"
-                            disabled={true}
-                            style={{
-                              padding: '6px 4px',
-                              borderRadius: '6px',
-                              border: '1.5px dashed #fca5a5',
-                              backgroundColor: '#fee2e2',
-                              color: '#ef4444',
-                              fontSize: '11px',
-                              fontWeight: '700',
-                              cursor: 'not-allowed',
-                              pointerEvents: 'none',
-                              opacity: 0.8,
-                              textAlign: 'center',
-                              lineHeight: '1.2'
-                            }}
-                          >
-                            <s style={{ textDecoration: 'line-through' }}>{displayStr}</s>
-                            <span style={{ display: 'block', fontSize: '9px', fontWeight: '800', color: '#dc2626' }}>Terbooking</span>
-                          </button>
-                        );
-                      }
-
-                      return (
-                        <button
-                          key={dateIso}
-                          type="button"
-                          onClick={() => handleStartDateChange(dateIso)}
-                          style={{
-                            padding: '6px 4px',
-                            borderRadius: '6px',
-                            border: isSelected ? '1.5px solid #007bff' : '1px solid #cbd5e1',
-                            backgroundColor: isSelected ? '#007bff' : '#ffffff',
-                            color: isSelected ? '#ffffff' : '#0f172a',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                            textAlign: 'center',
-                            lineHeight: '1.2',
-                            transition: 'all 0.15s'
-                          }}
-                        >
-                          {displayStr}
-                          <span style={{ display: 'block', fontSize: '9px', color: isSelected ? '#e0f2fe' : '#10b981', fontWeight: '700' }}>
-                            {isSelected ? 'Terpilih' : 'Tersedia'}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
 
                 {/* Strikethrough Booked Dates Visual Indicator Banner */}
                 {currentPkgBookedDates.length > 0 && (
                   <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fff1f2', borderRadius: '8px', border: '1px solid #fecdd3' }}>
                     <span style={{ fontSize: '11px', fontWeight: '800', color: '#be123c', display: 'block', marginBottom: '6px' }}>
-                      🚫 Tanggal Sudah Terbooking (Gabisa Diklik / Tercoret):
+                      🚫 Tanggal Sudah Terbooking (Gabisa Diklik / Tercoret di Kalender):
                     </span>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       {currentPkgBookedDates.map((bDate, idx) => (
@@ -1463,7 +1339,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                           }}
                         >
                           <s style={{ textDecoration: 'line-through' }}>{formatDateIndoFull(bDate)}</s>
-                          <span style={{ fontSize: '9.5px', backgroundColor: '#ef4444', color: '#fff', padding: '1px 4px', borderRadius: '3px' }}>Penuh</span>
+                          <span style={{ fontSize: '9.5px', backgroundColor: '#ef4444', color: '#fff', padding: '1px 4px', borderRadius: '3px' }}>FULL</span>
                         </span>
                       ))}
                     </div>
@@ -1747,6 +1623,22 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
         </div>
       )}
+
+      {/* Traveloka Calendar Modal for Date Selection */}
+      <TravelokaCalendarModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+        startDateIso={customStartDate}
+        endDateIso={customEndDate}
+        onSelectRange={(startIso, endIso) => {
+          setCustomStartDate(startIso);
+          setCustomEndDate(endIso);
+        }}
+        bookedDates={currentPkgBookedDates}
+        minDateIso={h7MinDateStr}
+        tripType={pkg.tripType}
+        durationDays={defaultDuration}
+      />
 
     </div>
   );
