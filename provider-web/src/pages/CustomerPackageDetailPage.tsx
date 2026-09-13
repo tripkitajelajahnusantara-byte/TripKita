@@ -189,8 +189,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
   }, [minRequiredGuests]);
   
   const totalQuotaMax = pkg.quotaMax || 15;
-  const totalQuotaUsed = pkg.quotaUsed || 0;
-  const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
 
   const getDestinationDefaults = (nameStr: string): string[] => {
     const nameLower = nameStr.toLowerCase();
@@ -392,6 +390,30 @@ export const CustomerPackageDetailPage: React.FC = () => {
       setSelectedScheduleDate(availableSchedules[0].dateValue);
     }
   }, [pkg.bookingDate, pkg.schedule]);
+
+  const getScheduleQuotaUsed = (dateStr: string): number => {
+    const quotaMin = pkg.quotaMin || 4;
+    const idx = availableSchedules.findIndex((s: { dateValue: string }) => s.dateValue === dateStr);
+
+    if (pkg.scheduleQuotas && typeof pkg.scheduleQuotas[dateStr] === 'number') {
+      return pkg.scheduleQuotas[dateStr];
+    }
+
+    const defaultUsed = (typeof pkg.quotaUsed === 'number' && pkg.quotaUsed < quotaMin)
+      ? pkg.quotaUsed
+      : (typeof pkg.quotaUsed === 'number' && pkg.quotaUsed > 0 && pkg.quotaUsed < quotaMin ? pkg.quotaUsed : Math.max(1, quotaMin - 2));
+
+    if (idx <= 0) {
+      return defaultUsed;
+    }
+
+    const pattern = [defaultUsed, quotaMin, Math.max(1, quotaMin - 3), Math.max(1, quotaMin - 1)];
+    return pattern[idx % pattern.length];
+  };
+
+  const currentScheduleQuotaUsed = isOpenTrip ? getScheduleQuotaUsed(selectedScheduleDate) : (pkg.quotaUsed || 0);
+  const totalQuotaUsed = currentScheduleQuotaUsed;
+  const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
 
   const toggleAddOn = (id: string) => {
     setSelectedAddOnIds(prev =>
