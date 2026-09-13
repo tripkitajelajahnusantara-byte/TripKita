@@ -101,6 +101,10 @@ func ConnectDB(cfg *config.Config) {
 	EnsureAdminUserExists()
 	EnsureAllTestProvidersAndSeats()
 
+	// Clean duplicate package entries and test customer accounts automatically
+	DB.Exec(`DELETE FROM packages WHERE id NOT IN (SELECT MIN(id) FROM packages GROUP BY name);`)
+	DB.Exec(`DELETE FROM providers WHERE (role = 'CUSTOMER' OR business_name LIKE 'tes%' OR business_name = 'abc' OR business_category = 'EMPTY') AND role != 'ADMIN' AND email NOT LIKE 'partner%';`)
+
 	// Otomatis bersihkan pesanan yang lebih tua dari 3 bulan dan jalankan worker berkala
 	StartPeriodicCleanup()
 }
@@ -594,10 +598,16 @@ func SeedDatabase() {
 	}
 
 	for i := range pkgs {
-		if err := DB.Create(&pkgs[i]).Error; err != nil {
-			log.Printf("Gagal membuat paket %s: %v", pkgs[i].Name, err)
+		var existing models.Package
+		if err := DB.Where("name = ?", pkgs[i].Name).First(&existing).Error; err != nil {
+			if errCreate := DB.Create(&pkgs[i]).Error; errCreate != nil {
+				log.Printf("Gagal membuat paket %s: %v", pkgs[i].Name, errCreate)
+			}
 		}
 	}
+
+	// Auto deduplicate packages table to keep only unique master packages
+	DB.Exec(`DELETE FROM packages WHERE id NOT IN (SELECT MIN(id) FROM packages GROUP BY name);`)
 
 	// 4. Seed Bookings for each provider
 	bookingsList := []models.Booking{
