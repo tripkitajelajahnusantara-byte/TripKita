@@ -930,23 +930,9 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
             {/* Profil Provider Penyelenggara Section */}
             {(() => {
-              const pId = pkg.providerId || 1;
-              const providerNames: { [key: number]: string } = {
-                1: 'Wisata Bromo Nusantara',
-                2: 'Tidung Paradise Tour',
-                3: 'Bogor Curug Explorer',
-                4: 'Bandung Juara Tour',
-                8: 'Jogja Istimewa Tour',
-              };
-              const providerCities: { [key: number]: string } = {
-                1: 'Probolinggo, Jawa Timur',
-                2: 'Kepulauan Seribu, Jakarta',
-                3: 'Bogor, Jawa Barat',
-                4: 'Bandung, Jawa Barat',
-                8: 'Yogyakarta, DI Yogyakarta',
-              };
-              const currentProviderName = providerNames[pId] || 'Wisata Bromo Nusantara';
-              const currentProviderCity = providerCities[pId] || 'Indonesia';
+              const pId = pkg.providerId || pkg.provider?.id || 1;
+              const currentProviderName = pkg.providerName || pkg.providerDetails?.businessName || pkg.provider?.businessName || (pkg.destination ? `Mitra Tour ${pkg.destination.split(',')[0]}` : 'Mitra Resmi TemenTrip');
+              const currentProviderCity = pkg.providerCity || pkg.providerDetails?.operationalCity || pkg.provider?.operationalCity || pkg.destination || 'Indonesia';
 
               return (
                 <div 
