@@ -258,14 +258,14 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
           </button>
         </div>
 
-        {/* Selected Check-In & Check-Out Range Header (Gambar 1) */}
+        {/* Selected Date Range Header */}
         <div style={{ backgroundColor: '#f8fafc', padding: '14px 24px', borderBottom: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #007bff' }}>
-            <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Mulai (Check-In)</span>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Mulai</span>
             <strong style={{ fontSize: '13.5px', color: '#007bff' }}>{formatDayHeader(startDateIso)}</strong>
           </div>
           <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #007bff' }}>
-            <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Selesai (Check-Out)</span>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Selesai</span>
             <strong style={{ fontSize: '13.5px', color: '#007bff' }}>{formatDayHeader(endDateIso)}</strong>
           </div>
         </div>

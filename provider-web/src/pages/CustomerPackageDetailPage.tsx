@@ -1261,20 +1261,20 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#007bff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Calendar size={15} color="#007bff" /> Buka Kalender Tanggal Menginap
+                      <Calendar size={15} color="#007bff" /> Kalender Jadwal Perjalanan
                     </span>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: '#007bff', backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>
-                      Ubah Tanggal &gt;
+                      Pilih Tanggal &gt;
                     </span>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#f8fafc', padding: '8px 10px', borderRadius: '8px' }}>
                     <div>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Check-In</span>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Tanggal Mulai</span>
                       <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
                     </div>
                     <div>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Check-Out</span>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Tanggal Selesai</span>
                       <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
                     </div>
                   </div>
