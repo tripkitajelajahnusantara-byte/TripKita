@@ -124,6 +124,37 @@ func (ctrl *BookingController) UpdateStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, booking)
 }
 
+func (ctrl *BookingController) ProviderReschedule(c *gin.Context) {
+	providerID, exists := c.Get("provider_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		return
+	}
+
+	var req struct {
+		NewTripDate string `json:"newTripDate" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tanggal baru diperlukan"})
+		return
+	}
+
+	booking, err := ctrl.service.ProviderReschedule(uint(id), providerID.(uint), req.NewTripDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, booking)
+}
+
 func (ctrl *BookingController) PublicUpdateStatus(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)

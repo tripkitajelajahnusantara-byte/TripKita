@@ -30,7 +30,7 @@ export const LoginPage: React.FC = () => {
     setForgotLoading(true);
     setForgotError('');
     try {
-      await request('/auth/provider/forgot-password', {
+      await request('/public/auth/provider/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email: forgotEmail })
       });
@@ -54,7 +54,7 @@ export const LoginPage: React.FC = () => {
     setForgotLoading(true);
     setForgotError('');
     try {
-      await request('/auth/provider/reset-password', {
+      await request('/public/auth/provider/reset-password', {
         method: 'POST',
         body: JSON.stringify({ email: forgotEmail, otp: forgotOtp, newPassword: forgotNewPassword })
       });

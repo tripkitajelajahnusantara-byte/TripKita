@@ -14,6 +14,7 @@ import (
 type BookingService interface {
 	GetAllBookings(providerID uint) ([]models.Booking, error)
 	UpdateBookingStatus(id uint, providerID uint, status string) (*models.Booking, error)
+	ProviderReschedule(id uint, providerID uint, newDate string) (*models.Booking, error)
 	CreateBooking(booking *models.Booking) error
 	UpdateStatusByWebhook(invoiceID string, externalID string, xenditStatus string, paymentMethod string) error
 	GetRefunds() ([]models.Booking, error)
@@ -136,6 +137,19 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 		if booking.CancellationReason == "" {
 			booking.CancellationReason = "Dibatalkan oleh Provider / Kendala Cuaca / Kuota Minimal (Refund 100%)"
 		}
+		
+		// If previously paid or confirmed, we must revert the balance addition
+		if oldStatus == "PAID" || oldStatus == "CONFIRMED" || oldStatus == "COMPLETED" {
+			if database.DB != nil {
+				var settlement models.HeldSettlement
+				if errS := database.DB.Where("booking_id = ?", booking.ID).First(&settlement).Error; errS == nil && settlement.Status != "CANCELLED" {
+					settlement.Status = "CANCELLED"
+					database.DB.Save(&settlement)
+					database.DB.Exec("UPDATE provider_balances SET available_balance = GREATEST(available_balance - ?, 0), held_balance = GREATEST(held_balance - ?, 0), total_earned = GREATEST(total_earned - ?, 0) WHERE provider_id = ?", settlement.Amount, settlement.Amount, booking.TotalPrice, booking.ProviderID)
+				}
+			}
+		}
+
 	} else if status == "RESCHEDULE_OFFERED" {
 		if booking.RescheduleCount >= 1 {
 			return nil, fmt.Errorf("penjadwalan ulang (reschedule) hanya diperbolehkan maksimal 1 kali. Harap pilih opsi pembatalan untuk 100%% Full Refund")
@@ -156,6 +170,50 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 	// Adjust package quota
 	s.adjustQuota(booking, oldStatus, booking.Status, providerID)
 	s.sendNotificationsAndEmails(booking, oldStatus, booking.Status)
+
+	return booking, nil
+}
+
+func (s *bookingService) ProviderReschedule(id uint, providerID uint, newDate string) (*models.Booking, error) {
+	booking, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if booking.ProviderID != providerID {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	
+	if booking.RescheduleCount >= 1 {
+		return nil, fmt.Errorf("penjadwalan ulang (reschedule) hanya diperbolehkan maksimal 1 kali")
+	}
+
+	parsedDate, err := time.Parse("2006-01-02", newDate)
+	if err != nil {
+		return nil, fmt.Errorf("format tanggal tidak valid")
+	}
+
+	orig := booking.TripDate
+	booking.OriginalTripDate = &orig
+	booking.TripDate = parsedDate
+	booking.RescheduleCount += 1
+	booking.Status = "CONFIRMED" // Keep it confirmed but rescheduled
+
+	err = s.repo.Update(booking)
+	if err != nil {
+		return nil, err
+	}
+
+	// Notifikasi
+	if booking.CustomerID != nil {
+		s.notifService.CreateNotification(
+			*booking.CustomerID,
+			"CUSTOMER",
+			"Booking Di-reschedule",
+			fmt.Sprintf("Jadwal trip Anda untuk %s telah diubah menjadi %s oleh Provider", booking.BookingCode, parsedDate.Format("02 Jan 2006")),
+			"INFO",
+			fmt.Sprintf("/riwayat-booking/%d", booking.ID),
+		)
+	}
 
 	return booking, nil
 }

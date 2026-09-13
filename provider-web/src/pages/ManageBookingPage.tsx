@@ -46,6 +46,13 @@ export const ManageBookingPage: React.FC = () => {
   const [createdBookingUrl, setCreatedBookingUrl] = useState('');
   const [simulateLoading, setSimulateLoading] = useState(false);
 
+  // Cancel/Reschedule Modal States
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelBookingId, setCancelBookingId] = useState<number | null>(null);
+  const [cancelActionType, setCancelActionType] = useState<'REFUND' | 'RESCHEDULE' | null>(null);
+  const [newRescheduleDate, setNewRescheduleDate] = useState('');
+  const [cancelLoading, setCancelLoading] = useState(false);
+
   const loadPackages = async () => {
     try {
       const data = await request('/provider/packages');
@@ -123,15 +130,10 @@ export const ManageBookingPage: React.FC = () => {
         alert(err.message || 'Gagal menyetujui booking');
       }
     } else if (type === 'reject') {
-      try {
-        await request(`/provider/bookings/${id}/status`, {
-          method: 'PUT',
-          body: JSON.stringify({ status: 'CANCELLED_BY_PROVIDER' }),
-        });
-        loadData();
-      } catch (err: any) {
-        alert(err.message || 'Gagal membatalkan booking');
-      }
+      setCancelBookingId(id as number);
+      setCancelActionType(null);
+      setNewRescheduleDate('');
+      setShowCancelModal(true);
     } else if (type === 'complete') {
       try {
         await request(`/provider/bookings/${id}/status`, {
@@ -149,6 +151,37 @@ export const ManageBookingPage: React.FC = () => {
       }
     } else {
       alert(`Aksi: "${type}" untuk booking ID: ${id} dipicu.`);
+    }
+  };
+
+  const handleSubmitCancel = async () => {
+    if (!cancelBookingId || !cancelActionType) return;
+    setCancelLoading(true);
+    try {
+      if (cancelActionType === 'REFUND') {
+        await request(`/provider/bookings/${cancelBookingId}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({ status: 'CANCELLED_BY_PROVIDER' }),
+        });
+        alert('Booking berhasil dibatalkan dan direfund 100%.');
+      } else if (cancelActionType === 'RESCHEDULE') {
+        if (!newRescheduleDate) {
+          alert('Silakan pilih tanggal reschedule.');
+          setCancelLoading(false);
+          return;
+        }
+        await request(`/provider/bookings/${cancelBookingId}/reschedule`, {
+          method: 'PUT',
+          body: JSON.stringify({ newTripDate: newRescheduleDate }),
+        });
+        alert('Jadwal booking berhasil diubah (Reschedule).');
+      }
+      setShowCancelModal(false);
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'Terjadi kesalahan saat memproses permintaan.');
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -797,6 +830,78 @@ export const ManageBookingPage: React.FC = () => {
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Action Modal */}
+      {showCancelModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h2>Tindakan Pembatalan</h2>
+              <button className="close-modal" onClick={() => setShowCancelModal(false)}>✕</button>
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>Pilih jenis pembatalan untuk pesanan ini. Anda dapat mengembalikan dana 100% atau menawarkan perubahan tanggal (reschedule).</p>
+              
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setCancelActionType('REFUND')}
+                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid', borderColor: cancelActionType === 'REFUND' ? '#dc2626' : '#cbd5e1', backgroundColor: cancelActionType === 'REFUND' ? '#fef2f2' : '#ffffff', color: cancelActionType === 'REFUND' ? '#dc2626' : '#475569', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Refund 100%
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setCancelActionType('RESCHEDULE')}
+                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid', borderColor: cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#cbd5e1', backgroundColor: cancelActionType === 'RESCHEDULE' ? '#f0fdfa' : '#ffffff', color: cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#475569', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Reschedule
+                </button>
+              </div>
+
+              {cancelActionType === 'RESCHEDULE' && (
+                <div className="input-group" style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>Pilih Tanggal Baru</label>
+                  <input 
+                    type="date" 
+                    value={newRescheduleDate} 
+                    onChange={(e) => setNewRescheduleDate(e.target.value)} 
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', marginTop: '6px' }}
+                  />
+                  <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>Maksimal penjadwalan ulang hanya diperbolehkan 1 kali.</p>
+                </div>
+              )}
+
+              {cancelActionType === 'REFUND' && (
+                <div style={{ padding: '12px', backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: '8px', marginBottom: '16px' }}>
+                  <p style={{ fontSize: '12px', color: '#c2410c', margin: 0 }}>
+                    <strong>Perhatian:</strong> Memilih refund 100% akan membatalkan booking ini secara permanen. Jika pembayaran sudah cair, saldo Anda akan dipotong sebesar nilai transaksi ini.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button 
+                type="button" 
+                onClick={() => setShowCancelModal(false)}
+                style={{ border: '1px solid var(--color-border)', backgroundColor: '#ffffff', color: '#334155', fontWeight: 600, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                Kembali
+              </button>
+              <button 
+                type="button" 
+                onClick={handleSubmitCancel}
+                disabled={cancelLoading || !cancelActionType}
+                style={{ width: 'auto', padding: '10px 24px', backgroundColor: cancelActionType === 'REFUND' ? '#dc2626' : (cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#94a3b8'), color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: (cancelLoading || !cancelActionType) ? 'not-allowed' : 'pointer' }}
+              >
+                {cancelLoading ? 'Memproses...' : 'Konfirmasi Tindakan'}
+              </button>
             </div>
           </div>
         </div>
