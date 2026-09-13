@@ -188,16 +188,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const isRangeBooked = checkRangeOverlap(customStartDate, customEndDate, currentPkgBookedDates);
 
-  const getDurationDisplay = (startIso: string, endIso: string) => {
-    const start = new Date(startIso);
-    const end = new Date(endIso);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
-    const diffTime = end.getTime() - start.getTime();
-    const diffDays = Math.max(1, Math.round(diffTime / (1000 * 3600 * 24)) + 1);
-    const nights = Math.max(0, diffDays - 1);
-    return `${diffDays} Hari ${nights > 0 ? `${nights} Malam` : ''}`;
-  };
-
   useEffect(() => {
     if (guestsCount < minRequiredGuests) {
       setGuestsCount(minRequiredGuests);
@@ -1254,15 +1244,15 @@ export const CustomerPackageDetailPage: React.FC = () => {
             ) : (
               <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', border: '1px solid #dbeafe' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase' }}>
-                    Pilih Tanggal Trip ({pkg.tripType})
+                  <label style={{ fontSize: '12.5px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase' }}>
+                    Pilih Jadwal
                   </label>
                   <span style={{ fontSize: '11px', color: '#007bff', fontWeight: '700', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px' }}>
                     Min. H-7
                   </span>
                 </div>
                 
-                {/* Trigger Button to Open Traveloka Calendar Month Grid (Gambar 1) */}
+                {/* Clean Date Range Trigger Button */}
                 <button
                   type="button"
                   onClick={() => setIsCalendarModalOpen(true)}
@@ -1275,74 +1265,30 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     textAlign: 'left',
                     cursor: 'pointer',
                     boxShadow: '0 2px 8px rgba(0,123,255,0.08)',
-                    transition: 'all 0.15s',
-                    marginBottom: '10px'
+                    transition: 'all 0.15s'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#007bff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Calendar size={15} color="#007bff" /> Buka Kalender Tanggal Menginap
-                    </span>
-                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#007bff', backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>
-                      Ubah Tanggal &gt;
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#f8fafc', padding: '8px 10px', borderRadius: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Check-In</span>
-                      <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Check-In</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Calendar size={14} color="#007bff" />
+                        <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
+                      </div>
                     </div>
                     <div>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Check-Out</span>
-                      <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Check-Out</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Calendar size={14} color="#007bff" />
+                        <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
+                      </div>
                     </div>
                   </div>
                 </button>
 
-                <div style={{ backgroundColor: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #bfdbfe', fontSize: '12px', fontWeight: '700', color: '#0369a1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>🗓️ Durasi Trip:</span>
-                  <span style={{ backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px', color: '#0284c7' }}>
-                    {getDurationDisplay(customStartDate, customEndDate)}
-                  </span>
-                </div>
-
                 {isRangeBooked && (
-                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '8px 10px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '8px', lineHeight: '1.4' }}>
-                    ❌ Rentang tanggal menabrak jadwal terbooking! Silakan klik kalender di atas untuk memilih rentang tanggal lain.
-                  </div>
-                )}
-
-                {/* Strikethrough Booked Dates Visual Indicator Banner */}
-                {currentPkgBookedDates.length > 0 && (
-                  <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fff1f2', borderRadius: '8px', border: '1px solid #fecdd3' }}>
-                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#be123c', display: 'block', marginBottom: '6px' }}>
-                      🚫 Tanggal Sudah Terbooking (Gabisa Diklik / Tercoret di Kalender):
-                    </span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {currentPkgBookedDates.map((bDate, idx) => (
-                        <span 
-                          key={idx} 
-                          style={{ 
-                            backgroundColor: '#fee2e2', 
-                            color: '#ef4444', 
-                            fontSize: '11px', 
-                            fontWeight: '700', 
-                            padding: '3px 8px', 
-                            borderRadius: '4px', 
-                            border: '1px solid #fca5a5',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            cursor: 'not-allowed',
-                            pointerEvents: 'none'
-                          }}
-                        >
-                          <s style={{ textDecoration: 'line-through' }}>{formatDateIndoFull(bDate)}</s>
-                          <span style={{ fontSize: '9.5px', backgroundColor: '#ef4444', color: '#fff', padding: '1px 4px', borderRadius: '3px' }}>FULL</span>
-                        </span>
-                      ))}
-                    </div>
+                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '8px 10px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.4' }}>
+                    ❌ Tanggal pilihan Anda sudah terbooking. Silakan klik untuk memilih tanggal lain pada kalender.
                   </div>
                 )}
               </div>
