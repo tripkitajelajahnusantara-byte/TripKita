@@ -57,7 +57,7 @@ const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = 
 };
 
 export const CustomerHistoryPage: React.FC = () => {
-  const { navigateTo, customerProfile, setSelectedBookingForInvoice } = useNavigation();
+  const { navigateTo, customerProfile } = useNavigation();
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -401,18 +401,12 @@ export const CustomerHistoryPage: React.FC = () => {
                     {trackedBooking.status === 'PENDING_PAYMENT' && (
                       <button
                         onClick={() => {
-                          setSelectedBookingForInvoice({
-                            id: trackedBooking.id,
-                            bookingCode: trackedBooking.bookingCode,
-                            packageName: trackedBooking.packageDetails?.name || trackedBooking.packageName,
-                            totalPrice: trackedBooking.totalPrice,
-                            guests: trackedBooking.guests,
-                            tripDate: trackedBooking.tripDate,
-                            accountNumber: '693800143473',
-                            bankName: 'Bank OCBC',
-                            paymentUrl: trackedBooking.paymentUrl || ''
-                          });
-                          navigateTo('halaman-pembayaran');
+                          const pUrl = trackedBooking.paymentUrl || trackedBooking.payment_url;
+                          if (pUrl && pUrl.startsWith('http')) {
+                            window.location.href = pUrl;
+                          } else {
+                            alert('Tautan pembayaran Xendit tidak ditemukan. Silakan lakukan pemesanan ulang.');
+                          }
                         }}
                         style={{
                           padding: '10px 18px',
@@ -425,7 +419,7 @@ export const CustomerHistoryPage: React.FC = () => {
                           cursor: 'pointer'
                         }}
                       >
-                        ⚡ Selesaikan Pembayaran
+                        Selesaikan Pembayaran
                       </button>
                     )}
                     {(trackedBooking.status === 'PAID' || trackedBooking.status === 'CONFIRMED') && (
@@ -632,18 +626,12 @@ export const CustomerHistoryPage: React.FC = () => {
 
                             <button
                               onClick={() => {
-                                setSelectedBookingForInvoice({
-                                  id: booking.id,
-                                  bookingCode: booking.bookingCode,
-                                  packageName: tripName,
-                                  totalPrice: booking.totalPrice,
-                                  guests: booking.guests,
-                                  tripDate: formattedTripDate,
-                                  accountNumber: '693800143473',
-                                  bankName: 'Bank OCBC',
-                                  paymentUrl: booking.paymentUrl || ''
-                                });
-                                navigateTo('halaman-pembayaran');
+                                const pUrl = booking.paymentUrl || (booking as any).payment_url;
+                                if (pUrl && pUrl.startsWith('http')) {
+                                  window.location.href = pUrl;
+                                } else {
+                                  alert('Tautan pembayaran Xendit tidak ditemukan. Silakan lakukan pemesanan ulang.');
+                                }
                               }}
                               style={{
                                 padding: '8px 16px',
@@ -657,7 +645,7 @@ export const CustomerHistoryPage: React.FC = () => {
                                 boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
                               }}
                             >
-                              ⚡ Selesaikan Pembayaran
+                              Selesaikan Pembayaran
                             </button>
                           </div>
                         </div>

@@ -8,9 +8,6 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [openGuide, setOpenGuide] = useState<'mobile' | 'atm' | null>(null);
 
-  // 1-minute countdown timer logic (60 seconds testing limit)
-  const [timeLeft, setTimeLeft] = useState(60);
-
   const booking = selectedBookingForInvoice || {
     id: 1,
     bookingCode: 'TK-20260906-8941',
@@ -24,32 +21,14 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (timeLeft <= 0) {
-      // Auto-expire: update local history & redirect straight to riwayat-booking!
-      const existingStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-      const history = JSON.parse(existingStr);
-      const updatedHistory = history.map((item: any) => {
-        if (item.id === booking.id || item.bookingCode === booking.bookingCode) {
-          return { ...item, status: 'EXPIRED' };
-        }
-        return item;
-      });
-      localStorage.setItem('tripkita_my_bookings', JSON.stringify(updatedHistory));
+    if (booking.paymentUrl && booking.paymentUrl.startsWith('http')) {
+      window.location.replace(booking.paymentUrl);
+      return;
+    } else {
       navigateTo('riwayat-booking');
       return;
     }
-
-    const timer = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  }, [booking]);
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -108,9 +87,9 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
           <div style={{ backgroundColor: '#ffffff', border: '1px solid #fcd34d', padding: '10px 18px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Clock size={20} color="#d97706" />
             <div>
-              <span style={{ fontSize: '11px', color: '#b45309', display: 'block', fontWeight: '600' }}>Sisa Waktu Testing</span>
+              <span style={{ fontSize: '11px', color: '#b45309', display: 'block', fontWeight: '600' }}>Batas Waktu Pembayaran</span>
               <strong style={{ fontSize: '18px', fontWeight: '800', color: '#d97706', fontFamily: 'monospace' }}>
-                {formatTimer(timeLeft)}
+                24:00:00
               </strong>
             </div>
           </div>
