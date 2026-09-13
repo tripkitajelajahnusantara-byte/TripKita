@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Bell, X, CreditCard, RefreshCw, Calendar, Wallet, Info } from 'lucide-react';
-import { API_BASE_URL, getAuthHeaders } from '../utils/api';
+import { request } from '../utils/api';
 import { useNavigation } from '../context/NavigationContext';
 
 export interface NotificationItem {
@@ -14,75 +14,47 @@ export interface NotificationItem {
 }
 
 export const NotificationCenter: React.FC = () => {
-  const { navigateTo } = useNavigation();
+  const { navigateTo, providerProfile, customerProfile } = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [readingId, setReadingId] = useState<number | null>(null);
+  const isCustomer = customerProfile?.role === 'CUSTOMER';
+  const endpoint = isCustomer ? '/customer/notifications' : '/provider/notifications';
+  const userId = isCustomer ? customerProfile?.id : providerProfile?.id;
+  const unreadCount = notifications.filter(item => !item.isRead).length;
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
+    if (!userId) { setNotifications([]); setLoading(false); return; }
     try {
-      const res = await fetch(`${API_BASE_URL}/provider/notifications`, {
-        headers: getAuthHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const list: NotificationItem[] = data.data || [];
-        setNotifications(list);
-        setUnreadCount(list.filter((n) => !n.isRead).length);
-      }
-    } catch (err) {
-      // Mock fallback if offline or initial state
-      setNotifications([
-        {
-          id: 101,
-          title: '🎉 Pembayaran Berhasil',
-          message: 'Booking #TK-8821 terkonfirmasi. Bukti E-Voucher PDF telah dikirim ke email.',
-          type: 'PAYMENT',
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 102,
-          title: '💰 Pencairan Dana Uang Muka (DP 50%)',
-          message: 'Pencairan dana sebesar Rp 1.750.000 berhasil ditransfer ke rekening bank Anda.',
-          type: 'PAYOUT',
-          isRead: false,
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-        },
-      ]);
-      setUnreadCount(2);
-    }
-  };
+      const data = await request(endpoint);
+      setNotifications(data.data || []);
+      setError('');
+    } catch {
+      setError('Notifikasi gagal dimuat. Silakan coba lagi.');
+    } finally { setLoading(false); }
+  }, [endpoint, userId]);
 
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // Polling every 30s
+    void fetchNotifications();
+    const interval = setInterval(() => { void fetchNotifications(); }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchNotifications]);
 
-  const markAsRead = async (id: number) => {
+  const handleNotifClick = async (item: NotificationItem) => {
+    if (readingId !== null) return;
+    setReadingId(item.id);
     try {
-      await fetch(`${API_BASE_URL}/provider/notifications/${id}/read`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-      });
-    } catch (err) {
-      // ignore
-    }
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
-    setUnreadCount((prev) => Math.max(0, prev - 1));
-  };
-
-  const handleNotifClick = (item: NotificationItem) => {
-    markAsRead(item.id);
-    setIsOpen(false);
-    if (item.type === 'PAYOUT') {
-      navigateTo('keuangan-provider');
-    } else {
-      navigateTo('booking');
-    }
+      if (!item.isRead) {
+        await request(endpoint + '/' + item.id + '/read', { method: 'PUT' });
+        setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, isRead: true } : n));
+      }
+      setIsOpen(false);
+      navigateTo(isCustomer ? 'riwayat-booking' : item.type === 'PAYOUT' ? 'keuangan-provider' : 'booking');
+    } catch {
+      setError('Notifikasi belum berhasil ditandai dibaca. Silakan coba lagi.');
+    } finally { setReadingId(null); }
   };
 
   const getIcon = (type: string) => {
@@ -182,7 +154,7 @@ export const NotificationCenter: React.FC = () => {
           </div>
 
           <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
-            {notifications.length === 0 ? (
+            {loading ? <p>Memuat notifikasi...</p> : error ? <div role="alert"><p>{error}</p><button onClick={() => void fetchNotifications()}>Coba lagi</button></div> : notifications.length === 0 ? (
               <div style={{ padding: '30px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
                 Belum ada notifikasi baru.
               </div>

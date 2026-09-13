@@ -51,6 +51,7 @@ export interface PopularPackage {
 }
 
 export interface PackageItem {
+  image?: string;
   id: string;
   name: string;
   destination: string;
@@ -59,4 +60,39 @@ export interface PackageItem {
   schedule: string;
   status: 'Aktif' | 'Draft' | 'Nonaktif';
   rating?: number;
+}
+
+export interface PublicPackage {
+  id: number;
+  providerId: number;
+  name: string;
+  destination: string;
+  meetingPoint: string;
+  category: string;
+  tripType: string;
+  price: number;
+  quotaMin: number;
+  quotaUsed: number;
+  quotaMax: number;
+  startDate: string;
+  endDate: string;
+  schedule: string;
+  status: string;
+  rating: number;
+  description: string;
+  includedFacilities: string;
+  excludedFacilities: string;
+  itinerary: string;
+  image: string;
+  images: string;
+}
+
+export interface PackageReview {
+  id: number;
+  bookingId: number;
+  customerId: number;
+  packageId: number;
+  rating: number;
+  comment: string;
+  createdAt: string;
 }

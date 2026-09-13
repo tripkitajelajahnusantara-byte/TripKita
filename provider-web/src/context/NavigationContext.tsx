@@ -11,6 +11,8 @@ export function getRouteFromHash(): Route {
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isMitraDomain = hostname.startsWith('mitra.') || hostname.startsWith('provider.') || hostname.includes('mitra-') || hostname.includes('provider-');
 
+  if ((!hash || hash === '#/' || hash === '#') && window.location.pathname.replace(/\/$/, '') === '/riwayat-booking') return 'riwayat-booking';
+  if ((!hash || hash === '#/' || hash === '#') && window.location.pathname.replace(/\/$/, '') === '/xendit-checkout') return 'xendit-checkout';
   if (!hash || hash === '#/' || hash === '#') {
     return isMitraDomain ? 'provider-login' : 'beranda';
   }
@@ -160,6 +162,13 @@ interface ProviderProfile {
   sertifikatRejectionReason?: string;
 }
 
+interface BookingFormData {
+  packageId: number;
+  tripDate: string;
+  pemesan: { nama: string };
+  guests: number;
+}
+
 interface NavigationContextType {
   route: Route;
   navigateTo: (newRoute: Route) => void;
@@ -189,20 +198,8 @@ interface NavigationContextType {
   setSelectedBookingForInvoice: (booking: any) => void;
   searchParams: { destination: string; date: string; type: string; category: string };
   setSearchParams: React.Dispatch<React.SetStateAction<{ destination: string; date: string; type: string; category: string }>>;
-  bookingFormData: {
-    packageId?: number | string;
-    tripDate?: string;
-    pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
-    selectedAddOns?: Array<{ id: string; name: string; price: number }>;
-  } | null;
-  setBookingFormData: React.Dispatch<React.SetStateAction<{
-    packageId?: number | string;
-    tripDate?: string;
-    pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
-    selectedAddOns?: Array<{ id: string; name: string; price: number }>;
-  } | null>>;
+  bookingFormData: BookingFormData | null;
+  setBookingFormData: React.Dispatch<React.SetStateAction<BookingFormData | null>>;
   isAuthModalOpen: boolean;
   authModalMode: 'login' | 'register';
   openAuthModal: (mode?: 'login' | 'register', onSuccess?: () => void) => void;
@@ -221,7 +218,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
   const [selectedPackageForDetail, setSelectedPackageForDetail] = useState<any>(null);
-  const [selectedProviderId, setSelectedProviderId] = useState<number | null>(1);
+  const [selectedProviderId, setSelectedProviderId] = useState<number | null>(null);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<any>(null);
 
   const [searchParams, setSearchParams] = useState({
@@ -231,42 +228,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     category: 'Semua Kategori'
   });
 
-  const [bookingFormData, setBookingFormDataState] = useState<{
-    packageId?: number | string;
-    tripDate?: string;
-    pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
-    selectedAddOns?: Array<{ id: string; name: string; price: number }>;
-  } | null>(() => {
-    try {
-      const saved = sessionStorage.getItem('tripkita_booking_form_data');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const setBookingFormData: React.Dispatch<React.SetStateAction<{
-    packageId?: number | string;
-    tripDate?: string;
-    pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
-    selectedAddOns?: Array<{ id: string; name: string; price: number }>;
-  } | null>> = (valueOrFn) => {
-    setBookingFormDataState((prev) => {
-      const next = typeof valueOrFn === 'function' ? (valueOrFn as any)(prev) : valueOrFn;
-      try {
-        if (next) {
-          sessionStorage.setItem('tripkita_booking_form_data', JSON.stringify(next));
-        } else {
-          sessionStorage.removeItem('tripkita_booking_form_data');
-        }
-      } catch (e) {
-        console.error('Failed to save to sessionStorage', e);
-      }
-      return next;
-    });
-  };
+  const [bookingFormData, setBookingFormData] = useState<BookingFormData | null>(null);
 
   const [registerData, setRegisterData] = useState<RegisterData>({
     businessName: '',
@@ -303,7 +265,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const fetchSessionProfile = async (targetRoute: Route) => {
     setLoadingProfile(true);
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
-    const isProviderRoute = hash.includes('/provider') || hash.includes('/admin') ||
+    const isProviderRoute = hash.startsWith('#/provider/') || hash.startsWith('#/admin/') ||
       ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard'].includes(targetRoute);
 
     try {
@@ -328,14 +290,6 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
           if (data && data.role === 'CUSTOMER') {
             setCustomerProfile(data);
             setIsRegistered(true);
-            if (data.wishlistData) {
-              try {
-                localStorage.setItem('tripkita_customer_wishlist', data.wishlistData);
-                window.dispatchEvent(new CustomEvent('tripkita_wishlist_updated', { detail: JSON.parse(data.wishlistData) }));
-              } catch (e) {
-                console.error('Error parsing DB wishlistData:', e);
-              }
-            }
             return data;
           }
         }

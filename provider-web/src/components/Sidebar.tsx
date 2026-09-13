@@ -14,7 +14,7 @@ import {
 
 export const Sidebar: React.FC = () => {
   const { route, navigateTo, logout, providerProfile, setEditingPackageId } = useNavigation();
-  const providerName = providerProfile?.businessName || 'Wisata Nusantara';
+  const providerName = providerProfile?.businessName || 'Mitra';
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },

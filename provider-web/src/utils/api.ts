@@ -48,7 +48,7 @@ export function removeCustomerToken() {
 
 export function getAuthToken(): string | null {
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
-  if (hash.includes('/provider') || hash.includes('/admin')) {
+  if (hash.startsWith('#/provider/') || hash.startsWith('#/admin/')) {
     return getProviderToken();
   }
   return getCustomerToken();
@@ -68,7 +68,7 @@ export function removeAuthToken() {
 }
 
 export function getAuthHeaders(): Record<string, string> {
-  const token = getProviderToken() || getCustomerToken();
+  const token = getAuthToken();
   const headers: Record<string, string> = {};
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -79,12 +79,12 @@ export function getAuthHeaders(): Record<string, string> {
 export async function request(endpoint: string, options: RequestInit = {}) {
   let token: string | null = null;
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
-  const isProviderRoute = hash.includes('/provider') || hash.includes('/admin');
+  const isProviderRoute = hash.startsWith('#/provider/') || hash.startsWith('#/admin/');
 
   // Decide which token to attach based on endpoint or current route
   if (endpoint.startsWith('/provider/profile')) {
-    token = isProviderRoute ? getProviderToken() : (getCustomerToken() || getProviderToken());
-  } else if (endpoint.startsWith('/provider') || endpoint.startsWith('/admin') || isProviderRoute) {
+    token = isProviderRoute ? getProviderToken() : getCustomerToken();
+  } else if (endpoint.startsWith('/provider') || endpoint.startsWith('/admin')) {
     token = getProviderToken();
   } else if (endpoint.startsWith('/customer')) {
     token = getCustomerToken();
@@ -94,7 +94,7 @@ export async function request(endpoint: string, options: RequestInit = {}) {
 
   const headers = new Headers(options.headers || {});
 
-  if (token) {
+  if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
@@ -112,6 +112,14 @@ export async function request(endpoint: string, options: RequestInit = {}) {
     throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
   }
 
-  return response.json().catch(() => ({}));
+  if (response.status === 204) return null;
+  return response.json().catch(() => { throw new Error('Respons server tidak valid. Silakan coba lagi.'); });
 }
 
+
+export function getUploadUrl(path?: string): string | undefined {
+  if (!path) return undefined;
+  if (/^https?:\/\//i.test(path)) return path;
+  if (!path.startsWith('/uploads/') && !path.startsWith('uploads/')) return undefined;
+  return API_BASE_URL.replace(/\/api\/v1\/?$/, '') + '/' + path.replace(/^\//, '');
+}

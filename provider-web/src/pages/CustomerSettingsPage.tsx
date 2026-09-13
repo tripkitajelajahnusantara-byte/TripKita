@@ -2,25 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { request } from '../utils/api';
-import { getTripImage } from '../utils/tripImages';
-import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin } from 'lucide-react';
+import { User, Star, Save, ChevronRight } from 'lucide-react';
 
 export const CustomerSettingsPage: React.FC = () => {
-  const { customerProfile, setCustomerProfile, navigateTo, setSelectedPackageForDetail } = useNavigation();
+  const { customerProfile, setCustomerProfile } = useNavigation();
   const { showAlert } = useCustomAlert();
 
-  const [activeTab, setActiveTab] = useState<'akun' | 'favorit' | 'review'>('akun');
+  const [activeTab, setActiveTab] = useState<'akun' | 'review'>('akun');
   const [submitting, setSubmitting] = useState(false);
 
   // Profile Form State
   const [namaLengkap, setNamaLengkap] = useState('');
   const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
-  const [gender, setGender] = useState('Laki-laki');
+  const [gender, setGender] = useState('');
   const [birthDate, setBirthDate] = useState('');
 
   // Favorit & Review State
-  const [wishlistItems, setWishlistItems] = useState<any[]>([]);
+  
   const [reviewItems, setReviewItems] = useState<any[]>([]);
 
   useEffect(() => {
@@ -28,43 +27,39 @@ export const CustomerSettingsPage: React.FC = () => {
       setNamaLengkap(customerProfile.picName || customerProfile.businessName || '');
       setEmail(customerProfile.email || '');
       setWhatsapp(customerProfile.whatsapp || '');
-      setGender(customerProfile.gender || 'Laki-laki');
+      setGender(customerProfile.gender || '');
       setBirthDate(customerProfile.birthDate || '');
     }
   }, [customerProfile]);
 
+  const [reviewsError, setReviewsError] = useState('');
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   useEffect(() => {
-    const loadWishlist = () => {
+    let active = true;
+    setReviewItems([]);
+    if (!customerProfile || activeTab !== 'review') return;
+    setReviewsLoading(true);
+    setReviewsError('');
+    async function loadReviews() {
       try {
-        const storedWishlist = localStorage.getItem('tripkita_customer_wishlist');
-        if (storedWishlist) {
-          setWishlistItems(JSON.parse(storedWishlist));
-        } else {
-          setWishlistItems([]);
-        }
-      } catch (e) {
-        console.error(e);
+        const bookings = await request('/customer/bookings');
+        const results = await Promise.all((bookings || []).map(async (booking: any) => {
+          const result = await request('/public/reviews/booking/' + booking.id);
+          return result.reviewed && result.review ? {
+            ...result.review, packageName: booking.packageDetails?.name || 'Paket wisata',
+            date: result.review.createdAt
+          } : null;
+        }));
+        if (active) setReviewItems(results.filter(Boolean));
+      } catch {
+        if (active) setReviewsError('Ulasan gagal dimuat. Silakan buka kembali tab Ulasan.');
+      } finally {
+        if (active) setReviewsLoading(false);
       }
-    };
-
-    loadWishlist();
-
-    window.addEventListener('tripkita_wishlist_updated', loadWishlist);
-
-    // Load Reviews
-    try {
-      const storedReviews = localStorage.getItem('tripkita_customer_reviews');
-      if (storedReviews) {
-        setReviewItems(JSON.parse(storedReviews));
-      } else {
-        setReviewItems([]);
-      }
-    } catch (e) {
-      console.error(e);
     }
-
-    return () => window.removeEventListener('tripkita_wishlist_updated', loadWishlist);
-  }, []);
+    void loadReviews();
+    return () => { active = false; };
+  }, [customerProfile, activeTab]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,18 +83,7 @@ export const CustomerSettingsPage: React.FC = () => {
         body: JSON.stringify(payload)
       });
 
-      const updatedProfile = {
-        ...(customerProfile || {}),
-        ...updated,
-        picName: namaLengkap,
-        whatsapp: whatsapp,
-        gender: gender,
-        birthDate: birthDate
-      };
-
-      setCustomerProfile(updatedProfile as any);
-      localStorage.setItem('tementrip_customer', JSON.stringify(updatedProfile));
-      localStorage.setItem('tripkita_customer', JSON.stringify(updatedProfile));
+      setCustomerProfile(updated);
 
       showAlert({
         type: 'success',
@@ -108,35 +92,16 @@ export const CustomerSettingsPage: React.FC = () => {
       });
     } catch (err: any) {
       console.error(err);
-      // Fallback local update if offline
-      const updatedProfile = {
-        ...(customerProfile || {}),
-        picName: namaLengkap,
-        whatsapp: whatsapp,
-        gender: gender,
-        birthDate: birthDate
-      };
-      setCustomerProfile(updatedProfile as any);
-      localStorage.setItem('tementrip_customer', JSON.stringify(updatedProfile));
-      localStorage.setItem('tripkita_customer', JSON.stringify(updatedProfile));
-
       showAlert({
-        type: 'success',
-        title: 'Profil Berhasil Disimpan',
-        message: 'Data akun Anda telah tersimpan.'
+        type: 'error', title: 'Profil Gagal Disimpan',
+        message: err.message || 'Data belum tersimpan. Silakan coba lagi.'
       });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleRemoveWishlist = (id: number | string) => {
-    const updated = wishlistItems.filter(item => Number(item.id) !== Number(id));
-    setWishlistItems(updated);
-    localStorage.setItem('tripkita_customer_wishlist', JSON.stringify(updated));
-    window.dispatchEvent(new CustomEvent('tripkita_wishlist_updated', { detail: updated }));
-    showAlert({ type: 'success', message: 'Paket berhasil dihapus dari Favorit.' });
-  };
+  
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '32px 0 80px 0', fontFamily: 'Inter, sans-serif' }}>
@@ -148,7 +113,7 @@ export const CustomerSettingsPage: React.FC = () => {
             Pengaturan Akun & Profil
           </h1>
           <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-            Kelola data pribadi, paket favorit yang Anda simpan, dan riwayat ulasan ulasan perjalanan Anda.
+            Kelola data pribadi dan ulasan perjalanan Anda.
           </p>
         </div>
 
@@ -197,30 +162,7 @@ export const CustomerSettingsPage: React.FC = () => {
                 <ChevronRight size={16} color={activeTab === 'akun' ? '#0284c7' : '#94a3b8'} />
               </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('favorit')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  borderRadius: '12px',
-                  border: 'none',
-                  backgroundColor: activeTab === 'favorit' ? '#e0f2fe' : 'transparent',
-                  color: activeTab === 'favorit' ? '#0284c7' : '#475569',
-                  fontWeight: activeTab === 'favorit' ? '800' : '600',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Heart size={18} />
-                  <span>Opsi Favorit</span>
-                </div>
-                <ChevronRight size={16} color={activeTab === 'favorit' ? '#0284c7' : '#94a3b8'} />
-              </button>
+              
 
               <button
                 type="button"
@@ -347,6 +289,7 @@ export const CustomerSettingsPage: React.FC = () => {
                           cursor: 'pointer'
                         }}
                       >
+                        <option value="" disabled>Pilih jenis kelamin</option>
                         <option value="Laki-laki">Laki-laki</option>
                         <option value="Perempuan">Perempuan</option>
                       </select>
@@ -401,79 +344,7 @@ export const CustomerSettingsPage: React.FC = () => {
             )}
 
             {/* TAB 2: OPSI FAVORIT (WISHLIST) */}
-            {activeTab === 'favorit' && (
-              <div>
-                <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-                  Paket Wisata Favorit Anda
-                </h2>
-
-                {wishlistItems.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
-                    <div style={{ backgroundColor: '#fee2e2', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
-                      <Heart size={30} color="#ef4444" />
-                    </div>
-                    <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>
-                      Belum Ada Paket Favorit
-                    </h3>
-                    <p style={{ fontSize: '13.5px', color: '#64748b', marginBottom: '20px' }}>
-                      Anda belum menambahkan paket wisata apa pun ke daftar favorit Anda.
-                    </p>
-                    <button
-                      onClick={() => navigateTo('cari-trip')}
-                      style={{ padding: '10px 24px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' }}
-                    >
-                      Jelajahi Paket Wisata
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-                    {wishlistItems.map((pkg: any) => (
-                      <div key={pkg.id} style={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-                        <div style={{ height: '160px', overflow: 'hidden', position: 'relative' }}>
-                          <img 
-                            src={getTripImage(pkg.id, pkg.name || '', pkg.category || '', pkg.image)} 
-                            alt={pkg.name} 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                            onError={(e) => {
-                              e.currentTarget.src = getTripImage(pkg.id, pkg.name || '', pkg.category || '');
-                            }}
-                          />
-                          <button
-                            onClick={() => handleRemoveWishlist(pkg.id)}
-                            style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(255, 255, 255, 0.9)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                          >
-                            <Trash2 size={16} color="#ef4444" />
-                          </button>
-                        </div>
-                        <div style={{ padding: '16px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
-                            <MapPin size={14} color="#0284c7" />
-                            <span>{pkg.destination || 'Indonesia'}</span>
-                          </div>
-                          <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0', lineHeight: '1.4' }}>
-                            {pkg.name}
-                          </h4>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <strong style={{ fontSize: '15px', color: '#0284c7', fontWeight: '800' }}>
-                              Rp {(pkg.price || 0).toLocaleString('id-ID')}
-                            </strong>
-                            <button
-                              onClick={() => {
-                                setSelectedPackageForDetail(pkg);
-                                navigateTo('paket-detail');
-                              }}
-                              style={{ padding: '6px 14px', backgroundColor: '#e0f2fe', color: '#0284c7', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                            >
-                              Lihat Detail
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            
 
             {/* TAB 3: KUMPULAN REVIEW */}
             {activeTab === 'review' && (
@@ -482,7 +353,7 @@ export const CustomerSettingsPage: React.FC = () => {
                   Kumpulan Review & Ulasan Anda
                 </h2>
 
-                {reviewItems.length === 0 ? (
+                {reviewsLoading ? <p>Memuat ulasan...</p> : reviewsError ? <p role="alert">{reviewsError}</p> : reviewItems.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
                     <div style={{ backgroundColor: '#fef3c7', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
                       <Star size={30} color="#d97706" />
@@ -517,14 +388,14 @@ export const CustomerSettingsPage: React.FC = () => {
                             <Star
                               key={i}
                               size={16}
-                              fill={i < (rev.rating || 5) ? '#f59e0b' : '#e2e8f0'}
-                              color={i < (rev.rating || 5) ? '#f59e0b' : '#e2e8f0'}
+                              fill={i < (rev.rating || 0) ? '#f59e0b' : '#e2e8f0'}
+                              color={i < (rev.rating || 0) ? '#f59e0b' : '#e2e8f0'}
                             />
                           ))}
                         </div>
 
                         <p style={{ margin: 0, fontSize: '13.5px', color: '#334155', lineHeight: '1.6' }}>
-                          "{rev.comment || rev.content || 'Pelayanan sangat memuaskan!'}"
+                          {rev.comment || 'Ulasan tanpa komentar.'}
                         </p>
                       </div>
                     ))}

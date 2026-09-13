@@ -1,22 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { Sidebar } from '../components/Sidebar';
-import { 
-  Package, 
-  CalendarDays, 
-  Search, 
-  Bell,
-  CheckCircle,
-  TrendingUp,
-  Star,
-  ChevronRight,
-  ArrowUpRight,
-  ShoppingBag,
-  CheckCircle2,
-  XCircle,
-  X
-} from 'lucide-react';
+import { Package, CalendarDays, Search, CheckCircle, TrendingUp, Star, ChevronRight, ArrowUpRight } from 'lucide-react';
 import type { Booking } from '../types';
+import { NotificationCenter } from '../components/NotificationCenter';
+import { getTripImage } from '../utils/tripImages';
 import { request } from '../utils/api';
 
 interface DashboardStats {
@@ -29,15 +17,6 @@ interface DashboardStats {
   activePackages: number;
 }
 
-interface NotificationItem {
-  id: string;
-  type: 'ORDER_IN' | 'PAYOUT_SUCCESS' | 'PAYOUT_REJECTED';
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-}
-
 export const DashboardPage: React.FC = () => {
   const { providerProfile, navigateTo } = useNavigation();
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,37 +26,8 @@ export const DashboardPage: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [popularPackages, setPopularPackages] = useState<any[]>([]);
 
-  // Notification state
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    {
-      id: 'n1',
-      type: 'ORDER_IN',
-      title: 'Pesanan Baru Masuk',
-      message: 'Booking TK-20260906-7891 dari Antonius (Yogyakarta City Tour). Status: Lunas & Aktif.',
-      time: '5 menit yang lalu',
-      read: false,
-    },
-    {
-      id: 'n2',
-      type: 'PAYOUT_SUCCESS',
-      title: 'Pencairan Berhasil',
-      message: 'Pengajuan pencairan saldo sebesar Rp 1.500.000 telah berhasil ditransfer ke rekening BCA ***8821 Anda.',
-      time: '1 jam yang lalu',
-      read: false,
-    },
-    {
-      id: 'n3',
-      type: 'PAYOUT_REJECTED',
-      title: 'Pencairan Ditolak',
-      message: 'Pengajuan pencairan saldo Rp 500.000 ditolak. Alasan: Nama pemilik rekening tidak cocok dengan dokumen identitas provider.',
-      time: 'Kemarin',
-      read: false,
-    },
-  ]);
-
-  const providerName = providerProfile?.businessName || 'Wisata Nusantara';
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const providerName = providerProfile?.businessName || 'Mitra';
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -91,6 +41,9 @@ export const DashboardPage: React.FC = () => {
         ]);
 
         if (!isMounted) return;
+        if ([statsRes, bookingsRes, packagesRes].some(result => result.status === 'rejected')) {
+          setLoadError('Sebagian data dashboard gagal dimuat. Silakan muat ulang halaman.');
+        }
 
         if (statsRes.status === 'fulfilled' && statsRes.value) {
           setStats(statsRes.value);
@@ -117,15 +70,9 @@ export const DashboardPage: React.FC = () => {
             .map((pkg: any) => ({
               name: pkg.name,
               location: pkg.destination ? (pkg.destination.split(',').pop()?.trim() || pkg.destination) : 'Indonesia',
-              rating: pkg.rating || 5.0,
+              rating: pkg.rating || 0,
               bookings: pkg.quotaUsed || 0,
-              img: (pkg.name || '').toLowerCase().includes('bromo')
-                ? 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=80&q=80'
-                : (pkg.name || '').toLowerCase().includes('baduy')
-                ? 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=80&q=80'
-                : (pkg.name || '').toLowerCase().includes('bandung')
-                ? 'https://images.unsplash.com/photo-1584810359583-96fc3448beaa?auto=format&fit=crop&w=80&q=80'
-                : 'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?auto=format&fit=crop&w=80&q=80',
+              img: getTripImage(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image),
             }));
           setPopularPackages(sortedPackages);
         }
@@ -139,9 +86,7 @@ export const DashboardPage: React.FC = () => {
     return () => { isMounted = false; };
   }, [providerProfile]);
 
-  const handleMarkAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
+  
 
   const filteredBookings = bookings.filter((b) => {
     const matchesSearch = b.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -176,240 +121,13 @@ export const DashboardPage: React.FC = () => {
               />
             </div>
             
-            {/* Notification Bell with Dropdown */}
-            <div style={{ position: 'relative' }}>
-              <button 
-                className="notification-btn" 
-                onClick={() => setShowNotifications(!showNotifications)}
-                title="Notifikasi"
-              >
-                <Bell size={18} />
-                {unreadCount > 0 && <span className="bell-badge">{unreadCount}</span>}
-              </button>
-
-              {showNotifications && (
-                <div 
-                  style={{
-                    position: 'absolute',
-                    top: '48px',
-                    right: '0',
-                    width: '360px',
-                    backgroundColor: '#ffffff',
-                    borderRadius: '16px',
-                    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.15)',
-                    border: '1px solid #e2e8f0',
-                    zIndex: 100,
-                    overflow: 'hidden',
-                    animation: 'fadeIn 0.2s ease-out'
-                  }}
-                >
-                  <div style={{
-                    padding: '14px 18px',
-                    borderBottom: '1px solid #f1f5f9',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    backgroundColor: '#f8fafc'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Bell size={16} color="#0284c7" />
-                      <span style={{ fontWeight: '700', fontSize: '14px', color: '#0f172a' }}>Notifikasi Mitra</span>
-                      {unreadCount > 0 && (
-                        <span style={{ backgroundColor: '#0284c7', color: '#ffffff', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
-                          {unreadCount} baru
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {unreadCount > 0 && (
-                        <button 
-                          onClick={handleMarkAllRead} 
-                          style={{ border: 'none', background: 'none', color: '#0284c7', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
-                        >
-                          Tandai Dibaca
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => setShowNotifications(false)} 
-                        style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex' }}
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
-                    {notifications.map((n) => (
-                      <div 
-                        key={n.id}
-                        onClick={() => setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item))}
-                        style={{
-                          padding: '14px 18px',
-                          borderBottom: '1px solid #f1f5f9',
-                          backgroundColor: n.read ? '#ffffff' : '#f0f9ff',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          gap: '12px',
-                          alignItems: 'flex-start',
-                          transition: 'background-color 0.2s'
-                        }}
-                      >
-                        <div style={{
-                          padding: '8px',
-                          borderRadius: '10px',
-                          backgroundColor: n.type === 'ORDER_IN' ? '#e0f2fe' : n.type === 'PAYOUT_SUCCESS' ? '#dcfce7' : '#fee2e2',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          {n.type === 'ORDER_IN' && <ShoppingBag size={16} color="#0284c7" />}
-                          {n.type === 'PAYOUT_SUCCESS' && <CheckCircle2 size={16} color="#16a34a" />}
-                          {n.type === 'PAYOUT_REJECTED' && <XCircle size={16} color="#dc2626" />}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: '700', color: n.type === 'ORDER_IN' ? '#0369a1' : n.type === 'PAYOUT_SUCCESS' ? '#15803d' : '#b91c1c' }}>
-                              {n.title}
-                            </span>
-                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>{n.time}</span>
-                          </div>
-                          <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: '1.4' }}>
-                            {n.message}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div style={{ padding: '10px', textAlign: 'center', backgroundColor: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
-                    <span style={{ fontSize: '11.5px', color: '#64748b' }}>Hanya menampilkan notifikasi terbaru Mitra</span>
-                  </div>
-                </div>
-              )}
-            </div>
+            <NotificationCenter />
 
             <div className="user-profile-circle">{providerName.substring(0, 2).toUpperCase()}</div>
           </div>
         </header>
 
-        {/* H-3 Open Trip Quota Verification Alert Banner */}
-        <section style={{ margin: '20px 0 10px 0' }}>
-          <div style={{
-            backgroundColor: '#fffbebfb',
-            border: '1.5px solid #fde68a',
-            borderRadius: '20px',
-            padding: '20px 24px',
-            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '20px' }}>⚠️</span>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#92400e' }}>
-                    Verifikasi H-3 Keberangkatan Open Trip (Penting)
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '12.5px', color: '#b45309' }}>
-                    Jadwal Open Trip <strong>Gunung Bromo (15 Sep 2026)</strong> saat ini terisi <strong>2 dari minimal 4 orang</strong>. Harap tentukan keputusan H-3 sebelum pendaftaran ditutup:
-                  </p>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: '#b45309', backgroundColor: '#fef3c7', padding: '4px 10px', borderRadius: '20px', border: '1px solid #fde68a' }}>
-                  Batas Keputusan: H-3 06:00 WIB
-                </span>
-                <button
-                  type="button"
-                  onClick={() => navigateTo('booking')}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    color: '#92400e',
-                    border: '1.5px solid #f59e0b',
-                    padding: '5px 12px',
-                    borderRadius: '20px',
-                    fontSize: '11.5px',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
-                  }}
-                >
-                  📋 Lihat Detail Pesanan &gt;
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px', paddingTop: '14px', borderTop: '1px dashed #fde68a' }}>
-              <button
-                onClick={() => alert('Berhasil mengonfirmasi keberangkatan! Status trip berubah menjadi Pasti Berangkat dan DP 50% sebesar Rp 350.000 telah dicairkan ke saldo Anda.')}
-                style={{
-                  backgroundColor: '#16a34a',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px 18px',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <CheckCircle2 size={16} /> 1. Tetap Berangkat (Cairkan DP 50%)
-              </button>
-
-              <button
-                onClick={() => {
-                  const newDate = prompt('Masukkan Tanggal Pengganti untuk Reschedule (Contoh: 2026-09-25):', '2026-09-25');
-                  if (newDate) {
-                    alert(`Opsi Reschedule berhasil dibuat untuk tanggal ${newDate}! Notifikasi WA & Email berisi pilihan (Setuju Pindah / Full Refund 100%) telah dikirimkan ke 2 peserta.`);
-                  }
-                }}
-                style={{
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px 18px',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <CalendarDays size={16} /> 2. Buka Reschedule (Pilih Tanggal Baru)
-              </button>
-
-              <button
-                onClick={() => {
-                  if (confirm('Apakah Anda yakin ingin membatalkan Open Trip ini? Seluruh dana peserta akan dikembalikan 100% (Full Refund) langsung dari sistem tanpa mengurangi uang pribadi Anda.')) {
-                    alert('Open Trip dibatalkan. Uang 100% Full Refund sedang diproses otomatis ke rekening peserta.');
-                  }
-                }}
-                style={{
-                  backgroundColor: '#dc2626',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px 18px',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <XCircle size={16} /> 3. Batalkan Trip (Full Refund 100%)
-              </button>
-            </div>
-          </div>
-        </section>
+        {loadError && <p role="alert">{loadError}</p>}
 
         {/* Stats Grid */}
         <section className="stats-cards-grid">

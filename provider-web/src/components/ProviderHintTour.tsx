@@ -32,7 +32,7 @@ export const TOUR_STEPS: TourStep[] = [
     title: '3. Kelola Pesanan (Booking)',
     menuName: 'Booking',
     icon: <CalendarDays size={18} color="#f59e0b" />,
-    description: 'Mencatat seluruh pemesanan pelanggan. Lihat detail pemesan, daftar peserta, verifikasi pembayaran, dan update status trip.',
+    description: 'Mencatat seluruh pemesanan pelanggan. Lihat nama pemesan, jumlah peserta, pembayaran, dan status trip.',
     tips: 'Gunakan tombol Export CSV untuk mengunduh rekap laporan pesanan ke Excel.'
   },
   {
@@ -116,7 +116,6 @@ export const ProviderHintTour: React.FC = () => {
   };
 
   const handleCloseTour = () => {
-    localStorage.setItem('tripkita_provider_seen_tour', 'true');
     setIsOpen(false);
   };
 

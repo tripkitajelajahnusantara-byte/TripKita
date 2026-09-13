@@ -1,22 +1,11 @@
+import type { PackageReview, PublicPackage } from '../types';
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { Sidebar } from '../components/Sidebar';
 import { PROVINCES, CITIES_BY_PROVINCE } from '../utils/locationData';
-import { 
-  Edit3, 
-  MapPin, 
-  Star, 
-  Award, 
-  ShieldCheck, 
-  CalendarDays, 
-  Package, 
-  DollarSign,
-  AlertTriangle,
-  FileCheck,
-  Upload,
-  Clock
-} from 'lucide-react';
+import { Edit3, MapPin, Star, CalendarDays, Package, DollarSign, AlertTriangle, FileCheck, Upload, Clock } from 'lucide-react';
 import { request } from '../utils/api';
+import { getUploadUrl } from '../utils/api';
 
 interface DashboardStats {
   totalPackages: number;
@@ -30,6 +19,26 @@ interface DashboardStats {
 
 export const ProfileProviderPage: React.FC = () => {
   const { providerProfile, updateProfile } = useNavigation();
+  const [reviews, setReviews] = useState<Array<PackageReview & { name: string; trip: string; date: string }>>([]);
+  const [reviewsError, setReviewsError] = useState('');
+  useEffect(() => {
+    let active = true;
+    async function loadReviews() {
+      try {
+        const packages = await request('/provider/packages');
+        const lists = await Promise.all((packages || []).map(async (pkg: PublicPackage) => {
+          const reviews = await request('/public/reviews/package/' + pkg.id);
+          return (reviews || []).map((review: PackageReview) => ({
+            ...review, name: 'Pelanggan', trip: pkg.name,
+            date: new Date(review.createdAt).toLocaleDateString('id-ID')
+          }));
+        }));
+        if (active) setReviews(lists.flat().sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 3));
+      } catch { if (active) setReviewsError('Ulasan gagal dimuat.'); }
+    }
+    void loadReviews();
+    return () => { active = false; };
+  }, []);
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -97,7 +106,7 @@ export const ProfileProviderPage: React.FC = () => {
     }
   };
 
-  const providerName = providerProfile?.businessName || 'Wisata Nusantara';
+  const providerName = providerProfile?.businessName || 'Mitra';
   const categoryLabel = providerProfile?.businessCategory || 'Penyedia Jasa';
 
   useEffect(() => {
@@ -165,7 +174,7 @@ export const ProfileProviderPage: React.FC = () => {
     rejectionReason: string | undefined,
     fieldName: string
   ) => {
-    const isApproved = status === 'APPROVED' || (!pendingPath && activePath && providerProfile?.status === 'APPROVED');
+    const isApproved = status === 'APPROVED';
     const isPending = !!pendingPath || status === 'PENDING';
     const isRejected = status === 'REJECTED';
 
@@ -190,7 +199,7 @@ export const ProfileProviderPage: React.FC = () => {
             <span style={{ color: '#10b981' }}>Terverifikasi</span>
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <a href={`http://localhost:8080${activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
+            <a href={getUploadUrl(activePath)} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
             <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
           </div>
         </div>
@@ -209,7 +218,7 @@ export const ProfileProviderPage: React.FC = () => {
             {pendingPath ? 'Review Berkas Baru' : 'Menunggu Verifikasi'}
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <a href={`http://localhost:8080${pendingPath || activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
+            <a href={getUploadUrl(pendingPath || activePath)} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
             {activePath && (
               <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
             )}
@@ -233,7 +242,7 @@ export const ProfileProviderPage: React.FC = () => {
           )}
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
             {activePath && (
-              <a href={`http://localhost:8080${activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
+              <a href={getUploadUrl(activePath)} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
             )}
             <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
           </div>
@@ -244,11 +253,7 @@ export const ProfileProviderPage: React.FC = () => {
     return null;
   };
 
-  const reviews = [
-    { name: 'Anisa R.', date: '10 Des 2024', rating: 5, comment: 'Pelayanan sangat profesional! Guide sangat informatif dan ramah. Pasti akan kembali lagi.', trip: 'Raja Ampat Diving' },
-    { name: 'Dimas P.', date: '5 Des 2024', rating: 5, comment: 'Pengalaman tak terlupakan. Semua sesuai deskripsi bahkan lebih dari ekspektasi.', trip: 'Bali Cultural Tour' },
-    { name: 'Rika S.', date: '1 Dis 2024', rating: 4, comment: 'Overall bagus. Hanya penginapan bisa ditingkatkan kualitasnya sedikit.', trip: 'Komodo Adventure' },
-  ];
+  
 
   return (
     <div className="dashboard-layout animate-fade-in">
@@ -278,41 +283,24 @@ export const ProfileProviderPage: React.FC = () => {
             <div className="summary-profile-card">
               <div className="card-banner" />
               <div className="profile-badge-area">
-                <div className="profile-avatar-large">WN</div>
-                <span className="status-badge-verified">✓ Terverifikasi</span>
+                <div className="profile-avatar-large">{providerName.slice(0, 2).toUpperCase()}</div>
+                {providerProfile?.status === 'APPROVED' && <span className="status-badge-verified">✓ Terverifikasi</span>}
               </div>
               <div className="profile-details-info">
                 <h3>{providerName}</h3>
-                <p className="tagline">Jelajahi keindahan Indonesia bersama kami</p>
+                
                 <div className="loc-rating">
                   <span className="loc">
                     <MapPin size={12} /> {providerProfile?.operationalCity && providerProfile?.operationalProvince 
                       ? `${providerProfile.operationalCity}, ${providerProfile.operationalProvince}`
                       : providerProfile?.operationalCity || providerProfile?.operationalProvince || 'Indonesia'}
                   </span>
-                  <span className="rating"><Star size={12} fill="#eab308" color="#eab308" /> 4.92 <span>(284 ulasan)</span></span>
+                  <span className="rating"><Star size={12} fill="#eab308" color="#eab308" /> {stats?.rating ? stats.rating.toFixed(2) : 'Belum ada ulasan'}</span>
                 </div>
               </div>
             </div>
 
-            {/* Achievements/Pencapaian Card */}
-            <div className="profile-sub-card">
-              <h4>Pencapaian</h4>
-              <div className="badges-grid-pencapaian">
-                <div className="achievement-badge green-badge">
-                  <ShieldCheck size={14} /> Verified Partner
-                </div>
-                <div className="achievement-badge yellow-badge">
-                  <Award size={14} /> Top Provider 2024
-                </div>
-                <div className="achievement-badge blue-badge">
-                  <CalendarDays size={14} /> 100+ Bookings
-                </div>
-                <div className="achievement-badge purple-badge">
-                  <Star size={14} /> 4.9+ Rating
-                </div>
-              </div>
-            </div>            {/* Mini Stats Card */}
+            {/* Mini Stats Card */}
             <div className="profile-sub-card">
               <h4>Statistik Provider</h4>
               <div className="stats-box-grid">
@@ -353,6 +341,7 @@ export const ProfileProviderPage: React.FC = () => {
             <div className="profile-sub-card">
               <h4>Ulasan Terbaru</h4>
               <div className="reviews-list">
+                {reviewsError ? <p role="alert">{reviewsError}</p> : reviews.length === 0 && <p>Belum ada ulasan.</p>}
                 {reviews.map((rev, i) => (
                   <div key={i} className="review-log-item">
                     <div className="rev-log-header">
@@ -388,10 +377,7 @@ export const ProfileProviderPage: React.FC = () => {
                   <label>NAMA PROVIDER</label>
                   <span>{providerName}</span>
                 </div>
-                <div className="field-group">
-                  <label>TAGLINE</label>
-                  <span>Jelajahi keindahan Indonesia bersama kami</span>
-                </div>
+                
                 <div className="field-group">
                   <label>KATEGORI</label>
                   <span>{categoryLabel}</span>

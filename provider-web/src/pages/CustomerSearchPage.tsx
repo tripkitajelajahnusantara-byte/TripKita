@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
-import { Star, MapPin, Calendar, ChevronRight, ArrowLeft, Heart, Share2 } from 'lucide-react';
-import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
+import { Star, MapPin, Calendar, ChevronRight, ArrowLeft, Share2 } from 'lucide-react';
 import { ShareModal } from '../components/ShareModal';
 
 interface TripPackage {
@@ -28,46 +27,18 @@ interface TripPackage {
   highlights?: string[];
 }
 
-const getTodayIsoDate = () => {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
-const getDynamicScheduleStr = (daysFromToday: number, durationDays: number) => {
-  const d1 = new Date();
-  d1.setDate(d1.getDate() + daysFromToday);
-  const d2 = new Date(d1);
-  d2.setDate(d2.getDate() + durationDays - 1);
 
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  const m1 = months[d1.getMonth()];
-  const m2 = months[d2.getMonth()];
 
-  if (m1 === m2) {
-    return `${d1.getDate()} ${m1} ${d1.getFullYear()} - ${d2.getDate()} ${m2} ${d2.getFullYear()} (${durationDays} Hari)`;
-  }
-  return `${d1.getDate()} ${m1} - ${d2.getDate()} ${m2} ${d2.getFullYear()} (${durationDays} Hari)`;
-};
 
 export const CustomerSearchPage: React.FC = () => {
   const { navigateTo, setSelectedPackageForDetail, searchParams } = useNavigation();
   const [packages, setPackages] = useState<TripPackage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [sortBy, setSortBy] = useState('Rekomendasi');
 
-  const DEFAULT_PACKAGES: TripPackage[] = [
-    { id: 1, providerId: 1, name: "Open Trip Gunung Bromo", destination: "Probolinggo, Jawa Timur", category: "Gunung", tripType: "Open Trip", price: 350000, quotaMin: 5, quotaUsed: 3, quotaMax: 15, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 3), status: "Aktif", rating: 4.8 },
-    { id: 2, providerId: 1, name: "Open Trip Pulau Tidung", destination: "Kepulauan Seribu, Jakarta", category: "Pantai", tripType: "Open Trip", price: 450000, quotaMin: 4, quotaUsed: 2, quotaMax: 12, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 3), status: "Aktif", rating: 4.7 },
-    { id: 3, providerId: 1, name: "Trip Curug Cilember", destination: "Bogor, Jawa Barat", category: "Curug", tripType: "Open Trip", price: 275000, quotaMin: 5, quotaUsed: 4, quotaMax: 10, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 2), status: "Aktif", rating: 4.6 },
-    { id: 4, providerId: 1, name: "Bandung City Tour", destination: "Bandung, Jawa Barat", category: "City Tour", tripType: "Open Trip", price: 420000, quotaMin: 4, quotaUsed: 3, quotaMax: 15, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 3), status: "Aktif", rating: 4.9 },
-    { id: 5, providerId: 1, name: "Wisata Budaya Suku Baduy", destination: "Lebak, Banten", category: "Wisata Budaya & Sejarah", tripType: "Open Trip", price: 380000, quotaMin: 5, quotaUsed: 2, quotaMax: 15, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 3), status: "Aktif", rating: 4.8 },
-    { id: 6, providerId: 1, name: "Open Trip Ranu Kumbolo", destination: "Malang, Jawa Timur", category: "Gunung", tripType: "Open Trip", price: 550000, quotaMin: 6, quotaUsed: 4, quotaMax: 15, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 4), status: "Aktif", rating: 4.9 },
-    { id: 7, providerId: 1, name: "Wisata Pantai Tanjung Karang Palu", destination: "Palu, Sulawesi Tengah", category: "Pantai", tripType: "Open Trip", price: 850000, quotaMin: 4, quotaUsed: 2, quotaMax: 10, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 4), status: "Aktif", rating: 4.7 },
-    { id: 8, providerId: 1, name: "Yogyakarta City Tour", destination: "Yogyakarta, DI Yogyakarta", category: "City Tour", tripType: "Open Trip", price: 490000, quotaMin: 4, quotaUsed: 3, quotaMax: 15, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 3), status: "Aktif", rating: 4.8 }
-  ];
+  
 
   useEffect(() => {
     const fetchPackages = async () => {
@@ -75,37 +46,20 @@ export const CustomerSearchPage: React.FC = () => {
         const data = await request('/public/packages');
         if (Array.isArray(data) && data.length > 0) {
           const activePkgs = data.filter((p: TripPackage) => p.status === 'Aktif');
-          setPackages(activePkgs.length > 0 ? activePkgs : DEFAULT_PACKAGES);
+          setPackages(activePkgs);
         } else {
-          setPackages(DEFAULT_PACKAGES);
+          setPackages([]);
         }
       } catch (err) {
         console.error('Failed to load search packages:', err);
-        setPackages(DEFAULT_PACKAGES);
+        setLoadError('Daftar paket gagal dimuat. Silakan muat ulang halaman.');
+        setPackages([]);
       } finally {
         setLoading(false);
       }
     };
     fetchPackages();
   }, []);
-
-  const [wishlistIds, setWishlistIds] = useState<number[]>(() => 
-    getWishlistStorage().map(item => Number(item.id))
-  );
-
-  useEffect(() => {
-    const handleWishlistUpdate = () => {
-      setWishlistIds(getWishlistStorage().map(item => Number(item.id)));
-    };
-    window.addEventListener('tripkita_wishlist_updated', handleWishlistUpdate);
-    return () => window.removeEventListener('tripkita_wishlist_updated', handleWishlistUpdate);
-  }, []);
-
-  const toggleFavorite = (e: React.MouseEvent, pkg: TripPackage) => {
-    e.stopPropagation();
-    const updated = toggleWishlistStorage(pkg);
-    setWishlistIds(updated.map(i => Number(i.id)));
-  };
 
   const [selectedPackageForShare, setSelectedPackageForShare] = useState<TripPackage | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -135,7 +89,7 @@ export const CustomerSearchPage: React.FC = () => {
   const handleSelectPackage = (pkg: TripPackage) => {
     const updatedPkg = {
       ...pkg,
-      bookingDate: searchParams.date || pkg.startDate || '2026-05-22'
+      bookingDate: searchParams.date || pkg.startDate || ''
     };
     setSelectedPackageForDetail(updatedPkg);
     navigateTo('paket-detail');
@@ -159,7 +113,7 @@ export const CustomerSearchPage: React.FC = () => {
   if (sortBy === 'Terpopuler') {
     processedPackages.sort((a, b) => (b.quotaUsed || 0) - (a.quotaUsed || 0));
   } else if (sortBy === 'Rating Tertinggi') {
-    processedPackages.sort((a, b) => (b.rating || 4.8) - (a.rating || 4.8));
+    processedPackages.sort((a, b) => (b.rating || 0) - (a.rating || 0));
   } else if (sortBy === 'Termahal') {
     processedPackages.sort((a, b) => b.price - a.price);
   } else if (sortBy === 'Termurah') {
@@ -252,7 +206,7 @@ export const CustomerSearchPage: React.FC = () => {
           pkg={selectedPackageForShare} 
         />
 
-        {loading ? (
+        {loadError ? <p role="alert">{loadError}</p> : loading ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
             <p>Memuat daftar paket wisata...</p>
           </div>
@@ -265,12 +219,11 @@ export const CustomerSearchPage: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {processedPackages.map((pkg) => {
               // Calculate active reserved seats from pending/paid/completed bookings
-              const totalQuotaMax = pkg.quotaMax || 15;
+              const totalQuotaMax = pkg.quotaMax ?? 0;
               const totalQuotaUsed = pkg.quotaUsed || 0;
               const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
 
               const badge = getBadgeColor(pkg.category);
-              const isFavorite = wishlistIds.includes(Number(pkg.id));
 
               return (
                 <div 
@@ -299,27 +252,7 @@ export const CustomerSearchPage: React.FC = () => {
                         e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80';
                       }}
                     />
-                    <button 
-                      onClick={(e) => toggleFavorite(e, pkg)}
-                      style={{ 
-                        position: 'absolute', 
-                        top: '10px', 
-                        right: '10px', 
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                        border: 'none', 
-                        borderRadius: '50%', 
-                        width: '34px', 
-                        height: '34px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <Heart size={18} fill={isFavorite ? '#ef4444' : 'none'} color={isFavorite ? '#ef4444' : '#64748b'} />
-                    </button>
+                    
                   </div>
 
                   {/* Content Right */}
@@ -395,7 +328,7 @@ export const CustomerSearchPage: React.FC = () => {
                       {/* Schedule */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: '500' }}>
                         <Calendar size={14} color="#94a3b8" />
-                        <span>Jadwal tersedia: <strong>{pkg.schedule || getDynamicScheduleStr(0, 3)}</strong></span>
+                        <span>Jadwal tersedia: <strong>{pkg.schedule || 'Jadwal belum tersedia'}</strong></span>
                       </div>
                     </div>
 
@@ -403,7 +336,7 @@ export const CustomerSearchPage: React.FC = () => {
                     <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: '700' }}>
-                          <Star size={14} fill="#f59e0b" color="#f59e0b" /> {pkg.rating > 0 ? pkg.rating.toFixed(1) : '4.8'}
+                          <Star size={14} fill="#f59e0b" color="#f59e0b" /> {pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Belum ada ulasan'}
                         </span>
                         <span style={{ color: '#94a3b8' }}>({(pkg.id * 17) % 50 + 80} ulasan)</span>
                         <span style={{ color: '#cbd5e1' }}>|</span>

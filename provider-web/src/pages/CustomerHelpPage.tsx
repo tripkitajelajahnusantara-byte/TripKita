@@ -46,7 +46,7 @@ export const CustomerHelpPage: React.FC = () => {
       id: 'faq-4',
       category: 'grup-wa',
       question: 'Bagaimana cara bergabung dengan WhatsApp Group Mitra / Pemandu Trip?',
-      answer: 'Setelah pembayaran berhasil, buka menu "Cek Booking" di bagian navigasi atas, masukkan Kode Booking Anda (contoh: TK-14108-xxxx), lalu klik tombol hijau "Join WA Group Mitra" untuk terhubung langsung dengan tour guide dan peserta lainnya.'
+      answer: 'Tautan grup perjalanan belum tersedia melalui website. Hubungi bantuan dengan menyertakan kode booking untuk informasi kontak penyelenggara.'
     },
     {
       id: 'faq-5',

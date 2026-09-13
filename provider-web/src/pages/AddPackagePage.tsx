@@ -43,23 +43,26 @@ export const AddPackagePage: React.FC = () => {
   const [packageName, setPackageName] = useState('');
   const [category, setCategory] = useState('City Tour');
   const [tripType, setTripType] = useState('Open Trip');
-  const [duration, setDuration] = useState('5');
-  const [location, setLocation] = useState('DKI Jakarta');
+  const [duration, setDuration] = useState('1');
+  const [location, setLocation] = useState('');
   const [meetPoint, setMeetPoint] = useState('');
   const [description, setDescription] = useState('');
-  const [minGuests, setMinGuests] = useState('2');
-  const [maxGuests, setMaxGuests] = useState('12');
-  const [minAge, setMinAge] = useState('10');
-  const [maxAge, setMaxAge] = useState('65');
+  
+  
+  
+  
 
   // New fields mapping to backend
   const todayStr = new Date().toISOString().split('T')[0];
   const [price, setPrice] = useState('');
-  const [quotaMin, setQuotaMin] = useState('14');
-  const [quotaMax, setQuotaMax] = useState('15');
+  const [quotaMin, setQuotaMin] = useState('');
+  const [quotaMax, setQuotaMax] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [schedule, setSchedule] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingPackage, setLoadingPackage] = useState(Boolean(editingPackageId));
+  const [loadError, setLoadError] = useState('');
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const handleStartDateChange = (val: string) => {
@@ -90,33 +93,19 @@ export const AddPackagePage: React.FC = () => {
   }, [duration]);
 
   // Itinerary states
-  const [itineraries, setItineraries] = useState<{ day: number; activities: { time: string; title: string }[] }[]>([
-    { day: 1, activities: [{ time: '08:00 - 10:00', title: 'Penjemputan di Meeting Point' }, { time: '12:00 - 13:00', title: 'Makan Siang' }] }
-  ]);
+  const [itineraries, setItineraries] = useState<{ day: number; activities: { time: string; title: string }[] }[]>([]);
   const [newActivityTime, setNewActivityTime] = useState('');
   const [newActivityTitle, setNewActivityTitle] = useState('');
   const [selectedItineraryDay, setSelectedItineraryDay] = useState(1);
 
   // Facilities states
-  const [includedFacilities, setIncludedFacilities] = useState<string[]>([
-    'Transportasi AC AC/PP',
-    'Makan sesuai program',
-    'Tiket masuk objek wisata',
-    'Pemandu wisata profesional'
-  ]);
-  const [excludedFacilities, setExcludedFacilities] = useState<string[]>([
-    'Pengeluaran pribadi',
-    'Tiket penerbangan ke meeting point',
-    'Tipping guide & driver'
-  ]);
+  const [includedFacilities, setIncludedFacilities] = useState<string[]>([]);
+  const [excludedFacilities, setExcludedFacilities] = useState<string[]>([]);
   const [newIncludedFacility, setNewIncludedFacility] = useState('');
   const [newExcludedFacility, setNewExcludedFacility] = useState('');
 
   // Photos states
-  const [packagePhotos, setPackagePhotos] = useState<string[]>([
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=400&q=80'
-  ]);
+  const [packagePhotos, setPackagePhotos] = useState<string[]>([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   const steps = [
@@ -132,6 +121,13 @@ export const AddPackagePage: React.FC = () => {
       if (editingPackageId) {
         try {
           const pkg = await request(`/provider/packages/${editingPackageId}`);
+          setCategory(pkg.category || '');
+          setTripType(pkg.tripType || '');
+          setQuotaMin(String(pkg.quotaMin ?? ''));
+          setStartDate(pkg.startDate || '');
+          setEndDate(pkg.endDate || '');
+          const days = Math.round((Date.parse(pkg.endDate) - Date.parse(pkg.startDate)) / 86400000) + 1;
+          setDuration(String(Number.isFinite(days) && days > 0 ? days : 1));
           setPackageName(pkg.name || '');
           setLocation(pkg.destination || '');
           setMeetPoint(pkg.meetingPoint || '');
@@ -155,8 +151,10 @@ export const AddPackagePage: React.FC = () => {
           } else if (pkg.image) {
             setPackagePhotos([pkg.image]);
           }
-        } catch (err) {
-          console.error('Failed to load package details:', err);
+        } catch {
+          setLoadError('Data paket gagal dimuat. Kembali ke Kelola Paket dan coba lagi.');
+        } finally {
+          setLoadingPackage(false);
         }
       }
     }
@@ -278,10 +276,11 @@ export const AddPackagePage: React.FC = () => {
   };
 
   const handleSubmit = async (status: 'draft' | 'publish') => {
+    if (submitting || loadingPackage || loadError || isUploadingPhoto) return;
     const qMin = parseInt(quotaMin, 10);
     const qMax = parseInt(quotaMax, 10);
-    const minG = parseInt(minGuests, 10);
-    const maxG = parseInt(maxGuests, 10);
+    
+    
 
     if (status === 'publish') {
       if (!packageName.trim()) {
@@ -308,18 +307,6 @@ export const AddPackagePage: React.FC = () => {
         alert(`⚠️ Kuota maksimal (${qMax}) tidak boleh lebih kecil dari kuota minimal (${qMin})! Silakan naikkan kuota maksimal atau sesuaikan kuota minimal.`);
         return;
       }
-      if (isNaN(minG) || minG < 1) {
-        alert('⚠️ Minimum peserta per pemesanan minimal 1 orang!');
-        return;
-      }
-      if (isNaN(maxG) || maxG < minG) {
-        alert(`⚠️ Maksimum peserta per pemesanan (${maxG}) tidak boleh lebih kecil dari minimum peserta (${minG})!`);
-        return;
-      }
-      if (maxG > qMax) {
-        alert(`⚠️ Maksimum peserta per pemesanan (${maxG}) tidak boleh melebihi kuota maksimal paket (${qMax})!`);
-        return;
-      }
       if (!startDate || !endDate) {
         alert('⚠️ Jadwal tanggal mulai dan tanggal selesai keberangkatan harus diisi!');
         return;
@@ -340,6 +327,7 @@ export const AddPackagePage: React.FC = () => {
       }
     }
 
+    setSubmitting(true);
     try {
       const dbStatus = status === 'draft' ? 'Draft' : 'Aktif';
       const finalSchedule = schedule.trim() || (startDate && endDate ? `${startDate} s/d ${endDate} (${duration} Hari)` : 'Jadwal Fleksibel');
@@ -381,7 +369,7 @@ export const AddPackagePage: React.FC = () => {
       navigateTo('kelola-paket');
     } catch (err: any) {
       alert(err.message || 'Gagal menyimpan paket wisata');
-    }
+    } finally { setSubmitting(false); }
   };
 
   return (
@@ -389,6 +377,8 @@ export const AddPackagePage: React.FC = () => {
       <Sidebar />
 
       <main className="dashboard-main">
+        {loadError && <p role="alert">{loadError}</p>}
+        {loadingPackage && <p role="status">Memuat data paket...</p>}
         {/* Header toolbar */}
         <header className="dashboard-header">
           <div className="header-left-back">
@@ -404,10 +394,10 @@ export const AddPackagePage: React.FC = () => {
             <button className="action-outline-btn" onClick={() => setShowPreviewModal(true)}>
               <Eye size={14} /> Preview
             </button>
-            <button className="action-outline-btn" onClick={() => handleSubmit('draft')}>
+            <button className="action-outline-btn" disabled={submitting || loadingPackage || Boolean(loadError) || isUploadingPhoto} onClick={() => handleSubmit('draft')}>
               <Save size={14} /> Simpan Draft
             </button>
-            <button className="action-solid-btn" onClick={() => handleSubmit('publish')}>
+            <button className="action-solid-btn" disabled={submitting || loadingPackage || Boolean(loadError) || isUploadingPhoto} onClick={() => handleSubmit('publish')}>
               <Send size={14} /> Publikasikan
             </button>
           </div>
@@ -474,16 +464,12 @@ export const AddPackagePage: React.FC = () => {
                         setTripType(val);
                         if (val === 'Honeymoon' || val === 'Private Trip') {
                           setQuotaMin('2');
-                          setMinGuests('2');
                         } else if (val === 'Family') {
                           setQuotaMin('3');
-                          setMinGuests('3');
                         } else if (val === 'Corporate') {
                           setQuotaMin('10');
-                          setMinGuests('10');
                         } else {
                           setQuotaMin('1');
-                          setMinGuests('1');
                         }
                       }}
                     >
@@ -774,63 +760,9 @@ export const AddPackagePage: React.FC = () => {
                   />
                 </div>
 
-                <div className="input-row-2">
-                  <div className="input-group">
-                    <label>Minimum Peserta (per Booking)</label>
-                    <input 
-                      type="number" 
-                      min="1"
-                      value={minGuests} 
-                      onChange={(e) => setMinGuests(e.target.value)}
-                      placeholder="2"
-                    />
-                    {parseInt(minGuests, 10) < 1 && (
-                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                        ⚠️ Minimum peserta per pemesanan minimal 1
-                      </span>
-                    )}
-                  </div>
-                  <div className="input-group">
-                    <label>Maksimum Peserta (per Booking)</label>
-                    <input 
-                      type="number" 
-                      min={minGuests || "1"}
-                      max={quotaMax || undefined}
-                      value={maxGuests} 
-                      onChange={(e) => setMaxGuests(e.target.value)}
-                      placeholder="12"
-                    />
-                    {parseInt(maxGuests, 10) < parseInt(minGuests, 10) ? (
-                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                        ⚠️ Maksimum peserta ({maxGuests}) harus &gt;= minimum peserta ({minGuests})
-                      </span>
-                    ) : parseInt(quotaMax, 10) > 0 && parseInt(maxGuests, 10) > parseInt(quotaMax, 10) ? (
-                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                        ⚠️ Maksimum peserta per booking ({maxGuests}) tidak boleh melebihi kuota maksimal ({quotaMax})
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
+                
 
-                <div className="input-group">
-                  <label>Batas Usia</label>
-                  <div className="input-range-row">
-                    <input 
-                      type="number" 
-                      value={minAge} 
-                      onChange={(e) => setMinAge(e.target.value)} 
-                      placeholder="10"
-                    />
-                    <span>s/d</span>
-                    <input 
-                      type="number" 
-                      value={maxAge} 
-                      onChange={(e) => setMaxAge(e.target.value)} 
-                      placeholder="65"
-                    />
-                    <span className="range-suffix">tahun</span>
-                  </div>
-                </div>
+                
               </div>
             )}
 
@@ -935,8 +867,8 @@ export const AddPackagePage: React.FC = () => {
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>📍 {location || 'Destinasi Belum Diatur'}</span>
                   <span>⏱️ {duration} Hari</span>
                   <span>📅 {schedule || 'Jadwal Belum Diatur'}</span>
-                  <span>👥 Kuota: {quotaMax || '0'} orang (Min: {minGuests} s/d Max: {maxGuests})</span>
-                  <span>🔞 Batas Usia: {minAge} s/d {maxAge} tahun</span>
+                  <span>👥 Kuota: {quotaMax || '0'} orang (Min: {quotaMin || '0'})</span>
+                  
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--color-bg-light)', padding: '16px 20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                   <div>

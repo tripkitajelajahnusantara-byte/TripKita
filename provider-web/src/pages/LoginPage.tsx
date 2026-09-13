@@ -50,16 +50,7 @@ export const LoginPage: React.FC = () => {
                 : 'Kelola paket wisata, pantau booking, dan tingkatkan pendapatan bisnis Anda dari satu dashboard terintegrasi.'}
             </p>
 
-            <div className="stats-cards-grid">
-              <div className="stat-card-item">
-                <span className="stat-number">2,500+</span>
-                <span className="stat-label">Provider Aktif</span>
-              </div>
-              <div className="stat-card-item">
-                <span className="stat-number">850K+</span>
-                <span className="stat-label">Wisatawan</span>
-              </div>
-            </div>
+            
           </div>
 
           <div className="sidebar-footer">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, MessageCircle, Share2, Camera } from 'lucide-react';
+import { X, Copy, Check, MessageCircle, Share2 } from 'lucide-react';
 import { getTripImage } from '../utils/tripImages';
 
 interface ShareModalProps {
@@ -16,29 +16,20 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
 
   const shareUrl = `${window.location.origin}${window.location.pathname}#/paket-detail?id=${pkg.id}`;
 
-  const handleCopyLink = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl);
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setToastMsg('Link detail paket berhasil disalin!');
       setTimeout(() => setCopied(false), 2500);
       setTimeout(() => setToastMsg(''), 3000);
-    }
+    } catch { setToastMsg('Link belum berhasil disalin. Silakan salin dari kolom tautan.'); }
   };
 
   const handleWhatsAppShare = () => {
     const text = `Halo! Cek paket wisata "${pkg.name}" di TripKita!\n\n📍 Destinasi: ${pkg.destination || 'Indonesia'}\n💰 Harga: Rp ${(pkg.price || 0).toLocaleString('id-ID')} / orang\n\nLihat detail paket selengkapnya di sini:\n${shareUrl}`;
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
-  };
-
-  const handleInstagramShare = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(`${pkg.name} - Rp ${(pkg.price || 0).toLocaleString('id-ID')}\nLink: ${shareUrl}`);
-      setToastMsg('Link & caption disalin! Buka Instagram untuk membuat Story / Post.');
-      setTimeout(() => setToastMsg(''), 3500);
-    }
-    window.open('https://www.instagram.com/', '_blank');
   };
 
   const pkgImg = getTripImage(pkg.id, pkg.name || '', pkg.category || '', pkg.image || pkg.images);
@@ -151,31 +142,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
           </button>
 
           {/* Instagram */}
-          <button
-            type="button"
-            onClick={handleInstagramShare}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              padding: '12px 8px',
-              borderRadius: '12px',
-              border: '1px solid #fbcfe8',
-              backgroundColor: '#fdf2f8',
-              color: '#9d174d',
-              fontWeight: '700',
-              fontSize: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            <div style={{ background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)', color: '#fff', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Camera size={20} />
-            </div>
-            <span>Instagram</span>
-          </button>
+          
 
           {/* Copy Link */}
           <button

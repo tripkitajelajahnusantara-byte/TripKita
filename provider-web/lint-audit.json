@@ -1,0 +1,185 @@
+{
+  "errors": 119,
+  "warnings": 6,
+  "introduced": [
+    {
+      "file": "provider-web/src/pages/AddPackagePage.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "added": 1,
+      "issues": [
+        {
+          "line": 144,
+          "message": "'e' is defined but never used."
+        },
+        {
+          "line": 154,
+          "message": "'err' is defined but never used."
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/CustomerHistoryPage.tsx",
+      "rule": "react-hooks/set-state-in-effect",
+      "added": 1,
+      "issues": [
+        {
+          "line": 54,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/CustomerHistoryPage.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "added": 1,
+      "issues": [
+        {
+          "line": 77,
+          "message": "'err' is defined but never used."
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/CustomerPackageDetailPage.tsx",
+      "rule": "react-hooks/set-state-in-effect",
+      "added": 1,
+      "issues": [
+        {
+          "line": 19,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "line": 139,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "line": 162,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/CustomerPackageDetailPage.tsx",
+      "rule": "react-hooks/purity",
+      "added": 1,
+      "issues": [
+        {
+          "line": 150,
+          "message": "Error: Cannot call impure function during render"
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/CustomerPackageDetailPage.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "added": 1,
+      "issues": [
+        {
+          "line": 168,
+          "message": "'_dateStr' is defined but never used."
+        },
+        {
+          "line": 194,
+          "message": "'e' is defined but never used."
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/CustomerPaymentInvoicePage.tsx",
+      "rule": "react-hooks/set-state-in-effect",
+      "added": 1,
+      "issues": [
+        {
+          "line": 16,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/CustomerSettingsPage.tsx",
+      "rule": "react-hooks/exhaustive-deps",
+      "added": 1,
+      "issues": [
+        {
+          "line": 62,
+          "message": "React Hook useEffect has a missing dependency: 'customerProfile'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/KelolaPaketPage.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "added": 1,
+      "issues": [
+        {
+          "line": 65,
+          "message": "'err' is defined but never used."
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/ProfileProviderPage.tsx",
+      "rule": "@typescript-eslint/no-explicit-any",
+      "added": 3,
+      "issues": [
+        {
+          "line": 21,
+          "message": "Unexpected any. Specify a different type."
+        },
+        {
+          "line": 28,
+          "message": "Unexpected any. Specify a different type."
+        },
+        {
+          "line": 30,
+          "message": "Unexpected any. Specify a different type."
+        },
+        {
+          "line": 103,
+          "message": "Unexpected any. Specify a different type."
+        },
+        {
+          "line": 156,
+          "message": "Unexpected any. Specify a different type."
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/ProviderFinancePage.tsx",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "added": 1,
+      "issues": [
+        {
+          "line": 61,
+          "message": "'err' is defined but never used."
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/pages/ProviderPublicProfilePage.tsx",
+      "rule": "react-hooks/set-state-in-effect",
+      "added": 1,
+      "issues": [
+        {
+          "line": 19,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "provider-web/src/utils/tripImages.ts",
+      "rule": "@typescript-eslint/no-unused-vars",
+      "added": 2,
+      "issues": [
+        {
+          "line": 28,
+          "message": "'_name' is assigned a value but never used."
+        },
+        {
+          "line": 28,
+          "message": "'_category' is assigned a value but never used."
+        }
+      ]
+    }
+  ]
+}

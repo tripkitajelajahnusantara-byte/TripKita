@@ -23,6 +23,8 @@ export const KelolaPaketPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Semua' | 'Aktif' | 'Draft' | 'Nonaktif'>('Semua');
 
+  const [loadError, setLoadError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [packages, setPackages] = useState<PackageItem[]>([]);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
@@ -41,16 +43,15 @@ export const KelolaPaketPage: React.FC = () => {
   }, []);
 
   const loadPackages = async () => {
+    setLoading(true); setLoadError('');
     try {
-      const data = await request('/provider/packages').catch(e => {
-        console.error('Failed to load packages:', e);
-        return [];
-      });
+      const data = await request('/provider/packages');
       if (Array.isArray(data)) {
         const mapped = data.map((pkg: any) => ({
           id: String(pkg.id),
           name: pkg.name,
           category: pkg.category || '',
+          image: pkg.images || pkg.image || '',
           destination: pkg.destination,
           price: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price || 0),
           quota: `${pkg.quotaUsed || 0}/${pkg.quotaMax || 0}`,
@@ -61,9 +62,10 @@ export const KelolaPaketPage: React.FC = () => {
 
         setPackages(mapped);
       }
-    } catch (err) {
-      console.error('Failed to load packages:', err);
-    }
+    } catch {
+      setPackages([]);
+      setLoadError('Paket gagal dimuat. Silakan coba lagi.');
+    } finally { setLoading(false); }
   };
 
   useEffect(() => {
@@ -88,8 +90,6 @@ export const KelolaPaketPage: React.FC = () => {
       if (pkg) {
         setSelectedPackage(pkg);
       }
-    } else {
-      alert(`Aksi: "${type}" untuk paket ID: ${id} dipicu.`);
     }
   };
 
@@ -109,6 +109,8 @@ export const KelolaPaketPage: React.FC = () => {
       <Sidebar />
 
       <main className="dashboard-main">
+        {loading && <p role="status">Memuat paket...</p>}
+        {loadError && <div role="alert"><p>{loadError}</p><button onClick={() => void loadPackages()}>Coba lagi</button></div>}
         {/* Header Block */}
         <header className="dashboard-header">
           <div className="header-welcome">
@@ -205,7 +207,7 @@ export const KelolaPaketPage: React.FC = () => {
                       <td>
                         <div className="pkg-item-cell">
                           <img 
-                            src={getTripImage(Number(pkg.id), pkg.name, (pkg as any).category)} 
+                            src={getTripImage(Number(pkg.id), pkg.name, (pkg as any).category, pkg.image)} 
                             alt={pkg.name} 
                             style={{ width: '42px', height: '42px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} 
                           />

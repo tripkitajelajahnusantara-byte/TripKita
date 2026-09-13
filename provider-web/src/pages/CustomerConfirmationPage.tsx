@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
+import { getPaymentInvoiceUrl } from '../utils/payment';
 import { request } from '../utils/api';
 import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck } from 'lucide-react';
 import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsContent } from '../components/LegalModals';
 
 export const CustomerConfirmationPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, customerProfile, bookingFormData } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, customerProfile, bookingFormData, setBookingFormData, setSelectedBookingForInvoice } = useNavigation();
   const [submitting, setSubmitting] = useState(false);
   
   // Agreement Checkbox state
@@ -30,13 +31,12 @@ export const CustomerConfirmationPage: React.FC = () => {
   }
 
   const pkg = selectedPackageForDetail;
-  const { pemesan, peserta } = bookingFormData;
-  const guestsCount = peserta.length;
-  const selectedAddOns = pkg.selectedAddOns || bookingFormData?.selectedAddOns || [];
-  const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
+  const { pemesan, guests: guestsCount } = bookingFormData;
+  
+  
   const baseCost = pkg.price * guestsCount;
-  const serviceFee = 5000;
-  const totalCost = baseCost + addOnsTotal + serviceFee;
+  const serviceFee = 4000; // Matches the current backend booking fee.
+  const totalCost = baseCost + serviceFee;
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -55,85 +55,36 @@ export const CustomerConfirmationPage: React.FC = () => {
     setShowConfirmModal(true);
   };
 
-  const calculateAge = (dobString?: string) => {
-    if (!dobString) return '-';
-    const birth = new Date(dobString);
-    if (isNaN(birth.getTime())) return '-';
-    const now = new Date();
-    let age = now.getFullYear() - birth.getFullYear();
-    const monthDiff = now.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
-      age--;
-    }
-    return age > 0 ? `${age} Tahun` : '0 Tahun';
-  };
+  
 
   const handleFinalConfirmBooking = async () => {
+    if (submitting) return;
     setShowConfirmModal(false);
     setSubmitting(true);
 
-    const nowIso = new Date().toISOString();
-    const dateStr = nowIso.slice(0, 10).replace(/-/g, '');
-    const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const randomCode = `TK-${dateStr}-${randSuffix}`;
-
     try {
-      const parseTripDateToFuture = (dateInput?: string) => {
-        if (dateInput) {
-          const d = new Date(dateInput);
-          if (!isNaN(d.getTime()) && d.getTime() > Date.now()) {
-            return d;
-          }
-
-          const monthsMap: { [key: string]: number } = {
-            jan: 0, januari: 0, feb: 1, februari: 1, mar: 2, maret: 2,
-            apr: 3, april: 3, mei: 4, jun: 5, juni: 5, jul: 6, juli: 6,
-            agu: 7, agustus: 7, sep: 8, september: 8, okt: 9, oktober: 9,
-            nov: 10, november: 10, des: 11, desember: 11
-          };
-
-          const match = dateInput.match(/(\d{1,2})[^\d]+([a-zA-Z]+)[^\d]+(\d{4})/);
-          if (match) {
-            const day = parseInt(match[1], 10);
-            const monthStr = match[2].toLowerCase();
-            const year = parseInt(match[3], 10);
-            if (monthsMap[monthStr] !== undefined) {
-              const parsed = new Date(year, monthsMap[monthStr], day, 8, 0, 0);
-              if (!isNaN(parsed.getTime())) {
-                return parsed;
-              }
-            }
-          }
-        }
-
-        const defaultFuture = new Date();
-        defaultFuture.setDate(defaultFuture.getDate() + 14);
-        return defaultFuture;
-      };
-
-      const selectedTripSchedule = bookingFormData?.tripDate || pkg.bookingDate || pkg.schedule || '';
-
-      const parsedTripDate = parseTripDateToFuture(selectedTripSchedule);
-
-      const rawPkgId = Number(pkg.id);
-      const safePackageId = (!isNaN(rawPkgId) && rawPkgId > 0) ? rawPkgId : 1;
+      const selectedTripSchedule = bookingFormData.tripDate || pkg.bookingDate || pkg.startDate || '';
+      const parsedTripDate = new Date(selectedTripSchedule);
+      const packageId = Number(pkg.id);
+      if (!Number.isInteger(packageId) || packageId <= 0 || !Number.isFinite(parsedTripDate.getTime()) || parsedTripDate.getTime() <= Date.now()) {
+        throw new Error('Paket atau tanggal keberangkatan tidak valid. Silakan pilih kembali paket dan tanggal.');
+      }
+      if (!customerProfile || !pemesan.nama.trim() || guestsCount < 1) throw new Error('Lengkapi data pemesanan terlebih dahulu.');
+      const packages = await request('/public/packages');
+      const currentPackage = (packages || []).find((item: any) => item.id === packageId && item.status === 'Aktif');
+      if (!currentPackage) throw new Error('Paket sudah tidak tersedia. Silakan pilih paket lain.');
+      if (currentPackage.price !== pkg.price) throw new Error('Harga paket berubah. Silakan buka kembali detail paket.');
+      if (guestsCount > currentPackage.quotaMax - currentPackage.quotaUsed) throw new Error('Sisa kuota tidak mencukupi.');
 
       const payload: any = {
-        packageId: safePackageId,
-        bookingCode: randomCode,
-        customerName: pemesan.nama || 'Pelanggan TripKita',
+        packageId,
+        customerName: pemesan.nama.trim(),
         customerInitial: (pemesan.nama || 'P').charAt(0).toUpperCase(),
-        guests: guestsCount || 1,
-        totalPrice: totalCost,
+        guests: guestsCount,
+        totalPrice: 0, // Let the server calculate the invoice amount.
         tripDate: parsedTripDate.toISOString(),
         paymentMethod: 'Xendit Invoice',
-        participants: peserta.map((p: any) => ({
-          nama: p.nama,
-          hp: p.hp,
-          gender: p.gender,
-          tanggalLahir: p.tanggalLahir || '',
-          riwayatPenyakit: p.riwayatPenyakit || 'Tidak Ada'
-        }))
+
       };
 
       if (customerProfile && customerProfile.role === 'CUSTOMER') {
@@ -145,33 +96,12 @@ export const CustomerConfirmationPage: React.FC = () => {
         body: JSON.stringify(payload)
       });
 
-      const paymentUrl = response.paymentUrl || response.payment_url;
-      if (!paymentUrl || !paymentUrl.startsWith('http')) {
-        throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
-      }
-
-      const finalBookingCode = response.bookingCode || response.booking_code || randomCode;
-      const bookingObj = {
-        id: response.id || Date.now(),
-        bookingCode: finalBookingCode,
-        packageName: pkg.name,
-        totalPrice: totalCost,
-        guests: guestsCount,
-        tripDate: selectedTripSchedule || parsedTripDate.toISOString().split('T')[0],
-        createdAt: response.createdAt || nowIso,
-        status: response.status || 'PENDING_PAYMENT',
-        paymentUrl: paymentUrl
-      };
-
-      // Save into local history
-      const existingHistoryStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-      const history = JSON.parse(existingHistoryStr);
-      history.unshift(bookingObj);
-      localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
-      sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
-
-      // Direct external redirect to Xendit Invoice URL (using replace so back button doesn't loop)!
-      window.location.replace(paymentUrl);
+      if (!response.id || !response.bookingCode) throw new Error('Respons booking tidak lengkap. Periksa Cek Booking sebelum mencoba lagi.');
+      setSelectedBookingForInvoice(response);
+      setBookingFormData(null);
+      const paymentUrl = getPaymentInvoiceUrl(response.paymentUrl);
+      if (paymentUrl) window.location.assign(paymentUrl);
+      else navigateTo('halaman-pembayaran');
 
     } catch (err: any) {
       console.error('[Booking Error]', err);
@@ -198,60 +128,11 @@ export const CustomerConfirmationPage: React.FC = () => {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Pemesan & Peserta Card */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-              Daftar Peserta Trip ({guestsCount} Orang)
-            </h2>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {peserta.map((p: any, idx: number) => (
-                <div key={idx} style={{ backgroundColor: '#ffffff', borderRadius: '14px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: '800', color: '#0284c7' }}>
-                      Peserta {idx + 1}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px' }}>
-                    <div>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nama Lengkap</span>
-                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>{p.nama || '-'}</strong>
-                    </div>
-
-                    <div>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nomor HP / WhatsApp</span>
-                      <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.hp || '-'}</span>
-                    </div>
-
-                    <div>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Jenis Kelamin</span>
-                      <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.gender || '-'}</span>
-                    </div>
-
-                    <div>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Tanggal Lahir</span>
-                      <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.tanggalLahir || '-'}</span>
-                    </div>
-
-                    <div>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Umur</span>
-                      <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{calculateAge(p.tanggalLahir)}</span>
-                    </div>
-
-                    <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #f1f5f9', paddingTop: '10px' }}>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Riwayat Penyakit & Alergi</span>
-                      <span style={{ fontSize: '13.5px', fontWeight: '600', color: p.riwayatPenyakit && p.riwayatPenyakit !== 'Tidak Ada' ? '#ef4444' : '#10b981' }}>
-                        {p.riwayatPenyakit || 'Tidak Ada'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+            <h2>Data Pemesan</h2><p>{pemesan.nama}</p><p>{guestsCount} peserta</p>
           </div>
 
-          {/* Ringkasan Pembayaran Card (Positioned directly below Data Peserta) */}
+          {/* Estimasi Pembayaran Card (Positioned directly below Data Peserta) */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
               Ringkasan Pembayaran
@@ -281,12 +162,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                 <span style={{ color: '#0f172a', fontWeight: '600' }}>{formatIDR(baseCost)}</span>
               </div>
 
-              {selectedAddOns.map((addon: any, idx: number) => (
-                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#0284c7' }}>
-                  <span>Add-On: {addon.name}</span>
-                  <span style={{ fontWeight: '600' }}>+{formatIDR(addon.price)}</span>
-                </div>
-              ))}
+              
 
               {serviceFee > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
-import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, MessageSquare, Star } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, Star } from 'lucide-react';
 
 interface BookingItem {
   id: number;
@@ -14,7 +14,7 @@ interface BookingItem {
     destination: string;
     price: number;
   };
-  packageName?: string; // Fallback for local history items
+  packageName?: string;
   tripDate: string;
   guests: number;
   totalPrice: number;
@@ -26,42 +26,13 @@ interface BookingItem {
 
 
 
-const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = ({ createdAt, onExpire }) => {
-  const [timeLeft, setTimeLeft] = useState<number>(60);
-
-  useEffect(() => {
-    const createdTime = createdAt ? new Date(createdAt).getTime() : Date.now();
-    const expireTime = createdTime + 1 * 60 * 1000;
-
-    const interval = setInterval(() => {
-      const diff = Math.max(0, Math.floor((expireTime - Date.now()) / 1000));
-      setTimeLeft(diff);
-      if (diff <= 0 && onExpire) {
-        onExpire();
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [createdAt, onExpire]);
-
-  const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
-  const seconds = String(timeLeft % 60).padStart(2, '0');
-
-  return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', padding: '5px 12px', borderRadius: '30px', fontSize: '12px', fontWeight: '800' }}>
-      <Clock size={14} color="#ea580c" />
-      <span>Batas Transfer: {minutes}:{seconds}</span>
-    </div>
-  );
-};
-
 export const CustomerHistoryPage: React.FC = () => {
   const { navigateTo, customerProfile, setSelectedBookingForInvoice } = useNavigation();
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Lacak Tiket State
-  const [searchCode, setSearchCode] = useState('');
+  const [searchCode, setSearchCode] = useState(() => new URLSearchParams(window.location.search).get('code') || new URLSearchParams(window.location.hash.split('?')[1] || '').get('code') || '');
   const [trackedBooking, setTrackedBooking] = useState<any | null>(null);
   const [trackingError, setTrackingError] = useState('');
   const [trackingLoading, setTrackingLoading] = useState(false);
@@ -74,65 +45,23 @@ export const CustomerHistoryPage: React.FC = () => {
   // Custom Notice Modal state
   const [modalNotice, setModalNotice] = useState<{ title: string; message: string; isError?: boolean } | null>(null);
 
-  const handleExpireBooking = async (bId: string | number) => {
-    try {
-      await request(`/public/bookings/${bId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: 'EXPIRED' })
-      });
-    } catch (e) {
-      console.error('Failed to update expired status to DB:', e);
-    }
-  };
-
+  const [historyError, setHistoryError] = useState('');
+  const [sendingReview, setSendingReview] = useState(false);
   useEffect(() => {
-    // Handle return from Xendit payment gateway
-    const urlParams = new URLSearchParams(window.location.search);
-    const paymentStatus = urlParams.get('payment_status');
-    const bookingId = urlParams.get('booking_id');
-    const bookingCode = urlParams.get('code');
-
-    if (paymentStatus === 'PAID' && (bookingId || bookingCode)) {
-      const targetId = bookingId || bookingCode;
-      // Clean URL params right away so refresh won't repeat this request
-      if (window.history.replaceState) {
-        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-      }
-      request(`/public/bookings/${targetId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: 'PAID' })
-      }).then(() => {
-        try {
-          const historyStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-          const history = JSON.parse(historyStr);
-          const updatedHistory = history.map((b: any) => {
-            if (b.id == bookingId || b.bookingCode === bookingCode) {
-              return { ...b, status: 'PAID' };
-            }
-            return b;
-          });
-          localStorage.setItem('tripkita_my_bookings', JSON.stringify(updatedHistory));
-
-          const recentStr = sessionStorage.getItem('tripkita_recent_guest_booking');
-          if (recentStr) {
-            const recent = JSON.parse(recentStr);
-            sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify({ ...recent, status: 'PAID' }));
-          }
-        } catch (e) {
-          console.error(e);
-        }
-        fetchHistory();
-      }).catch((e) => {
-        console.error('Failed to update payment status:', e);
-        fetchHistory();
-      });
-    } else {
-      fetchHistory();
+    // Redirect parameters identify the booking only; the API owns its payment status.
+    const code = new URLSearchParams(window.location.search).get('code') || new URLSearchParams(window.location.hash.split('?')[1] || '').get('code');
+    if (code) {
+      request('/public/bookings/status/' + encodeURIComponent(code))
+        .then(data => setTrackedBooking(data))
+        .catch(err => setTrackingError(err.message || 'Booking gagal dimuat.'))
+        .finally(() => setTrackingLoading(false));
     }
+    void fetchHistory();
   }, [customerProfile]);
 
   const fetchHistory = async () => {
     setLoading(true);
+    setHistoryError('');
     try {
       if (customerProfile && customerProfile.role === 'CUSTOMER') {
         // Authenticated customer: fetch directly from DB
@@ -141,11 +70,11 @@ export const CustomerHistoryPage: React.FC = () => {
       } else {
         // Guest customer: keep search empty until user manually enters booking code
         setBookings([]);
-        setSearchCode('');
-        setTrackedBooking(null);
+
       }
     } catch (err) {
-      console.error('Failed to fetch booking history:', err);
+      setBookings([]);
+      setHistoryError('Riwayat booking gagal dimuat. Silakan coba lagi.');
     } finally {
       setLoading(false);
     }
@@ -163,23 +92,17 @@ export const CustomerHistoryPage: React.FC = () => {
 
     setTrackingLoading(true);
     try {
-      const data = await request(`/public/bookings/status/${searchCode.trim()}`);
+      const data = await request(`/public/bookings/status/${encodeURIComponent(searchCode.trim())}`);
       setTrackedBooking(data);
     } catch (err: any) {
       console.error(err);
-      setTrackingError('Kode booking tidak ditemukan. Mohon masukkan Kode Booking secara lengkap dan tepat (contoh: TK-2824-1889).');
+      setTrackingError(err.message || 'Booking gagal dilacak. Silakan coba lagi.');
     } finally {
       setTrackingLoading(false);
     }
   };
 
-  const isBookingExpired = (createdAt?: string) => {
-    if (!createdAt) return false;
-    const createdTime = new Date(createdAt).getTime();
-    if (isNaN(createdTime)) return false;
-    const expireTime = createdTime + 1 * 60 * 1000; // 1 minute limit for testing expiration
-    return Date.now() > expireTime;
-  };
+  
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -204,7 +127,8 @@ export const CustomerHistoryPage: React.FC = () => {
   }, [bookings]);
 
   const handleSendReview = async () => {
-    if (!selectedReviewBooking) return;
+    if (!selectedReviewBooking || sendingReview) return;
+    setSendingReview(true);
     try {
       await request('/customer/reviews', {
         method: 'POST',
@@ -218,16 +142,16 @@ export const CustomerHistoryPage: React.FC = () => {
       setSelectedReviewBooking(null);
       setModalNotice({
         title: 'Ulasan Berhasil Terkirim!',
-        message: 'Terima kasih! Ulasan dan penilaian bintang Anda telah berhasil dikirim dan tersimpan di database.'
+        message: 'Terima kasih! Ulasan dan penilaian Anda berhasil dikirim.'
       });
     } catch (err: any) {
       console.error(err);
       setModalNotice({
         title: 'Gagal Mengirim Ulasan',
-        message: err.message || 'Gagal menyimpan ulasan ke database.',
+        message: err.message || 'Gagal menyimpan ulasan.',
         isError: true
       });
-    }
+    } finally { setSendingReview(false); }
   };
 
   const getStatusBadge = (status: string) => {
@@ -267,11 +191,16 @@ export const CustomerHistoryPage: React.FC = () => {
         };
       case 'WAITING_CONFIRMATION':
         return {
-          label: 'Lunas & Aktif',
+          label: 'Menunggu Konfirmasi Pembayaran',
           color: '#10b981',
           bgColor: '#ecfdf5',
           icon: <CheckCircle2 size={14} color="#10b981" />
         };
+      case 'CANCELLED_BY_CUSTOMER':
+      case 'CANCELLED_BY_PROVIDER':
+        return { label: 'Dibatalkan', color: '#ef4444', bgColor: '#fee2e2', icon: <XCircle size={14} /> };
+      case 'REFUNDED':
+        return { label: 'Dana Dikembalikan', color: '#0284c7', bgColor: '#eff6ff', icon: <CheckCircle2 size={14} /> };
       case 'REFUND_REQUIRED':
         return {
           label: 'Proses Refund',
@@ -407,8 +336,6 @@ export const CustomerHistoryPage: React.FC = () => {
                             totalPrice: trackedBooking.totalPrice,
                             guests: trackedBooking.guests,
                             tripDate: trackedBooking.tripDate,
-                            accountNumber: '693800143473',
-                            bankName: 'Bank OCBC',
                             paymentUrl: trackedBooking.paymentUrl || ''
                           });
                           navigateTo('halaman-pembayaran');
@@ -427,27 +354,7 @@ export const CustomerHistoryPage: React.FC = () => {
                         ⚡ Selesaikan Pembayaran
                       </button>
                     )}
-                    {(trackedBooking.status === 'PAID' || trackedBooking.status === 'CONFIRMED') && (
-                      <a
-                        href="https://wa.me/6281234567890" 
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          backgroundColor: '#25d366',
-                          color: '#ffffff',
-                          textDecoration: 'none',
-                          padding: '10px 18px',
-                          borderRadius: '8px',
-                          fontWeight: '700',
-                          fontSize: '13px'
-                        }}
-                      >
-                        <MessageSquare size={14} /> Join WA Group Mitra
-                      </a>
-                    )}
+                    
                   </div>
                 </div>
               </div>
@@ -455,12 +362,13 @@ export const CustomerHistoryPage: React.FC = () => {
           )}
         </div>
 
+        {customerProfile && <button disabled={loading} onClick={() => void fetchHistory()}>Perbarui riwayat</button>}
         {/* History List Header */}
         <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', marginBottom: '20px' }}>
           {customerProfile && customerProfile.role === 'CUSTOMER' ? 'Riwayat Pemesanan Akun Anda' : 'Detail Status Pemesanan Tiket'}
         </h1>
 
-        {loading ? (
+        {historyError ? <div role="alert"><p>{historyError}</p><button onClick={() => void fetchHistory()}>Coba lagi</button></div> : loading ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
             <p>Sedang memuat riwayat pesanan...</p>
           </div>
@@ -496,7 +404,7 @@ export const CustomerHistoryPage: React.FC = () => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {bookings.map((booking, idx) => {
-              const isExpired = booking.status === 'EXPIRED' || (booking.status === 'PENDING_PAYMENT' && isBookingExpired(booking.createdAt));
+              const isExpired = booking.status === 'EXPIRED';
               const badge = getStatusBadge(isExpired ? 'EXPIRED' : booking.status);
               const tripName = booking.packageDetails?.name || booking.packageName || 'Paket Wisata Nusantara';
               const formattedTripDate = new Date(booking.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -552,120 +460,14 @@ export const CustomerHistoryPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {booking.status === 'PENDING_PAYMENT' && (
-                    isExpired ? (
-                      /* EXPIRED CARD BANNER */
-                      <div style={{ backgroundColor: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <strong style={{ fontSize: '13.5px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <XCircle size={16} color="#dc2626" /> Batas Waktu Pembayaran Habis (Kadaluwarsa)
-                          </strong>
-                          <span style={{ fontSize: '12px', fontWeight: '800', color: '#dc2626', backgroundColor: '#fee2e2', padding: '4px 12px', borderRadius: '20px' }}>DIBATALKAN</span>
-                        </div>
-                        
-                        <p style={{ fontSize: '13px', color: '#7f1d1d', margin: 0, lineHeight: '1.5' }}>
-                          Batas waktu transfer 1 menit untuk testing transaksi ini telah kadaluwarsa. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.
-                        </p>
-
-                        <div style={{ marginTop: '4px' }}>
-                          <button
-                            onClick={() => navigateTo('beranda')}
-                            style={{
-                              display: 'inline-block',
-                              backgroundColor: '#dc2626',
-                              color: '#ffffff',
-                              padding: '10px 20px',
-                              borderRadius: '10px',
-                              fontSize: '13px',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              border: 'none',
-                              boxShadow: '0 4px 10px rgba(220, 38, 38, 0.25)'
-                            }}
-                          >
-                            Pesan Ulang Trip Ini
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* ACTIVE PENDING PAYMENT BANNER */
-                      <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Transfer Pembayaran:</strong>
-                          <CountdownTimer createdAt={booking.createdAt} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
-                        </div>
-                        
-                        <span style={{ fontSize: '13px', color: '#0f172a' }}>
-                          Silakan lakukan transfer sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> ke rekening berikut:
-                        </span>
-                        
-                        <div style={{ backgroundColor: '#ffffff', padding: '14px', borderRadius: '10px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <div style={{ fontSize: '13px', color: '#1e293b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div><span style={{ color: '#64748b' }}>Bank:</span> <strong>Bank OCBC</strong></div>
-                            <div><span style={{ color: '#64748b' }}>No. Rekening:</span> <strong style={{ fontSize: '15px', color: '#0284c7', letterSpacing: '0.5px' }}>693800143473</strong></div>
-                            <div><span style={{ color: '#64748b' }}>Atas Nama:</span> <strong>TripKita</strong></div>
-                          </div>
-
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText('693800143473');
-                                setModalNotice({
-                                  title: 'Nomor Rekening Disalin!',
-                                  message: 'Nomor Rekening Bank OCBC (693800143473) telah berhasil disalin ke clipboard.'
-                                });
-                              }}
-                              style={{
-                                padding: '8px 14px',
-                                backgroundColor: '#e0f2fe',
-                                color: '#0284c7',
-                                border: '1px solid #7dd3fc',
-                                borderRadius: '8px',
-                                fontSize: '12.5px',
-                                fontWeight: '700',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Salin No. Rekening
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                setSelectedBookingForInvoice({
-                                  id: booking.id,
-                                  bookingCode: booking.bookingCode,
-                                  packageName: tripName,
-                                  totalPrice: booking.totalPrice,
-                                  guests: booking.guests,
-                                  tripDate: formattedTripDate,
-                                  accountNumber: '693800143473',
-                                  bankName: 'Bank OCBC',
-                                  paymentUrl: booking.paymentUrl || ''
-                                });
-                                navigateTo('halaman-pembayaran');
-                              }}
-                              style={{
-                                padding: '8px 16px',
-                                backgroundColor: '#0284c7',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontSize: '12.5px',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
-                              }}
-                            >
-                              ⚡ Selesaikan Pembayaran
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  )}
+                  
 
 
 
+                  {booking.status === 'PENDING_PAYMENT' && <button onClick={() => {
+                    setSelectedBookingForInvoice(booking);
+                    navigateTo('halaman-pembayaran');
+                  }}>Lihat invoice pembayaran</button>}
                   <div style={{ borderTop: '1px dotted #e2e8f0', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <span style={{ fontSize: '10px', color: '#94a3b8', display: 'block' }}>TOTAL HARGA</span>
@@ -675,25 +477,7 @@ export const CustomerHistoryPage: React.FC = () => {
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       {(booking.status === 'PAID' || booking.status === 'CONFIRMED' || booking.status === 'Dikonfirmasi' || booking.status === 'COMPLETED') && (
                         <>
-                          <a
-                            href="https://wa.me/6281234567890"
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              backgroundColor: '#25d366',
-                              color: '#ffffff',
-                              textDecoration: 'none',
-                              padding: '8px 16px',
-                              borderRadius: '8px',
-                              fontWeight: '700',
-                              fontSize: '13px'
-                            }}
-                          >
-                            <MessageSquare size={14} /> Grup WhatsApp
-                          </a>
+                          
                           
                           {(() => {
                             const isAlreadyReviewed = reviewedMap[booking.id];
@@ -815,13 +599,14 @@ export const CustomerHistoryPage: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setSelectedReviewBooking(null)}
+                  disabled={sendingReview} onClick={() => setSelectedReviewBooking(null)}
                   style={{ padding: '10px 18px', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
                 >
                   Batal
                 </button>
                 <button
                   type="button"
+                  disabled={sendingReview}
                   onClick={handleSendReview}
                   style={{ padding: '10px 20px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
                 >

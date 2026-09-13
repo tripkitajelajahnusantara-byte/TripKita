@@ -9,7 +9,6 @@ import {
   Search, 
   Building, 
   Eye,
-  SlidersHorizontal,
   X,
   Maximize2,
   ZoomIn,
@@ -20,6 +19,7 @@ import {
   Wallet
 } from 'lucide-react';
 import { request } from '../utils/api';
+import { getUploadUrl } from '../utils/api';
 import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
 
 
@@ -158,7 +158,7 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const adminName = providerProfile?.picName || 'Administrator';
-  const adminEmail = providerProfile?.email || 'admin@tripkita.id';
+  const adminEmail = providerProfile?.email || '—';
 
   const fetchProviders = async () => {
     setLoading(true);
@@ -596,22 +596,10 @@ export const AdminDashboardPage: React.FC = () => {
         {/* Top Header */}
         <header className="admin-top-header">
           <div className="header-left">
-            <button className="hamburger-btn">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="12" x2="21" y2="12"></line>
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <line x1="3" y1="18" x2="21" y2="18"></line>
-              </svg>
-            </button>
+            
           </div>
           <div className="header-right">
-            <button className="notification-bell-btn">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-              </svg>
-              <span className="bell-badge">3</span>
-            </button>
+            
             <div className="user-profile-widget">
               <div className="avatar-circle">AD</div>
               <div className="profile-details">
@@ -641,7 +629,7 @@ export const AdminDashboardPage: React.FC = () => {
                 {activeView === 'administrasi-refund' 
                   ? 'Pantau dan kelola proses refund dana customer.' 
                   : activeView === 'kelola-pembayaran'
-                  ? 'Verifikasi bukti transfer pembayaran manual Bank OCBC.'
+                  ? 'Verifikasi bukti pembayaran manual yang dikirim pelanggan.'
                   : activeView === 'pencairan-provider'
                   ? 'Kelola pengajuan pencairan saldo DP 50% & pelunasan dari mitra provider.'
                   : 'Kelola dan verifikasi semua provider yang terdaftar di TripKita.'}
@@ -1027,9 +1015,7 @@ export const AdminDashboardPage: React.FC = () => {
                       {cities.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
 
-                    <button className="filter-btn-outline">
-                      <SlidersHorizontal size={14} /> Filter
-                    </button>
+                    
                   </div>
 
                   {/* Main Providers Table */}
@@ -1105,12 +1091,8 @@ export const AdminDashboardPage: React.FC = () => {
 
                   {/* Pagination Footer */}
                   <div className="table-pagination-footer">
-                    <span className="count-label">Menampilkan 1 - {filteredProviders.length} dari {filteredProviders.length} data</span>
-                    <div className="pagination-buttons">
-                      <button className="page-nav" disabled>&lt;</button>
-                      <button className="page-number active">1</button>
-                      <button className="page-nav" disabled>&gt;</button>
-                    </div>
+                    <span className="count-label">Menampilkan {filteredProviders.length} data</span>
+                    
                   </div>
 
                 </div>
@@ -1321,19 +1303,19 @@ export const AdminDashboardPage: React.FC = () => {
                       <div className="preview-controls">
                         <button className="ctrl-btn" onClick={() => handleZoom('out')} title="Zoom Out"><ZoomOut size={14} /></button>
                         <button className="ctrl-btn" onClick={() => handleZoom('in')} title="Zoom In"><ZoomIn size={14} /></button>
-                        <a href={`http://localhost:8080${previewDocUrl}`} target="_blank" rel="noreferrer" className="ctrl-btn" title="Fullscreen"><Maximize2 size={14} /></a>
+                        <a href={getUploadUrl(previewDocUrl)} target="_blank" rel="noreferrer" className="ctrl-btn" title="Fullscreen"><Maximize2 size={14} /></a>
                       </div>
                     </div>
                     <div className="doc-preview-container">
                       {previewDocUrl.endsWith('.pdf') ? (
                         <iframe 
-                          src={`http://localhost:8080${previewDocUrl}`} 
+                          src={getUploadUrl(previewDocUrl)} 
                           title="Legal Document Preview"
                           style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
                         />
                       ) : (
                         <img 
-                          src={`http://localhost:8080${previewDocUrl}`} 
+                          src={getUploadUrl(previewDocUrl)} 
                           alt="Document Preview" 
                           style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', maxWidth: '100%', height: 'auto' }}
                         />

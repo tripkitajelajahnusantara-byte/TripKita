@@ -45,6 +45,7 @@ export const ProviderFinancePage: React.FC = () => {
   const { providerProfile } = useNavigation();
   const { showAlert } = useCustomAlert();
   const [summary, setSummary] = useState<PayoutSummary | null>(null);
+  const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -53,11 +54,13 @@ export const ProviderFinancePage: React.FC = () => {
 
   const fetchSummary = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const data = await request('/provider/payouts/summary');
       setSummary(data);
-    } catch (err) {
-      console.error('Failed to fetch payout summary:', err);
+    } catch {
+      setSummary(null);
+      setLoadError('Data keuangan gagal dimuat. Silakan coba lagi.');
     } finally {
       setLoading(false);
     }
@@ -141,7 +144,7 @@ export const ProviderFinancePage: React.FC = () => {
       setShowRequestModal(false);
       setModalNotice({
         title: 'Pengajuan Berhasil Dikirim!',
-        message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan Akhir 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim dan akan langsung ditransfer ke rekening bank Mitra Anda.`
+        message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan Akhir 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim untuk diproses oleh admin.`
       });
       fetchSummary();
     } catch (err: any) {
@@ -156,6 +159,13 @@ export const ProviderFinancePage: React.FC = () => {
     }
   };
 
+  if (loading || loadError || !summary) return (
+    <div className="dashboard-layout"><Sidebar /><main className="dashboard-main">
+      <h1>Keuangan & Saldo Mitra</h1>
+      <p role={loadError ? 'alert' : 'status'}>{loading ? 'Memuat data keuangan...' : loadError || 'Data keuangan belum tersedia.'}</p>
+      {!loading && <button onClick={() => void fetchSummary()}>Coba lagi</button>}
+    </main></div>
+  );
   return (
     <div className="dashboard-layout animate-fade-in" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
       <Sidebar />
