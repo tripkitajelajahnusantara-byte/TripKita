@@ -81,27 +81,6 @@ export const CustomerXenditCheckoutPage: React.FC = () => {
     }, 800);
   };
 
-  const handleSimulateExpired = () => {
-    setProcessing(true);
-    setTimeout(() => {
-      try {
-        const existingStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-        const history = JSON.parse(existingStr);
-        const updatedHistory = history.map((item: any) => {
-          if (item.id === booking.id || item.bookingCode === booking.bookingCode) {
-            return { ...item, status: 'EXPIRED' };
-          }
-          return item;
-        });
-        localStorage.setItem('tripkita_my_bookings', JSON.stringify(updatedHistory));
-      } catch (e) {
-        console.error(e);
-      }
-      setProcessing(false);
-      navigateTo('riwayat-booking');
-    }, 500);
-  };
-
   const getVaNumber = (bank: string) => {
     switch (bank) {
       case 'BCA': return '88001894124029';
@@ -358,14 +337,14 @@ export const CustomerXenditCheckoutPage: React.FC = () => {
               style={{
                 width: '100%',
                 padding: '16px',
-                backgroundColor: processing ? '#047857' : '#10b981',
+                backgroundColor: processing ? '#047857' : '#007bff',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '15px',
                 fontWeight: '800',
                 cursor: processing ? 'not-allowed' : 'pointer',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                boxShadow: '0 4px 14px rgba(0, 123, 255, 0.4)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -373,25 +352,7 @@ export const CustomerXenditCheckoutPage: React.FC = () => {
                 transition: 'all 0.2s'
               }}
             >
-              {processing ? 'Memproses Webhook Xendit...' : '⚡ SIMULASIKAN PEMBAYARAN SUKSES (XENDIT TEST)'}
-            </button>
-
-            <button
-              onClick={handleSimulateExpired}
-              disabled={processing}
-              style={{
-                width: '100%',
-                padding: '12px',
-                backgroundColor: 'transparent',
-                color: '#f87171',
-                border: '1px solid #991b1b',
-                borderRadius: '12px',
-                fontSize: '13.5px',
-                fontWeight: '700',
-                cursor: processing ? 'not-allowed' : 'pointer'
-              }}
-            >
-              ❌ Simulasikan Waktu Pembayaran Habis (EXPIRED)
+              {processing ? 'Memproses Pembayaran...' : '💳 Lanjutkan Pembayaran Xendit'}
             </button>
           </div>
         </div>
