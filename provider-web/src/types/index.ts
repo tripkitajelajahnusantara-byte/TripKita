@@ -40,6 +40,7 @@ export interface Booking {
   dpAmount?: string;
   paymentMethod?: string;
   paymentUrl?: string;
+  rawEndDate?: string;
   status: 'PENDING_PAYMENT' | 'WAITING_CONFIRMATION' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED';
 }
 

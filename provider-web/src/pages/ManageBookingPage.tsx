@@ -95,6 +95,7 @@ export const ManageBookingPage: React.FC = () => {
           dpAmount: b.dpAmount ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.dpAmount) : '—',
           paymentMethod: b.paymentMethod || 'Transfer Bank',
           paymentUrl: b.paymentUrl,
+          rawEndDate: b.endDate || b.tripDate,
           status: b.status,
         }));
         setBookings(mapped);
@@ -355,9 +356,15 @@ export const ManageBookingPage: React.FC = () => {
                           </button>
                           {(b.status === 'CONFIRMED' || b.status === 'PAID') && b.dbId && (
                             <>
-                              <button className="action-btn text-green" title="Selesaikan Perjalanan" onClick={() => handleAction('complete', b.dbId!)}>
-                                <Check size={14} />
-                              </button>
+                              {b.rawEndDate && new Date() >= new Date(b.rawEndDate) ? (
+                                <button className="action-btn text-green" title="Selesaikan Perjalanan" onClick={() => handleAction('complete', b.dbId!)}>
+                                  <Check size={14} />
+                                </button>
+                              ) : (
+                                <button className="action-btn text-gray" title="Perjalanan belum selesai" style={{ cursor: 'not-allowed', opacity: 0.5 }}>
+                                  <Check size={14} />
+                                </button>
+                              )}
                               <button className="action-btn text-red" title="Batalkan Perjalanan (Refund)" onClick={() => handleAction('reject', b.dbId!)}>
                                 <X size={14} />
                               </button>

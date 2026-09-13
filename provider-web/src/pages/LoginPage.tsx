@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { request } from '../utils/api';
 
 export const LoginPage: React.FC = () => {
   const { login, navigateTo, route } = useNavigation();
@@ -29,12 +30,10 @@ export const LoginPage: React.FC = () => {
     setForgotLoading(true);
     setForgotError('');
     try {
-      const res = await fetch('http://localhost:8080/api/v1/auth/provider/forgot-password', {
+      await request('/auth/provider/forgot-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail })
       });
-      if (!res.ok) throw new Error('Gagal memproses permintaan');
       setForgotStep(2);
     } catch (err: any) {
       setForgotError(err.message || 'Terjadi kesalahan');
@@ -55,13 +54,10 @@ export const LoginPage: React.FC = () => {
     setForgotLoading(true);
     setForgotError('');
     try {
-      const res = await fetch('http://localhost:8080/api/v1/auth/provider/reset-password', {
+      await request('/auth/provider/reset-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail, otp: forgotOtp, newPassword: forgotNewPassword })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Gagal mereset password');
       
       alert('Password berhasil direset! Silakan login dengan password baru.');
       setShowForgotModal(false);
