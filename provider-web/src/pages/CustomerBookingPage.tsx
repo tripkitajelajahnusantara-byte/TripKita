@@ -37,8 +37,8 @@ export const CustomerBookingPage: React.FC = () => {
   const [pemesanPhone, setPemesanPhone] = useState(() => 
     customerProfile?.whatsapp || activeFormData?.pemesan?.whatsapp || ''
   );
-  const [pemesanBirthDate, setPemesanBirthDate] = useState(() => activeFormData?.peserta?.[0]?.tanggalLahir || '1998-05-15');
-  const [pemesanGender, setPemesanGender] = useState(() => activeFormData?.peserta?.[0]?.gender || 'Laki-laki');
+  const [pemesanBirthDate, setPemesanBirthDate] = useState(() => customerProfile?.birthDate || activeFormData?.peserta?.[0]?.tanggalLahir || '1998-05-15');
+  const [pemesanGender, setPemesanGender] = useState(() => customerProfile?.gender || activeFormData?.peserta?.[0]?.gender || 'Laki-laki');
 
   // Checkbox state: Peserta 1 sama dengan Pemesan (Do NOT auto-check!)
   const [isSameAsPemesan, setIsSameAsPemesan] = useState(() => {
@@ -79,6 +79,12 @@ export const CustomerBookingPage: React.FC = () => {
       if (customerProfile.whatsapp) {
         setPemesanPhone(customerProfile.whatsapp || '');
       }
+      if (customerProfile.birthDate) {
+        setPemesanBirthDate(customerProfile.birthDate || '1998-05-15');
+      }
+      if (customerProfile.gender) {
+        setPemesanGender(customerProfile.gender || 'Laki-laki');
+      }
     }
   }, [customerProfile]);
 
@@ -88,11 +94,12 @@ export const CustomerBookingPage: React.FC = () => {
       const updated = [...prev];
       if (updated.length < guestsCount) {
         for (let i = updated.length; i < guestsCount; i++) {
+          const isFirst = (i === 0);
           updated.push({
-            nama: '',
-            hp: '',
-            gender: 'Laki-laki',
-            tanggalLahir: '2000-01-01',
+            nama: isFirst && customerProfile ? (customerProfile.picName || customerProfile.businessName || '') : '',
+            hp: isFirst && customerProfile ? (customerProfile.whatsapp || '') : '',
+            gender: isFirst && customerProfile ? (customerProfile.gender || 'Laki-laki') : 'Laki-laki',
+            tanggalLahir: isFirst && customerProfile ? (customerProfile.birthDate || '2000-01-01') : '2000-01-01',
             riwayatPenyakit: 'Tidak Ada'
           });
         }
@@ -101,7 +108,7 @@ export const CustomerBookingPage: React.FC = () => {
       }
       return updated;
     });
-  }, [guestsCount, bookingFormData]);
+  }, [guestsCount, bookingFormData, customerProfile]);
 
   // Sync Peserta 1 with Pemesan when checkbox is toggled or when pemesan data changes
   useEffect(() => {

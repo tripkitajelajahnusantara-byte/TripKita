@@ -83,7 +83,7 @@ export const CustomerSettingsPage: React.FC = () => {
         birthDate: birthDate
       };
 
-      const updated = await request('/auth/profile', {
+      const updated = await request('/provider/profile', {
         method: 'PUT',
         body: JSON.stringify(payload)
       });
