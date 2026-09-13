@@ -54,7 +54,7 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 		MinAge:             req.MinAge,
 		MaxAge:             req.MaxAge,
 		Status:             req.Status,
-		Rating:             5.0,
+		Rating:             0.0,
 		Description:        req.Description,
 		IncludedFacilities: req.IncludedFacilities,
 		ExcludedFacilities: req.ExcludedFacilities,

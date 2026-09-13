@@ -126,6 +126,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const h7MinDateStr = getH7MinDateIso();
 
   const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
+  const isCorporateTrip = pkg.tripType === 'Corporate' || pkg.category === 'Corporate';
 
   const minRequiredGuests = isOpenTrip ? 1 : (
     pkg.tripType === 'Honeymoon' ? 2 :
@@ -539,8 +540,9 @@ export const CustomerPackageDetailPage: React.FC = () => {
       showAlert({ type: 'warning', title: 'Pemesanan Wajib H-7', message: `Pemesanan paket ${pkg.tripType || 'ini'} wajib H-7 sebelum keberangkatan. Tanggal paling awal yang dapat dipesan adalah ${formatDateIndoFull(h7MinDateStr)}.` });
       return;
     }
-    const finalBookingDate = isOpenTrip 
-      ? selectedScheduleDate 
+    // Generate ISO string to match what's expected in booking
+    const finalBookingDate = (isOpenTrip || isCorporateTrip)
+      ? (customStartDate || selectedScheduleDate)
       : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`;
     
     if (!finalBookingDate) {
@@ -1243,6 +1245,22 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   );
                 })()}
               </div>
+            ) : isCorporateTrip ? (
+              <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', border: '1px solid #dbeafe' }}>
+                <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                  Jadwal Keberangkatan (Corporate Trip)
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #007bff' }}>
+                  <div>
+                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Tanggal Mulai</span>
+                    <strong style={{ fontSize: '13px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Tanggal Selesai</span>
+                    <strong style={{ fontSize: '13px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', border: '1px solid #dbeafe' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -1378,24 +1396,24 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Pesan Sekarang Button (Directly Visible!) */}
             <button
               onClick={handleBookNow}
-              disabled={availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)}
+              disabled={availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)}
               style={{
                 width: '100%',
                 padding: '14px',
-                backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? '#94a3b8' : '#007bff',
+                backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? '#94a3b8' : '#007bff',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '15px',
                 fontWeight: '700',
-                cursor: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'not-allowed' : 'pointer',
-                boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
+                cursor: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? 'not-allowed' : 'pointer',
+                boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
                 transition: 'all 0.2s'
               }}
             >
               {availableSeats <= 0 ? 'Kuota Habis (Tidak Bisa Dipesan)' :
                guestsCount > availableSeats ? 'Peserta Melebihi Kuota' :
-               (!isOpenTrip && isRangeBooked) ? 'Tanggal Terbooking (Tidak Tersedia)' : 'Pesan Sekarang'}
+               (!(isOpenTrip || isCorporateTrip) && isRangeBooked) ? 'Tanggal Terbooking (Tidak Tersedia)' : 'Pesan Sekarang'}
             </button>
 
           </div>
@@ -1431,17 +1449,17 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
         <button
           onClick={handleBookNow}
-          disabled={availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)}
+          disabled={availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)}
           style={{
             padding: '12px 24px',
-            backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? '#94a3b8' : '#007bff',
+            backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? '#94a3b8' : '#007bff',
             color: '#ffffff',
             border: 'none',
             borderRadius: '12px',
             fontSize: '14.5px',
             fontWeight: '700',
-            cursor: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'not-allowed' : 'pointer',
-            boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || (!isOpenTrip && isRangeBooked)) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
+            cursor: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? 'not-allowed' : 'pointer',
+            boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
             whiteSpace: 'nowrap'
           }}
         >

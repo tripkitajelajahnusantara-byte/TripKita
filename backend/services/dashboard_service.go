@@ -67,12 +67,23 @@ func (s *dashboardService) GetStats(providerID uint) (*DashboardStats, error) {
 		return nil, err
 	}
 
-	// Fetch provider to get rating (hardcoded or average of packages rating)
 	provider, err := s.providerRepo.FindByID(providerID)
-	var rating float64 = 4.92
+	var rating float64 = 0
 	if err == nil && provider.IsVerified {
-		// Can compute or keep default provider rating
-		rating = 4.92
+		packages, _ := s.packageRepo.FindAllByProvider(providerID)
+		if len(packages) > 0 {
+			var total float64
+			var count int
+			for _, p := range packages {
+				if p.Rating > 0 {
+					total += p.Rating
+					count++
+				}
+			}
+			if count > 0 {
+				rating = total / float64(count)
+			}
+		}
 	}
 
 	return &DashboardStats{

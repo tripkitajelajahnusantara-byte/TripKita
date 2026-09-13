@@ -16,6 +16,35 @@ import {
 } from 'lucide-react';
 
 import { request, API_BASE_URL } from '../utils/api';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+const customIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+
+function LocationPicker({ position, setPosition, setMeetPoint }: any) {
+  useMapEvents({
+    click(e) {
+      setPosition(e.latlng);
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.display_name) {
+                setMeetPoint(data.display_name);
+            }
+        }).catch(err => {
+            setMeetPoint(`Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`);
+        });
+    },
+  });
+  return position === null ? null : <Marker position={position} icon={customIcon} />;
+}
 
 export const INDONESIA_PROVINCES = [
   "Aceh", "Sumatera Utara", "Sumatera Barat", "Riau", "Kepulauan Riau", 
@@ -40,11 +69,12 @@ export const AddPackagePage: React.FC = () => {
 
   // Form states
   const [packageName, setPackageName] = useState('');
-  const [category, setCategory] = useState('City Tour');
-  const [tripType, setTripType] = useState('Open Trip');
+  const [category, setCategory] = useState('');
+  const [tripType, setTripType] = useState('');
   const [duration, setDuration] = useState('5');
   const [location, setLocation] = useState('DKI Jakarta');
   const [meetPoint, setMeetPoint] = useState('');
+  const [mapPosition, setMapPosition] = useState<any>(null);
   const [description, setDescription] = useState('');
   const [minGuests, setMinGuests] = useState('2');
   const [maxGuests, setMaxGuests] = useState('12');
@@ -540,6 +570,15 @@ export const AddPackagePage: React.FC = () => {
 
                 <div className="input-group">
                   <label>Titik Kumpul *</label>
+                  <p style={{fontSize: '12.5px', color: '#64748b', marginBottom: '8px', marginTop: '-4px'}}>Pilih lokasi di peta atau ketik langsung nama titik kumpulnya.</p>
+                  <div style={{ height: '250px', width: '100%', marginBottom: '12px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', zIndex: 1 }}>
+                    <MapContainer center={[-0.7893, 113.9213]} zoom={4} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+                      <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <LocationPicker position={mapPosition} setPosition={setMapPosition} setMeetPoint={setMeetPoint} />
+                    </MapContainer>
+                  </div>
                   <input 
                     type="text" 
                     value={meetPoint} 

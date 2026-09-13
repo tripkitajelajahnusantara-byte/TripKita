@@ -30,8 +30,8 @@ interface DashboardStats {
 }
 
 interface NotificationItem {
-  id: string;
-  type: 'ORDER_IN' | 'PAYOUT_SUCCESS' | 'PAYOUT_REJECTED';
+  id: string | number;
+  type: string;
   title: string;
   message: string;
   time: string;
@@ -50,32 +50,7 @@ export const DashboardPage: React.FC = () => {
 
   // Notification state
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    {
-      id: 'n1',
-      type: 'ORDER_IN',
-      title: 'Pesanan Baru Masuk',
-      message: 'Booking TK-20260906-7891 dari Antonius (Yogyakarta City Tour). Status: Lunas & Aktif.',
-      time: '5 menit yang lalu',
-      read: false,
-    },
-    {
-      id: 'n2',
-      type: 'PAYOUT_SUCCESS',
-      title: 'Pencairan Berhasil',
-      message: 'Pengajuan pencairan saldo sebesar Rp 1.500.000 telah berhasil ditransfer ke rekening BCA ***8821 Anda.',
-      time: '1 jam yang lalu',
-      read: false,
-    },
-    {
-      id: 'n3',
-      type: 'PAYOUT_REJECTED',
-      title: 'Pencairan Ditolak',
-      message: 'Pengajuan pencairan saldo Rp 500.000 ditolak. Alasan: Nama pemilik rekening tidak cocok dengan dokumen identitas provider.',
-      time: 'Kemarin',
-      read: false,
-    },
-  ]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   const providerName = providerProfile?.businessName || 'Wisata Nusantara';
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -85,10 +60,11 @@ export const DashboardPage: React.FC = () => {
     async function loadDashboardData() {
       setIsLoading(true);
       try {
-        const [statsRes, bookingsRes, packagesRes] = await Promise.allSettled([
+        const [statsRes, bookingsRes, packagesRes, notifsRes] = await Promise.allSettled([
           request('/provider/dashboard/stats'),
           request('/provider/bookings'),
-          request('/provider/packages')
+          request('/provider/packages'),
+          request('/provider/notifications')
         ]);
 
         if (!isMounted) return;
@@ -132,23 +108,42 @@ export const DashboardPage: React.FC = () => {
 
           // Find urgent open trip (H-3)
           const urgentTrip = packagesRes.value.find((pkg: any) => {
-            const isOpenTrip = pkg.tripType === 'Open Trip' || pkg.category === 'Open Trip' || (pkg.name || '').toLowerCase().includes('open trip');
-            if (!isOpenTrip) return false;
-            
-            const quotaUsed = pkg.quotaUsed || 0;
-            const quotaMin = pkg.quotaMin || 1;
-            if (quotaUsed >= quotaMin) return false; // Already fulfilled
+          // Check for urgent Open Trip (H-3)
+          const allPackages = packagesRes.value;
+          const openTrips = allPackages.filter(p => p.tripType === 'Open Trip' && p.status === 'Aktif');
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
 
+          let foundUrgent = null;
+          for (const pkg of openTrips) {
             if (pkg.startDate) {
               const tripDate = new Date(pkg.startDate);
-              const now = new Date();
+              tripDate.setHours(0, 0, 0, 0);
               const diffTime = tripDate.getTime() - now.getTime();
               const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              return diffDays >= 0 && diffDays <= 3;
+              
+              if (diffDays <= 3 && diffDays >= 0 && pkg.quotaUsed < pkg.quotaMin) {
+                foundUrgent = {
+                  ...pkg,
+                  daysLeft: diffDays
+                };
+                break;
+              }
             }
-            return false;
-          });
-          setUrgentOpenTrip(urgentTrip || null);
+          }
+          setUrgentOpenTrip(foundUrgent);
+        }
+        
+        if (notifsRes.status === 'fulfilled' && Array.isArray(notifsRes.value)) {
+          const formattedNotifs = notifsRes.value.map((n: any) => ({
+            id: n.id,
+            type: n.type,
+            title: n.title,
+            message: n.message,
+            time: new Date(n.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+            read: n.isRead
+          }));
+          setNotifications(formattedNotifs);
         }
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
@@ -162,6 +157,9 @@ export const DashboardPage: React.FC = () => {
 
   const handleMarkAllRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    notifications.filter(n => !n.read).forEach(n => {
+      request(`/provider/notifications/${n.id}/read`, { method: 'PUT' }).catch(console.error);
+    });
   };
 
   const filteredBookings = bookings.filter((b) => {
@@ -263,7 +261,10 @@ export const DashboardPage: React.FC = () => {
                     {notifications.map((n) => (
                       <div 
                         key={n.id}
-                        onClick={() => setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item))}
+                        onClick={() => {
+                          setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
+                          request(`/provider/notifications/${n.id}/read`, { method: 'PUT' }).catch(console.error);
+                        }}
                         style={{
                           padding: '14px 18px',
                           borderBottom: '1px solid #f1f5f9',
