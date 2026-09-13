@@ -793,6 +793,7 @@ export const AddPackagePage: React.FC = () => {
                         min={todayStr}
                         value={startDate} 
                         onChange={(e) => handleStartDateChange(e.target.value)}
+                        style={{ width: '100%', textAlign: 'left' }}
                       />
                     </div>
                     <span style={{ alignSelf: 'flex-end', marginBottom: '8px' }}>s/d</span>
@@ -809,6 +810,7 @@ export const AddPackagePage: React.FC = () => {
                             setSchedule(`${startDate} s/d ${val}`);
                           }
                         }}
+                        style={{ width: '100%', textAlign: 'left' }}
                       />
                     </div>
                   </div>

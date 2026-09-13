@@ -137,15 +137,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const [guestsCount, setGuestsCount] = useState(1);
 
-  const getDefaultDurationDays = (nameStr: string): number => {
-    const lower = nameStr.toLowerCase();
-    if (lower.includes('4d3n')) return 3;
-    if (lower.includes('3d2n')) return 2;
-    if (lower.includes('2d1n')) return 1;
-    return 2;
-  };
 
-  const defaultDuration = getDefaultDurationDays(pkg.name || '');
 
   const [customStartDate, setCustomStartDate] = useState<string>(
     pkg.bookingDate && pkg.bookingDate.length === 10 && pkg.bookingDate >= h7MinDateStr ? pkg.bookingDate : h7MinDateStr
@@ -313,7 +305,19 @@ export const CustomerPackageDetailPage: React.FC = () => {
     return getDestinationDefaults(name);
   };
 
-  const photos = getGalleryImages(pkg.name);
+  const photos = (() => {
+    let images: string[] = [];
+    if (pkg.images && pkg.images.trim()) {
+      images = pkg.images.split(',').map((img: string) => img.trim()).filter(Boolean);
+    }
+    if (images.length === 0 && pkg.image) {
+      images = [pkg.image];
+    }
+    if (images.length === 0) {
+      images = getGalleryImages(pkg.name);
+    }
+    return images;
+  })();
 
   // Dynamic Add-on services list per destination
   const getPackageAddOns = (name: string): AddOn[] => {
@@ -1606,7 +1610,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
         bookedDates={currentPkgBookedDates}
         minDateIso={h7MinDateStr}
         tripType={pkg.tripType}
-        durationDays={defaultDuration}
+        durationDays={pkg.duration}
       />
 
     </div>

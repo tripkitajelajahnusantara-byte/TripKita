@@ -21,7 +21,8 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
   onSelectRange,
   bookedDates,
   minDateIso,
-  tripType = 'Private Trip'
+  tripType = 'Private Trip',
+  durationDays
 }) => {
   if (!isOpen) return null;
 
@@ -69,6 +70,14 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
   };
 
   const handleDayClick = (dateIso: string) => {
+    if (durationDays && durationDays > 0) {
+      const d = new Date(dateIso);
+      d.setDate(d.getDate() + durationDays - 1);
+      const endIso = d.toISOString().split('T')[0];
+      onSelectRange(dateIso, endIso);
+      return;
+    }
+
     // If a single date is currently selected (start === end) and new date >= start, form a date range!
     if (startDateIso && endDateIso && startDateIso === endDateIso && dateIso >= startDateIso) {
       onSelectRange(startDateIso, dateIso);

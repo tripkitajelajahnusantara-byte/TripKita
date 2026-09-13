@@ -413,7 +413,7 @@ button {
 .bg-red { background-color: #fef2f2; }
 
 .trend-up {
-  font-size: 10px;
+  font-size: 13px;
   color: #10b981;
   font-weight: 600;
 }
@@ -430,7 +430,7 @@ button {
 }
 
 .card-bottom p {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--color-text-medium);
 }
 
