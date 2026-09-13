@@ -136,13 +136,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const [guestsCount, setGuestsCount] = useState(1);
 
-  const getAddDaysIso = (baseIso: string, days: number) => {
-    const d = new Date(baseIso);
-    if (isNaN(d.getTime())) return baseIso;
-    d.setDate(d.getDate() + days);
-    return d.toISOString().split('T')[0];
-  };
-
   const getDefaultDurationDays = (nameStr: string): number => {
     const lower = nameStr.toLowerCase();
     if (lower.includes('4d3n')) return 3;
@@ -157,9 +150,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
     pkg.bookingDate && pkg.bookingDate.length === 10 && pkg.bookingDate >= h7MinDateStr ? pkg.bookingDate : h7MinDateStr
   );
 
-  const [customEndDate, setCustomEndDate] = useState<string>(
-    getAddDaysIso(customStartDate, defaultDuration)
-  );
+  const [customEndDate, setCustomEndDate] = useState<string>(customStartDate);
 
   // Booked / Occupied dates dynamically fetched from database or calculated relative to current date
   const getAddDaysFromToday = (days: number) => {
@@ -1268,22 +1259,32 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {customStartDate === customEndDate ? (
                     <div>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Check-In</span>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Keberangkatan</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Calendar size={14} color="#007bff" />
-                        <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
+                        <strong style={{ fontSize: '13px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
                       </div>
                     </div>
-                    <div>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Check-Out</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Calendar size={14} color="#007bff" />
-                        <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Mulai</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Calendar size={14} color="#007bff" />
+                          <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Selesai</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Calendar size={14} color="#007bff" />
+                          <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </button>
 
                 {isRangeBooked && (
