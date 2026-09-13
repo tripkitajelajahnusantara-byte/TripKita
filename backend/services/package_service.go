@@ -48,6 +48,11 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 		StartDate:          req.StartDate,
 		EndDate:            req.EndDate,
 		Schedule:           req.Schedule,
+		Duration:           req.Duration,
+		MinGuests:          req.MinGuests,
+		MaxGuests:          req.MaxGuests,
+		MinAge:             req.MinAge,
+		MaxAge:             req.MaxAge,
 		Status:             req.Status,
 		Rating:             5.0,
 		Description:        req.Description,
@@ -121,6 +126,21 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	}
 	if req.Schedule != "" {
 		pkg.Schedule = req.Schedule
+	}
+	if req.Duration != 0 {
+		pkg.Duration = req.Duration
+	}
+	if req.MinGuests != 0 {
+		pkg.MinGuests = req.MinGuests
+	}
+	if req.MaxGuests != 0 {
+		pkg.MaxGuests = req.MaxGuests
+	}
+	if req.MinAge != 0 {
+		pkg.MinAge = req.MinAge
+	}
+	if req.MaxAge != 0 {
+		pkg.MaxAge = req.MaxAge
 	}
 	if req.Status != "" {
 		pkg.Status = req.Status

@@ -84,6 +84,11 @@ func ConnectDB(cfg *config.Config) {
 	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS included_facilities TEXT;`)
 	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS excluded_facilities TEXT;`)
 	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS itinerary TEXT;`)
+	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 1;`)
+	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_guests INTEGER DEFAULT 1;`)
+	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_guests INTEGER DEFAULT 10;`)
+	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_age INTEGER DEFAULT 0;`)
+	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_age INTEGER DEFAULT 100;`)
 	DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT;`)
 	DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT;`)
 

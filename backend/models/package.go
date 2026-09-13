@@ -21,6 +21,11 @@ type Package struct {
 	StartDate          string         `gorm:"size:50" json:"startDate"`
 	EndDate            string         `gorm:"size:50" json:"endDate"`
 	Schedule           string         `gorm:"size:255;not null" json:"schedule"`
+	Duration           int            `gorm:"default:1" json:"duration"`
+	MinGuests          int            `gorm:"default:1" json:"minGuests"`
+	MaxGuests          int            `gorm:"default:10" json:"maxGuests"`
+	MinAge             int            `gorm:"default:0" json:"minAge"`
+	MaxAge             int            `gorm:"default:100" json:"maxAge"`
 	Status             string         `gorm:"size:50;default:'Draft'" json:"status"` // Aktif, Draft, Nonaktif
 	Rating             float64        `gorm:"default:0" json:"rating"`
 	Description        string         `gorm:"type:text" json:"description"`
@@ -46,6 +51,11 @@ type CreatePackageRequest struct {
 	StartDate          string `json:"startDate"`
 	EndDate            string `json:"endDate"`
 	Schedule           string `json:"schedule"`
+	Duration           int    `json:"duration"`
+	MinGuests          int    `json:"minGuests"`
+	MaxGuests          int    `json:"maxGuests"`
+	MinAge             int    `json:"minAge"`
+	MaxAge             int    `json:"maxAge"`
 	Status             string `json:"status" binding:"required"` // Convert to Aktif, Draft, Nonaktif
 	Description        string `json:"description"`
 	IncludedFacilities string `json:"includedFacilities"`
@@ -67,6 +77,11 @@ type UpdatePackageRequest struct {
 	StartDate          string `json:"startDate"`
 	EndDate            string `json:"endDate"`
 	Schedule           string `json:"schedule"`
+	Duration           int    `json:"duration"`
+	MinGuests          int    `json:"minGuests"`
+	MaxGuests          int    `json:"maxGuests"`
+	MinAge             int    `json:"minAge"`
+	MaxAge             int    `json:"maxAge"`
 	Status             string `json:"status"` // Convert to Aktif, Draft, Nonaktif
 	Description        string `json:"description"`
 	IncludedFacilities string `json:"includedFacilities"`

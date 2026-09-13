@@ -60,7 +60,7 @@ export const AddPackagePage: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [schedule, setSchedule] = useState('');
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
@@ -136,7 +136,17 @@ export const AddPackagePage: React.FC = () => {
           setLocation(pkg.destination || '');
           setMeetPoint(pkg.meetingPoint || '');
           setPrice(pkg.price ? String(pkg.price) : '');
+          if (pkg.quotaMin) setQuotaMin(String(pkg.quotaMin));
           setQuotaMax(pkg.quotaMax ? String(pkg.quotaMax) : '');
+          if (pkg.category) setCategory(pkg.category);
+          if (pkg.tripType) setTripType(pkg.tripType);
+          if (pkg.startDate) setStartDate(pkg.startDate);
+          if (pkg.endDate) setEndDate(pkg.endDate);
+          if (pkg.duration) setDuration(String(pkg.duration));
+          if (pkg.minGuests) setMinGuests(String(pkg.minGuests));
+          if (pkg.maxGuests) setMaxGuests(String(pkg.maxGuests));
+          if (pkg.minAge) setMinAge(String(pkg.minAge));
+          if (pkg.maxAge) setMaxAge(String(pkg.maxAge));
           setSchedule(pkg.schedule || '');
           if (pkg.description) setDescription(pkg.description);
           if (pkg.includedFacilities) setIncludedFacilities(pkg.includedFacilities.split('\n').filter(Boolean));
@@ -278,6 +288,8 @@ export const AddPackagePage: React.FC = () => {
   };
 
   const handleSubmit = async (status: 'draft' | 'publish') => {
+    if (isSubmitting) return;
+
     const qMin = parseInt(quotaMin, 10);
     const qMax = parseInt(quotaMax, 10);
     const minG = parseInt(minGuests, 10);
@@ -340,6 +352,7 @@ export const AddPackagePage: React.FC = () => {
       }
     }
 
+    setIsSubmitting(true);
     try {
       const dbStatus = status === 'draft' ? 'Draft' : 'Aktif';
       const finalSchedule = schedule.trim() || (startDate && endDate ? `${startDate} s/d ${endDate} (${duration} Hari)` : 'Jadwal Fleksibel');
@@ -356,6 +369,11 @@ export const AddPackagePage: React.FC = () => {
         startDate: startDate,
         endDate: endDate,
         schedule: finalSchedule,
+        duration: parseInt(duration, 10) || 1,
+        minGuests: minG,
+        maxGuests: maxG,
+        minAge: parseInt(minAge, 10) || 0,
+        maxAge: parseInt(maxAge, 10) || 100,
         status: dbStatus,
         description: description,
         includedFacilities: includedFacilities.join('\n'),
@@ -381,6 +399,8 @@ export const AddPackagePage: React.FC = () => {
       navigateTo('kelola-paket');
     } catch (err: any) {
       alert(err.message || 'Gagal menyimpan paket wisata');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -401,14 +421,11 @@ export const AddPackagePage: React.FC = () => {
             </div>
           </div>
           <div className="header-actions-row">
-            <button className="action-outline-btn" onClick={() => setShowPreviewModal(true)}>
-              <Eye size={14} /> Preview
+            <button className="action-outline-btn" onClick={() => handleSubmit('draft')} disabled={isSubmitting}>
+              <Save size={14} /> {isSubmitting ? 'Menyimpan...' : 'Simpan Draft'}
             </button>
-            <button className="action-outline-btn" onClick={() => handleSubmit('draft')}>
-              <Save size={14} /> Simpan Draft
-            </button>
-            <button className="action-solid-btn" onClick={() => handleSubmit('publish')}>
-              <Send size={14} /> Publikasikan
+            <button className="action-solid-btn" onClick={() => handleSubmit('publish')} disabled={isSubmitting}>
+              <Send size={14} /> {isSubmitting ? 'Memproses...' : 'Publikasikan'}
             </button>
           </div>
         </header>
@@ -732,7 +749,7 @@ export const AddPackagePage: React.FC = () => {
                   <label>Jadwal Keberangkatan (Durasi {duration} Hari) *</label>
                   <div className="input-range-row">
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '2px', display: 'block' }}>Tanggal Mulai (Min. Hari Ini)</label>
+                      <label style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '2px', display: 'block' }}>Tanggal Mulai</label>
                       <input 
                         type="date" 
                         min={todayStr}
@@ -742,7 +759,7 @@ export const AddPackagePage: React.FC = () => {
                     </div>
                     <span style={{ alignSelf: 'flex-end', marginBottom: '8px' }}>s/d</span>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '2px', display: 'block' }}>Tanggal Selesai (Otomatis {duration} Hari)</label>
+                      <label style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '2px', display: 'block' }}>Tanggal Selesai</label>
                       <input 
                         type="date" 
                         min={startDate || todayStr}
@@ -893,131 +910,6 @@ export const AddPackagePage: React.FC = () => {
 
         </div>
       </main>
-
-      {showPreviewModal && (
-        <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div className="modal-content animate-fade-in" style={{ maxWidth: '800px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: '28px' }}>
-            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>Pratinjau Paket Wisata</h2>
-              <button style={{ background: 'transparent', border: 0, fontSize: '24px', cursor: 'pointer', color: 'var(--color-text-light)', padding: 0 }} onClick={() => setShowPreviewModal(false)}>×</button>
-            </div>
-            
-            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* Photo Banner */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
-                <div style={{ height: '300px', borderRadius: 'var(--radius-lg)', overflow: 'hidden', backgroundColor: 'var(--color-bg-light)', position: 'relative' }}>
-                  {packagePhotos.length > 0 ? (
-                    <img src={packagePhotos[0]} alt="Banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-light)' }}>Belum ada foto yang diunggah</div>
-                  )}
-                  <span style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'var(--color-accent)', color: '#ffffff', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, textTransform: 'capitalize' }}>
-                    {category}
-                  </span>
-                </div>
-                {packagePhotos.length > 1 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' }}>
-                    {packagePhotos.slice(1).map((photo, i) => (
-                      <div key={i} style={{ height: '70px', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'var(--color-bg-light)' }}>
-                        <img src={photo} alt={`Thumb ${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Title & Info */}
-              <div>
-                <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '8px', lineHeight: 1.3, margin: 0 }}>
-                  {packageName || 'Nama Paket Wisata'}
-                </h1>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', color: 'var(--color-text-medium)', fontSize: '13px', marginBottom: '16px', marginTop: '8px' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>📍 {location || 'Destinasi Belum Diatur'}</span>
-                  <span>⏱️ {duration} Hari</span>
-                  <span>📅 {schedule || 'Jadwal Belum Diatur'}</span>
-                  <span>👥 Kuota: {quotaMax || '0'} orang (Min: {minGuests} s/d Max: {maxGuests})</span>
-                  <span>🔞 Batas Usia: {minAge} s/d {maxAge} tahun</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--color-bg-light)', padding: '16px 20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                  <div>
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-light)', display: 'block', fontWeight: 600 }}>HARGA MULAI DARI</span>
-                    <strong style={{ fontSize: '20px', color: 'var(--color-accent)', fontWeight: 800 }}>
-                      {price ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(parseInt(price, 10)) : 'Rp 0'}
-                    </strong>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}> / orang</span>
-                  </div>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-primary-medium)' }}>
-                    📍 MP: {meetPoint || 'Belum Diatur'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-primary-dark)', marginBottom: '8px', borderLeft: '3px solid var(--color-accent)', paddingLeft: '10px', marginTop: 0 }}>Deskripsi Paket</h3>
-                <p style={{ fontSize: '13px', color: 'var(--color-text-medium)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>
-                  {description || 'Belum ada deskripsi.'}
-                </p>
-              </div>
-
-              {/* Itinerary */}
-              <div>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-primary-dark)', marginBottom: '12px', borderLeft: '3px solid var(--color-accent)', paddingLeft: '10px', marginTop: 0 }}>Itinerary Rencana Perjalanan</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {itineraries.map((it, i) => (
-                    <div key={i} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '14px' }}>
-                      <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary-medium)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                        <span style={{ backgroundColor: 'var(--color-accent-light)', color: 'var(--color-accent)', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px' }}>{it.day}</span>
-                        Hari {it.day}
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '28px', marginTop: '8px' }}>
-                        {it.activities.map((act, idx) => (
-                          <div key={idx} style={{ display: 'flex', gap: '12px', fontSize: '12px', lineHeight: 1.5 }}>
-                            <span style={{ fontWeight: 600, color: 'var(--color-accent)', flexShrink: 0, minWidth: '85px' }}>{act.time}</span>
-                            <span style={{ color: 'var(--color-text-medium)' }}>{act.title}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Facilities */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div>
-                  <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-success)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                    ✓ Termasuk (Included)
-                  </h4>
-                  <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', color: 'var(--color-text-medium)', marginTop: '8px' }}>
-                    {includedFacilities.map((fac, idx) => (
-                      <li key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                        <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>•</span> {fac}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                    ✗ Tidak Termasuk (Excluded)
-                  </h4>
-                  <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', color: 'var(--color-text-medium)', marginTop: '8px' }}>
-                    {excludedFacilities.map((fac, idx) => (
-                      <li key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                        <span style={{ color: '#ef4444', fontWeight: 'bold' }}>•</span> {fac}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
-              <button className="action-solid-btn" style={{ padding: '10px 24px' }} onClick={() => setShowPreviewModal(false)}>Tutup Pratinjau</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         .header-left-back {

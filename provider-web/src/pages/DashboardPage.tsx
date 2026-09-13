@@ -46,6 +46,7 @@ export const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [popularPackages, setPopularPackages] = useState<any[]>([]);
+  const [urgentOpenTrip, setUrgentOpenTrip] = useState<any | null>(null);
 
   // Notification state
   const [showNotifications, setShowNotifications] = useState(false);
@@ -128,6 +129,26 @@ export const DashboardPage: React.FC = () => {
                 : 'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?auto=format&fit=crop&w=80&q=80',
             }));
           setPopularPackages(sortedPackages);
+
+          // Find urgent open trip (H-3)
+          const urgentTrip = packagesRes.value.find((pkg: any) => {
+            const isOpenTrip = pkg.tripType === 'Open Trip' || pkg.category === 'Open Trip' || (pkg.name || '').toLowerCase().includes('open trip');
+            if (!isOpenTrip) return false;
+            
+            const quotaUsed = pkg.quotaUsed || 0;
+            const quotaMin = pkg.quotaMin || 1;
+            if (quotaUsed >= quotaMin) return false; // Already fulfilled
+
+            if (pkg.startDate) {
+              const tripDate = new Date(pkg.startDate);
+              const now = new Date();
+              const diffTime = tripDate.getTime() - now.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              return diffDays >= 0 && diffDays <= 3;
+            }
+            return false;
+          });
+          setUrgentOpenTrip(urgentTrip || null);
         }
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
@@ -294,122 +315,89 @@ export const DashboardPage: React.FC = () => {
         </header>
 
         {/* H-3 Open Trip Quota Verification Alert Banner */}
-        <section style={{ margin: '20px 0 10px 0' }}>
-          <div style={{
-            backgroundColor: '#fffbebfb',
-            border: '1.5px solid #fde68a',
-            borderRadius: '20px',
-            padding: '20px 24px',
-            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '20px' }}>⚠️</span>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#92400e' }}>
-                    Verifikasi H-3 Keberangkatan Open Trip (Penting)
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '12.5px', color: '#b45309' }}>
-                    Jadwal Open Trip <strong>Gunung Bromo (15 Sep 2026)</strong> saat ini terisi <strong>2 dari minimal 4 orang</strong>. Harap tentukan keputusan H-3 sebelum pendaftaran ditutup:
-                  </p>
+        {urgentOpenTrip && (
+          <section style={{ margin: '20px 0 10px 0' }}>
+            <div style={{
+              backgroundColor: '#fffbebfb',
+              border: '1.5px solid #fde68a',
+              borderRadius: '20px',
+              padding: '20px 24px',
+              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '20px' }}>⚠️</span>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#92400e' }}>
+                      Verifikasi H-3 Keberangkatan Open Trip (Penting)
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '12.5px', color: '#b45309' }}>
+                      Jadwal Open Trip <strong>{urgentOpenTrip.name} ({new Date(urgentOpenTrip.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })})</strong> saat ini terisi <strong>{urgentOpenTrip.quotaUsed || 0} dari minimal {urgentOpenTrip.quotaMin || 1} orang</strong>. Harap tentukan keputusan H-3 sebelum pendaftaran ditutup:
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#b45309', backgroundColor: '#fef3c7', padding: '4px 10px', borderRadius: '20px', border: '1px solid #fde68a' }}>
+                    Batas Keputusan: H-3 06:00 WIB
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigateTo('booking')}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      color: '#92400e',
+                      border: '1.5px solid #f59e0b',
+                      padding: '5px 12px',
+                      borderRadius: '20px',
+                      fontSize: '11.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
+                    }}
+                  >
+                    📋 Lihat Detail Pesanan &gt;
+                  </button>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: '#b45309', backgroundColor: '#fef3c7', padding: '4px 10px', borderRadius: '20px', border: '1px solid #fde68a' }}>
-                  Batas Keputusan: H-3 06:00 WIB
-                </span>
+
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px', paddingTop: '14px', borderTop: '1px dashed #fde68a' }}>
                 <button
-                  type="button"
-                  onClick={() => navigateTo('booking')}
+                  onClick={() => alert(`Berhasil mengonfirmasi keberangkatan untuk ${urgentOpenTrip.name}! Status trip berubah menjadi Pasti Berangkat.`)}
                   style={{
-                    backgroundColor: '#ffffff',
-                    color: '#92400e',
-                    border: '1.5px solid #f59e0b',
-                    padding: '5px 12px',
-                    borderRadius: '20px',
-                    fontSize: '11.5px',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
+                    backgroundColor: '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
                   }}
                 >
-                  📋 Lihat Detail Pesanan &gt;
+                  ✅ Konfirmasi Berangkat (Tetap Jalan)
+                </button>
+                <button
+                  onClick={() => alert(`Trip ${urgentOpenTrip.name} telah dibatalkan. Dana akan dikembalikan ke pelanggan.`)}
+                  style={{
+                    backgroundColor: '#ef4444',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ❌ Batalkan Trip (Refund)
                 </button>
               </div>
             </div>
-
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px', paddingTop: '14px', borderTop: '1px dashed #fde68a' }}>
-              <button
-                onClick={() => alert('Berhasil mengonfirmasi keberangkatan! Status trip berubah menjadi Pasti Berangkat dan DP 50% sebesar Rp 350.000 telah dicairkan ke saldo Anda.')}
-                style={{
-                  backgroundColor: '#16a34a',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px 18px',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <CheckCircle2 size={16} /> 1. Tetap Berangkat (Cairkan DP 50%)
-              </button>
-
-              <button
-                onClick={() => {
-                  const newDate = prompt('Masukkan Tanggal Pengganti untuk Reschedule (Contoh: 2026-09-25):', '2026-09-25');
-                  if (newDate) {
-                    alert(`Opsi Reschedule berhasil dibuat untuk tanggal ${newDate}! Notifikasi WA & Email berisi pilihan (Setuju Pindah / Full Refund 100%) telah dikirimkan ke 2 peserta.`);
-                  }
-                }}
-                style={{
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px 18px',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <CalendarDays size={16} /> 2. Buka Reschedule (Pilih Tanggal Baru)
-              </button>
-
-              <button
-                onClick={() => {
-                  if (confirm('Apakah Anda yakin ingin membatalkan Open Trip ini? Seluruh dana peserta akan dikembalikan 100% (Full Refund) langsung dari sistem tanpa mengurangi uang pribadi Anda.')) {
-                    alert('Open Trip dibatalkan. Uang 100% Full Refund sedang diproses otomatis ke rekening peserta.');
-                  }
-                }}
-                style={{
-                  backgroundColor: '#dc2626',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px 18px',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <XCircle size={16} /> 3. Batalkan Trip (Full Refund 100%)
-              </button>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Stats Grid */}
         <section className="stats-cards-grid">
