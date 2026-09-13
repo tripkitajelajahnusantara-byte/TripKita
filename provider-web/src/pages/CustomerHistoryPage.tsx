@@ -27,11 +27,11 @@ interface BookingItem {
 
 
 const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = ({ createdAt, onExpire }) => {
-  const [timeLeft, setTimeLeft] = useState<number>(60);
+  const [timeLeft, setTimeLeft] = useState<number>(86400);
 
   useEffect(() => {
     const createdTime = createdAt ? new Date(createdAt).getTime() : Date.now();
-    const expireTime = createdTime + 1 * 60 * 1000;
+    const expireTime = createdTime + 24 * 60 * 60 * 1000; // 24 Hours Xendit Limit
 
     const interval = setInterval(() => {
       const diff = Math.max(0, Math.floor((expireTime - Date.now()) / 1000));
@@ -44,13 +44,14 @@ const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = 
     return () => clearInterval(interval);
   }, [createdAt, onExpire]);
 
-  const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+  const hours = String(Math.floor(timeLeft / 3600)).padStart(2, '0');
+  const minutes = String(Math.floor((timeLeft % 3600) / 60)).padStart(2, '0');
   const seconds = String(timeLeft % 60).padStart(2, '0');
 
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', padding: '5px 12px', borderRadius: '30px', fontSize: '12px', fontWeight: '800' }}>
       <Clock size={14} color="#ea580c" />
-      <span>Batas Transfer: {minutes}:{seconds}</span>
+      <span>Batas Transfer: {hours}:{minutes}:{seconds}</span>
     </div>
   );
 };
@@ -177,7 +178,7 @@ export const CustomerHistoryPage: React.FC = () => {
     if (!createdAt) return false;
     const createdTime = new Date(createdAt).getTime();
     if (isNaN(createdTime)) return false;
-    const expireTime = createdTime + 1 * 60 * 1000; // 1 minute limit for testing expiration
+    const expireTime = createdTime + 24 * 60 * 60 * 1000; // 24 Hours Xendit Invoice Limit
     return Date.now() > expireTime;
   };
 
@@ -564,7 +565,7 @@ export const CustomerHistoryPage: React.FC = () => {
                         </div>
                         
                         <p style={{ fontSize: '13px', color: '#7f1d1d', margin: 0, lineHeight: '1.5' }}>
-                          Batas waktu transfer 1 menit untuk testing transaksi ini telah kadaluwarsa. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.
+                          Batas waktu pembayaran 24 jam untuk transaksi ini telah kadaluwarsa. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.
                         </p>
 
                         <div style={{ marginTop: '4px' }}>
