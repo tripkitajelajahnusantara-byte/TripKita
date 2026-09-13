@@ -19,7 +19,7 @@ import {
   DollarSign,
   Wallet
 } from 'lucide-react';
-import { request } from '../utils/api';
+import { request, HOST_BASE_URL } from '../utils/api';
 import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
 
 
@@ -1321,19 +1321,19 @@ export const AdminDashboardPage: React.FC = () => {
                       <div className="preview-controls">
                         <button className="ctrl-btn" onClick={() => handleZoom('out')} title="Zoom Out"><ZoomOut size={14} /></button>
                         <button className="ctrl-btn" onClick={() => handleZoom('in')} title="Zoom In"><ZoomIn size={14} /></button>
-                        <a href={`http://localhost:8080${previewDocUrl}`} target="_blank" rel="noreferrer" className="ctrl-btn" title="Fullscreen"><Maximize2 size={14} /></a>
+                        <a href={`${HOST_BASE_URL}${previewDocUrl}`} target="_blank" rel="noreferrer" className="ctrl-btn" title="Fullscreen"><Maximize2 size={14} /></a>
                       </div>
                     </div>
                     <div className="doc-preview-container">
                       {previewDocUrl.endsWith('.pdf') ? (
                         <iframe 
-                          src={`http://localhost:8080${previewDocUrl}`} 
+                          src={`${HOST_BASE_URL}${previewDocUrl}`} 
                           title="Legal Document Preview"
                           style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
                         />
                       ) : (
                         <img 
-                          src={`http://localhost:8080${previewDocUrl}`} 
+                          src={`${HOST_BASE_URL}${previewDocUrl}`} 
                           alt="Document Preview" 
                           style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', maxWidth: '100%', height: 'auto' }}
                         />

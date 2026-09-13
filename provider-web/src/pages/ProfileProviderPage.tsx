@@ -16,7 +16,7 @@ import {
   Upload,
   Clock
 } from 'lucide-react';
-import { request } from '../utils/api';
+import { request, HOST_BASE_URL } from '../utils/api';
 
 interface DashboardStats {
   totalPackages: number;
@@ -190,7 +190,7 @@ export const ProfileProviderPage: React.FC = () => {
             <span style={{ color: '#10b981' }}>Terverifikasi</span>
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <a href={`http://localhost:8080${activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
+            <a href={`${HOST_BASE_URL}${activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
             <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
           </div>
         </div>
@@ -209,7 +209,7 @@ export const ProfileProviderPage: React.FC = () => {
             {pendingPath ? 'Review Berkas Baru' : 'Menunggu Verifikasi'}
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <a href={`http://localhost:8080${pendingPath || activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
+            <a href={`${HOST_BASE_URL}${pendingPath || activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
             {activePath && (
               <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
             )}
@@ -233,7 +233,7 @@ export const ProfileProviderPage: React.FC = () => {
           )}
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
             {activePath && (
-              <a href={`http://localhost:8080${activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
+              <a href={`${HOST_BASE_URL}${activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
             )}
             <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
           </div>

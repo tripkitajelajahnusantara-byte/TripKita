@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { Check, Upload, ArrowRight, ArrowLeft } from 'lucide-react';
 import { PROVINCES, CITIES_BY_PROVINCE } from '../utils/locationData';
+import { API_BASE_URL } from '../utils/api';
 
 export const RegisterPage: React.FC = () => {
   const { 
@@ -110,7 +111,7 @@ export const RegisterPage: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8080/api/v1/public/auth/upload', {
+      const response = await fetch(`${API_BASE_URL}/public/auth/upload`, {
         method: 'POST',
         body: formData,
       });
