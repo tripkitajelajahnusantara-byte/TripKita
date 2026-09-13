@@ -258,25 +258,16 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
           </button>
         </div>
 
-        {/* Selected Date / Range Header */}
-        <div style={{ backgroundColor: '#f8fafc', padding: '14px 24px', borderBottom: '1px solid #e2e8f0' }}>
-          {startDateIso === endDateIso ? (
-            <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #007bff' }}>
-              <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Keberangkatan</span>
-              <strong style={{ fontSize: '14px', color: '#007bff' }}>{formatDayHeader(startDateIso)} (1 Hari)</strong>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #007bff' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Mulai</span>
-                <strong style={{ fontSize: '13.5px', color: '#007bff' }}>{formatDayHeader(startDateIso)}</strong>
-              </div>
-              <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #007bff' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Selesai</span>
-                <strong style={{ fontSize: '13.5px', color: '#007bff' }}>{formatDayHeader(endDateIso)}</strong>
-              </div>
-            </div>
-          )}
+        {/* Selected Check-In & Check-Out Range Header (Gambar 1) */}
+        <div style={{ backgroundColor: '#f8fafc', padding: '14px 24px', borderBottom: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #007bff' }}>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Mulai (Check-In)</span>
+            <strong style={{ fontSize: '13.5px', color: '#007bff' }}>{formatDayHeader(startDateIso)}</strong>
+          </div>
+          <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #007bff' }}>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Selesai (Check-Out)</span>
+            <strong style={{ fontSize: '13.5px', color: '#007bff' }}>{formatDayHeader(endDateIso)}</strong>
+          </div>
         </div>
 
         {/* Month Navigation & Grid */}

@@ -1243,7 +1243,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   </span>
                 </div>
                 
-                {/* Clean Date Range Trigger Button */}
+                {/* Trigger Button to Open Traveloka Calendar Month Grid (Gambar 1) */}
                 <button
                   type="button"
                   onClick={() => setIsCalendarModalOpen(true)}
@@ -1259,32 +1259,25 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     transition: 'all 0.15s'
                   }}
                 >
-                  {customStartDate === customEndDate ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#007bff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Calendar size={15} color="#007bff" /> Buka Kalender Tanggal Menginap
+                    </span>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#007bff', backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>
+                      Ubah Tanggal &gt;
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#f8fafc', padding: '8px 10px', borderRadius: '8px' }}>
                     <div>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Keberangkatan</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Calendar size={14} color="#007bff" />
-                        <strong style={{ fontSize: '13px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
-                      </div>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Check-In</span>
+                      <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
                     </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Mulai</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Calendar size={14} color="#007bff" />
-                          <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
-                        </div>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Selesai</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Calendar size={14} color="#007bff" />
-                          <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
-                        </div>
-                      </div>
+                    <div>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Check-Out</span>
+                      <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
                     </div>
-                  )}
+                  </div>
                 </button>
 
                 {isRangeBooked && (
