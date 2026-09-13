@@ -201,7 +201,13 @@ export const CustomerSearchPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', flexWrap: 'wrap', gap: '14px' }}>
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-              Daftar Paket Open Trip
+              Daftar Paket {
+                (searchParams.type && searchParams.type !== 'Semua Tipe')
+                  ? searchParams.type
+                  : (searchParams.category && searchParams.category !== 'Semua Kategori')
+                  ? searchParams.category
+                  : 'Wisata'
+              }
             </h2>
             <span style={{ fontSize: '13px', color: '#64748b' }}>
               Menampilkan <strong>{processedPackages.length}</strong> paket wisata

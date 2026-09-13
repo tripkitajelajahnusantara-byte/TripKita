@@ -165,19 +165,22 @@ export const CustomerPackageDetailPage: React.FC = () => {
         ? [getAddDaysFromToday(9), getAddDaysFromToday(12), getAddDaysFromToday(20)]
         : [getAddDaysFromToday(((pkg.id || 1) * 3) % 7 + 9), getAddDaysFromToday(((pkg.id || 1) * 3) % 7 + 16)]);
 
-  const checkRangeOverlap = (startIso: string, endIso: string, bookedList: string[]) => {
+  const getBookedDatesInSelectedRange = (startIso: string, endIso: string, bookedList: string[]) => {
+    if (!startIso || !endIso) return [];
     const start = new Date(startIso).getTime();
     const end = new Date(endIso).getTime();
+    const list: string[] = [];
     for (const bStr of bookedList) {
       const bTime = new Date(bStr).getTime();
       if (bTime >= start && bTime <= end) {
-        return true;
+        list.push(bStr);
       }
     }
-    return false;
+    return list;
   };
 
-  const isRangeBooked = checkRangeOverlap(customStartDate, customEndDate, currentPkgBookedDates);
+  const bookedDatesInRange = getBookedDatesInSelectedRange(customStartDate, customEndDate, currentPkgBookedDates);
+  const isRangeBooked = bookedDatesInRange.length > 0;
 
   useEffect(() => {
     if (guestsCount < minRequiredGuests) {
@@ -1281,8 +1284,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 </button>
 
                 {isRangeBooked && (
-                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '8px 10px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.4' }}>
-                    ❌ Tanggal pilihan Anda sudah terbooking. Silakan klik untuk memilih tanggal lain pada kalender.
+                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '10px 12px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
+                    ❌ Dalam rentang tanggal yang Anda pilih ({customStartDate === customEndDate ? formatDateIndoFull(customStartDate) : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`}), terdapat tanggal yang sudah terbooking ({bookedDatesInRange.map(d => formatDateIndoFull(d)).join(', ')} FULL). Silakan pilih rentang tanggal lain pada kalender.
                   </div>
                 )}
               </div>

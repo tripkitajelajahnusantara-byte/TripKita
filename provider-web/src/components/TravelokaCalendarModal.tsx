@@ -270,6 +270,24 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
           </div>
         </div>
 
+        {(() => {
+          if (!startDateIso || !endDateIso) return null;
+          const start = new Date(startDateIso).getTime();
+          const end = new Date(endDateIso).getTime();
+          const bookedInModal = bookedDates.filter(bStr => {
+            const bTime = new Date(bStr).getTime();
+            return bTime >= start && bTime <= end;
+          });
+
+          if (bookedInModal.length === 0) return null;
+
+          return (
+            <div style={{ backgroundColor: '#fef2f2', padding: '10px 24px', borderBottom: '1px solid #fca5a5', color: '#991b1b', fontSize: '12px', fontWeight: '700', lineHeight: '1.4' }}>
+              ⚠️ Rentang tanggal pilihan Anda ({formatDayHeader(startDateIso)} - {formatDayHeader(endDateIso)}) mengandung tanggal yang sudah terbooking ({bookedInModal.map(d => formatDayHeader(d)).join(', ')} FULL). Silakan pilih tanggal yang tersedia.
+            </div>
+          );
+        })()}
+
         {/* Month Navigation & Grid */}
         <div style={{ padding: '24px', position: 'relative' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'absolute', top: '24px', left: '24px', right: '24px', pointerEvents: 'none' }}>

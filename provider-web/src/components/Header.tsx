@@ -355,32 +355,34 @@ export const Header: React.FC = () => {
           border: 1px solid rgba(0, 168, 150, 0.15);
         }
 
-        .desktop-nav {
+        .main-nav, .desktop-nav {
           display: flex;
-          gap: 32px;
+          align-items: center;
+          gap: 28px;
         }
 
         .nav-link {
-          font-size: 14px;
-          font-weight: 500;
-          color: var(--color-text-medium);
-          padding: 8px 4px;
+          font-size: 14.5px;
+          font-weight: 600;
+          color: #475569;
+          padding: 8px 14px;
+          border-radius: 8px;
           position: relative;
+          transition: all 0.2s ease;
+          background: transparent;
+          border: none;
+          cursor: pointer;
         }
 
-        .nav-link:hover, .nav-link.active {
-          color: var(--color-accent);
+        .nav-link:hover {
+          color: #007bff;
+          background-color: #f0f7ff;
         }
 
-        .nav-link.active::after {
-          content: '';
-          position: absolute;
-          bottom: -4px;
-          left: 0;
-          right: 0;
-          height: 2px;
-          background: var(--color-accent);
-          border-radius: 2px;
+        .nav-link.active {
+          color: #007bff;
+          font-weight: 700;
+          background-color: #e0f2fe;
         }
 
         .auth-buttons {
