@@ -48,6 +48,10 @@ type Provider struct {
 	PendingBankAccount      string     `gorm:"size:100" json:"pendingBankAccount"`
 	PendingBankAccountName  string     `gorm:"size:255" json:"pendingBankAccountName"`
 	LegalVerificationStatus string     `gorm:"size:50;default:''" json:"legalVerificationStatus"` // PENDING, APPROVED, REJECTED
+
+	// Password Reset fields
+	ResetToken              string     `gorm:"size:255;default:''" json:"-"`
+	ResetTokenExpiry        *time.Time `json:"-"`
 	LegalRejectionReason    string     `gorm:"type:text" json:"legalRejectionReason"`
 
 	// Pending documents & individual verification status

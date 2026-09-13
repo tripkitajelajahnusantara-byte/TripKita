@@ -3,6 +3,8 @@ package services
 import (
 	"errors"
 	"time"
+	"math/rand"
+	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -18,15 +20,18 @@ type AuthService interface {
 	Login(req *models.LoginRequest) (*models.LoginResponse, error)
 	GetProfile(providerID uint) (*models.Provider, error)
 	UpdateProfile(providerID uint, req *models.UpdateProfileRequest) (*models.Provider, error)
+	ForgotPassword(email string) error
+	ResetPassword(email string, token string, newPassword string) error
 }
 
 type authService struct {
-	repo repositories.ProviderRepository
-	cfg  *config.Config
+	repo         repositories.ProviderRepository
+	cfg          *config.Config
+	emailService *EmailService
 }
 
-func NewAuthService(repo repositories.ProviderRepository, cfg *config.Config) AuthService {
-	return &authService{repo: repo, cfg: cfg}
+func NewAuthService(repo repositories.ProviderRepository, cfg *config.Config, emailService *EmailService) AuthService {
+	return &authService{repo: repo, cfg: cfg, emailService: emailService}
 }
 
 func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, error) {
@@ -167,6 +172,58 @@ func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 		Provider: *provider,
 	}, nil
 }
+
+// Generate random 6 digit string
+func generateOTP() string {
+	// This is just a quick local pseudo-rand for a 6-digit OTP
+	rand.Seed(time.Now().UnixNano())
+	return fmt.Sprintf("%06d", rand.Intn(1000000))
+}
+
+func (s *authService) ForgotPassword(email string) error {
+	provider, err := s.repo.FindByEmail(email)
+	if err != nil {
+		// Do not leak whether email exists
+		return nil
+	}
+
+	otp := generateOTP()
+	
+	// Save to provider
+	expiry := time.Now().Add(15 * time.Minute)
+	provider.ResetToken = otp
+	provider.ResetTokenExpiry = &expiry
+	
+	if err := s.repo.Update(provider); err != nil {
+		return err
+	}
+
+	// Send email
+	return s.emailService.SendResetPasswordEmail(provider.Email, otp)
+}
+
+func (s *authService) ResetPassword(email string, otp string, newPassword string) error {
+	provider, err := s.repo.FindByEmail(email)
+	if err != nil {
+		return errors.New("invalid or expired reset token")
+	}
+
+	if provider.ResetToken != otp || provider.ResetTokenExpiry == nil || time.Now().After(*provider.ResetTokenExpiry) {
+		return errors.New("invalid or expired reset token")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	provider.PasswordHash = string(hashedPassword)
+	provider.ResetToken = ""
+	provider.ResetTokenExpiry = nil
+
+	return s.repo.Update(provider)
+}
+
 
 func (s *authService) GetProfile(providerID uint) (*models.Provider, error) {
 	return s.repo.FindByID(providerID)

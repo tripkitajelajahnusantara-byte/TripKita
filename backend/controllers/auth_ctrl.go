@@ -114,5 +114,44 @@ func (ctrl *AuthController) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+
 	c.JSON(http.StatusOK, provider)
+}
+
+func (ctrl *AuthController) ProviderForgotPassword(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := ctrl.service.ForgotPassword(req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process request"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "If the email is registered, a password reset code has been sent."})
+}
+
+func (ctrl *AuthController) ProviderResetPassword(c *gin.Context) {
+	var req struct {
+		Email       string `json:"email" binding:"required,email"`
+		OTP         string `json:"otp" binding:"required"`
+		NewPassword string `json:"newPassword" binding:"required,min=6"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := ctrl.service.ResetPassword(req.Email, req.OTP, req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password successfully reset"})
 }

@@ -12,6 +12,71 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Forgot Password States
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotStep, setForgotStep] = useState(1);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotError, setForgotError] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const handleRequestOtp = async () => {
+    if (!forgotEmail) {
+      setForgotError('Email harus diisi');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      const res = await fetch('http://localhost:8080/api/v1/auth/provider/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail })
+      });
+      if (!res.ok) throw new Error('Gagal memproses permintaan');
+      setForgotStep(2);
+    } catch (err: any) {
+      setForgotError(err.message || 'Terjadi kesalahan');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!forgotOtp || !forgotNewPassword) {
+      setForgotError('Semua kolom harus diisi');
+      return;
+    }
+    if (forgotNewPassword.length < 6) {
+      setForgotError('Password minimal 6 karakter');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      const res = await fetch('http://localhost:8080/api/v1/auth/provider/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail, otp: forgotOtp, newPassword: forgotNewPassword })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal mereset password');
+      
+      alert('Password berhasil direset! Silakan login dengan password baru.');
+      setShowForgotModal(false);
+      setForgotStep(1);
+      setForgotEmail('');
+      setForgotOtp('');
+      setForgotNewPassword('');
+    } catch (err: any) {
+      setForgotError(err.message || 'Kode OTP salah atau sudah kedaluwarsa');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -123,7 +188,11 @@ export const LoginPage: React.FC = () => {
                 <div className="label-row">
                   <label className="field-label">Password</label>
                   {!isAdminMode && (
-                    <span className="forgot-password-link" onClick={() => alert('Fitur lupa password sedang disiapkan.')}>
+                    <span className="forgot-password-link" onClick={() => {
+                      setForgotStep(1);
+                      setForgotError('');
+                      setShowForgotModal(true);
+                    }}>
                       Lupa password?
                     </span>
                   )}
@@ -187,6 +256,83 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center'
+        }}>
+          <div className="modal-content" style={{
+            background: 'white', padding: '30px', borderRadius: '12px', width: '100%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', color: '#092c2e' }}>Reset Password</h2>
+              <button onClick={() => setShowForgotModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>✕</button>
+            </div>
+
+            {forgotError && (
+              <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '10px 15px', borderRadius: '6px', fontSize: '13px', marginBottom: '15px' }}>
+                {forgotError}
+              </div>
+            )}
+
+            {forgotStep === 1 ? (
+              <div>
+                <p style={{ fontSize: '14px', color: '#475569', marginBottom: '15px' }}>Masukkan email yang terdaftar untuk menerima kode reset password (OTP).</p>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Email</label>
+                  <input 
+                    type="email" 
+                    value={forgotEmail} 
+                    onChange={e => setForgotEmail(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                    placeholder="email@bisnis.com"
+                  />
+                </div>
+                <button 
+                  onClick={handleRequestOtp} 
+                  disabled={forgotLoading}
+                  style={{ width: '100%', padding: '12px', background: '#00a896', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: forgotLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  {forgotLoading ? 'Mengirim...' : 'Kirim Kode Reset'}
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p style={{ fontSize: '14px', color: '#475569', marginBottom: '15px' }}>Masukkan kode OTP yang telah dikirim ke email Anda beserta password baru.</p>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Kode OTP</label>
+                  <input 
+                    type="text" 
+                    value={forgotOtp} 
+                    onChange={e => setForgotOtp(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', letterSpacing: '2px', textAlign: 'center' }}
+                    placeholder="123456"
+                    maxLength={6}
+                  />
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Password Baru</label>
+                  <input 
+                    type="password" 
+                    value={forgotNewPassword} 
+                    onChange={e => setForgotNewPassword(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                    placeholder="Minimal 6 karakter"
+                  />
+                </div>
+                <button 
+                  onClick={handleResetPassword} 
+                  disabled={forgotLoading}
+                  style={{ width: '100%', padding: '12px', background: '#00a896', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: forgotLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  {forgotLoading ? 'Memproses...' : 'Simpan Password Baru'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <style>{`
         .login-container {

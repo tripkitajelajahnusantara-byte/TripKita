@@ -30,7 +30,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	excelService := services.NewExcelService()
 	notifService := services.NewNotificationService(db)
 
-	authService := services.NewAuthService(providerRepo, cfg)
+	authService := services.NewAuthService(providerRepo, cfg, emailService)
 	adminService := services.NewAdminService(providerRepo)
 	packageService := services.NewPackageService(packageRepo)
 	xenditService := services.NewXenditService(cfg)
@@ -89,6 +89,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 				auth.POST("/upload", uploadCtrl.UploadDocument)
 				auth.GET("/google", oauthCtrl.RedirectToGoogle)
 				auth.GET("/google/callback", oauthCtrl.GoogleCallback)
+				
+				auth.POST("/provider/forgot-password", authCtrl.ProviderForgotPassword)
+				auth.POST("/provider/reset-password", authCtrl.ProviderResetPassword)
 			}
 		}
 
