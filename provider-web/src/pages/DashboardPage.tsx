@@ -314,9 +314,31 @@ export const DashboardPage: React.FC = () => {
                   </p>
                 </div>
               </div>
-              <span style={{ fontSize: '11px', fontWeight: 800, color: '#b45309', backgroundColor: '#fef3c7', padding: '4px 10px', borderRadius: '20px', border: '1px solid #fde68a' }}>
-                Batas Keputusan: H-3 06:00 WIB
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#b45309', backgroundColor: '#fef3c7', padding: '4px 10px', borderRadius: '20px', border: '1px solid #fde68a' }}>
+                  Batas Keputusan: H-3 06:00 WIB
+                </span>
+                <button
+                  type="button"
+                  onClick={() => navigateTo('booking')}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#92400e',
+                    border: '1.5px solid #f59e0b',
+                    padding: '5px 12px',
+                    borderRadius: '20px',
+                    fontSize: '11.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
+                  }}
+                >
+                  📋 Lihat Detail Pesanan &gt;
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px', paddingTop: '14px', borderTop: '1px dashed #fde68a' }}>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, X, CreditCard, RefreshCw, Calendar, Wallet, Info } from 'lucide-react';
 import { API_BASE_URL, getAuthHeaders } from '../utils/api';
+import { useNavigation } from '../context/NavigationContext';
 
 export interface NotificationItem {
   id: number;
@@ -13,6 +14,7 @@ export interface NotificationItem {
 }
 
 export const NotificationCenter: React.FC = () => {
+  const { navigateTo } = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -71,6 +73,16 @@ export const NotificationCenter: React.FC = () => {
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
+  };
+
+  const handleNotifClick = (item: NotificationItem) => {
+    markAsRead(item.id);
+    setIsOpen(false);
+    if (item.type === 'PAYOUT') {
+      navigateTo('keuangan-provider');
+    } else {
+      navigateTo('booking');
+    }
   };
 
   const getIcon = (type: string) => {
@@ -178,7 +190,7 @@ export const NotificationCenter: React.FC = () => {
               notifications.map((item) => (
                 <div
                   key={item.id}
-                  onClick={() => markAsRead(item.id)}
+                  onClick={() => handleNotifClick(item)}
                   style={{
                     padding: '14px 18px',
                     borderBottom: '1px solid #f1f5f9',
