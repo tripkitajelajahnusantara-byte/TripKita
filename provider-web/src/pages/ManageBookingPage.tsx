@@ -750,10 +750,18 @@ export const ManageBookingPage: React.FC = () => {
                         packageId: parseInt(simulatePkgId),
                         customerName: simulateName,
                         guests: simulateGuests,
-                        tripDate: new Date(simulateDate).toISOString()
+                        tripDate: new Date(simulateDate).toISOString(),
+                        paymentMethod: 'Xendit Invoice'
                       })
                     });
-                    setCreatedBookingUrl(res.paymentUrl);
+                    
+                    if (res.paymentUrl) {
+                      setCreatedBookingUrl(res.paymentUrl);
+                    } else {
+                      alert('Berhasil membuat pesanan, tapi URL Xendit kosong. Pastikan backend terhubung ke Xendit.');
+                      setShowSimulateModal(false);
+                    }
+                    
                     loadData();
                   } catch (err: any) {
                     alert(err.message || 'Gagal membuat simulasi booking');
