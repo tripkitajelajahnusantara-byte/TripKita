@@ -238,6 +238,9 @@ export const ManageBookingPage: React.FC = () => {
             <p>Monitor dan kelola semua pemesanan</p>
           </div>
           <div className="header-actions" style={{ display: 'flex', gap: '12px' }}>
+            <button className="export-csv-btn" onClick={() => setShowSimulateModal(true)} style={{ backgroundColor: '#facc15', color: '#854d0e', borderColor: '#eab308' }}>
+              <CalendarDays size={16} /> Simulasi Xendit
+            </button>
             <button className="export-csv-btn" onClick={handleExportCSV}>
               <FileSpreadsheet size={16} /> Export CSV
             </button>
