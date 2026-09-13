@@ -101,10 +101,6 @@ func ConnectDB(cfg *config.Config) {
 	EnsureAdminUserExists()
 	EnsureAllTestProvidersAndSeats()
 
-	// Clean duplicate package entries and test customer accounts automatically
-	DB.Exec(`DELETE FROM packages WHERE id NOT IN (SELECT MIN(id) FROM packages GROUP BY name);`)
-	DB.Exec(`DELETE FROM providers WHERE (role = 'CUSTOMER' OR business_name LIKE 'tes%' OR business_name = 'abc' OR business_category = 'EMPTY') AND role != 'ADMIN' AND email NOT LIKE 'partner%';`)
-
 	// Otomatis bersihkan pesanan yang lebih tua dari 3 bulan dan jalankan worker berkala
 	StartPeriodicCleanup()
 }
