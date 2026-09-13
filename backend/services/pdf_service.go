@@ -194,6 +194,119 @@ Tim Keuangan & Partner Hub TemenTrip
 	return pdfBuf, filename, nil
 }
 
+// GenerateCancelledReceiptPDF generates a PDF proof for cancelled bookings
+func (s *PDFService) GenerateCancelledReceiptPDF(b *models.Booking) ([]byte, string, error) {
+	filename := fmt.Sprintf("Bukti_Pembatalan_TemenTrip_%s.pdf", b.BookingCode)
+
+	packageName := "Paket Wisata"
+	if b.Package.Name != "" {
+		packageName = b.Package.Name
+	}
+
+	reason := "Pembatalan oleh Pelanggan"
+	if b.CancellationReason != "" {
+		reason = b.CancellationReason
+	}
+
+	pdfContent := fmt.Sprintf(`================================================================================
+                      BUKTI PEMBATALAN PESANAN TEMENTRIP
+================================================================================
+Kode Invoice    : %s
+Status Pesanan  : DIBATALKAN (CANCELLED)
+Tanggal Batal   : %s
+
+--------------------------------------------------------------------------------
+INFORMASI PELANGGAN:
+Nama Pelanggan  : %s
+Nomor Telepon   : %s
+Email           : %s
+
+--------------------------------------------------------------------------------
+RINCIAN PEMBATALAN:
+Paket Wisata    : %s
+Total Tagihan   : Rp %s
+Alasan Batal    : %s
+--------------------------------------------------------------------------------
+
+PEMBERITAHUAN:
+Pesanan ini telah resmi dibatalkan. Jika Anda membutuhkan bantuan lebih lanjut,
+silakan hubungi Layanan Pelanggan TemenTrip di tripkitajelajahnusantara@gmail.com.
+
+Terima kasih atas perhatian Anda.
+================================================================================
+`,
+		b.BookingCode,
+		time.Now().Format("02 Jan 2006 15:04 WIB"),
+		b.CustomerName,
+		b.CustomerPhone,
+		b.CustomerEmail,
+		packageName,
+		formatIDRNumber(b.TotalPrice),
+		reason,
+	)
+
+	pdfBuf := createSimplePDFDocument("BUKTI PEMBATALAN TEMENTRIP", pdfContent)
+	return pdfBuf, filename, nil
+}
+
+// GenerateRescheduleReceiptPDF generates a PDF for rescheduled trip dates
+func (s *PDFService) GenerateRescheduleReceiptPDF(b *models.Booking) ([]byte, string, error) {
+	filename := fmt.Sprintf("Bukti_Reschedule_TemenTrip_%s.pdf", b.BookingCode)
+
+	packageName := "Paket Wisata"
+	if b.Package.Name != "" {
+		packageName = b.Package.Name
+	}
+
+	newDateStr := b.TripDate.Format("02 Jan 2006")
+	origDateStr := "-"
+	if b.OriginalTripDate != nil {
+		origDateStr = b.OriginalTripDate.Format("02 Jan 2006")
+	}
+
+	pdfContent := fmt.Sprintf(`================================================================================
+                   BUKTI PERUBAHAN JADWAL TRIP TEMENTRIP
+================================================================================
+Kode Invoice    : %s
+Status Pesanan  : DIJADWALKAN ULANG (RESCHEDULED)
+Tanggal Perubahan: %s
+
+--------------------------------------------------------------------------------
+INFORMASI PELANGGAN:
+Nama Pelanggan  : %s
+Nomor Telepon   : %s
+Email           : %s
+
+--------------------------------------------------------------------------------
+RINCIAN PERUBAHAN JADWAL:
+Paket Wisata    : %s
+Jadwal Semula   : %s
+Jadwal Baru     : %s
+Jumlah Peserta  : %d Orang
+--------------------------------------------------------------------------------
+
+PETUNJUK PERJALANAN:
+1. Harap menunjukkan Bukti Reschedule PDF ini saat tiba di Titik Kumpul.
+2. Tiba di Titik Kumpul setidaknya 15 menit sebelum keberangkatan.
+
+Terima kasih telah memilih TemenTrip!
+================================================================================
+`,
+		b.BookingCode,
+		time.Now().Format("02 Jan 2006 15:04 WIB"),
+		b.CustomerName,
+		b.CustomerPhone,
+		b.CustomerEmail,
+		packageName,
+		origDateStr,
+		newDateStr,
+		b.Guests,
+	)
+
+	pdfBuf := createSimplePDFDocument("BUKTI RESCHEDULE TEMENTRIP", pdfContent)
+	return pdfBuf, filename, nil
+}
+
 func createSimplePDFDocument(title, content string) []byte {
 	var buf bytes.Buffer
 

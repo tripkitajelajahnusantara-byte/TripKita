@@ -56,6 +56,7 @@ func (s *bookingService) checkAutoExpire(booking *models.Booking) {
 			booking.Status = "EXPIRED"
 			_ = s.repo.Update(booking)
 			s.adjustQuota(booking, oldStatus, "EXPIRED", booking.ProviderID)
+			s.sendNotificationsAndEmails(booking, oldStatus, "EXPIRED")
 		}
 	}
 }
@@ -154,6 +155,7 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 
 	// Adjust package quota
 	s.adjustQuota(booking, oldStatus, booking.Status, providerID)
+	s.sendNotificationsAndEmails(booking, oldStatus, booking.Status)
 
 	return booking, nil
 }
@@ -261,8 +263,13 @@ func (s *bookingService) CompleteRefund(id uint) error {
 	if err != nil {
 		return err
 	}
+	oldStatus := booking.Status
 	booking.Status = "REFUNDED"
-	return s.repo.Update(booking)
+	err = s.repo.Update(booking)
+	if err == nil {
+		s.sendNotificationsAndEmails(booking, oldStatus, "REFUNDED")
+	}
+	return err
 }
 
 func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID string, xenditStatus string, paymentMethod string) error {
@@ -307,6 +314,7 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID stri
 
 	// Adjust package quota (EXPIRED will reduce QuotaUsed and return seats)
 	s.adjustQuota(booking, oldStatus, newStatus, booking.ProviderID)
+	s.sendNotificationsAndEmails(booking, oldStatus, newStatus)
 
 	return nil
 }
@@ -451,6 +459,86 @@ func (s *bookingService) PublicUpdateStatus(id uint, status string) (*models.Boo
 		s.recordFinanceOnPayment(booking)
 	}
 	s.adjustQuota(booking, oldStatus, status, booking.ProviderID)
+	s.sendNotificationsAndEmails(booking, oldStatus, status)
 	return booking, nil
+}
+
+func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, oldStatus, newStatus string) {
+	if booking == nil {
+		return
+	}
+
+	go func(b models.Booking, oldS, newS string) {
+		var pkg *models.Package
+		if s.packageRepo != nil {
+			pkg, _ = s.packageRepo.FindByID(b.PackageID)
+		}
+
+		packageName := "Paket Wisata"
+		if pkg != nil && pkg.Name != "" {
+			packageName = pkg.Name
+		} else if b.Package.Name != "" {
+			packageName = b.Package.Name
+		}
+
+		var title, msgCustomer, msgProvider string
+
+		switch newS {
+		case "PAID", "CONFIRMED":
+			title = "Pembayaran Berhasil"
+			msgCustomer = fmt.Sprintf("Pembayaran pesanan #%s (%s) telah berhasil dikonfirmasi. E-Voucher PDF telah dikirim ke email Anda.", b.BookingCode, packageName)
+			msgProvider = fmt.Sprintf("Pesanan baru #%s (%s) telah lunas sebesar Rp %s.", b.BookingCode, packageName, formatIDRNumber(b.TotalPrice))
+
+			if s.emailService != nil {
+				_ = s.emailService.SendPaymentSuccessEmail(&b, pkg)
+			}
+
+		case "EXPIRED":
+			title = "Waktu Pembayaran Berakhir"
+			msgCustomer = fmt.Sprintf("Masa berlaku pembayaran pesanan #%s (%s) telah kadaluwarsa.", b.BookingCode, packageName)
+			msgProvider = fmt.Sprintf("Pesanan #%s (%s) telah kadaluwarsa karena batas waktu pembayaran habis.", b.BookingCode, packageName)
+
+			if s.emailService != nil {
+				_ = s.emailService.SendExpiredEmail(&b)
+			}
+
+		case "DIBATALKAN", "CANCELLED", "CANCELLED_BY_CUSTOMER", "CANCELLED_BY_PROVIDER":
+			title = "Pesanan Dibatalkan"
+			msgCustomer = fmt.Sprintf("Pesanan #%s (%s) telah dibatalkan.", b.BookingCode, packageName)
+			msgProvider = fmt.Sprintf("Pesanan #%s (%s) telah dibatalkan.", b.BookingCode, packageName)
+
+			if s.emailService != nil {
+				_ = s.emailService.SendCancelledEmail(&b)
+			}
+
+		case "REFUND_REQUIRED", "REFUNDED":
+			title = "Pengembalian Dana (Refund)"
+			msgCustomer = fmt.Sprintf("Pengembalian dana untuk pesanan #%s (%s) telah diproses.", b.BookingCode, packageName)
+			msgProvider = fmt.Sprintf("Status refund untuk pesanan #%s (%s) telah diperbarui.", b.BookingCode, packageName)
+
+			if s.emailService != nil {
+				_ = s.emailService.SendRefundEmail(&b)
+			}
+
+		case "RESCHEDULE_OFFERED", "RESCHEDULED":
+			title = "Perubahan Jadwal Trip (Reschedule)"
+			msgCustomer = fmt.Sprintf("Jadwal trip untuk pesanan #%s (%s) telah berhasil diperbarui.", b.BookingCode, packageName)
+			msgProvider = fmt.Sprintf("Pesanan #%s (%s) telah dilakukan penjadwalan ulang.", b.BookingCode, packageName)
+
+			if s.emailService != nil {
+				_ = s.emailService.SendRescheduleEmail(&b)
+			}
+		}
+
+		// Save in-app notification for Customer if CustomerID is set
+		if b.CustomerID != nil && *b.CustomerID > 0 && s.notifService != nil && title != "" {
+			_ = s.notifService.CreateNotification(*b.CustomerID, "CUSTOMER", title, msgCustomer, newS, "/riwayat-booking")
+		}
+
+		// Save in-app notification for Provider
+		if b.ProviderID > 0 && s.notifService != nil && title != "" {
+			_ = s.notifService.CreateNotification(b.ProviderID, "PROVIDER", title, msgProvider, newS, "/booking")
+		}
+	}(*booking, oldStatus, newStatus)
 }
 

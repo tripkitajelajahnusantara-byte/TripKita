@@ -222,6 +222,85 @@ func (s *EmailService) SendPayoutDisbursedEmail(payout *models.Payout, provider 
 	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
 }
 
+// SendCancelledEmail sends cancellation confirmation email to Customer with PDF Cancellation receipt attachment
+func (s *EmailService) SendCancelledEmail(b *models.Booking) error {
+	to := b.CustomerEmail
+	if to == "" {
+		return nil
+	}
+
+	subject := fmt.Sprintf("❌ Pesanan #%s Dibatalkan - TemenTrip", b.BookingCode)
+
+	pdfBytes, pdfFilename, err := s.pdfService.GenerateCancelledReceiptPDF(b)
+	if err != nil {
+		log.Printf("[EmailService] Failed to generate Cancelled PDF: %v\n", err)
+	}
+
+	packageName := "Paket Wisata"
+	if b.Package != nil && b.Package.Name != "" {
+		packageName = b.Package.Name
+	}
+
+	htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #1e293b;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #0284c7; text-align: center;">Temen<span style="color: #00c9a7;">Trip</span>✨</h2>
+    <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 16px; border-radius: 12px; text-align: center; margin: 20px 0;">
+      <h3 style="color: #dc2626; margin: 0 0 6px 0;">Pesanan Wisata Telah Dibatalkan</h3>
+      <p style="color: #991b1b; margin: 0; font-size: 14px;">Halo <strong>%s</strong>, pesanan #%s untuk paket <strong>%s</strong> telah resmi dibatalkan.</p>
+    </div>
+    <p style="font-size: 14px; color: #475569;">Berkas tanda bukti pembatalan resmi dalam format PDF telah kami lampirkan pada email ini.</p>
+    <p style="font-size: 14px; color: #475569;">Jika ini adalah kekeliruan atau Anda ingin melakukan pemesanan ulang, silakan kunjungi website kami kapan saja.</p>
+  </div>
+</body>
+</html>
+`, b.CustomerName, b.BookingCode, packageName)
+
+	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
+}
+
+// SendRescheduleEmail sends reschedule notice email to Customer with updated PDF E-Voucher attachment
+func (s *EmailService) SendRescheduleEmail(b *models.Booking) error {
+	to := b.CustomerEmail
+	if to == "" {
+		return nil
+	}
+
+	subject := fmt.Sprintf("📅 Perubahan Jadwal Trip Pesanan #%s - TemenTrip", b.BookingCode)
+
+	pdfBytes, pdfFilename, err := s.pdfService.GenerateRescheduleReceiptPDF(b)
+	if err != nil {
+		log.Printf("[EmailService] Failed to generate Reschedule PDF: %v\n", err)
+	}
+
+	packageName := "Paket Wisata"
+	if b.Package != nil && b.Package.Name != "" {
+		packageName = b.Package.Name
+	}
+
+	newDateStr := b.TripDate.Format("02 Jan 2006")
+
+	htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #1e293b;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #0284c7; text-align: center;">Temen<span style="color: #00c9a7;">Trip</span>✨</h2>
+    <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 16px; border-radius: 12px; text-align: center; margin: 20px 0;">
+      <h3 style="color: #0284c7; margin: 0 0 6px 0;">Jadwal Trip Berhasil Diperbarui!</h3>
+      <p style="color: #0369a1; margin: 0; font-size: 14px;">Halo <strong>%s</strong>, jadwal perjalanan pesanan #%s (Paket: %s) telah diubah menjadi tanggal <strong>%s</strong>.</p>
+    </div>
+    <p style="font-size: 14px; color: #475569;">Berkas Bukti Perubahan Jadwal PDF terbaru telah kami lampirkan pada email ini. Harap membawa dokumen ini saat hari keberangkatan.</p>
+  </div>
+</body>
+</html>
+`, b.CustomerName, b.BookingCode, packageName, newDateStr)
+
+	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
+}
+
 func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfBytes []byte, pdfFilename string) error {
 	smtpUser := s.cfg.SMTPUser
 	smtpPass := s.cfg.SMTPPass
