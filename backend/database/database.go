@@ -67,6 +67,17 @@ func ConnectDB(cfg *config.Config) {
 		fmt.Println("Migrasi database selesai")
 	}
 
+	// Ensure RLS (Row Level Security) is enabled on all tables for Supabase security compliance
+	DB.Exec(`ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;`)
+	DB.Exec(`ALTER TABLE IF EXISTS bookings ENABLE ROW LEVEL SECURITY;`)
+	DB.Exec(`ALTER TABLE IF EXISTS packages ENABLE ROW LEVEL SECURITY;`)
+	DB.Exec(`ALTER TABLE IF EXISTS providers ENABLE ROW LEVEL SECURITY;`)
+	DB.Exec(`ALTER TABLE IF EXISTS payouts ENABLE ROW LEVEL SECURITY;`)
+	DB.Exec(`ALTER TABLE IF EXISTS reviews ENABLE ROW LEVEL SECURITY;`)
+	DB.Exec(`ALTER TABLE IF EXISTS held_settlements ENABLE ROW LEVEL SECURITY;`)
+	DB.Exec(`ALTER TABLE IF EXISTS provider_balances ENABLE ROW LEVEL SECURITY;`)
+	DB.Exec(`ALTER TABLE IF EXISTS provider_status_histories ENABLE ROW LEVEL SECURITY;`)
+
 	// Pastikan kolom meeting_point, customer_email, customer_phone, description, included_facilities, excluded_facilities, itinerary ada di database Supabase
 	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS meeting_point TEXT;`)
 	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS description TEXT;`)
