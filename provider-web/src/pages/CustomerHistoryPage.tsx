@@ -26,23 +26,50 @@ interface BookingItem {
 
 
 
-const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = ({ createdAt, onExpire }) => {
-  const [timeLeft, setTimeLeft] = useState<number>(86400);
+const CountdownTimer: React.FC<{ createdAt?: string; bookingCode?: string; onExpire?: () => void }> = ({ createdAt, bookingCode, onExpire }) => {
+  const [timeLeft, setTimeLeft] = useState<number>(0);
 
   useEffect(() => {
-    const createdTime = createdAt ? new Date(createdAt).getTime() : Date.now();
-    const expireTime = createdTime + 24 * 60 * 60 * 1000; // 24 Hours Xendit Limit
+    let createdMs = 0;
+    if (createdAt) {
+      const parsed = new Date(createdAt).getTime();
+      if (!isNaN(parsed) && parsed > 0) {
+        createdMs = parsed;
+      }
+    }
 
-    const interval = setInterval(() => {
-      const diff = Math.max(0, Math.floor((expireTime - Date.now()) / 1000));
+    const storageKey = bookingCode ? `tripkita_booking_created_${bookingCode}` : null;
+
+    if (!createdMs && storageKey) {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        createdMs = parseInt(saved, 10);
+      }
+    }
+
+    if (createdMs && storageKey && !localStorage.getItem(storageKey)) {
+      localStorage.setItem(storageKey, createdMs.toString());
+    } else if (!createdMs) {
+      createdMs = Date.now();
+      if (storageKey) {
+        localStorage.setItem(storageKey, createdMs.toString());
+      }
+    }
+
+    const expireMs = createdMs + 24 * 60 * 60 * 1000;
+
+    const updateTimer = () => {
+      const diff = Math.max(0, Math.floor((expireMs - Date.now()) / 1000));
       setTimeLeft(diff);
       if (diff <= 0 && onExpire) {
         onExpire();
       }
-    }, 1000);
+    };
 
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [createdAt, onExpire]);
+  }, [createdAt, bookingCode]);
 
   const hours = String(Math.floor(timeLeft / 3600)).padStart(2, '0');
   const minutes = String(Math.floor((timeLeft % 3600) / 60)).padStart(2, '0');
@@ -74,6 +101,49 @@ export const CustomerHistoryPage: React.FC = () => {
 
   // Custom Notice Modal state
   const [modalNotice, setModalNotice] = useState<{ title: string; message: string; isError?: boolean } | null>(null);
+
+  // Cancellation Modal state
+  const [cancelConfirmBooking, setCancelConfirmBooking] = useState<any | null>(null);
+  const [cancellingLoading, setCancellingLoading] = useState(false);
+
+  const handleConfirmCancel = async (bookingToCancel: any) => {
+    if (!bookingToCancel) return;
+    setCancellingLoading(true);
+    try {
+      const targetId = bookingToCancel.id || bookingToCancel.bookingCode;
+      await request(`/public/bookings/${targetId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'DIBATALKAN' })
+      });
+
+      try {
+        const historyStr = localStorage.getItem('tripkita_my_bookings') || '[]';
+        const history = JSON.parse(historyStr);
+        const updatedHistory = history.map((b: any) => {
+          if (b.id == bookingToCancel.id || b.bookingCode === bookingToCancel.bookingCode) {
+            return { ...b, status: 'DIBATALKAN' };
+          }
+          return b;
+        });
+        localStorage.setItem('tripkita_my_bookings', JSON.stringify(updatedHistory));
+      } catch (e) {
+        console.error(e);
+      }
+
+      if (trackedBooking && (trackedBooking.id == bookingToCancel.id || trackedBooking.bookingCode === bookingToCancel.bookingCode)) {
+        setTrackedBooking({ ...trackedBooking, status: 'DIBATALKAN' });
+      }
+
+      setBookings(prev => prev.map(b => (b.id == bookingToCancel.id || b.bookingCode === bookingToCancel.bookingCode) ? { ...b, status: 'DIBATALKAN' } : b));
+      fetchHistory();
+      setCancelConfirmBooking(null);
+    } catch (err: any) {
+      console.error('Failed to cancel booking:', err);
+      alert('Gagal membatalkan pesanan: ' + (err.message || 'Terjadi kesalahan sistem'));
+    } finally {
+      setCancellingLoading(false);
+    }
+  };
 
   const handleExpireBooking = async (bId: string | number) => {
     try {
@@ -251,9 +321,16 @@ export const CustomerHistoryPage: React.FC = () => {
           icon: <CheckCircle2 size={14} color="#10b981" />
         };
       case 'EXPIRED':
-      case 'DIBATALKAN':
         return {
-          label: 'Kadaluwarsa (Dibatalkan)',
+          label: 'Kadaluwarsa (Batas Waktu Habis)',
+          color: '#ef4444',
+          bgColor: '#fee2e2',
+          icon: <XCircle size={14} color="#ef4444" />
+        };
+      case 'DIBATALKAN':
+      case 'CANCELLED':
+        return {
+          label: 'Pesanan Dibatalkan',
           color: '#ef4444',
           bgColor: '#fee2e2',
           icon: <XCircle size={14} color="#ef4444" />
@@ -555,7 +632,7 @@ export const CustomerHistoryPage: React.FC = () => {
                           <strong style={{ fontSize: '13.5px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <XCircle size={16} color="#dc2626" /> Batas Waktu Pembayaran Habis (Kadaluwarsa)
                           </strong>
-                          <span style={{ fontSize: '12px', fontWeight: '800', color: '#dc2626', backgroundColor: '#fee2e2', padding: '4px 12px', borderRadius: '20px' }}>DIBATALKAN</span>
+                          <span style={{ fontSize: '12px', fontWeight: '800', color: '#dc2626', backgroundColor: '#fee2e2', padding: '4px 12px', borderRadius: '20px' }}>KADALUWARSA</span>
                         </div>
                         
                         <p style={{ fontSize: '13px', color: '#7f1d1d', margin: 0, lineHeight: '1.5' }}>
@@ -586,42 +663,36 @@ export const CustomerHistoryPage: React.FC = () => {
                       /* ACTIVE PENDING PAYMENT BANNER */
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Transfer Pembayaran:</strong>
-                          <CountdownTimer createdAt={booking.createdAt} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
+                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Pembayaran Xendit:</strong>
+                          <CountdownTimer createdAt={booking.createdAt} bookingCode={booking.bookingCode} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
                         </div>
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
-                          Silakan lakukan transfer sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> ke rekening berikut:
+                          Silakan lakukan pembayaran sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> via Payment Gateway Xendit.
                         </span>
                         
-                        <div style={{ backgroundColor: '#ffffff', padding: '14px', borderRadius: '10px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <div style={{ fontSize: '13px', color: '#1e293b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div><span style={{ color: '#64748b' }}>Bank:</span> <strong>Bank OCBC</strong></div>
-                            <div><span style={{ color: '#64748b' }}>No. Rekening:</span> <strong style={{ fontSize: '15px', color: '#0284c7', letterSpacing: '0.5px' }}>693800143473</strong></div>
-                            <div><span style={{ color: '#64748b' }}>Atas Nama:</span> <strong>TripKita</strong></div>
+                        <div style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                          <div style={{ fontSize: '13px', color: '#1e293b', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div><span style={{ color: '#64748b' }}>Tipe Trip:</span> <strong>{booking.packageDetails?.category || 'Open Trip'}</strong></div>
+                            <div><span style={{ color: '#64748b' }}>Tujuan Trip:</span> <strong>{booking.packageDetails?.destination || tripName}</strong></div>
+                            <div><span style={{ color: '#64748b' }}>Nama Pemesan:</span> <strong>{booking.customerName || (customerProfile as any)?.name || 'Pelanggan TripKita'}</strong></div>
                           </div>
 
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                             <button
-                              onClick={() => {
-                                navigator.clipboard.writeText('693800143473');
-                                setModalNotice({
-                                  title: 'Nomor Rekening Disalin!',
-                                  message: 'Nomor Rekening Bank OCBC (693800143473) telah berhasil disalin ke clipboard.'
-                                });
-                              }}
+                              onClick={() => setCancelConfirmBooking(booking)}
                               style={{
-                                padding: '8px 14px',
-                                backgroundColor: '#e0f2fe',
-                                color: '#0284c7',
-                                border: '1px solid #7dd3fc',
+                                padding: '10px 18px',
+                                backgroundColor: '#fee2e2',
+                                color: '#dc2626',
+                                border: '1px solid #fca5a5',
                                 borderRadius: '8px',
-                                fontSize: '12.5px',
+                                fontSize: '13px',
                                 fontWeight: '700',
                                 cursor: 'pointer'
                               }}
                             >
-                              Salin No. Rekening
+                              Batalkan
                             </button>
 
                             <button
@@ -634,12 +705,12 @@ export const CustomerHistoryPage: React.FC = () => {
                                 }
                               }}
                               style={{
-                                padding: '8px 16px',
+                                padding: '10px 18px',
                                 backgroundColor: '#0284c7',
                                 color: '#ffffff',
                                 border: 'none',
                                 borderRadius: '8px',
-                                fontSize: '12.5px',
+                                fontSize: '13px',
                                 fontWeight: '700',
                                 cursor: 'pointer',
                                 boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
@@ -651,6 +722,20 @@ export const CustomerHistoryPage: React.FC = () => {
                         </div>
                       </div>
                     )
+                  )}
+
+                  {(booking.status === 'DIBATALKAN' || booking.status === 'CANCELLED') && (
+                    <div style={{ backgroundColor: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <strong style={{ fontSize: '13.5px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <XCircle size={16} color="#dc2626" /> Pesanan Dibatalkan oleh Pelanggan
+                        </strong>
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#dc2626', backgroundColor: '#fee2e2', padding: '4px 12px', borderRadius: '20px' }}>DIBATALKAN</span>
+                      </div>
+                      <p style={{ fontSize: '13px', color: '#7f1d1d', margin: 0, lineHeight: '1.5' }}>
+                        Pesanan ini telah Anda batalkan. Jika Anda ingin mengikuti trip ini kembali, Anda dapat melakukan pemesanan ulang.
+                      </p>
+                    </div>
                   )}
 
 
@@ -879,6 +964,87 @@ export const CustomerHistoryPage: React.FC = () => {
               >
                 OK, Mengerti
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* CONFIRMATION MODAL BEFORE CANCELLING BOOKING */}
+        {cancelConfirmBooking && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+              backdropFilter: 'blur(4px)'
+            }}
+          >
+            <div 
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '24px',
+                maxWidth: '440px',
+                width: '100%',
+                padding: '32px 28px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                textAlign: 'center'
+              }}
+            >
+              <div style={{ backgroundColor: '#fee2e2', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px auto' }}>
+                <XCircle size={32} color="#dc2626" />
+              </div>
+
+              <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0' }}>
+                Konfirmasi Pembatalan Pesanan
+              </h3>
+
+              <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.6', margin: '0 0 24px 0' }}>
+                Apakah Anda yakin ingin membatalkan pesanan <strong style={{ color: '#0f172a' }}>{cancelConfirmBooking.bookingCode}</strong>? Status pesanan akan diubah menjadi <strong>Dibatalkan</strong>.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <button
+                  onClick={() => setCancelConfirmBooking(null)}
+                  disabled={cancellingLoading}
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#ffffff',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Tidak (Kembali)
+                </button>
+
+                <button
+                  onClick={() => handleConfirmCancel(cancelConfirmBooking)}
+                  disabled={cancellingLoading}
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    cursor: cancellingLoading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
+                  }}
+                >
+                  {cancellingLoading ? 'Membatalkan...' : 'Ya, Batalkan'}
+                </button>
+              </div>
             </div>
           </div>
         )}
