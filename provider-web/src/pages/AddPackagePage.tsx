@@ -38,7 +38,7 @@ function LocationPicker({ position, setPosition, setMeetPoint }: any) {
             if (data && data.display_name) {
                 setMeetPoint(data.display_name);
             }
-        }).catch(err => {
+        }).catch(() => {
             setMeetPoint(`Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`);
         });
     },

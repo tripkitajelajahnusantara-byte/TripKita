@@ -107,8 +107,6 @@ export const DashboardPage: React.FC = () => {
           setPopularPackages(sortedPackages);
 
           // Find urgent open trip (H-3)
-          const urgentTrip = packagesRes.value.find((pkg: any) => {
-          // Check for urgent Open Trip (H-3)
           const allPackages = packagesRes.value;
           const openTrips = allPackages.filter(p => p.tripType === 'Open Trip' && p.status === 'Aktif');
           const now = new Date();
