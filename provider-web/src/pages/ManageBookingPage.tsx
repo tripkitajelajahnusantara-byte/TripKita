@@ -238,9 +238,6 @@ export const ManageBookingPage: React.FC = () => {
             <p>Monitor dan kelola semua pemesanan</p>
           </div>
           <div className="header-actions" style={{ display: 'flex', gap: '12px' }}>
-            <button className="export-csv-btn" onClick={() => setShowSimulateModal(true)} style={{ backgroundColor: '#facc15', color: '#854d0e', borderColor: '#eab308' }}>
-              <CalendarDays size={16} /> Simulasi Xendit
-            </button>
             <button className="export-csv-btn" onClick={handleExportCSV}>
               <FileSpreadsheet size={16} /> Export CSV
             </button>
@@ -401,10 +398,12 @@ export const ManageBookingPage: React.FC = () => {
                                   <Check size={14} />
                                 </button>
                               )}
-                              <button className="action-btn text-red" title="Batalkan Perjalanan (Refund)" onClick={() => handleAction('reject', b.dbId!)}>
-                                <X size={14} />
-                              </button>
                             </>
+                          )}
+                          {(b.status === 'CONFIRMED' || b.status === 'PAID' || b.status === 'PENDING_PAYMENT') && b.dbId && (
+                            <button className="action-btn text-red" title="Batalkan Pesanan" onClick={() => handleAction('reject', b.dbId!)}>
+                              <X size={14} />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -848,8 +847,8 @@ export const ManageBookingPage: React.FC = () => {
 
       {/* Cancel Action Modal */}
       {showCancelModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '400px' }}>
+        <div className="detail-modal-overlay">
+          <div className="detail-modal-card" style={{ maxWidth: '400px', padding: '24px' }}>
             <div className="modal-header">
               <h2>Tindakan Pembatalan</h2>
               <button className="close-modal" onClick={() => setShowCancelModal(false)}>✕</button>
