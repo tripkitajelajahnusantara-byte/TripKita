@@ -3,7 +3,6 @@ import { useNavigation } from '../context/NavigationContext';
 import { Sidebar } from '../components/Sidebar';
 import { 
   ArrowLeft, 
-  Eye, 
   Save, 
   Send, 
   Sparkles,
