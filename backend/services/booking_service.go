@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -284,7 +285,8 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID stri
 		}
 	}
 	if err != nil || booking == nil {
-		return fmt.Errorf("booking tidak ditemukan untuk invoice %s / external_id %s", invoiceID, externalID)
+		log.Printf("[Xendit Webhook] Booking tidak ditemukan untuk invoice %s / external_id %s (Kemungkinan test payload Xendit). Mengembalikan 200 OK.", invoiceID, externalID)
+		return nil
 	}
 
 	oldStatus := booking.Status
