@@ -28,3 +28,14 @@ dist-ssr
 backend/.env
 backend/uploads/*
 !backend/uploads/.gitkeep
+
+# Flutter & Android Gradle build cache
+.gradle/
+*.gradle
+**/android/.gradle/
+**/android/app/build/
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
