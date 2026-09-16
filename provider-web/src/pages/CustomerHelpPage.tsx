@@ -8,7 +8,8 @@ import {
   Mail, 
   PhoneCall, 
   ChevronDown, 
-  Search
+  Search,
+  MapPin
 } from 'lucide-react';
 
 interface FAQItem {
@@ -203,6 +204,16 @@ export const CustomerHelpPage: React.FC = () => {
                   <div>
                     <span className="method-label">Jam Operasional Layanan:</span>
                     <span className="method-value-text">24 Jam / 7 Hari Seminggu (Senin - Minggu)</span>
+                  </div>
+                </div>
+
+                <div className="contact-method-item">
+                  <div className="method-icon-box">
+                    <MapPin size={20} color="#f59e0b" />
+                  </div>
+                  <div>
+                    <span className="method-label">Alamat Kantor / Operasional Resmi:</span>
+                    <span className="method-value-text">Jl. Puskesmas No.35-22, RT.11/RW.7, Duri Kosambi, Kecamatan Cengkareng, Kota Jakarta Barat, Daerah Khusus Ibukota Jakarta</span>
                   </div>
                 </div>
               </div>
