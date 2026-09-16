@@ -89,4 +89,6 @@ export interface PackageItem {
   schedule: string;
   status: 'Aktif' | 'Draft' | 'Nonaktif';
   rating?: number;
+  image?: string;
+  tripType?: string;
 }

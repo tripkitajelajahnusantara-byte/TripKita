@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import type { TripPlan, TripChecklistItem, TripSavingsLog, PackageItem } from '../types';
-import { Target, Calendar, Users, Wallet, Plus, CheckCircle2, Circle, Sparkles, TrendingUp, Compass, ArrowRight, RefreshCw, Trash2 } from 'lucide-react';
+import { Target, Calendar, Users, Wallet, Plus, CheckCircle2, Circle, Sparkles, TrendingUp, Compass, ArrowRight, RefreshCw } from 'lucide-react';
 
 export const CustomerTripPlannerPage: React.FC = () => {
   const { customerProfile, navigateTo } = useNavigation();
@@ -291,8 +291,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     border: '1.5px solid #cbd5e1',
                     fontSize: '14px',
                     fontWeight: '600',
-                    outline: 'none',
-                    boxSizing: 'border-[#0f8b8d]'
+                    outline: 'none'
                   }}
                   required
                 />
@@ -648,7 +647,6 @@ export const CustomerTripPlannerPage: React.FC = () => {
                         key={log.id}
                         style={{
                           display: 'flex',
-                          justifyConstraint: 'space-between',
                           justifyContent: 'space-between',
                           alignItems: 'center',
                           padding: '10px 14px',
@@ -681,7 +679,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   onClick={() => navigateTo('cari-trip')}
                   style={{ background: 'none', border: 'none', color: '#0f8b8d', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}
                 >
-                  Lihat Semua Paket >
+                  Lihat Semua Paket &gt;
                 </button>
               </div>
 
@@ -733,7 +731,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
 
         {/* Modal Catat Tabungan Bulan Ini */}
         {showSavingsModal && (
-          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyControl: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', maxWidth: '400px', width: '100%', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Wallet size={20} color="#0f8b8d" /> Catat Tabungan Bulan Ini
