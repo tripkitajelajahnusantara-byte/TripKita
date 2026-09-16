@@ -37,13 +37,14 @@ jobs:
       - name: Generate Fresh Android Project & Get Dependencies
         run: |
           cd customer-mobile
-          flutter create . --platforms=android --org com.tementrip.app
+          flutter create . --platforms=android --org com.tementrip.app --project-name customer_mobile
           chmod +x android/gradlew 2>/dev/null || true
           flutter pub get
 
       - name: Build Release APK
         run: |
           cd customer-mobile
+          chmod +x android/gradlew 2>/dev/null || true
           flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK Artifact
