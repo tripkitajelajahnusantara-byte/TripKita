@@ -39,14 +39,15 @@ jobs:
           cd customer-mobile
           flutter pub get
 
-      - name: Build Release APK
+      - name: Build Debug & Release APKs
         run: |
           cd customer-mobile
           chmod +x android/gradlew 2>/dev/null || true
+          flutter build apk --debug --no-tree-shake-icons
           flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload APK Artifact
+      - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: TemenTrip-Customer-App
-          path: customer-mobile/build/app/outputs/flutter-apk/app-release.apk
+          path: customer-mobile/build/app/outputs/flutter-apk/*.apk
