@@ -4,7 +4,7 @@ import { request } from '../utils/api';
 import type { TripPlan, TripChecklistItem, TripSavingsLog, PackageItem } from '../types';
 import { 
   Target, Calendar, Users, Wallet, CheckCircle2, Circle, Sparkles, Compass, 
-  RefreshCw, Trash2, Save, Info, Plus, ArrowLeft, HeartHandshake, ShieldCheck
+  RefreshCw, Trash2, Save, Info, Plus, ArrowLeft, HeartHandshake, ShieldCheck, Edit3
 } from 'lucide-react';
 
 const getTodayIsoDate = () => {
@@ -129,7 +129,7 @@ const CATALOG_PACKAGES: PackageItem[] = [
 export const CustomerTripPlannerPage: React.FC = () => {
   const { customerProfile, navigateTo } = useNavigation();
 
-  // Storage key linked to customer ID or email
+  // Storage key linked to customer account
   const storageKey = customerProfile 
     ? `tementrip_plans_cust_${customerProfile.id || customerProfile.email}`
     : 'tementrip_plans_guest';
@@ -137,7 +137,9 @@ export const CustomerTripPlannerPage: React.FC = () => {
   // Account Plans Array (Max 10 plans)
   const [plans, setPlans] = useState<TripPlan[]>([]);
   const [activePlan, setActivePlan] = useState<TripPlan | null>(null);
-  const [viewState, setViewState] = useState<'FORM' | 'DETAIL'>('FORM');
+  
+  // Page view modes: 'LIST' (home list), 'FORM' (create/edit form), 'DETAIL' (full detail dashboard)
+  const [viewState, setViewState] = useState<'LIST' | 'FORM' | 'DETAIL'>('LIST');
   const [isEditingExisting, setIsEditingExisting] = useState(false);
 
   // Form input state
@@ -149,13 +151,16 @@ export const CustomerTripPlannerPage: React.FC = () => {
   // Date input ref
   const dateInputRef = useRef<HTMLInputElement>(null);
 
-  // Savings log modal / input
+  // Savings log modal state (for Add & Edit)
   const [showSavingsModal, setShowSavingsModal] = useState(false);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [savingsInput, setSavingsInput] = useState<string>('');
   const [savingsNote, setSavingsNote] = useState<string>('');
 
-  // Custom checklist input
+  // Manual Checklist state (Add & Edit)
   const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
+  const [editingChecklistLabel, setEditingChecklistLabel] = useState('');
 
   // Automated item info modal
   const [autoItemModalInfo, setAutoItemModalInfo] = useState<string | null>(null);
@@ -164,7 +169,11 @@ export const CustomerTripPlannerPage: React.FC = () => {
   const [matchingPackages, setMatchingPackages] = useState<PackageItem[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
 
-  // Load plans from localStorage
+  // Helper for customer identity
+  const currentUserName = (customerProfile as any)?.name || (customerProfile as any)?.fullName || customerProfile?.picName || 'Customer';
+  const currentUserEmail = customerProfile?.email || 'customer@tementrip.com';
+
+  // Load saved plans from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
     if (saved) {
@@ -172,11 +181,9 @@ export const CustomerTripPlannerPage: React.FC = () => {
         const parsed: TripPlan[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setPlans(parsed);
-          setActivePlan(parsed[0]);
-          setViewState('DETAIL');
+          setViewState('LIST');
         } else {
           setPlans([]);
-          setActivePlan(null);
           setViewState('FORM');
         }
       } catch (e) {
@@ -207,9 +214,9 @@ export const CustomerTripPlannerPage: React.FC = () => {
     });
   };
 
-  // Fetch matching packages when active plan exists
+  // Fetch matching packages when active plan exists in DETAIL view
   useEffect(() => {
-    if (activePlan && activePlan.destination) {
+    if (activePlan && activePlan.destination && viewState === 'DETAIL') {
       setLoadingPackages(true);
       request('/public/packages')
         .then((data: any) => {
@@ -231,9 +238,9 @@ export const CustomerTripPlannerPage: React.FC = () => {
         })
         .finally(() => setLoadingPackages(false));
     }
-  }, [activePlan?.destination]);
+  }, [activePlan?.destination, viewState]);
 
-  // Start creating a new plan
+  // Start creating a new plan from Home List
   const handleStartNewPlan = () => {
     if (plans.length >= 10) {
       alert('Batas maksimal 10 rencana trip telah tercapai. Silakan hapus rencana lama terlebih dahulu jika ingin membuat rencana baru.');
@@ -244,6 +251,18 @@ export const CustomerTripPlannerPage: React.FC = () => {
     setParticipants(2);
     setTargetBudget('');
     setIsEditingExisting(false);
+    setActivePlan(null);
+    setViewState('FORM');
+  };
+
+  // Start editing an existing plan from Home List
+  const handleStartEditPlan = (planToEdit: TripPlan) => {
+    setActivePlan(planToEdit);
+    setDestination(planToEdit.destination);
+    setTargetDate(planToEdit.targetMonth || getTodayIsoDate());
+    setParticipants(planToEdit.participants);
+    setTargetBudget(planToEdit.targetBudget.toString());
+    setIsEditingExisting(true);
     setViewState('FORM');
   };
 
@@ -262,20 +281,19 @@ export const CustomerTripPlannerPage: React.FC = () => {
 
     const formattedDateLabel = formatDateIndo(targetDate);
 
+    // Initial default checklist with 5 automated system milestones (0%, 25%, 50%, 75%, 100%)
     const defaultChecklist: TripChecklistItem[] = [
       { id: '1', label: 'Tentukan Destinasi & Target Budget Liburan', completed: true },
-      { id: '2', label: 'Capai 50% Tabungan Perjalanan', completed: false },
-      { id: '3', label: 'Capai 100% Target Tabungan', completed: false },
-      { id: '4', label: 'Cari & Pesan Paket Open Trip di TemenTrip', completed: false },
-      { id: '5', label: 'Siapkan Barang Bawaan & Pakaian Liburan', completed: false },
-      { id: '6', label: 'Siap Berangkat & Nikmati Liburan! 🥳', completed: false },
+      { id: '2', label: 'Capai 25% Tabungan Perjalanan', completed: false },
+      { id: '3', label: 'Capai 50% Tabungan Perjalanan', completed: false },
+      { id: '4', label: 'Capai 75% Tabungan Perjalanan', completed: false },
+      { id: '5', label: 'Capai 100% Target Tabungan', completed: false },
+      { id: '6', label: 'Cari & Pesan Paket Open Trip di TemenTrip', completed: false },
+      { id: '7', label: 'Siapkan Barang Bawaan & Pakaian Liburan', completed: false },
+      { id: '8', label: 'Siap Berangkat & Nikmati Liburan! 🥳', completed: false },
     ];
 
-    const currentUserName = (customerProfile as any)?.name || (customerProfile as any)?.fullName || customerProfile?.picName || activePlan?.userName || 'Customer';
-    const currentUserEmail = customerProfile?.email || activePlan?.userEmail || 'customer@tementrip.com';
-
     if (isEditingExisting && activePlan) {
-      // Update active plan transiently
       const updated: TripPlan = {
         ...activePlan,
         destination: destination.trim(),
@@ -289,7 +307,6 @@ export const CustomerTripPlannerPage: React.FC = () => {
       };
       setActivePlan(updated);
     } else {
-      // Create new draft plan object
       const newPlanObj: TripPlan = {
         id: `plan_${Date.now()}`,
         destination: destination.trim(),
@@ -315,9 +332,6 @@ export const CustomerTripPlannerPage: React.FC = () => {
   // Permanently Save Active Plan (Step 2 Bottom Action)
   const handleSavePlanPermanent = () => {
     if (!activePlan) return;
-    const currentUserName = (customerProfile as any)?.name || (customerProfile as any)?.fullName || customerProfile?.picName || activePlan.userName || 'Customer';
-    const currentUserEmail = customerProfile?.email || activePlan.userEmail || 'customer@tementrip.com';
-
     const finalPlan: TripPlan = {
       ...activePlan,
       status: 'SAVED',
@@ -337,25 +351,39 @@ export const CustomerTripPlannerPage: React.FC = () => {
     savePlansToStorage(updatedList);
     setActivePlan(finalPlan);
     alert(`Rencana trip ke "${finalPlan.destination}" berhasil disimpan!`);
+    setViewState('LIST');
   };
 
-  // Cancel Plan & Return to Form (Step 2 Bottom Action)
+  // Batalkan Rencana Trip (Point 4: Confirms and deletes/cancels plan)
   const handleCancelPlan = () => {
-    if (plans.length > 0) {
-      setActivePlan(plans[0]);
-      setViewState('DETAIL');
-    } else {
+    if (!activePlan) {
+      if (plans.length > 0) setViewState('LIST');
+      else handleStartNewPlan();
+      return;
+    }
+
+    if (window.confirm(`Apakah Anda yakin ingin membatalkan rencana trip ke "${activePlan.destination}"? Tindakan ini akan menghapus semua data yang sudah diisi.`)) {
+      // Remove from plans list if existing
+      const filtered = plans.filter(p => p.id !== activePlan.id);
+      savePlansToStorage(filtered);
+
       setActivePlan(null);
       setDestination('');
       setTargetDate(getTodayIsoDate());
       setParticipants(2);
       setTargetBudget('');
-      setViewState('FORM');
+
+      if (filtered.length > 0) {
+        setViewState('LIST');
+      } else {
+        handleStartNewPlan();
+      }
     }
   };
 
-  // Delete Plan
-  const handleDeletePlan = (planId: string, destName: string) => {
+  // Delete Plan from List
+  const handleDeletePlanFromList = (e: React.MouseEvent, planId: string, destName: string) => {
+    e.stopPropagation();
     if (!window.confirm(`Apakah Anda yakin ingin menghapus rencana trip ke "${destName}"?`)) {
       return;
     }
@@ -363,11 +391,11 @@ export const CustomerTripPlannerPage: React.FC = () => {
     const filtered = plans.filter(p => p.id !== planId);
     savePlansToStorage(filtered);
 
-    if (filtered.length > 0) {
-      setActivePlan(filtered[0]);
-      setViewState('DETAIL');
-    } else {
+    if (activePlan?.id === planId) {
       setActivePlan(null);
+    }
+
+    if (filtered.length === 0) {
       handleStartNewPlan();
     }
   };
@@ -375,9 +403,6 @@ export const CustomerTripPlannerPage: React.FC = () => {
   // Save active plan as DRAFT automatically when navigating to packages
   const autoSaveDraftAndNavigate = (targetRoute: 'cari-trip' | 'paket-detail') => {
     if (activePlan) {
-      const currentUserName = (customerProfile as any)?.name || (customerProfile as any)?.fullName || customerProfile?.picName || activePlan.userName || 'Customer';
-      const currentUserEmail = customerProfile?.email || activePlan.userEmail || 'customer@tementrip.com';
-
       const draftPlan: TripPlan = {
         ...activePlan,
         status: activePlan.status || 'DRAFT',
@@ -398,8 +423,21 @@ export const CustomerTripPlannerPage: React.FC = () => {
     navigateTo(targetRoute);
   };
 
-  // Add Savings Log
-  const handleAddSavings = (e: React.FormEvent) => {
+  // Add or Edit Savings Log (Point 3)
+  const handleOpenSavingsModal = (log?: TripSavingsLog) => {
+    if (log) {
+      setEditingLogId(log.id);
+      setSavingsInput(new Intl.NumberFormat('id-ID').format(log.amount));
+      setSavingsNote(log.note || '');
+    } else {
+      setEditingLogId(null);
+      setSavingsInput('');
+      setSavingsNote('');
+    }
+    setShowSavingsModal(true);
+  };
+
+  const handleSaveSavings = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activePlan) return;
     const amount = parseInt(savingsInput.replace(/\D/g, ''), 10);
@@ -408,24 +446,32 @@ export const CustomerTripPlannerPage: React.FC = () => {
       return;
     }
 
-    const newSavedAmount = activePlan.savedAmount + amount;
-    const newLog: TripSavingsLog = {
-      id: `log_${Date.now()}`,
-      date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-      amount,
-      note: savingsNote.trim() || 'Tabungan bulanan'
-    };
+    let updatedLogs: TripSavingsLog[];
+    if (editingLogId) {
+      updatedLogs = activePlan.savingsLogs.map(l => 
+        l.id === editingLogId ? { ...l, amount, note: savingsNote.trim() || 'Tabungan bulanan' } : l
+      );
+    } else {
+      const newLog: TripSavingsLog = {
+        id: `log_${Date.now()}`,
+        date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+        amount,
+        note: savingsNote.trim() || 'Tabungan bulanan'
+      };
+      updatedLogs = [newLog, ...activePlan.savingsLogs];
+    }
+
+    const newSavedTotal = updatedLogs.reduce((acc, curr) => acc + curr.amount, 0);
 
     const updatedPlan: TripPlan = {
       ...activePlan,
-      savedAmount: newSavedAmount,
-      savingsLogs: [newLog, ...activePlan.savingsLogs],
+      savedAmount: newSavedTotal,
+      savingsLogs: updatedLogs,
       updatedAt: new Date().toISOString()
     };
 
     setActivePlan(updatedPlan);
 
-    // If plan is already saved in plans list, update it in storage too
     if (plans.some(p => p.id === updatedPlan.id)) {
       const updatedList = plans.map(p => p.id === updatedPlan.id ? updatedPlan : p);
       savePlansToStorage(updatedList);
@@ -434,9 +480,34 @@ export const CustomerTripPlannerPage: React.FC = () => {
     setShowSavingsModal(false);
     setSavingsInput('');
     setSavingsNote('');
+    setEditingLogId(null);
   };
 
-  // Toggle Manual Checklist Item (1, 2, 3 show automated info modal)
+  // Delete Savings Log (Point 3)
+  const handleDeleteSavingsLog = (e: React.MouseEvent, logId: string) => {
+    e.stopPropagation();
+    if (!activePlan) return;
+    if (!window.confirm('Apakah Anda yakin ingin menghapus catatan tabungan ini?')) return;
+
+    const updatedLogs = activePlan.savingsLogs.filter(l => l.id !== logId);
+    const newSavedTotal = updatedLogs.reduce((acc, curr) => acc + curr.amount, 0);
+
+    const updatedPlan: TripPlan = {
+      ...activePlan,
+      savedAmount: newSavedTotal,
+      savingsLogs: updatedLogs,
+      updatedAt: new Date().toISOString()
+    };
+
+    setActivePlan(updatedPlan);
+
+    if (plans.some(p => p.id === updatedPlan.id)) {
+      const updatedList = plans.map(p => p.id === updatedPlan.id ? updatedPlan : p);
+      savePlansToStorage(updatedList);
+    }
+  };
+
+  // Toggle Manual Checklist Item (1,2,3,4,5 show automated info modal)
   const handleToggleChecklist = (id: string) => {
     if (!activePlan) return;
 
@@ -445,10 +516,18 @@ export const CustomerTripPlannerPage: React.FC = () => {
       return;
     }
     if (id === '2') {
-      setAutoItemModalInfo('Item "Capai 50% Tabungan Perjalanan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 50% dari target budget.');
+      setAutoItemModalInfo('Item "Capai 25% Tabungan Perjalanan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 25% dari target budget.');
       return;
     }
     if (id === '3') {
+      setAutoItemModalInfo('Item "Capai 50% Tabungan Perjalanan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 50% dari target budget.');
+      return;
+    }
+    if (id === '4') {
+      setAutoItemModalInfo('Item "Capai 75% Tabungan Perjalanan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 75% dari target budget.');
+      return;
+    }
+    if (id === '5') {
       setAutoItemModalInfo('Item "Capai 100% Target Tabungan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 100% dari target budget.');
       return;
     }
@@ -487,16 +566,53 @@ export const CustomerTripPlannerPage: React.FC = () => {
     setNewChecklistItem('');
   };
 
+  // Edit Manual Checklist Item (Point 3)
+  const handleSaveEditChecklist = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activePlan || !editingChecklistId || !editingChecklistLabel.trim()) return;
+
+    const updatedChecklist = activePlan.checklist.map(item =>
+      item.id === editingChecklistId ? { ...item, label: editingChecklistLabel.trim() } : item
+    );
+    const updatedPlan: TripPlan = { ...activePlan, checklist: updatedChecklist };
+    setActivePlan(updatedPlan);
+
+    if (plans.some(p => p.id === updatedPlan.id)) {
+      const updatedList = plans.map(p => p.id === updatedPlan.id ? updatedPlan : p);
+      savePlansToStorage(updatedList);
+    }
+    setEditingChecklistId(null);
+    setEditingChecklistLabel('');
+  };
+
+  // Delete Manual Checklist Item (Point 3)
+  const handleDeleteChecklistItem = (e: React.MouseEvent, itemId: string) => {
+    e.stopPropagation();
+    if (!activePlan) return;
+    if (!window.confirm('Apakah Anda yakin ingin menghapus item checklist ini?')) return;
+
+    const updatedChecklist = activePlan.checklist.filter(item => item.id !== itemId);
+    const updatedPlan: TripPlan = { ...activePlan, checklist: updatedChecklist };
+    setActivePlan(updatedPlan);
+
+    if (plans.some(p => p.id === updatedPlan.id)) {
+      const updatedList = plans.map(p => p.id === updatedPlan.id ? updatedPlan : p);
+      savePlansToStorage(updatedList);
+    }
+  };
+
   // Calculate percentages
   const savedPercentage = activePlan ? Math.min(100, Math.round((activePlan.savedAmount / activePlan.targetBudget) * 100)) : 0;
   const remainingBudget = activePlan ? Math.max(0, activePlan.targetBudget - activePlan.savedAmount) : 0;
 
-  // Dynamic status evaluation for checklist items
+  // Dynamic status evaluation for checklist items (0%, 25%, 50%, 75%, 100%)
   const isItemCompleted = (item: TripChecklistItem): boolean => {
     if (!activePlan) return item.completed;
     if (item.id === '1') return true;
-    if (item.id === '2') return activePlan.savedAmount >= (activePlan.targetBudget * 0.5);
-    if (item.id === '3') return activePlan.savedAmount >= activePlan.targetBudget;
+    if (item.id === '2') return activePlan.savedAmount >= (activePlan.targetBudget * 0.25);
+    if (item.id === '3') return activePlan.savedAmount >= (activePlan.targetBudget * 0.50);
+    if (item.id === '4') return activePlan.savedAmount >= (activePlan.targetBudget * 0.75);
+    if (item.id === '5') return activePlan.savedAmount >= activePlan.targetBudget;
     return item.completed;
   };
 
@@ -504,158 +620,271 @@ export const CustomerTripPlannerPage: React.FC = () => {
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '32px 16px', fontFamily: 'Inter, sans-serif' }}>
       <div style={{ maxWidth: '960px', margin: '0 auto' }}>
         
-        {/* Header Title & Saved Plans Selector */}
+        {/* Header Title Section */}
         <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Target size={28} color="#0f8b8d" /> Rencana Trip &amp; Target Tabungan
-              </h1>
-              <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0 }}>
-                Susun liburan impianmu bersama pasangan atau teman, atur target tabungan bulanan, dan wujudkan trip impian tanpa beban.
-              </p>
-            </div>
-
-            {/* Top Action Controls for Saved/Draft Plans */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              {plans.length < 10 && viewState === 'DETAIL' && (
-                <button
-                  onClick={handleStartNewPlan}
-                  style={{
-                    backgroundColor: '#0f8b8d',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '8px 14px',
-                    borderRadius: '12px',
-                    fontSize: '12.5px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 2px 6px rgba(15,139,141,0.2)'
-                  }}
-                >
-                  <Plus size={15} /> Buat Rencana Baru ({plans.length}/10)
-                </button>
-              )}
-
-              {/* Edit & Hapus Buttons: ONLY shown when an existing saved/draft plan is active */}
-              {activePlan && plans.some(p => p.id === activePlan.id) && (
-                <>
-                  <button
-                    onClick={() => {
-                      setDestination(activePlan.destination);
-                      setTargetDate(activePlan.targetMonth || getTodayIsoDate());
-                      setParticipants(activePlan.participants);
-                      setTargetBudget(activePlan.targetBudget.toString());
-                      setIsEditingExisting(true);
-                      setViewState('FORM');
-                    }}
-                    style={{
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      padding: '8px 14px',
-                      borderRadius: '12px',
-                      fontSize: '12.5px',
-                      fontWeight: '700',
-                      color: '#334155',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
-                    }}
-                  >
-                    <RefreshCw size={14} color="#0f8b8d" /> Edit Rencana
-                  </button>
-
-                  <button
-                    onClick={() => handleDeletePlan(activePlan.id, activePlan.destination)}
-                    style={{
-                      backgroundColor: '#fef2f2',
-                      border: '1px solid #fecaca',
-                      padding: '8px 14px',
-                      borderRadius: '12px',
-                      fontSize: '12.5px',
-                      fontWeight: '700',
-                      color: '#ef4444',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Trash2 size={14} color="#ef4444" /> Hapus Rencana
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* List Tabs of Saved Plans */}
-          {plans.length > 0 && (
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '12px 0 4px 0', marginTop: '10px' }}>
-              {plans.map(p => {
-                const isActive = activePlan?.id === p.id && viewState === 'DETAIL';
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setActivePlan(p);
-                      setViewState('DETAIL');
-                    }}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: '20px',
-                      border: isActive ? '1.5px solid #0f8b8d' : '1px solid #cbd5e1',
-                      backgroundColor: isActive ? '#e6f4f4' : '#ffffff',
-                      color: isActive ? '#0f8b8d' : '#475569',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <span>🌴 {p.destination}</span>
-                    <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '10px', backgroundColor: p.status === 'SAVED' ? '#dcfce7' : '#fef3c7', color: p.status === 'SAVED' ? '#166534' : '#92400e' }}>
-                      {p.status === 'SAVED' ? 'Tersimpan' : 'Draft'}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Target size={28} color="#0f8b8d" /> Rencana Trip &amp; Target Tabungan
+          </h1>
+          <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0 }}>
+            Susun liburan impianmu bersama pasangan atau teman, atur target tabungan bulanan, dan wujudkan trip impian tanpa beban.
+          </p>
         </div>
 
-        {/* 1. Form Step 1: Input Rencana Trip */}
-        {viewState === 'FORM' && (
+        {/* ========================================================================= */}
+        {/* VIEW 1: HOME LIST PAGE (Tampilan Awal Daftar Rencana Trip Saya) */}
+        {/* ========================================================================= */}
+        {viewState === 'LIST' && (
           <div>
-            {/* Banner Promotional Header matching Item 1 */}
+            {/* Banner Promotional Poster - High Contrast Vibrant Styling (Point 2) */}
             <div 
               style={{ 
-                backgroundImage: 'linear-gradient(135deg, #0f8b8d 0%, #0369a1 100%)', 
+                backgroundImage: 'linear-gradient(135deg, #0d4b56 0%, #0f8b8d 50%, #0284c7 100%)', 
                 borderRadius: '24px', 
-                padding: '24px 28px', 
+                padding: '28px 32px', 
                 color: '#ffffff', 
-                marginBottom: '24px',
-                boxShadow: '0 10px 25px rgba(15,139,141,0.2)',
+                marginBottom: '28px',
+                boxShadow: '0 12px 30px rgba(15,139,141,0.25)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '20px'
+                gap: '24px'
               }}
             >
               <div style={{ flex: 1 }}>
-                <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: '#ffffff', fontSize: '11px', fontWeight: '800', padding: '4px 12px', borderRadius: '20px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  <HeartHandshake size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '4px' }} /> Liburan Impian Tanpa Beban
+                <span 
+                  style={{ 
+                    backgroundColor: '#fbbf24', 
+                    color: '#0f172a', 
+                    fontSize: '11px', 
+                    fontWeight: '800', 
+                    padding: '5px 14px', 
+                    borderRadius: '20px', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.5px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                  }}
+                >
+                  <HeartHandshake size={14} /> Liburan Impian Tanpa Beban
                 </span>
-                <h2 style={{ fontSize: '20px', fontWeight: '800', margin: '10px 0 6px 0', lineHeight: 1.3 }}>
+                
+                <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#ffffff', margin: '14px 0 8px 0', lineHeight: 1.3, textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
                   Rencanakan Liburan Seru Bersama Pasangan, Teman, atau Keluarga! 🏝️✨
                 </h2>
-                <p style={{ fontSize: '13px', color: '#e0f2fe', margin: 0, lineHeight: 1.5 }}>
+                
+                <p style={{ fontSize: '14px', color: '#f0f9ff', margin: 0, lineHeight: 1.6, fontWeight: '500', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
+                  Susun target budget dan tabungan bulananmu mulai dari sekarang. Nikmati perjalanan impian tanpa perlu risau masalah keuangan!
+                </p>
+              </div>
+            </div>
+
+            {/* List of Saved/Draft Plans Section (Points 1 & 6) */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '28px', border: '1px solid #e2e8f0', boxShadow: '0 10px 30px rgba(0,0,0,0.04)', marginBottom: '28px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Compass size={20} color="#0f8b8d" /> Daftar Rencana Trip Saya ({plans.length}/10)
+                </h2>
+              </div>
+
+              {plans.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                  Belum ada rencana trip yang dibuat.<br />
+                  <button
+                    onClick={handleStartNewPlan}
+                    style={{
+                      marginTop: '16px',
+                      backgroundColor: '#0f8b8d',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '10px 22px',
+                      borderRadius: '12px',
+                      fontSize: '13.5px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(15,139,141,0.25)'
+                    }}
+                  >
+                    + Buat Rencana Trip Baru
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '18px', marginBottom: '24px' }}>
+                    {plans.map(p => {
+                      const pct = Math.min(100, Math.round((p.savedAmount / p.targetBudget) * 100));
+                      return (
+                        <div
+                          key={p.id}
+                          style={{
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '18px',
+                            border: '1px solid #e2e8f0',
+                            padding: '20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                              <span style={{ fontSize: '11px', fontWeight: '800', padding: '3px 10px', borderRadius: '12px', backgroundColor: p.status === 'SAVED' ? '#dcfce7' : '#fef3c7', color: p.status === 'SAVED' ? '#166534' : '#92400e' }}>
+                                {p.status === 'SAVED' ? 'Tersimpan' : 'Draft'}
+                              </span>
+                              <span style={{ fontSize: '12px', fontWeight: '800', color: '#0f8b8d' }}>{pct}%</span>
+                            </div>
+
+                            <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>
+                              🏝️ {p.destination}
+                            </h3>
+
+                            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span><Calendar size={13} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {p.targetMonthLabel}</span>
+                              <span><Users size={13} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {p.participants} Peserta</span>
+                            </div>
+
+                            {/* Progress bar */}
+                            <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '6px', overflow: 'hidden', marginBottom: '14px' }}>
+                              <div style={{ width: `${pct}%`, height: '100%', backgroundColor: '#0f8b8d', borderRadius: '6px' }} />
+                            </div>
+                          </div>
+
+                          {/* Plan Card Actions (Point 1) */}
+                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              onClick={() => {
+                                setActivePlan(p);
+                                setViewState('DETAIL');
+                              }}
+                              style={{
+                                backgroundColor: '#0f8b8d',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '8px 14px',
+                                borderRadius: '10px',
+                                fontSize: '12px',
+                                fontWeight: '800',
+                                cursor: 'pointer',
+                                flex: 1
+                              }}
+                            >
+                              Lihat Detail &rarr;
+                            </button>
+
+                            {/* Edit & Hapus appear ONLY for saved/draft plans in the list */}
+                            <button
+                              onClick={() => handleStartEditPlan(p)}
+                              title="Edit Rencana"
+                              style={{
+                                backgroundColor: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                padding: '8px 10px',
+                                borderRadius: '10px',
+                                fontSize: '12px',
+                                color: '#334155',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <RefreshCw size={14} color="#0f8b8d" />
+                            </button>
+
+                            <button
+                              onClick={(e) => handleDeletePlanFromList(e, p.id, p.destination)}
+                              title="Hapus Rencana"
+                              style={{
+                                backgroundColor: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                padding: '8px 10px',
+                                borderRadius: '10px',
+                                fontSize: '12px',
+                                color: '#ef4444',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Trash2 size={14} color="#ef4444" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Point 6: Option to add new plan appears UNDER the first list once saved */}
+                  {plans.length < 10 && (
+                    <div style={{ textAlign: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
+                      <button
+                        onClick={handleStartNewPlan}
+                        style={{
+                          backgroundColor: '#0f8b8d',
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '12px 24px',
+                          borderRadius: '12px',
+                          fontSize: '13.5px',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 14px rgba(15,139,141,0.25)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        <Plus size={16} /> + Buat Rencana Baru ({plans.length}/10)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* VIEW 2: FORM PAGE (Form Buat / Edit Rencana Trip) */}
+        {/* ========================================================================= */}
+        {viewState === 'FORM' && (
+          <div>
+            {/* Banner Promotional Header */}
+            <div 
+              style={{ 
+                backgroundImage: 'linear-gradient(135deg, #0d4b56 0%, #0f8b8d 50%, #0284c7 100%)', 
+                borderRadius: '24px', 
+                padding: '28px 32px', 
+                color: '#ffffff', 
+                marginBottom: '28px',
+                boxShadow: '0 12px 30px rgba(15,139,141,0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '24px'
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <span 
+                  style={{ 
+                    backgroundColor: '#fbbf24', 
+                    color: '#0f172a', 
+                    fontSize: '11px', 
+                    fontWeight: '800', 
+                    padding: '5px 14px', 
+                    borderRadius: '20px', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.5px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                  }}
+                >
+                  <HeartHandshake size={14} /> Liburan Impian Tanpa Beban
+                </span>
+                
+                <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#ffffff', margin: '14px 0 8px 0', lineHeight: 1.3, textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                  Rencanakan Liburan Seru Bersama Pasangan, Teman, atau Keluarga! 🏝️✨
+                </h2>
+                
+                <p style={{ fontSize: '14px', color: '#f0f9ff', margin: 0, lineHeight: 1.6, fontWeight: '500', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
                   Susun target budget dan tabungan bulananmu mulai dari sekarang. Nikmati perjalanan impian tanpa perlu risau masalah keuangan!
                 </p>
               </div>
@@ -804,26 +1033,28 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Button Next Step matching Item 1 (Don't write Simpan Rencana Trip here) */}
+                {/* Button Next Step matching Item 1 */}
                 <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                  {plans.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleCancelPlan}
-                      style={{
-                        padding: '12px 20px',
-                        borderRadius: '12px',
-                        border: 'none',
-                        backgroundColor: '#f1f5f9',
-                        color: '#64748b',
-                        fontSize: '13.5px',
-                        fontWeight: '700',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Batal
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (plans.length > 0) setViewState('LIST');
+                      else handleStartNewPlan();
+                    }}
+                    style={{
+                      padding: '12px 20px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      backgroundColor: '#f1f5f9',
+                      color: '#64748b',
+                      fontSize: '13.5px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Batal
+                  </button>
+                  
                   <button
                     type="submit"
                     style={{
@@ -849,30 +1080,30 @@ export const CustomerTripPlannerPage: React.FC = () => {
           </div>
         )}
 
-        {/* 2. Detail & Dashboard View (Gambar 2 & 3) */}
+        {/* ========================================================================= */}
+        {/* VIEW 3: DETAIL PAGE (Point 5: CLEAN DETAIL DASHBOARD WITHOUT HEADER BUTTONS) */}
+        {/* ========================================================================= */}
         {viewState === 'DETAIL' && activePlan && (
           <div>
-            {/* Back Button if navigating */}
-            {plans.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <button
-                  onClick={handleStartNewPlan}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#64748b',
-                    fontSize: '12.5px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <ArrowLeft size={14} /> Buat rencana trip lain
-                </button>
-              </div>
-            )}
+            {/* Navigation Back Link to Home List */}
+            <div style={{ marginBottom: '16px' }}>
+              <button
+                onClick={() => setViewState('LIST')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#0f8b8d',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <ArrowLeft size={16} /> &larr; Kembali ke Daftar Rencana Trip Saya
+              </button>
+            </div>
 
             {/* Top Overview Cards */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px rgba(0,0,0,0.04)', marginBottom: '24px' }}>
@@ -896,7 +1127,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={() => setShowSavingsModal(true)}
+                  onClick={() => handleOpenSavingsModal()}
                   style={{
                     backgroundColor: '#0f8b8d',
                     color: '#ffffff',
@@ -973,20 +1204,20 @@ export const CustomerTripPlannerPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Grid 2 Columns: Scrollable Checklist & Scrollable History Tabungan (Item 6) */}
+            {/* Grid 2 Columns: Scrollable Checklist & Scrollable History Tabungan */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '32px' }}>
               
-              {/* Scrollable Checklist Persiapan Liburan */}
+              {/* Scrollable Checklist Persiapan Liburan with Edit/Hapus for Manual items (Point 3) */}
               <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 6px 20px rgba(0,0,0,0.03)' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Sparkles size={18} color="#0f8b8d" /> Checklist Persiapan Trip
                 </h3>
 
-                {/* Scrollable Container Box for Checklist */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
+                {/* Scrollable Container Box */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px' }}>
                   {activePlan.checklist.map(item => {
                     const completed = isItemCompleted(item);
-                    const isAutomated = item.id === '1' || item.id === '2' || item.id === '3';
+                    const isAutomated = item.id === '1' || item.id === '2' || item.id === '3' || item.id === '4' || item.id === '5';
                     return (
                       <div
                         key={item.id}
@@ -1003,7 +1234,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                           transition: 'all 0.2s ease'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
                           {completed ? (
                             <CheckCircle2 size={18} color="#10b981" />
                           ) : (
@@ -1021,8 +1252,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                           </span>
                         </div>
 
-                        {/* Distinct badge icon for automated system items */}
-                        {isAutomated && (
+                        {/* Automated items show system badge (cannot be deleted/edited) */}
+                        {isAutomated ? (
                           <span 
                             title="Item ini diperbarui otomatis oleh sistem"
                             style={{ 
@@ -1039,13 +1270,35 @@ export const CustomerTripPlannerPage: React.FC = () => {
                           >
                             <ShieldCheck size={12} /> Otomatis
                           </span>
+                        ) : (
+                          /* Manual items have Edit & Hapus icons (Point 3) */
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingChecklistId(item.id);
+                                setEditingChecklistLabel(item.label);
+                              }}
+                              title="Edit item"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#0f8b8d' }}
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteChecklistItem(e, item.id)}
+                              title="Hapus item"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#ef4444' }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Add Custom Checklist Item */}
+                {/* Add Custom Checklist Item Form */}
                 <form onSubmit={handleAddChecklistItem} style={{ display: 'flex', gap: '8px' }}>
                   <input
                     type="text"
@@ -1079,7 +1332,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 </form>
               </div>
 
-              {/* Scrollable Riwayat Tabungan Bulanan (Item 6) */}
+              {/* Scrollable Riwayat Tabungan Bulanan with Edit & Hapus options (Point 3) */}
               <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 6px 20px rgba(0,0,0,0.03)' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Wallet size={18} color="#0f8b8d" /> Riwayat Catatan Tabungan
@@ -1091,7 +1344,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   </div>
                 ) : (
                   /* Scrollable Container Box for Savings Logs */
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px' }}>
                     {activePlan.savingsLogs.map(log => (
                       <div
                         key={log.id}
@@ -1109,9 +1362,28 @@ export const CustomerTripPlannerPage: React.FC = () => {
                           <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>{log.date}</div>
                           <div style={{ fontSize: '12.5px', color: '#334155', fontWeight: '700' }}>{log.note || 'Tabungan bulanan'}</div>
                         </div>
-                        <strong style={{ fontSize: '13.5px', color: '#10b981', fontWeight: '800' }}>
-                          + {formatRupiah(log.amount)}
-                        </strong>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <strong style={{ fontSize: '13.5px', color: '#10b981', fontWeight: '800' }}>
+                            + {formatRupiah(log.amount)}
+                          </strong>
+
+                          {/* Edit & Hapus options for savings logs (Point 3) */}
+                          <button
+                            onClick={() => handleOpenSavingsModal(log)}
+                            title="Edit Catatan"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#0f8b8d' }}
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteSavingsLog(e, log.id)}
+                            title="Hapus Catatan"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#ef4444' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1177,7 +1449,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
               )}
             </div>
 
-            {/* Item 4: Bottom Action Bar (Simpan Rencana Trip & Batalkan Rencana Trip) */}
+            {/* Bottom Action Bar (Points 4 & 5: Interactive Cancel & Permanent Save) */}
             <div 
               style={{ 
                 backgroundColor: '#ffffff', 
@@ -1207,9 +1479,9 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   style={{
                     padding: '12px 20px',
                     borderRadius: '12px',
-                    border: '1.5px solid #cbd5e1',
-                    backgroundColor: '#ffffff',
-                    color: '#64748b',
+                    border: '1.5px solid #ef4444',
+                    backgroundColor: '#fef2f2',
+                    color: '#ef4444',
                     fontSize: '13px',
                     fontWeight: '700',
                     cursor: 'pointer'
@@ -1243,15 +1515,19 @@ export const CustomerTripPlannerPage: React.FC = () => {
           </div>
         )}
 
-        {/* Modal Catat Tabungan Bulan Ini */}
+        {/* ========================================================================= */}
+        {/* MODALS */}
+        {/* ========================================================================= */}
+
+        {/* Modal Add / Edit Savings Log (Point 3) */}
         {showSavingsModal && (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', maxWidth: '400px', width: '100%', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Wallet size={20} color="#0f8b8d" /> Catat Tabungan Bulan Ini
+                <Wallet size={20} color="#0f8b8d" /> {editingLogId ? 'Edit Catatan Tabungan' : 'Catat Tabungan Bulan Ini'}
               </h3>
               
-              <form onSubmit={handleAddSavings}>
+              <form onSubmit={handleSaveSavings}>
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px' }}>
                     Nominal Disisihkan (Rp) <span style={{ color: '#ef4444' }}>*</span>
@@ -1303,7 +1579,10 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                   <button
                     type="button"
-                    onClick={() => setShowSavingsModal(false)}
+                    onClick={() => {
+                      setShowSavingsModal(false);
+                      setEditingLogId(null);
+                    }}
                     style={{
                       padding: '10px 18px',
                       borderRadius: '12px',
@@ -1339,7 +1618,75 @@ export const CustomerTripPlannerPage: React.FC = () => {
           </div>
         )}
 
-        {/* Modal Info Item Otomatis Sistem */}
+        {/* Modal Edit Manual Checklist Item (Point 3) */}
+        {editingChecklistId && (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', maxWidth: '400px', width: '100%', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Edit3 size={20} color="#0f8b8d" /> Edit Item Checklist
+              </h3>
+              
+              <form onSubmit={handleSaveEditChecklist}>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px' }}>
+                    Label Item Checklist
+                  </label>
+                  <input
+                    type="text"
+                    value={editingChecklistLabel}
+                    onChange={(e) => setEditingChecklistLabel(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '13.5px',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditingChecklistId(null)}
+                    style={{
+                      padding: '10px 18px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      backgroundColor: '#f1f5f9',
+                      color: '#64748b',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      backgroundColor: '#0f8b8d',
+                      color: '#ffffff',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Simpan Perubahan
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Info Item Otomatis System */}
         {autoItemModalInfo && (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', maxWidth: '420px', width: '100%', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
