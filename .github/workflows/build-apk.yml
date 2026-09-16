@@ -34,7 +34,7 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
           yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses 2>/dev/null || true
 
-      - name: Prepare Android Project & Dependencies
+      - name: Generate Fresh Android Project & Get Dependencies
         run: |
           cd customer-mobile
           flutter create . --platforms=android --org com.tementrip.app
@@ -44,7 +44,6 @@ jobs:
       - name: Build Release APK
         run: |
           cd customer-mobile
-          chmod +x android/gradlew 2>/dev/null || true
           flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK Artifact
