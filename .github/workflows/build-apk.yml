@@ -39,12 +39,13 @@ jobs:
           cd customer-mobile
           flutter pub get
 
-      - name: Build Debug & Release APKs
+      - name: Generate Release Keystore & Build Signed Universal APK
         run: |
-          cd customer-mobile
+          cd customer-mobile/android/app
+          keytool -genkeypair -v -keystore key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias key -storepass android -keypass android -dname "CN=TemenTrip, OU=Dev, O=TripKita, L=Jakarta, C=ID"
+          cd ../..
           chmod +x android/gradlew 2>/dev/null || true
-          flutter build apk --debug --no-tree-shake-icons
-          flutter build apk --release --no-tree-shake-icons
+          flutter build apk --release --target-platform android-arm,android-arm64,android-x64 --no-tree-shake-icons
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
