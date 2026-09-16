@@ -4,7 +4,7 @@ import { request } from '../utils/api';
 import type { TripPlan, TripChecklistItem, TripSavingsLog, PackageItem } from '../types';
 import { 
   Target, Calendar, Users, Wallet, CheckCircle2, Circle, Sparkles, Compass, 
-  RefreshCw, Trash2, Save, Info, Plus, ArrowLeft, HeartHandshake, ShieldCheck, Edit3
+  Trash2, Save, Info, Plus, ArrowLeft, HeartHandshake, ShieldCheck, Edit3
 } from 'lucide-react';
 
 const getTodayIsoDate = () => {
