@@ -42,13 +42,16 @@ export interface TripSavingsLog {
 export interface TripPlan {
   id: string;
   destination: string;
-  targetMonth: string; // "YYYY-MM" format e.g. "2026-12"
-  targetMonthLabel: string; // e.g. "Desember 2026"
+  targetMonth: string; // ISO date format e.g. "2026-11-17"
+  targetMonthLabel: string; // e.g. "17 November 2026"
   participants: number;
   targetBudget: number;
   savedAmount: number;
   checklist: TripChecklistItem[];
   savingsLogs: TripSavingsLog[];
+  status?: 'DRAFT' | 'SAVED';
+  userName?: string;
+  userEmail?: string;
   createdAt: string;
   updatedAt: string;
 }
