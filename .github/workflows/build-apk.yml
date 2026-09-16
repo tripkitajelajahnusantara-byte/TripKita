@@ -29,9 +29,11 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Get Dependencies
+      - name: Generate Android Project & Get Dependencies
         run: |
           cd customer-mobile
+          mkdir -p assets/images
+          flutter create . --platforms=android --org com.tementrip.app --overwrite
           flutter pub get
 
       - name: Build Release APK
