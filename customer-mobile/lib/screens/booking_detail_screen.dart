@@ -553,7 +553,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: const Color(0xFF374151),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
+                    side: BorderSide(color: Colors.grey.shade300),
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),

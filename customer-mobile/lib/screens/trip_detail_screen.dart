@@ -656,7 +656,10 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.circle, size: 8, color: Color(0xFF0F8B8D), margin: EdgeInsets.only(top: 6)),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: Icon(Icons.circle, size: 8, color: Color(0xFF0F8B8D)),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
