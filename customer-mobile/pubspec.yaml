@@ -10,10 +10,10 @@ dependencies:
   flutter:
     sdk: flutter
 
-  cupertino_icons: ^1.0.5
-  google_fonts: ^6.1.0
-  intl: ^0.18.1
-  qr_flutter: ^4.1.0
+  cupertino_icons: any
+  google_fonts: any
+  intl: any
+  qr_flutter: any
 
 dev_dependencies:
   flutter_test:
