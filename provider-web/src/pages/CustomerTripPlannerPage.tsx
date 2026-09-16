@@ -1,8 +1,127 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import type { TripPlan, TripChecklistItem, TripSavingsLog, PackageItem } from '../types';
-import { Target, Calendar, Users, Wallet, Plus, CheckCircle2, Circle, Sparkles, TrendingUp, Compass, ArrowRight, RefreshCw } from 'lucide-react';
+import { Target, Calendar, Users, Wallet, CheckCircle2, Circle, Sparkles, Compass, RefreshCw } from 'lucide-react';
+
+const getTodayIsoDate = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDateIndo = (dateStr: string) => {
+  if (!dateStr) return 'Pilih tanggal trip';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+const formatRupiah = (val: number) => {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+};
+
+const CATALOG_PACKAGES: PackageItem[] = [
+  {
+    id: 'pkg_palu',
+    name: 'Open Trip Palu & Teluk Tomini 3D2N',
+    destination: 'Palu, Sulawesi Tengah',
+    price: 'Rp 1.450.000',
+    quota: '10 Pax',
+    schedule: 'Tersedia tiap weekend',
+    status: 'Aktif',
+    rating: 4.9,
+    image: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600',
+    tripType: 'Open Trip'
+  },
+  {
+    id: 'pkg_rajaampat',
+    name: 'Private Trip Wisata Raja Ampat 4D3N',
+    destination: 'Raja Ampat, Papua Barat',
+    price: 'Rp 3.850.000',
+    quota: '8 Pax',
+    schedule: 'Fleksibel',
+    status: 'Aktif',
+    rating: 5.0,
+    image: 'https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600',
+    tripType: 'Private Trip'
+  },
+  {
+    id: 'pkg_bali',
+    name: 'Honeymoon Romantic Bali Villa 3D2N',
+    destination: 'Denpasar & Ubud, Bali',
+    price: 'Rp 2.950.000',
+    quota: '2 Pax',
+    schedule: 'Fleksibel',
+    status: 'Aktif',
+    rating: 5.0,
+    image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=600',
+    tripType: 'Honeymoon'
+  },
+  {
+    id: 'pkg_bromo',
+    name: 'Open Trip Gunung Bromo Sunrise',
+    destination: 'Probolinggo, Jawa Timur',
+    price: 'Rp 350.000',
+    quota: '15 Pax',
+    schedule: 'Setiap Hari',
+    status: 'Aktif',
+    rating: 4.8,
+    image: 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=600',
+    tripType: 'Open Trip'
+  },
+  {
+    id: 'pkg_tidung',
+    name: 'Open Trip Pulau Tidung Kepulauan Seribu',
+    destination: 'Kepulauan Seribu, Jakarta',
+    price: 'Rp 450.000',
+    quota: '12 Pax',
+    schedule: 'Setiap Sabtu-Minggu',
+    status: 'Aktif',
+    rating: 4.7,
+    image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600',
+    tripType: 'Open Trip'
+  },
+  {
+    id: 'pkg_cilember',
+    name: 'Trip Curug Cilember & Puncak',
+    destination: 'Bogor, Jawa Barat',
+    price: 'Rp 275.000',
+    quota: '10 Pax',
+    schedule: 'Weekend',
+    status: 'Aktif',
+    rating: 4.6,
+    image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=600',
+    tripType: 'Open Trip'
+  },
+  {
+    id: 'pkg_bandung',
+    name: 'Bandung City Tour & Lembang',
+    destination: 'Bandung, Jawa Barat',
+    price: 'Rp 420.000',
+    quota: '15 Pax',
+    schedule: 'Weekend',
+    status: 'Aktif',
+    rating: 4.9,
+    image: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=600',
+    tripType: 'Open Trip'
+  },
+  {
+    id: 'pkg_jogja',
+    name: 'Family Vacation Yogyakarta & Borobudur',
+    destination: 'Yogyakarta, DI Yogyakarta',
+    price: 'Rp 850.000',
+    quota: '15 Pax',
+    schedule: 'Fleksibel',
+    status: 'Aktif',
+    rating: 4.9,
+    image: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=600',
+    tripType: 'Family'
+  }
+];
 
 export const CustomerTripPlannerPage: React.FC = () => {
   const { customerProfile, navigateTo } = useNavigation();
@@ -16,9 +135,12 @@ export const CustomerTripPlannerPage: React.FC = () => {
 
   // Form state
   const [destination, setDestination] = useState('');
-  const [targetMonth, setTargetMonth] = useState('');
+  const [targetDate, setTargetDate] = useState(getTodayIsoDate());
   const [participants, setParticipants] = useState<number>(2);
   const [targetBudget, setTargetBudget] = useState<string>('');
+
+  // Date input ref
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Savings log modal / input
   const [showSavingsModal, setShowSavingsModal] = useState(false);
@@ -32,27 +154,6 @@ export const CustomerTripPlannerPage: React.FC = () => {
   const [matchingPackages, setMatchingPackages] = useState<PackageItem[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
 
-  // Generate available future months starting from current month
-  const generateFutureMonths = () => {
-    const months = [];
-    const now = new Date();
-    const monthNames = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-    ];
-    for (let i = 0; i < 24; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const val = `${yyyy}-${mm}`;
-      const label = `${monthNames[d.getMonth()]} ${yyyy}`;
-      months.push({ val, label });
-    }
-    return months;
-  };
-
-  const availableMonths = generateFutureMonths();
-
   // Load existing plan from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
@@ -65,11 +166,20 @@ export const CustomerTripPlannerPage: React.FC = () => {
       }
     } else {
       setIsEditing(true);
-      if (availableMonths.length > 0) {
-        setTargetMonth(availableMonths[2]?.val || availableMonths[0].val);
-      }
+      setTargetDate(getTodayIsoDate());
     }
   }, [storageKey]);
+
+  // Filter packages matching destination
+  const filterMatchingPackages = (allList: PackageItem[], destInput: string) => {
+    if (!destInput) return [];
+    const query = destInput.toLowerCase().trim();
+    return allList.filter(pkg => {
+      const pkgDest = (pkg.destination || '').toLowerCase();
+      const pkgName = (pkg.name || '').toLowerCase();
+      return pkgDest.includes(query) || pkgName.includes(query) || query.includes(pkgDest);
+    });
+  };
 
   // Fetch matching packages when plan exists
   useEffect(() => {
@@ -77,15 +187,23 @@ export const CustomerTripPlannerPage: React.FC = () => {
       setLoadingPackages(true);
       request('/public/packages')
         .then((data: any) => {
-          const list: PackageItem[] = Array.isArray(data) ? data : (data?.data || []);
-          const destLower = plan.destination.toLowerCase();
-          const filtered = list.filter(pkg =>
-            pkg.destination.toLowerCase().includes(destLower) ||
-            pkg.name.toLowerCase().includes(destLower)
-          );
-          setMatchingPackages(filtered.length > 0 ? filtered : list.slice(0, 3));
+          const apiList: PackageItem[] = Array.isArray(data) ? data : (data?.data || []);
+          // Combine API list with fallback catalog
+          const combined = [...apiList];
+          CATALOG_PACKAGES.forEach(catPkg => {
+            if (!combined.some(p => p.id === catPkg.id || p.name === catPkg.name)) {
+              combined.push(catPkg);
+            }
+          });
+
+          const filtered = filterMatchingPackages(combined, plan.destination);
+          setMatchingPackages(filtered);
         })
-        .catch(err => console.error(err))
+        .catch(err => {
+          console.error('Error fetching packages:', err);
+          const filtered = filterMatchingPackages(CATALOG_PACKAGES, plan.destination);
+          setMatchingPackages(filtered);
+        })
         .finally(() => setLoadingPackages(false));
     }
   }, [plan?.destination]);
@@ -103,13 +221,12 @@ export const CustomerTripPlannerPage: React.FC = () => {
       return;
     }
 
-    const selectedMonthObj = availableMonths.find(m => m.val === targetMonth);
-    const monthLabel = selectedMonthObj ? selectedMonthObj.label : targetMonth;
+    const formattedDateLabel = formatDateIndo(targetDate);
 
     const defaultChecklist: TripChecklistItem[] = [
       { id: '1', label: 'Tentukan Destinasi & Target Budget Liburan', completed: true },
-      { id: '2', label: 'Capai 50% Tabungan Perjalanan', completed: (plan?.savedAmount || 0) >= (numBudget * 0.5) },
-      { id: '3', label: 'Capai 100% Target Tabungan', completed: (plan?.savedAmount || 0) >= numBudget },
+      { id: '2', label: 'Capai 50% Tabungan Perjalanan', completed: false },
+      { id: '3', label: 'Capai 100% Target Tabungan', completed: false },
       { id: '4', label: 'Cari & Pesan Paket Open Trip di TemenTrip', completed: false },
       { id: '5', label: 'Siapkan Barang Bawaan & Pakaian Liburan', completed: false },
       { id: '6', label: 'Siap Berangkat & Nikmati Liburan! 🥳', completed: false },
@@ -118,8 +235,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
     const newPlan: TripPlan = {
       id: plan?.id || `plan_${Date.now()}`,
       destination: destination.trim(),
-      targetMonth,
-      targetMonthLabel: monthLabel,
+      targetMonth: targetDate,
+      targetMonthLabel: formattedDateLabel,
       participants: Number(participants) || 1,
       targetBudget: numBudget,
       savedAmount: plan?.savedAmount || 0,
@@ -152,21 +269,9 @@ export const CustomerTripPlannerPage: React.FC = () => {
       note: savingsNote.trim() || 'Tabungan bulanan'
     };
 
-    // Update checklist milestones
-    const updatedChecklist = plan.checklist.map(item => {
-      if (item.id === '2' && newSavedAmount >= plan.targetBudget * 0.5) {
-        return { ...item, completed: true };
-      }
-      if (item.id === '3' && newSavedAmount >= plan.targetBudget) {
-        return { ...item, completed: true };
-      }
-      return item;
-    });
-
     const updatedPlan: TripPlan = {
       ...plan,
       savedAmount: newSavedAmount,
-      checklist: updatedChecklist,
       savingsLogs: [newLog, ...plan.savingsLogs],
       updatedAt: new Date().toISOString()
     };
@@ -181,6 +286,9 @@ export const CustomerTripPlannerPage: React.FC = () => {
   // Toggle Checklist
   const handleToggleChecklist = (id: string) => {
     if (!plan) return;
+    // Items 1, 2, and 3 are automatically calculated based on savings progress
+    if (id === '1' || id === '2' || id === '3') return;
+
     const updatedChecklist = plan.checklist.map(item =>
       item.id === id ? { ...item, completed: !item.completed } : item
     );
@@ -207,29 +315,28 @@ export const CustomerTripPlannerPage: React.FC = () => {
     setNewChecklistItem('');
   };
 
-  // Format currency
-  const formatRupiah = (val: number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
-  };
-
   // Calculate percentage
   const savedPercentage = plan ? Math.min(100, Math.round((plan.savedAmount / plan.targetBudget) * 100)) : 0;
   const remainingBudget = plan ? Math.max(0, plan.targetBudget - plan.savedAmount) : 0;
 
-  // Check if target month is current or past
-  const now = new Date();
-  const currentMonthIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const isTargetMonthReached = plan ? plan.targetMonth <= currentMonthIso : false;
+  // Helper to determine if a checklist item is completed (dynamically for 1, 2, 3)
+  const isItemCompleted = (item: TripChecklistItem): boolean => {
+    if (!plan) return item.completed;
+    if (item.id === '1') return true; // Destinasi & Target Budget set
+    if (item.id === '2') return plan.savedAmount >= (plan.targetBudget * 0.5); // 50% reached
+    if (item.id === '3') return plan.savedAmount >= plan.targetBudget; // 100% reached
+    return item.completed;
+  };
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '32px 16px' }}>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '32px 16px', fontFamily: 'Inter, sans-serif' }}>
       <div style={{ maxWidth: '960px', margin: '0 auto' }}>
         
         {/* Header Title */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Target size={28} color="#0f8b8d" /> Rencana Trip & Target Tabungan
+              <Target size={28} color="#0f8b8d" /> Rencana Trip &amp; Target Tabungan
             </h1>
             <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0 }}>
               Susun liburan impianmu, atur target tabungan bulanan, dan pantau persiapan trip dengan mudah.
@@ -240,7 +347,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
             <button
               onClick={() => {
                 setDestination(plan.destination);
-                setTargetMonth(plan.targetMonth);
+                setTargetDate(plan.targetMonth || getTodayIsoDate());
                 setParticipants(plan.participants);
                 setTargetBudget(plan.targetBudget.toString());
                 setIsEditing(true);
@@ -281,7 +388,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: Bali, Labuan Bajo, Raja Ampat, Bandung..."
+                  placeholder="Contoh: Palu, Raja Ampat, Bali, Bandung..."
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
                   style={{
@@ -291,38 +398,69 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     border: '1.5px solid #cbd5e1',
                     fontSize: '14px',
                     fontWeight: '600',
-                    outline: 'none'
+                    outline: 'none',
+                    boxSizing: 'border-box'
                   }}
                   required
                 />
               </div>
 
-              {/* Rencana Waktu (Bulan & Tahun) */}
+              {/* Rencana Waktu Keberangkatan dengan Kalender Picker */}
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px', textTransform: 'uppercase' }}>
-                  Rencana Bulan Keberangkatan <span style={{ color: '#ef4444' }}>*</span>
+                  Rencana Waktu Keberangkatan <span style={{ color: '#ef4444' }}>*</span>
                 </label>
-                <select
-                  value={targetMonth}
-                  onChange={(e) => setTargetMonth(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    border: '1.5px solid #cbd5e1',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    outline: 'none',
-                    backgroundColor: '#ffffff',
-                    cursor: 'pointer'
+                <div 
+                  onClick={() => {
+                    if (dateInputRef.current) {
+                      if (typeof dateInputRef.current.showPicker === 'function') {
+                        dateInputRef.current.showPicker();
+                      } else {
+                        dateInputRef.current.focus();
+                      }
+                    }
                   }}
+                  style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
                 >
-                  {availableMonths.map(m => (
-                    <option key={m.val} value={m.val}>{m.label}</option>
-                  ))}
-                </select>
+                  <div
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: targetDate ? '#0f172a' : '#94a3b8',
+                      backgroundColor: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span>{formatDateIndo(targetDate)}</span>
+                    <Calendar size={18} color="#0f8b8d" />
+                  </div>
+                  <input 
+                    ref={dateInputRef}
+                    type="date" 
+                    min={getTodayIsoDate()}
+                    value={targetDate}
+                    onChange={(e) => setTargetDate(e.target.value)}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0,
+                      cursor: 'pointer'
+                    }}
+                    required
+                  />
+                </div>
                 <span style={{ fontSize: '10.5px', color: '#94a3b8', display: 'block', marginTop: '4px' }}>
-                  Bulan sebelum saat ini di-lock secara otomatis.
+                  Tanggal sebelum hari ini di-lock secara otomatis.
                 </span>
               </div>
 
@@ -344,7 +482,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     border: '1.5px solid #cbd5e1',
                     fontSize: '14px',
                     fontWeight: '600',
-                    outline: 'none'
+                    outline: 'none',
+                    boxSizing: 'border-box'
                   }}
                   required
                 />
@@ -371,7 +510,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     fontSize: '14px',
                     fontWeight: '700',
                     color: '#0f8b8d',
-                    outline: 'none'
+                    outline: 'none',
+                    boxSizing: 'border-box'
                   }}
                   required
                 />
@@ -453,102 +593,65 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     boxShadow: '0 4px 14px rgba(15,139,141,0.3)'
                   }}
                 >
-                  <Plus size={18} /> Catat Tabungan Bulan Ini
+                  <Wallet size={16} /> + Catat Tabungan Bulan Ini
                 </button>
               </div>
 
-              {/* Progress Bar */}
-              <div style={{ backgroundColor: '#f8fafc', borderRadius: '16px', padding: '16px', border: '1px solid #f1f5f9' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <TrendingUp size={16} color="#0f8b8d" /> Progres Tabungan
-                  </span>
-                  <strong style={{ fontSize: '16px', fontWeight: '900', color: '#0f8b8d' }}>
-                    {savedPercentage}%
-                  </strong>
+              {/* Savings Progress Bar */}
+              <div style={{ backgroundColor: '#f8fafc', borderRadius: '16px', padding: '18px', border: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', color: '#334155', marginBottom: '8px' }}>
+                  <span>📈 Progres Tabungan</span>
+                  <span style={{ color: '#0f8b8d' }}>{savedPercentage}%</span>
                 </div>
-
-                <div style={{ height: '14px', backgroundColor: '#e2e8f0', borderRadius: '10px', overflow: 'hidden', marginBottom: '12px' }}>
+                
+                <div style={{ width: '100%', height: '10px', backgroundColor: '#e2e8f0', borderRadius: '10px', overflow: 'hidden', marginBottom: '14px' }}>
                   <div
                     style={{
-                      height: '100%',
                       width: `${savedPercentage}%`,
-                      backgroundColor: savedPercentage >= 100 ? '#10b981' : '#0f8b8d',
+                      height: '100%',
+                      backgroundColor: '#0f8b8d',
                       borderRadius: '10px',
                       transition: 'width 0.5s ease-in-out'
                     }}
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', textAlign: 'center' }}>
-                  <div style={{ backgroundColor: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Terkumpul</span>
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#10b981' }}>{formatRupiah(plan.savedAmount)}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                  <div style={{ backgroundColor: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Terkumpul</div>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#10b981', marginTop: '2px' }}>
+                      {formatRupiah(plan.savedAmount)}
+                    </div>
                   </div>
-                  <div style={{ backgroundColor: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Target Total</span>
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>{formatRupiah(plan.targetBudget)}</div>
+                  <div style={{ backgroundColor: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Target Total</div>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>
+                      {formatRupiah(plan.targetBudget)}
+                    </div>
                   </div>
-                  <div style={{ backgroundColor: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Sisa Dibutuhkan</span>
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: remainingBudget > 0 ? '#ef4444' : '#10b981' }}>
-                      {remainingBudget > 0 ? formatRupiah(remainingBudget) : 'Lunas 🎉'}
+                  <div style={{ backgroundColor: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Sisa Dibutuhkan</div>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#ef4444', marginTop: '2px' }}>
+                      {formatRupiah(remainingBudget)}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Motivational Alert Box */}
-            <div
-              style={{
-                borderRadius: '20px',
-                padding: '20px',
-                marginBottom: '24px',
-                backgroundColor: savedPercentage >= 100 ? '#ecfdf5' : (isTargetMonthReached ? '#fff7ed' : '#e6f4f4'),
-                border: `1.5px solid ${savedPercentage >= 100 ? '#a7f3d0' : (isTargetMonthReached ? '#fed7aa' : '#b2e2e2')}`,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px'
-              }}
-            >
-              <div style={{ fontSize: '32px' }}>
-                {savedPercentage >= 100 ? '🥳' : (isTargetMonthReached ? '⏳' : '💪')}
-              </div>
-              <div style={{ flex: 1 }}>
-                <h4 style={{ margin: '0 0 4px 0', fontSize: '14.5px', fontWeight: '800', color: savedPercentage >= 100 ? '#065f46' : (isTargetMonthReached ? '#9a3412' : '#0d5c5e') }}>
-                  {savedPercentage >= 100
-                    ? 'SELAMAT! Target Tabungan 100% Terkumpul!'
-                    : (isTargetMonthReached ? 'Bulan Target Tiba, Tabungan Belum 100%' : 'Semangat! Tinggal Sedikit Lagi!')}
+            {/* Motivation Box */}
+            <div style={{ backgroundColor: '#e6f4f4', borderRadius: '20px', padding: '18px 24px', border: '1px solid #b2e0e0', marginBottom: '28px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <span style={{ fontSize: '28px' }}>💪</span>
+              <div>
+                <h4 style={{ fontSize: '14.5px', fontWeight: '800', color: '#0f8b8d', margin: '0 0 2px 0' }}>
+                  {savedPercentage >= 100 ? 'Hore! Target Tabunganmu Sudah Tercapai! 🎉' : 'Semangat! Tinggal Sedikit Lagi!'}
                 </h4>
-                <p style={{ margin: 0, fontSize: '13px', color: savedPercentage >= 100 ? '#047857' : (isTargetMonthReached ? '#c2410c' : '#0f8b8d'), lineHeight: 1.4 }}>
+                <p style={{ fontSize: '12.5px', color: '#334155', margin: 0, fontWeight: '500' }}>
                   {savedPercentage >= 100
-                    ? `Tabungan liburan kamu ke ${plan.destination} sudah terkumpul penuh (${formatRupiah(plan.savedAmount)}). Yuk langsung cari dan pesan paket trip di bawah ini!`
-                    : (isTargetMonthReached
-                        ? `Bulan target (${plan.targetMonthLabel}) sudah tiba namun tabungan baru ${savedPercentage}%. Jangan berkecil hati! Yuk tambah tabungan sedikit lagi atau undurkan target bulan agar trip-mu tetap terwujud!`
-                        : `Ayo semangat! Tinggal sedikit lagi nih tabungan kamu terkumpul untuk liburan impian ke ${plan.destination}! Yuk sisihkan tabungan bulan ini! ✨`
-                      )}
+                    ? `Tabungan untuk liburan impian ke ${plan.destination} sudah terkumpul 100%. Yuk langsung booking paketnya!`
+                    : `Ayo semangat! Tinggal sedikit lagi nih tabungan kamu terkumpul untuk liburan impian ke ${plan.destination}! Yuk sisihkan tabungan bulan ini! ✨`}
                 </p>
               </div>
-
-              {savedPercentage >= 100 && (
-                <button
-                  onClick={() => navigateTo('cari-trip')}
-                  style={{
-                    backgroundColor: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    padding: '10px 18px',
-                    borderRadius: '12px',
-                    fontSize: '13px',
-                    fontWeight: '800',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  Pesan Trip Sekarang <ArrowRight size={14} style={{ display: 'inline', verticalAlign: '-2px' }} />
-                </button>
-              )}
             </div>
 
             {/* Grid 2 Columns: Interactive Checklist & History Tabungan */}
@@ -561,39 +664,43 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 </h3>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-                  {plan.checklist.map(item => (
-                    <div
-                      key={item.id}
-                      onClick={() => handleToggleChecklist(item.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        backgroundColor: item.completed ? '#f0fdf4' : '#f8fafc',
-                        border: `1px solid ${item.completed ? '#bbf7d0' : '#e2e8f0'}`,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      {item.completed ? (
-                        <CheckCircle2 size={18} color="#10b981" />
-                      ) : (
-                        <Circle size={18} color="#94a3b8" />
-                      )}
-                      <span
+                  {plan.checklist.map(item => {
+                    const completed = isItemCompleted(item);
+                    const isAutomated = item.id === '1' || item.id === '2' || item.id === '3';
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => handleToggleChecklist(item.id)}
                         style={{
-                          fontSize: '13px',
-                          fontWeight: item.completed ? '700' : '600',
-                          color: item.completed ? '#166534' : '#334155',
-                          textDecoration: item.completed ? 'line-through' : 'none'
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '10px 14px',
+                          borderRadius: '12px',
+                          backgroundColor: completed ? '#f0fdf4' : '#f8fafc',
+                          border: `1px solid ${completed ? '#bbf7d0' : '#e2e8f0'}`,
+                          cursor: isAutomated ? 'default' : 'pointer',
+                          transition: 'all 0.2s ease'
                         }}
                       >
-                        {item.label}
-                      </span>
-                    </div>
-                  ))}
+                        {completed ? (
+                          <CheckCircle2 size={18} color="#10b981" />
+                        ) : (
+                          <Circle size={18} color="#94a3b8" />
+                        )}
+                        <span
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: completed ? '700' : '600',
+                            color: completed ? '#166534' : '#334155',
+                            textDecoration: completed ? 'line-through' : 'none'
+                          }}
+                        >
+                          {item.label}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Add Custom Checklist Item */}
@@ -657,7 +764,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       >
                         <div>
                           <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>{log.date}</div>
-                          <div style={{ fontSize: '12.5px', color: '#334155', fontWeight: '700' }}>{log.note || 'Tabungan'}</div>
+                          <div style={{ fontSize: '12.5px', color: '#334155', fontWeight: '700' }}>{log.note || 'Tabungan bulanan'}</div>
                         </div>
                         <strong style={{ fontSize: '13.5px', color: '#10b981', fontWeight: '800' }}>
                           + {formatRupiah(log.amount)}
@@ -669,7 +776,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Rekomendasi Paket Open Trip Sesuaian */}
+            {/* Rekomendasi Paket Open Trip Sesuaian Destinasi */}
             <div style={{ marginTop: '32px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -686,8 +793,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
               {loadingPackages ? (
                 <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>Memuat rekomendasi paket...</div>
               ) : matchingPackages.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '32px', backgroundColor: '#ffffff', borderRadius: '16px', color: '#64748b', fontSize: '13px' }}>
-                  Belum ada paket trip spesifik untuk lokasi ini. Silakan cek halaman paket trip untuk pilihan destinasi populer lainnya.
+                <div style={{ textAlign: 'center', padding: '32px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '13.5px' }}>
+                  Belum ada paket trip spesifik untuk lokasi <strong>{plan.destination}</strong>. Silakan cek halaman cari trip untuk pilihan destinasi populer lainnya.
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
@@ -752,26 +859,26 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     }}
                     style={{
                       width: '100%',
-                      padding: '12px 16px',
+                      padding: '10px 14px',
                       borderRadius: '12px',
                       border: '1.5px solid #cbd5e1',
-                      fontSize: '15px',
-                      fontWeight: '800',
-                      color: '#10b981',
-                      outline: 'none'
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: '#0f8b8d',
+                      outline: 'none',
+                      boxSizing: 'border-box'
                     }}
                     required
-                    autoFocus
                   />
                 </div>
 
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px' }}>
-                    Catatan / Sumber (Opsional)
+                    Catatan Opsional
                   </label>
                   <input
                     type="text"
-                    placeholder="Contoh: Gaji bulan September, Bonus..."
+                    placeholder="Contoh: Gaji bulan ini, Bonus proyek..."
                     value={savingsNote}
                     onChange={(e) => setSavingsNote(e.target.value)}
                     style={{
@@ -780,7 +887,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       borderRadius: '12px',
                       border: '1px solid #cbd5e1',
                       fontSize: '13px',
-                      outline: 'none'
+                      outline: 'none',
+                      boxSizing: 'border-box'
                     }}
                   />
                 </div>
@@ -810,9 +918,10 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       border: 'none',
                       backgroundColor: '#0f8b8d',
                       color: '#ffffff',
-                      fontSize: '13.5px',
+                      fontSize: '13px',
                       fontWeight: '800',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(15,139,141,0.25)'
                     }}
                   >
                     Simpan Tabungan
