@@ -41,7 +41,11 @@ func (r *packageRepository) FindAllByProvider(providerID uint) ([]models.Package
 
 func (r *packageRepository) FindAllPublic() ([]models.Package, error) {
 	var packages []models.Package
-	err := r.db.Where("status = ?", "Aktif").Order("id desc").Find(&packages).Error
+	err := r.db.
+		Joins("JOIN providers ON providers.id = packages.provider_id").
+		Where("packages.status = ? AND providers.role = ? AND providers.status = ? AND providers.is_verified = ?", "Aktif", "PROVIDER", "APPROVED", true).
+		Order("packages.id desc").
+		Find(&packages).Error
 	return packages, err
 }
 

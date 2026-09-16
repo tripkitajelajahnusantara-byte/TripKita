@@ -30,7 +30,6 @@ export function getRouteFromHash(): Route {
   if (hash.includes('/customer-checkout')) return 'customer-checkout';
   if (hash.includes('/customer-confirmation')) return 'customer-confirmation';
   if (hash.includes('/halaman-pembayaran')) return 'halaman-pembayaran';
-  if (hash.includes('/xendit-checkout')) return 'xendit-checkout';
   if (hash.includes('/paket-detail')) return 'paket-detail';
   if (hash.includes('/partner-landing')) return 'partner-landing';
   if (hash.includes('/tentang-kami')) return 'tentang-kami';
@@ -60,7 +59,6 @@ export function getHashFromRoute(r: Route): string {
     case 'customer-checkout': return '#/customer-checkout';
     case 'customer-confirmation': return '#/customer-confirmation';
     case 'halaman-pembayaran': return '#/halaman-pembayaran';
-    case 'xendit-checkout': return '#/xendit-checkout';
     case 'paket-detail': return '#/paket-detail';
     case 'partner-landing': return '#/partner-landing';
     case 'tentang-kami': return '#/tentang-kami';
@@ -221,7 +219,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
   const [selectedPackageForDetail, setSelectedPackageForDetail] = useState<any>(null);
-  const [selectedProviderId, setSelectedProviderId] = useState<number | null>(1);
+  const [selectedProviderId, setSelectedProviderId] = useState<number | null>(null);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<any>(null);
 
   const [searchParams, setSearchParams] = useState({
@@ -360,17 +358,20 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const routeParam = params.get('route');
+	const params = new URLSearchParams(window.location.search);
+	const oauthCode = params.get('oauth_code');
+	const routeParam = params.get('route');
 
-    if (token) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      // Fetch profile using token
-      request('/provider/profile', {
-        headers: { Authorization: `Bearer ${token}` }
-      }).then((data) => {
-        if (data?.role === 'CUSTOMER') {
+	if (oauthCode) {
+	  window.history.replaceState({}, document.title, window.location.pathname);
+	  request('/public/auth/google/exchange', {
+		method: 'POST',
+		body: JSON.stringify({ code: oauthCode })
+	  }).then((result) => {
+		const data = result.provider;
+		const token = result.token;
+		if (!data || !token) throw new Error('OAuth exchange response tidak valid');
+		if (data?.role === 'CUSTOMER') {
           setCustomerToken(token);
           setCustomerProfile(data);
           setProviderProfile(null);
@@ -384,10 +385,10 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
           if (routeParam === 'profil-provider') navigateTo('profil-provider');
           else navigateTo('dashboard');
         }
-      }).catch((err) => {
-        console.error('Token verification failed:', err);
-        fetchSessionProfile(route);
-      });
+	  }).catch((err) => {
+		console.error('Token verification failed:', err);
+		fetchSessionProfile(route);
+	  });
     } else {
       fetchSessionProfile(route);
     }

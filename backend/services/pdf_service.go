@@ -187,7 +187,7 @@ Tim Keuangan & Partner Hub TemenTrip
 		payout.BankName,
 		payout.BankAccount,
 		payout.BankAccountName,
-		formatIDRNumber(int64(payout.Amount)),
+		formatIDRNumber(payout.Amount),
 	)
 
 	pdfBuf := createSimplePDFDocument("BUKTI PENCAIRAN DANA TEMENTRIP", pdfContent)

@@ -1,14 +1,15 @@
 package controllers
 
 import (
+	"crypto/subtle"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
 	"tripkita-provider/config"
 	"tripkita-provider/models"
@@ -33,7 +34,7 @@ func (ctrl *BookingController) GetAll(c *gin.Context) {
 
 	bookings, err := ctrl.service.GetAllBookings(providerID.(uint))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat booking provider", err)
 		return
 	}
 
@@ -49,7 +50,7 @@ func (ctrl *BookingController) GetCustomerBookings(c *gin.Context) {
 
 	bookings, err := ctrl.service.GetCustomerBookings(customerID.(uint))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat booking pelanggan", err)
 		return
 	}
 
@@ -64,35 +65,32 @@ func (ctrl *BookingController) GetPublicStatus(c *gin.Context) {
 		return
 	}
 
-	// Ownership validation: If booking is associated with a customer account
+	// Account bookings are visible only to their owner, provider, or admin.
+	// Guest tracking receives a deliberately redacted view.
 	if booking.CustomerID != nil && *booking.CustomerID > 0 {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		callerID, hasID := c.Get("provider_id")
+		callerRole, _ := c.Get("role")
+		if !hasID {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Otentikasi diperlukan untuk mengakses data pesanan ini"})
 			return
 		}
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		token, parseErr := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-			return []byte(ctrl.cfg.JWTSecret), nil
-		})
-		if parseErr != nil || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi Anda telah berakhir, silakan masuk kembali"})
-			return
-		}
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Format sesi tidak valid"})
-			return
-		}
-		callerIDFloat, ok := claims["provider_id"].(float64)
-		callerRole, _ := claims["role"].(string)
-		if !ok || (uint(callerIDFloat) != *booking.CustomerID && callerRole != "ADMIN" && uint(callerIDFloat) != booking.ProviderID) {
+		id := callerID.(uint)
+		if (callerRole == "CUSTOMER" && id != *booking.CustomerID) || (callerRole == "PROVIDER" && id != booking.ProviderID) || (callerRole != "CUSTOMER" && callerRole != "PROVIDER" && callerRole != "ADMIN") {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki akses untuk melihat data pesanan ini"})
 			return
 		}
+		c.JSON(http.StatusOK, booking)
+		return
 	}
 
-	c.JSON(http.StatusOK, booking)
+	c.JSON(http.StatusOK, gin.H{
+		"bookingCode":    booking.BookingCode,
+		"status":         booking.Status,
+		"tripDate":       booking.TripDate,
+		"guests":         booking.Guests,
+		"totalPrice":     booking.TotalPrice,
+		"packageDetails": gin.H{"name": booking.Package.Name},
+	})
 }
 
 func (ctrl *BookingController) UpdateStatus(c *gin.Context) {
@@ -117,7 +115,7 @@ func (ctrl *BookingController) UpdateStatus(c *gin.Context) {
 
 	booking, err := ctrl.service.UpdateBookingStatus(uint(id), providerID.(uint), req.Status)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memperbarui status booking", err)
 		return
 	}
 
@@ -155,45 +153,16 @@ func (ctrl *BookingController) ProviderReschedule(c *gin.Context) {
 	c.JSON(http.StatusOK, booking)
 }
 
-func (ctrl *BookingController) PublicUpdateStatus(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		// Try finding by BookingCode if ID is not numeric
-		booking, err := ctrl.service.GetBookingByCode(idStr)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Booking not found"})
-			return
-		}
-		id = uint64(booking.ID)
-	}
-
-	var req models.UpdateBookingStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	booking, err := ctrl.service.PublicUpdateStatus(uint(id), req.Status)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, booking)
-}
-
-func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
+func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 	var req struct {
 		PackageID       uint      `json:"packageId"`
-		CustomerID      *uint     `json:"customerId"`
-		BookingCode     string    `json:"bookingCode"`
-		CustomerName    string    `json:"customerName" binding:"required"`
+		CustomerName    string    `json:"customerName" binding:"required,max=255"`
+		CustomerEmail   string    `json:"customerEmail" binding:"required,email,max=255"`
+		CustomerPhone   string    `json:"customerPhone" binding:"required,max=50"`
 		CustomerInitial string    `json:"customerInitial"`
 		Guests          int       `json:"guests" binding:"required,gt=0"`
-		TotalPrice      int64     `json:"totalPrice"`
 		TripDate        time.Time `json:"tripDate" binding:"required"`
-		PaymentMethod   string    `json:"paymentMethod"`
+		AddOnIDs        []string  `json:"addOnIds" binding:"max=10,dive,max=50"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -201,19 +170,26 @@ func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 	}
 
 	if req.PackageID == 0 {
-		req.PackageID = 1
+		c.JSON(http.StatusBadRequest, gin.H{"error": "packageId wajib diisi"})
+		return
 	}
 
 	booking := &models.Booking{
-		PackageID:       req.PackageID,
-		CustomerID:      req.CustomerID,
-		BookingCode:     req.BookingCode,
-		CustomerName:    req.CustomerName,
-		CustomerInitial: req.CustomerInitial,
-		Guests:          req.Guests,
-		TotalPrice:      req.TotalPrice,
-		TripDate:        req.TripDate,
-		PaymentMethod:   req.PaymentMethod,
+		PackageID:        req.PackageID,
+		CustomerName:     req.CustomerName,
+		CustomerEmail:    req.CustomerEmail,
+		CustomerPhone:    req.CustomerPhone,
+		CustomerInitial:  req.CustomerInitial,
+		Guests:           req.Guests,
+		TripDate:         req.TripDate,
+		PaymentMethod:    "Xendit Invoice",
+		SelectedAddOnIDs: req.AddOnIDs,
+	}
+	if role, _ := c.Get("role"); role == "CUSTOMER" {
+		if customerID, exists := c.Get("provider_id"); exists {
+			id := customerID.(uint)
+			booking.CustomerID = &id
+		}
 	}
 
 	if booking.CustomerInitial == "" && len(booking.CustomerName) > 0 {
@@ -221,11 +197,41 @@ func (ctrl *BookingController) CreateSimulatedBooking(c *gin.Context) {
 	}
 
 	if err := ctrl.service.CreateBooking(booking); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		var inputErr *services.BookingInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Error()})
+			return
+		}
+		var gatewayErr *services.BookingGatewayError
+		if errors.As(err, &gatewayErr) {
+			c.JSON(http.StatusBadGateway, gin.H{"error": gatewayErr.Error()})
+			return
+		}
+		log.Printf("gagal membuat booking: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Booking belum dapat dibuat"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, booking)
+}
+
+func (ctrl *BookingController) CustomerCancelBooking(c *gin.Context) {
+	customerID, exists := c.Get("provider_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		return
+	}
+	booking, err := ctrl.service.CancelBookingByCustomer(uint(id), customerID.(uint))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, booking)
 }
 
 func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
@@ -540,7 +546,7 @@ func (ctrl *BookingController) ProcessMockPayment(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.UpdateStatusByWebhook(booking.XenditInvoiceID, fmt.Sprintf("booking_%d", booking.ID), status, paymentMethod)
+	err = ctrl.service.UpdateStatusByWebhook(booking.XenditInvoiceID, fmt.Sprintf("booking_%d_mock", booking.ID), status, paymentMethod, booking.TotalPrice, "IDR")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -554,21 +560,24 @@ func (ctrl *BookingController) ProcessMockPayment(c *gin.Context) {
 }
 
 func (ctrl *BookingController) XenditWebhook(c *gin.Context) {
-	// Verify Xendit Callback Token header if XENDIT_WEBHOOK_TOKEN is configured in environment
-	if ctrl.cfg.XenditWebhookToken != "" {
-		callbackToken := c.GetHeader("x-callback-token")
-		if callbackToken != ctrl.cfg.XenditWebhookToken {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Invalid Xendit callback token"})
-			return
-		}
+	if ctrl.cfg.XenditWebhookToken == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Webhook belum dikonfigurasi"})
+		return
+	}
+	callbackToken := c.GetHeader("x-callback-token")
+	if len(callbackToken) != len(ctrl.cfg.XenditWebhookToken) || subtle.ConstantTimeCompare([]byte(callbackToken), []byte(ctrl.cfg.XenditWebhookToken)) != 1 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Invalid Xendit callback token"})
+		return
 	}
 
 	var req struct {
-		ID             string `json:"id"`
-		ExternalID     string `json:"external_id"`
-		Status         string `json:"status"`
-		PaymentMethod  string `json:"payment_method"`
-		PaymentChannel string `json:"payment_channel"`
+		ID             string `json:"id" binding:"required,max=255"`
+		ExternalID     string `json:"external_id" binding:"max=255"`
+		Status         string `json:"status" binding:"required,max=50"`
+		PaymentMethod  string `json:"payment_method" binding:"max=100"`
+		PaymentChannel string `json:"payment_channel" binding:"max=100"`
+		Amount         int64  `json:"amount" binding:"gte=0"`
+		Currency       string `json:"currency" binding:"max=10"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -583,9 +592,9 @@ func (ctrl *BookingController) XenditWebhook(c *gin.Context) {
 		payMethod = "Xendit Payment"
 	}
 
-	err := ctrl.service.UpdateStatusByWebhook(req.ID, req.ExternalID, req.Status, payMethod)
+	err := ctrl.service.UpdateStatusByWebhook(req.ID, req.ExternalID, req.Status, payMethod, req.Amount, req.Currency)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Webhook belum dapat diproses"})
 		return
 	}
 
@@ -595,7 +604,7 @@ func (ctrl *BookingController) XenditWebhook(c *gin.Context) {
 func (ctrl *BookingController) GetRefunds(c *gin.Context) {
 	refunds, err := ctrl.service.GetRefunds()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat daftar refund", err)
 		return
 	}
 	c.JSON(http.StatusOK, refunds)
@@ -610,42 +619,17 @@ func (ctrl *BookingController) CompleteRefund(c *gin.Context) {
 	}
 
 	if err := ctrl.service.CompleteRefund(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "menyelesaikan refund", err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Refund completed"})
 }
 
-func (ctrl *BookingController) UploadPaymentProof(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
-		return
-	}
-
-	var req struct {
-		PaymentProof string `json:"paymentProof" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	booking, err := ctrl.service.UploadPaymentProof(uint(id), req.PaymentProof)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, booking)
-}
-
 func (ctrl *BookingController) AdminListBookings(c *gin.Context) {
 	bookings, err := ctrl.service.AdminGetAllBookings()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat booking admin", err)
 		return
 	}
 	c.JSON(http.StatusOK, bookings)
@@ -661,7 +645,7 @@ func (ctrl *BookingController) AdminConfirmPayment(c *gin.Context) {
 
 	booking, err := ctrl.service.AdminConfirmPayment(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "mengonfirmasi pembayaran manual", err)
 		return
 	}
 

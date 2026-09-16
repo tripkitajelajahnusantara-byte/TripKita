@@ -146,22 +146,6 @@ export const LoginPage: React.FC = () => {
                 <p>{isAdminMode ? 'Masukkan email dan password akun administrator' : 'Masukkan email dan password akun provider Anda'}</p>
               </div>
 
-              {isAdminMode && (
-                <div style={{ backgroundColor: '#eff6ff', padding: '12px 14px', borderRadius: '10px', border: '1px solid #bfdbfe', marginBottom: '18px', fontSize: '13px', color: '#1e40af' }}>
-                  <div style={{ fontWeight: 700, marginBottom: '4px' }}>🛡️ Testing Login Admin Default:</div>
-                  <div style={{ fontSize: '12px', color: '#3b82f6', marginBottom: '8px' }}>
-                    Email: <strong>admin@tementrip.id</strong> | Pass: <strong>Admin123!</strong>
-                  </div>
-                  <button 
-                    type="button"
-                    onClick={() => { setEmail('admin@tementrip.id'); setPassword('Admin123!'); }}
-                    style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
-                  >
-                    ⚡ Isi Akun Admin Otomatis
-                  </button>
-                </div>
-              )}
-
               {error && <div className="error-alert">{error}</div>}
 
               {/* Email Input Field */}
@@ -691,53 +675,6 @@ export const LoginPage: React.FC = () => {
           height: 1px;
           background: var(--color-border);
           margin: 0 12px;
-        }
-
-        /* Demo Card */
-        .demo-account-card {
-          background-color: #f8fafc;
-          border: 1px solid var(--color-border);
-          border-radius: 12px;
-          padding: 16px;
-          text-align: center;
-        }
-
-        .demo-account-card h4 {
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--color-primary-dark);
-          margin-bottom: 10px;
-        }
-
-        .demo-credentials-text {
-          font-size: 11.5px;
-          color: var(--color-text-medium);
-          margin-bottom: 12px;
-          line-height: 1.6;
-        }
-
-        .demo-credentials-text p {
-          margin: 2px 0;
-        }
-
-        .use-demo-action-btn {
-          font-size: 12.5px;
-          font-weight: 600;
-          color: var(--color-accent);
-          transition: color 0.15s ease;
-          background: none;
-          border: none;
-          cursor: pointer;
-        }
-
-        .use-demo-action-btn:hover:not(:disabled) {
-          color: var(--color-accent-hover);
-          text-decoration: underline;
-        }
-
-        .use-demo-action-btn:disabled {
-          color: var(--color-text-light);
-          cursor: not-allowed;
         }
 
         /* Prompt */

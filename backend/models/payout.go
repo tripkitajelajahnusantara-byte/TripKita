@@ -10,8 +10,8 @@ type Payout struct {
 	Provider        *Provider `gorm:"foreignKey:ProviderID" json:"provider,omitempty"`
 	BookingID       *uint     `gorm:"index" json:"bookingId,omitempty"`
 	Booking         *Booking  `gorm:"foreignKey:BookingID" json:"booking,omitempty"`
-	Amount          float64   `gorm:"not null" json:"amount"`
-	Type            string    `gorm:"size:50;not null" json:"type"` // DP_50, PELUNASAN_50, FULL
+	Amount          int64     `gorm:"not null" json:"amount"`
+	Type            string    `gorm:"size:50;not null" json:"type"`                     // DP_50, PELUNASAN_50, FULL
 	Status          string    `gorm:"size:50;not null;default:'PENDING'" json:"status"` // PENDING, APPROVED, REJECTED
 	BankName        string    `gorm:"size:100;not null" json:"bankName"`
 	BankAccount     string    `gorm:"size:100;not null" json:"bankAccount"`
@@ -23,19 +23,19 @@ type Payout struct {
 }
 
 type CreatePayoutRequest struct {
-	Amount    float64 `json:"amount" binding:"required"`
-	Type      string  `json:"type" binding:"required"` // DP_50, PELUNASAN_50
-	BookingID *uint   `json:"bookingId"`
+	Amount    int64  `json:"amount" binding:"required,gt=0"`
+	Type      string `json:"type" binding:"required,oneof=DP_50 PELUNASAN_50"`
+	BookingID *uint  `json:"bookingId"`
 }
 
 type PayoutSummary struct {
-	TotalEarnings      float64  `json:"totalEarnings"`
-	PlatformFee        float64  `json:"platformFee"`
-	NetEarnings        float64  `json:"netEarnings"`
-	AvailableDP        float64  `json:"availableDp"`
-	AvailablePelunasan float64  `json:"availablePelunasan"`
-	HeldSettlement     float64  `json:"heldSettlement"`
-	TotalPaidOut       float64  `json:"totalPaidOut"`
-	PendingPayout      float64  `json:"pendingPayout"`
+	TotalEarnings      int64    `json:"totalEarnings"`
+	PlatformFee        int64    `json:"platformFee"`
+	NetEarnings        int64    `json:"netEarnings"`
+	AvailableDP        int64    `json:"availableDp"`
+	AvailablePelunasan int64    `json:"availablePelunasan"`
+	HeldSettlement     int64    `json:"heldSettlement"`
+	TotalPaidOut       int64    `json:"totalPaidOut"`
+	PendingPayout      int64    `json:"pendingPayout"`
 	Payouts            []Payout `json:"payouts"`
 }

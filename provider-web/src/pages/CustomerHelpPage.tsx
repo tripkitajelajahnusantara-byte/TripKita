@@ -45,8 +45,8 @@ export const CustomerHelpPage: React.FC = () => {
     {
       id: 'faq-4',
       category: 'grup-wa',
-      question: 'Bagaimana cara bergabung dengan WhatsApp Group Mitra / Pemandu Trip?',
-      answer: 'Setelah pembayaran berhasil, buka menu "Cek Booking" di bagian navigasi atas, masukkan Kode Booking Anda (contoh: TK-14108-xxxx), lalu klik tombol hijau "Join WA Group Mitra" untuk terhubung langsung dengan tour guide dan peserta lainnya.'
+      question: 'Bagaimana cara menghubungi provider setelah pembayaran?',
+      answer: 'Masuk ke akun Anda lalu buka riwayat booking. Setelah pembayaran terkonfirmasi, tombol "Hubungi Provider" akan tersedia bila provider memiliki nomor WhatsApp aktif.'
     },
     {
       id: 'faq-5',
@@ -93,7 +93,7 @@ export const CustomerHelpPage: React.FC = () => {
             <Search size={20} color="#0284c7" />
             <input 
               type="text" 
-              placeholder="Cari pertanyaan... (contoh: cara bayar, DP 50%, refund, WA Group)" 
+              placeholder="Cari pertanyaan... (contoh: cara bayar, DP 50%, refund, provider)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />

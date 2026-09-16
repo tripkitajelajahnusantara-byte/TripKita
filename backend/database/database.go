@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 
 	"tripkita-provider/config"
@@ -35,11 +36,15 @@ func ConnectDB(cfg *config.Config) {
 	}
 
 	var err error
+	logLevel := logger.Warn
+	if !cfg.IsProduction() {
+		logLevel = logger.Info
+	}
 	DB, err = gorm.Open(postgres.New(postgres.Config{
 		DSN:                  dsn,
 		PreferSimpleProtocol: true,
 	}), &gorm.Config{
-		Logger:      logger.Default.LogMode(logger.Info),
+		Logger:      logger.Default.LogMode(logLevel),
 		PrepareStmt: false,
 	})
 
@@ -48,127 +53,194 @@ func ConnectDB(cfg *config.Config) {
 	}
 
 	fmt.Println("Koneksi database berhasil terhubung")
-
-	// Jalankan Auto-Migration
-	err = DB.AutoMigrate(
-		&models.Provider{},
-		&models.Package{},
-		&models.Booking{},
-		&models.ProviderStatusHistory{},
-		&models.Payout{},
-		&models.Review{},
-		&models.ProviderBalance{},
-		&models.Notification{},
-		&models.HeldSettlement{},
-	)
+	sqlDB, err := DB.DB()
 	if err != nil {
-		log.Printf("[Catatan Migrasi] %v", err)
-	} else {
+		log.Fatalf("Gagal menyiapkan connection pool database: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+
+	if cfg.RunMigrations {
+		// Migration startup hanya untuk development atau deployment yang secara eksplisit mengaktifkannya.
+		err = DB.AutoMigrate(
+			&models.Provider{},
+			&models.Package{},
+			&models.Booking{},
+			&models.ProviderStatusHistory{},
+			&models.Payout{},
+			&models.Review{},
+			&models.ProviderBalance{},
+			&models.Notification{},
+			&models.HeldSettlement{},
+			&models.OAuthLoginCode{},
+		)
+		if err != nil {
+			log.Fatalf("Migrasi database gagal: %v", err)
+		}
 		fmt.Println("Migrasi database selesai")
+
+		// Ensure RLS (Row Level Security) is enabled on all tables for Supabase security compliance
+		DB.Exec(`ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;`)
+		DB.Exec(`ALTER TABLE IF EXISTS bookings ENABLE ROW LEVEL SECURITY;`)
+		DB.Exec(`ALTER TABLE IF EXISTS packages ENABLE ROW LEVEL SECURITY;`)
+		DB.Exec(`ALTER TABLE IF EXISTS providers ENABLE ROW LEVEL SECURITY;`)
+		DB.Exec(`ALTER TABLE IF EXISTS payouts ENABLE ROW LEVEL SECURITY;`)
+		DB.Exec(`ALTER TABLE IF EXISTS reviews ENABLE ROW LEVEL SECURITY;`)
+		DB.Exec(`ALTER TABLE IF EXISTS held_settlements ENABLE ROW LEVEL SECURITY;`)
+		DB.Exec(`ALTER TABLE IF EXISTS provider_balances ENABLE ROW LEVEL SECURITY;`)
+		DB.Exec(`ALTER TABLE IF EXISTS provider_status_histories ENABLE ROW LEVEL SECURITY;`)
+
+		// Pastikan kolom meeting_point, customer_email, customer_phone, description, included_facilities, excluded_facilities, itinerary ada di database Supabase
+		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS meeting_point TEXT;`)
+		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS description TEXT;`)
+		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS included_facilities TEXT;`)
+		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS excluded_facilities TEXT;`)
+		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS itinerary TEXT;`)
+		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 1;`)
+		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_guests INTEGER DEFAULT 1;`)
+		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_guests INTEGER DEFAULT 10;`)
+		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_age INTEGER DEFAULT 0;`)
+		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_age INTEGER DEFAULT 100;`)
+		DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT;`)
+		DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT;`)
+
+		// Update data titik kumpul spesifik untuk paket yang belum memiliki meeting_point
+		DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Bandung Door Selatan, Jl. Stasiun Barat No.1, Pasirkaliki, Kota Bandung, Jawa Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bandung%'`)
+		DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Malang Kota Baru (Door Depan Utama), Jl. Trunojoyo No.10, Klojen, Kota Malang, Jawa Timur' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bromo%'`)
+		DB.Exec(`UPDATE packages SET meeting_point = 'Dermaga 16 Marina Ancol, Jl. Lodan Timur No.7, Pademangan, Jakarta Utara' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Tidung%'`)
+		DB.Exec(`UPDATE packages SET meeting_point = 'Alfamart Melati Indah, Cengkareng / Rest Area Ciawi Km.45, Bogor, Jawa Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Cilember%'`)
+		DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Tugu Yogyakarta (Door Timur), Sosromenduran, Gedongtengen, Kota Yogyakarta, DI Yogyakarta' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Yogyakarta%'`)
+		DB.Exec(`UPDATE packages SET meeting_point = 'Bandara Marinda Waisai, Kabupaten Raja Ampat, Papua Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Raja Ampat%'`)
+		DB.Exec(`UPDATE packages SET meeting_point = 'Bandara Internasional I Gusti Ngurah Rai (Door Kedatangan Domestik), Badung, Bali' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bali%'`)
+
+		// Reset hardcoded 5.0 ratings for packages without reviews
+		DB.Exec(`UPDATE packages SET rating = 0 WHERE NOT EXISTS (SELECT 1 FROM reviews WHERE reviews.package_id = packages.id)`)
 	}
 
-	// Ensure RLS (Row Level Security) is enabled on all tables for Supabase security compliance
-	DB.Exec(`ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;`)
-	DB.Exec(`ALTER TABLE IF EXISTS bookings ENABLE ROW LEVEL SECURITY;`)
-	DB.Exec(`ALTER TABLE IF EXISTS packages ENABLE ROW LEVEL SECURITY;`)
-	DB.Exec(`ALTER TABLE IF EXISTS providers ENABLE ROW LEVEL SECURITY;`)
-	DB.Exec(`ALTER TABLE IF EXISTS payouts ENABLE ROW LEVEL SECURITY;`)
-	DB.Exec(`ALTER TABLE IF EXISTS reviews ENABLE ROW LEVEL SECURITY;`)
-	DB.Exec(`ALTER TABLE IF EXISTS held_settlements ENABLE ROW LEVEL SECURITY;`)
-	DB.Exec(`ALTER TABLE IF EXISTS provider_balances ENABLE ROW LEVEL SECURITY;`)
-	DB.Exec(`ALTER TABLE IF EXISTS provider_status_histories ENABLE ROW LEVEL SECURITY;`)
+	// Data demo tidak pernah dibuat otomatis di production.
+	if cfg.SeedDatabase {
+		if len(os.Getenv("DEV_ADMIN_PASSWORD")) < 8 || len(os.Getenv("DEV_PROVIDER_PASSWORD")) < 8 {
+			log.Fatal("DEV_ADMIN_PASSWORD dan DEV_PROVIDER_PASSWORD minimal 8 karakter saat SEED_DB=true")
+		}
+		SeedDatabase()
+		EnsureAdminUserExists()
+		EnsureAllTestProvidersAndSeats()
+	}
 
-	// Pastikan kolom meeting_point, customer_email, customer_phone, description, included_facilities, excluded_facilities, itinerary ada di database Supabase
-	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS meeting_point TEXT;`)
-	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS description TEXT;`)
-	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS included_facilities TEXT;`)
-	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS excluded_facilities TEXT;`)
-	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS itinerary TEXT;`)
-	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 1;`)
-	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_guests INTEGER DEFAULT 1;`)
-	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_guests INTEGER DEFAULT 10;`)
-	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_age INTEGER DEFAULT 0;`)
-	DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_age INTEGER DEFAULT 100;`)
-	DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT;`)
-	DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT;`)
-
-	// Update data titik kumpul spesifik untuk paket yang belum memiliki meeting_point
-	DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Bandung Door Selatan, Jl. Stasiun Barat No.1, Pasirkaliki, Kota Bandung, Jawa Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bandung%'`)
-	DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Malang Kota Baru (Door Depan Utama), Jl. Trunojoyo No.10, Klojen, Kota Malang, Jawa Timur' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bromo%'`)
-	DB.Exec(`UPDATE packages SET meeting_point = 'Dermaga 16 Marina Ancol, Jl. Lodan Timur No.7, Pademangan, Jakarta Utara' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Tidung%'`)
-	DB.Exec(`UPDATE packages SET meeting_point = 'Alfamart Melati Indah, Cengkareng / Rest Area Ciawi Km.45, Bogor, Jawa Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Cilember%'`)
-	DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Tugu Yogyakarta (Door Timur), Sosromenduran, Gedongtengen, Kota Yogyakarta, DI Yogyakarta' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Yogyakarta%'`)
-	DB.Exec(`UPDATE packages SET meeting_point = 'Bandara Marinda Waisai, Kabupaten Raja Ampat, Papua Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Raja Ampat%'`)
-	DB.Exec(`UPDATE packages SET meeting_point = 'Bandara Internasional I Gusti Ngurah Rai (Door Kedatangan Domestik), Badung, Bali' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bali%'`)
-
-	// Reset hardcoded 5.0 ratings for packages without reviews
-	DB.Exec(`UPDATE packages SET rating = 0 WHERE NOT EXISTS (SELECT 1 FROM reviews WHERE reviews.package_id = packages.id)`)
-
-	// Isi data awal (Seeding) jika DB kosong
-	SeedDatabase()
-	EnsureAdminUserExists()
-	EnsureAllTestProvidersAndSeats()
-
-	// Otomatis bersihkan pesanan yang lebih tua dari 3 bulan dan jalankan worker berkala
-	StartPeriodicCleanup()
+	if cfg.EnableJobs {
+		StartPeriodicCleanup()
+	}
 }
 
 func CleanOldBookings() {
-	threeMonthsAgo := time.Now().AddDate(0, -3, 0)
-	res := DB.Where("created_at < ? AND created_at IS NOT NULL AND created_at != '0001-01-01 00:00:00'", threeMonthsAgo).Delete(&models.Booking{})
-	if res.Error != nil {
-		log.Printf("[Pembersihan Gagal] Gagal menghapus pesanan lama: %v", res.Error)
-	} else if res.RowsAffected > 0 {
-		log.Printf("[Pembersihan] Berhasil menghapus %d pesanan lama (lebih tua dari 3 bulan).", res.RowsAffected)
+	log.Println("[Pembersihan] Penghapusan booking lama dinonaktifkan; data transaksi wajib dipertahankan untuk audit.")
+}
+
+func ExpirePendingBookings() {
+	cutoff := time.Now().Add(-24 * time.Hour)
+	var candidates []models.Booking
+	if err := DB.Select("id").Where("status = ? AND created_at < ?", "PENDING_PAYMENT", cutoff).Find(&candidates).Error; err != nil {
+		log.Printf("[Auto Expire] Gagal mencari booking kedaluwarsa: %v", err)
+		return
+	}
+
+	expired := 0
+	for _, candidate := range candidates {
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			var booking models.Booking
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("id = ? AND status = ? AND created_at < ?", candidate.ID, "PENDING_PAYMENT", cutoff).
+				First(&booking).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&booking).Update("status", "EXPIRED").Error; err != nil {
+				return err
+			}
+			return tx.Exec(`
+				UPDATE packages p
+				SET quota_used = COALESCE((
+					SELECT SUM(b.guests) FROM bookings b
+					WHERE b.package_id = p.id
+					AND b.status IN ('PENDING_PAYMENT', 'WAITING_CONFIRMATION', 'PAID', 'CONFIRMED', 'COMPLETED')
+				), 0)
+				WHERE p.id = ?
+			`, booking.PackageID).Error
+		})
+		if err != nil {
+			if err != gorm.ErrRecordNotFound {
+				log.Printf("[Auto Expire] Booking %d gagal diproses: %v", candidate.ID, err)
+			}
+			continue
+		}
+		expired++
+	}
+	if expired > 0 {
+		log.Printf("[Auto Expire] %d booking kedaluwarsa dan kuota dilepas.", expired)
 	}
 }
 
 func AutoCompleteFinishedBookings() {
-	now := time.Now()
-	// Fetch bookings whose status is PAID or CONFIRMED and trip_date is in the past
+	cutoff := time.Now().Add(-24 * time.Hour)
 	var finishedBookings []models.Booking
-	err := DB.Where("(status = ? OR status = ?) AND trip_date < ?", "PAID", "CONFIRMED", now).Find(&finishedBookings).Error
-	if err == nil && len(finishedBookings) > 0 {
-		for _, b := range finishedBookings {
-			DB.Model(&models.Booking{}).Where("id = ?", b.ID).Update("status", "COMPLETED")
-			
-			// Transition held_settlements from HELD to RELEASED
-			var settlement models.HeldSettlement
-			if errS := DB.Where("booking_id = ? AND status = ?", b.ID, "HELD").First(&settlement).Error; errS == nil {
-				settlement.Status = "RELEASED"
-				DB.Save(&settlement)
+	if err := DB.Select("id").Where("status IN ? AND trip_date < ?", []string{"PAID", "CONFIRMED"}, cutoff).Find(&finishedBookings).Error; err != nil {
+		log.Printf("[Auto Complete] Gagal mencari booking selesai: %v", err)
+		return
+	}
 
-				// Move funds from held_balance to available_balance in provider_balances
-				var balance models.ProviderBalance
-				if errB := DB.Where("provider_id = ?", b.ProviderID).First(&balance).Error; errB == nil {
-					halfAmount := b.TotalPrice / 2
-					if halfAmount <= 0 {
-						halfAmount = b.TotalPrice
-					}
-					balance.HeldBalance -= halfAmount
-					if balance.HeldBalance < 0 {
-						balance.HeldBalance = 0
-					}
-					balance.AvailableBalance += halfAmount
-					balance.UpdatedAt = time.Now()
-					DB.Save(&balance)
-				}
+	completed := 0
+	for _, candidate := range finishedBookings {
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			var booking models.Booking
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND status IN ? AND trip_date < ?", candidate.ID, []string{"PAID", "CONFIRMED"}, cutoff).First(&booking).Error; err != nil {
+				return err
 			}
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", int64(booking.ProviderID)+1_000_000_000).Error; err != nil {
+				return err
+			}
+			var settlement models.HeldSettlement
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("booking_id = ? AND status = ?", booking.ID, "HELD").First(&settlement).Error; err == nil {
+				result := tx.Model(&models.ProviderBalance{}).Where("provider_id = ? AND held_balance >= ?", booking.ProviderID, settlement.Amount).Updates(map[string]interface{}{
+					"available_balance": gorm.Expr("available_balance + ?", settlement.Amount),
+					"held_balance":      gorm.Expr("held_balance - ?", settlement.Amount),
+					"updated_at":        time.Now(),
+				})
+				if result.Error != nil || result.RowsAffected != 1 {
+					return fmt.Errorf("saldo provider %d tidak konsisten", booking.ProviderID)
+				}
+				settlement.Status = "RELEASED"
+				if err := tx.Save(&settlement).Error; err != nil {
+					return err
+				}
+			} else if err != gorm.ErrRecordNotFound {
+				return err
+			}
+			return tx.Model(&booking).Update("status", "COMPLETED").Error
+		})
+		if err != nil {
+			if err != gorm.ErrRecordNotFound {
+				log.Printf("[Auto Complete] Booking %d gagal diproses: %v", candidate.ID, err)
+			}
+			continue
 		}
-		log.Printf("[Auto Complete] Berhasil mengubah %d pesanan menjadi COMPLETED dan mencairkan held settlements.", len(finishedBookings))
+		completed++
+	}
+	if completed > 0 {
+		log.Printf("[Auto Complete] %d booking diselesaikan dan settlement dilepas.", completed)
 	}
 }
 
 func StartPeriodicCleanup() {
 	go func() {
-		// Pembersihan awal saat server baru dinyalakan
-		CleanOldBookings()
+		// Transaksi lama tidak boleh dihapus otomatis karena dibutuhkan untuk audit.
+		ExpirePendingBookings()
 		AutoCompleteFinishedBookings()
 
 		// Jalankan pembersihan berkala di latar belakang setiap 1 jam
 		ticker := time.NewTicker(1 * time.Hour)
 		for range ticker.C {
-			CleanOldBookings()
+			ExpirePendingBookings()
 			AutoCompleteFinishedBookings()
 		}
 	}()
@@ -200,21 +272,21 @@ func SeedDatabase() {
 	sched4 := fmt.Sprintf("%d %s %d - %d %s %d (4 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 3).Day(), months[now.AddDate(0, 0, 3).Month()-1], now.AddDate(0, 0, 3).Year())
 	_ = sched4
 	fmt.Println("Mengisi akun admin bawaan...")
-	hashedAdminPassword, _ := bcrypt.GenerateFromPassword([]byte("Admin123!"), bcrypt.DefaultCost)
+	hashedAdminPassword, _ := bcrypt.GenerateFromPassword([]byte(os.Getenv("DEV_ADMIN_PASSWORD")), bcrypt.DefaultCost)
 	admin := models.Provider{
 		BusinessName:        "TemenTrip Admin",
-		BusinessCategory:     "admin",
+		BusinessCategory:    "admin",
 		OperationalProvince: "DKI Jakarta",
 		OperationalCity:     "Jakarta Central",
-		Description:          "System Administrator",
+		Description:         "System Administrator",
 		DocumentUploaded:    true,
-		PicName:              "Admin",
-		Email:                "admin@tementrip.id",
-		PasswordHash:         string(hashedAdminPassword),
-		WhatsApp:             "+62 800 0000 0000",
-		IsVerified:           true,
-		Role:                 "ADMIN",
-		Status:               "APPROVED",
+		PicName:             "Admin",
+		Email:               "admin@tementrip.id",
+		PasswordHash:        string(hashedAdminPassword),
+		WhatsApp:            "+62 800 0000 0000",
+		IsVerified:          true,
+		Role:                "ADMIN",
+		Status:              "APPROVED",
 	}
 	if err := DB.Create(&admin).Error; err != nil {
 		log.Printf("Seeding admin failed: %v", err)
@@ -222,15 +294,15 @@ func SeedDatabase() {
 
 	// 2. Seed 8 Providers (One for each trip destination)
 	fmt.Println("Mengisi 8 akun mitra provider awal...")
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("demo123"), bcrypt.DefaultCost)
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(os.Getenv("DEV_PROVIDER_PASSWORD")), bcrypt.DefaultCost)
 
 	providersData := []models.Provider{
 		{
 			BusinessName:        "Wisata Bromo Nusantara",
-			BusinessCategory:     "tour",
+			BusinessCategory:    "tour",
 			OperationalProvince: "Jawa Timur",
 			OperationalCity:     "Probolinggo",
-			Description:          "Penyedia open trip Bromo terpercaya dengan pengalaman 10+ tahun dan pemandu berpengalaman.",
+			Description:         "Penyedia open trip Bromo terpercaya dengan pengalaman 10+ tahun dan pemandu berpengalaman.",
 			DocumentUploaded:    true,
 			DocumentPath:        "/uploads/siup.pdf",
 			KtpPath:             "/uploads/ktp_pic.jpg",
@@ -238,17 +310,17 @@ func SeedDatabase() {
 			Email:               "partner@wisatanusantara.id", // Akun 1: Bromo
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 812 3456 7890",
-			IsVerified:           true,
-			Role:                 "PROVIDER",
-			Status:               "APPROVED",
+			IsVerified:          true,
+			Role:                "PROVIDER",
+			Status:              "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
 			BusinessName:        "Tidung Paradise Tour",
-			BusinessCategory:     "tour",
+			BusinessCategory:    "tour",
 			OperationalProvince: "DKI Jakarta",
 			OperationalCity:     "Kepulauan Seribu",
-			Description:          "Spesialis wisata jelajah Pulau Tidung dan pulau-pulau eksotis Kepulauan Seribu.",
+			Description:         "Spesialis wisata jelajah Pulau Tidung dan pulau-pulau eksotis Kepulauan Seribu.",
 			DocumentUploaded:    true,
 			DocumentPath:        "/uploads/siup.pdf",
 			KtpPath:             "/uploads/ktp_pic.jpg",
@@ -256,17 +328,17 @@ func SeedDatabase() {
 			Email:               "partner2@tidung.id", // Akun 2: Tidung
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 813 9876 5432",
-			IsVerified:           true,
-			Role:                 "PROVIDER",
-			Status:               "APPROVED",
+			IsVerified:          true,
+			Role:                "PROVIDER",
+			Status:              "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
 			BusinessName:        "Bogor Curug Explorer",
-			BusinessCategory:     "tour",
+			BusinessCategory:    "tour",
 			OperationalProvince: "Jawa Barat",
 			OperationalCity:     "Bogor",
-			Description:          "Mitra petualangan alam dan eksplorasi curug indah seputar wilayah Bogor.",
+			Description:         "Mitra petualangan alam dan eksplorasi curug indah seputar wilayah Bogor.",
 			DocumentUploaded:    true,
 			DocumentPath:        "/uploads/siup.pdf",
 			KtpPath:             "/uploads/ktp_pic.jpg",
@@ -274,17 +346,17 @@ func SeedDatabase() {
 			Email:               "partner3@cilember.id", // Akun 3: Curug Cilember
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 815 1122 3344",
-			IsVerified:           true,
-			Role:                 "PROVIDER",
-			Status:               "APPROVED",
+			IsVerified:          true,
+			Role:                "PROVIDER",
+			Status:              "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
 			BusinessName:        "Bandung Juara Tour",
-			BusinessCategory:     "tour",
+			BusinessCategory:    "tour",
 			OperationalProvince: "Jawa Barat",
 			OperationalCity:     "Bandung",
-			Description:          "Layanan keliling kota Bandung, tempat bersejarah, wisata kuliner, dan belanja terfavorit.",
+			Description:         "Layanan keliling kota Bandung, tempat bersejarah, wisata kuliner, dan belanja terfavorit.",
 			DocumentUploaded:    true,
 			DocumentPath:        "/uploads/siup.pdf",
 			KtpPath:             "/uploads/ktp_pic.jpg",
@@ -292,17 +364,17 @@ func SeedDatabase() {
 			Email:               "partner4@bandung.id", // Akun 4: Bandung
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 817 5566 7788",
-			IsVerified:           true,
-			Role:                 "PROVIDER",
-			Status:               "APPROVED",
+			IsVerified:          true,
+			Role:                "PROVIDER",
+			Status:              "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
 			BusinessName:        "Ranu Kumbolo Trail",
-			BusinessCategory:     "tour",
+			BusinessCategory:    "tour",
 			OperationalProvince: "Jawa Timur",
 			OperationalCity:     "Malang",
-			Description:          "Komunitas dan operator pendakian Gunung Semeru & Danau Ranu Kumbolo.",
+			Description:         "Komunitas dan operator pendakian Gunung Semeru & Danau Ranu Kumbolo.",
 			DocumentUploaded:    true,
 			DocumentPath:        "/uploads/siup.pdf",
 			KtpPath:             "/uploads/ktp_pic.jpg",
@@ -310,17 +382,17 @@ func SeedDatabase() {
 			Email:               "partner5@ranukumbolo.id", // Akun 5: Ranu Kumbolo
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 819 9900 1122",
-			IsVerified:           true,
-			Role:                 "PROVIDER",
-			Status:               "APPROVED",
+			IsVerified:          true,
+			Role:                "PROVIDER",
+			Status:              "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
 			BusinessName:        "Baduy Cultural Heritage",
-			BusinessCategory:     "tour",
+			BusinessCategory:    "tour",
 			OperationalProvince: "Banten",
 			OperationalCity:     "Lebak",
-			Description:          "Penyedia trip edukasi dan budaya adat Suku Baduy Luar & Baduy Dalam.",
+			Description:         "Penyedia trip edukasi dan budaya adat Suku Baduy Luar & Baduy Dalam.",
 			DocumentUploaded:    true,
 			DocumentPath:        "/uploads/siup.pdf",
 			KtpPath:             "/uploads/ktp_pic.jpg",
@@ -328,17 +400,17 @@ func SeedDatabase() {
 			Email:               "partner6@baduy.id", // Akun 6: Baduy
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 821 3344 5566",
-			IsVerified:           true,
-			Role:                 "PROVIDER",
-			Status:               "APPROVED",
+			IsVerified:          true,
+			Role:                "PROVIDER",
+			Status:              "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
 			BusinessName:        "Palu Bahari Tour",
-			BusinessCategory:     "tour",
+			BusinessCategory:    "tour",
 			OperationalProvince: "Sulawesi Tengah",
 			OperationalCity:     "Palu",
-			Description:          "Wisata bahari pantai Tanjung Karang Palu dengan fasilitas snorkeling dan diving terpercaya.",
+			Description:         "Wisata bahari pantai Tanjung Karang Palu dengan fasilitas snorkeling dan diving terpercaya.",
 			DocumentUploaded:    true,
 			DocumentPath:        "/uploads/siup.pdf",
 			KtpPath:             "/uploads/ktp_pic.jpg",
@@ -346,17 +418,17 @@ func SeedDatabase() {
 			Email:               "partner7@palu.id", // Akun 7: Palu
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 823 7788 9900",
-			IsVerified:           true,
-			Role:                 "PROVIDER",
-			Status:               "APPROVED",
+			IsVerified:          true,
+			Role:                "PROVIDER",
+			Status:              "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 		{
 			BusinessName:        "Jogja Istimewa Tour",
-			BusinessCategory:     "tour",
+			BusinessCategory:    "tour",
 			OperationalProvince: "DI Yogyakarta",
 			OperationalCity:     "Yogyakarta",
-			Description:          "Paket liburan seru mengelilingi tempat bersejarah, keraton, candi, dan pantai Yogyakarta.",
+			Description:         "Paket liburan seru mengelilingi tempat bersejarah, keraton, candi, dan pantai Yogyakarta.",
 			DocumentUploaded:    true,
 			DocumentPath:        "/uploads/siup.pdf",
 			KtpPath:             "/uploads/ktp_pic.jpg",
@@ -364,9 +436,9 @@ func SeedDatabase() {
 			Email:               "partner8@jogja.id", // Akun 8: Jogja
 			PasswordHash:        string(hashedPassword),
 			WhatsApp:            "+62 856 1234 5678",
-			IsVerified:           true,
-			Role:                 "PROVIDER",
-			Status:               "APPROVED",
+			IsVerified:          true,
+			Role:                "PROVIDER",
+			Status:              "APPROVED",
 			VerificationNotes:   "Berkas lengkap dan terverifikasi secara sistem.",
 		},
 	}
@@ -718,7 +790,7 @@ func SeedDatabase() {
 func EnsureAdminUserExists() {
 	var count int64
 	DB.Model(&models.Provider{}).Where("email = ?", "admin@tementrip.id").Count(&count)
-	hashedAdminPassword, _ := bcrypt.GenerateFromPassword([]byte("Admin123!"), bcrypt.DefaultCost)
+	hashedAdminPassword, _ := bcrypt.GenerateFromPassword([]byte(os.Getenv("DEV_ADMIN_PASSWORD")), bcrypt.DefaultCost)
 
 	if count == 0 {
 		admin := models.Provider{
@@ -727,7 +799,7 @@ func EnsureAdminUserExists() {
 			OperationalProvince: "DKI Jakarta",
 			OperationalCity:     "Jakarta Central",
 			Description:         "System Administrator",
-			DocumentUploaded:   true,
+			DocumentUploaded:    true,
 			PicName:             "Admin",
 			Email:               "admin@tementrip.id",
 			PasswordHash:        string(hashedAdminPassword),
@@ -753,7 +825,7 @@ func EnsureAdminUserExists() {
 }
 
 func EnsureAllTestProvidersAndSeats() {
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("demo123"), bcrypt.DefaultCost)
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(os.Getenv("DEV_PROVIDER_PASSWORD")), bcrypt.DefaultCost)
 	passStr := string(hashedPassword)
 
 	testEmails := []struct {
@@ -819,7 +891,7 @@ func EnsureAllTestProvidersAndSeats() {
 			}
 		}
 	}
-	log.Println("[QA Prep] All 8 Provider test accounts verified and updated with password 'demo123'.")
+	log.Println("[QA Prep] All 8 Provider test accounts verified and updated with the configured development password.")
 
 	todayStr := time.Now().Format("2006-01-02")
 	months := []string{"Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"}
@@ -842,14 +914,38 @@ func EnsureAllTestProvidersAndSeats() {
 	DB.Where("role = ?", "PROVIDER").Order("id asc").First(&defaultProv)
 	fallbackID := defaultProv.ID
 
-	pID1 := p1.ID; if pID1 == 0 { pID1 = fallbackID }
-	pID2 := p2.ID; if pID2 == 0 { pID2 = fallbackID }
-	pID3 := p3.ID; if pID3 == 0 { pID3 = fallbackID }
-	pID4 := p4.ID; if pID4 == 0 { pID4 = fallbackID }
-	pID5 := p5.ID; if pID5 == 0 { pID5 = fallbackID }
-	pID6 := p6.ID; if pID6 == 0 { pID6 = fallbackID }
-	pID7 := p7.ID; if pID7 == 0 { pID7 = fallbackID }
-	pID8 := p8.ID; if pID8 == 0 { pID8 = fallbackID }
+	pID1 := p1.ID
+	if pID1 == 0 {
+		pID1 = fallbackID
+	}
+	pID2 := p2.ID
+	if pID2 == 0 {
+		pID2 = fallbackID
+	}
+	pID3 := p3.ID
+	if pID3 == 0 {
+		pID3 = fallbackID
+	}
+	pID4 := p4.ID
+	if pID4 == 0 {
+		pID4 = fallbackID
+	}
+	pID5 := p5.ID
+	if pID5 == 0 {
+		pID5 = fallbackID
+	}
+	pID6 := p6.ID
+	if pID6 == 0 {
+		pID6 = fallbackID
+	}
+	pID7 := p7.ID
+	if pID7 == 0 {
+		pID7 = fallbackID
+	}
+	pID8 := p8.ID
+	if pID8 == 0 {
+		pID8 = fallbackID
+	}
 
 	packagesToEnsure := []models.Package{
 		// Provider 1: Wisata Bromo Nusantara (Bromo & Bali)

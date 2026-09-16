@@ -17,5 +17,5 @@ type Review struct {
 type CreateReviewRequest struct {
 	BookingID uint   `json:"bookingId" binding:"required"`
 	Rating    int    `json:"rating" binding:"required,min=1,max=5"`
-	Comment   string `json:"comment"`
+	Comment   string `json:"comment" binding:"max=2000"`
 }

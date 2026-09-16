@@ -21,7 +21,7 @@ func NewAdminController(service services.AdminService) *AdminController {
 func (ctrl *AdminController) ListProviders(c *gin.Context) {
 	providers, err := ctrl.service.ListProviders()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat provider", err)
 		return
 	}
 
@@ -44,7 +44,7 @@ func (ctrl *AdminController) UpdateProviderStatus(c *gin.Context) {
 
 	err = ctrl.service.UpdateProviderStatus(uint(id), req.Status, req.VerificationNotes)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memperbarui status provider", err)
 		return
 	}
 
@@ -61,11 +61,11 @@ func (ctrl *AdminController) DeleteProvider(c *gin.Context) {
 
 	err = ctrl.service.DeleteProvider(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "menonaktifkan provider", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Provider deleted successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Provider berhasil dinonaktifkan; data transaksi tetap disimpan"})
 }
 
 func (ctrl *AdminController) GetStatusHistory(c *gin.Context) {
@@ -78,7 +78,7 @@ func (ctrl *AdminController) GetStatusHistory(c *gin.Context) {
 
 	history, err := ctrl.service.GetProviderStatusHistory(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat riwayat provider", err)
 		return
 	}
 
@@ -106,7 +106,7 @@ func (ctrl *AdminController) VerifyProviderLegal(c *gin.Context) {
 
 	err = ctrl.service.VerifyProviderLegal(uint(id), req.Action, req.Reason)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memverifikasi data legal provider", err)
 		return
 	}
 
@@ -135,7 +135,7 @@ func (ctrl *AdminController) VerifyProviderDocument(c *gin.Context) {
 
 	err = ctrl.service.VerifyProviderDocument(uint(id), req.DocType, req.Action, req.Reason)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memverifikasi dokumen provider", err)
 		return
 	}
 

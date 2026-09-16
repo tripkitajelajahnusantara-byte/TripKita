@@ -5,7 +5,7 @@ import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck } from
 import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsContent } from '../components/LegalModals';
 
 export const CustomerConfirmationPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, customerProfile, bookingFormData } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, bookingFormData } = useNavigation();
   const [submitting, setSubmitting] = useState(false);
   
   // Agreement Checkbox state
@@ -72,10 +72,7 @@ export const CustomerConfirmationPage: React.FC = () => {
     setShowConfirmModal(false);
     setSubmitting(true);
 
-    const nowIso = new Date().toISOString();
-    const dateStr = nowIso.slice(0, 10).replace(/-/g, '');
-    const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const randomCode = `TK-${dateStr}-${randSuffix}`;
+	const nowIso = new Date().toISOString();
 
     try {
       const parseTripDateToFuture = (dateInput?: string) => {
@@ -115,30 +112,21 @@ export const CustomerConfirmationPage: React.FC = () => {
 
       const parsedTripDate = parseTripDateToFuture(selectedTripSchedule);
 
-      const rawPkgId = Number(pkg.id);
-      const safePackageId = (!isNaN(rawPkgId) && rawPkgId > 0) ? rawPkgId : 1;
+	  const rawPkgId = Number(pkg.id);
+	  if (!Number.isInteger(rawPkgId) || rawPkgId <= 0) {
+		throw new Error('Paket yang dipilih tidak valid. Silakan kembali dan pilih paket lagi.');
+	  }
 
       const payload: any = {
-        packageId: safePackageId,
-        bookingCode: randomCode,
+		packageId: rawPkgId,
         customerName: pemesan.nama || 'Pelanggan TripKita',
+        customerEmail: pemesan.email,
+        customerPhone: pemesan.whatsapp,
         customerInitial: (pemesan.nama || 'P').charAt(0).toUpperCase(),
         guests: guestsCount || 1,
-        totalPrice: totalCost,
         tripDate: parsedTripDate.toISOString(),
-        paymentMethod: 'Xendit Invoice',
-        participants: peserta.map((p: any) => ({
-          nama: p.nama,
-          hp: p.hp,
-          gender: p.gender,
-          tanggalLahir: p.tanggalLahir || '',
-          riwayatPenyakit: p.riwayatPenyakit || 'Tidak Ada'
-        }))
+        addOnIds: selectedAddOns.map((item: any) => item.id)
       };
-
-      if (customerProfile && customerProfile.role === 'CUSTOMER') {
-        payload.customerId = customerProfile.id;
-      }
 
       const response = await request('/public/bookings', {
         method: 'POST',
@@ -146,16 +134,24 @@ export const CustomerConfirmationPage: React.FC = () => {
       });
 
       const paymentUrl = response.paymentUrl || response.payment_url;
-      if (!paymentUrl || !paymentUrl.startsWith('http')) {
-        throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
-      }
+	  let parsedPaymentURL: URL;
+	  try {
+		parsedPaymentURL = new URL(paymentUrl);
+	  } catch {
+		throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
+	  }
+	  const paymentHost = parsedPaymentURL.hostname.toLowerCase();
+	  if (parsedPaymentURL.protocol !== 'https:' || (paymentHost !== 'xendit.co' && !paymentHost.endsWith('.xendit.co'))) {
+		throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
+	  }
 
-      const finalBookingCode = response.bookingCode || response.booking_code || randomCode;
+	  const finalBookingCode = response.bookingCode || response.booking_code;
+	  if (!finalBookingCode) throw new Error('Backend tidak mengembalikan kode booking');
       const bookingObj = {
         id: response.id || Date.now(),
         bookingCode: finalBookingCode,
         packageName: pkg.name,
-        totalPrice: totalCost,
+        totalPrice: response.totalPrice,
         guests: guestsCount,
         tripDate: selectedTripSchedule || parsedTripDate.toISOString().split('T')[0],
         createdAt: response.createdAt || nowIso,
@@ -171,7 +167,7 @@ export const CustomerConfirmationPage: React.FC = () => {
       sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
       // Direct external redirect to Xendit Invoice URL (using replace so back button doesn't loop)!
-      window.location.replace(paymentUrl);
+	  window.location.replace(parsedPaymentURL.toString());
 
     } catch (err: any) {
       console.error('[Booking Error]', err);
