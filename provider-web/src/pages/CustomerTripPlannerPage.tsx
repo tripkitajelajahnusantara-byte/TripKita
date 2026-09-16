@@ -27,6 +27,79 @@ const formatRupiah = (val: number) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 };
 
+const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => {
+  if (isExpired && pct < 100) {
+    return {
+      icon: '🗓️',
+      title: 'Waktu Keberangkatan Tiba, Tapi Jangan Patah Semangat! 💪',
+      text: `Target tabungan liburan ke ${dest} belum 100% terkumpul. Usahamu sudah luar biasa! Yuk sesuaikan ulang tanggal keberangkatanmu dan coba lagi! ✨`,
+      bg: '#fffbe6',
+      border: '#ffe58f',
+      titleColor: '#d48806',
+      textColor: '#784c00'
+    };
+  }
+
+  if (pct >= 100) {
+    return {
+      icon: '🎉',
+      title: 'Hore! Target Tabunganmu 100% Tercapai! 🎉',
+      text: `Selamat! Tabungan untuk liburan impian ke ${dest} sudah terkumpul 100%. Yuk langsung cari dan pesan paket trip impianmu! 🚀`,
+      bg: '#dcfce7',
+      border: '#86efac',
+      titleColor: '#15803d',
+      textColor: '#166534'
+    };
+  }
+
+  if (pct >= 75) {
+    return {
+      icon: '💪',
+      title: 'Hampir Sampai! 75%+ Tabungan Terkumpul! 💪',
+      text: `Ayo semangat! Tinggal sedikit lagi nih tabungan kamu terkumpul 100% untuk liburan impian ke ${dest}! Yuk sisihkan tabungan bulan ini! ✨`,
+      bg: '#ecfdf5',
+      border: '#a7f3d0',
+      titleColor: '#047857',
+      textColor: '#065f46'
+    };
+  }
+
+  if (pct >= 50) {
+    return {
+      icon: '⚡',
+      title: 'Setengah Jalan Tercapai! 50% Tabungan Terkumpul! ⚡',
+      text: `Hebat! Kamu sudah berhasil mengumpulkan setengah dari target budget liburan ke ${dest}. Pertahankan semangatmu! 🔥`,
+      bg: '#e0e7ff',
+      border: '#c7d2fe',
+      titleColor: '#4338ca',
+      textColor: '#3730a3'
+    };
+  }
+
+  if (pct >= 25) {
+    return {
+      icon: '🔥',
+      title: 'Awal yang Bagus! 25% Tabungan Sudah Terkumpul! 🔥',
+      text: `Kerja bagus! Tabungan liburan ke ${dest} sudah mulai terkumpul. Tetap konsisten menyisihkan tabungan tiap bulan ya! ✨`,
+      bg: '#e0f2fe',
+      border: '#bae6fd',
+      titleColor: '#0284c7',
+      textColor: '#0369a1'
+    };
+  }
+
+  // 0% - 24% Progress
+  return {
+    icon: '🌱',
+    title: 'Langkah Awal Memulai Perjalanan Impian! 🚀',
+    text: `Setiap perjalanan besar dimulai dari langkah kecil. Rencana trip impianmu ke ${dest} baru saja dimulai. Yuk konsisten sisihkan tabungan bulan ini! ✨`,
+    bg: '#e6f4f4',
+    border: '#b2e0e0',
+    titleColor: '#0f8b8d',
+    textColor: '#134e4a'
+  };
+};
+
 const CATALOG_PACKAGES: PackageItem[] = [
   {
     id: 'pkg_palu',
@@ -1217,20 +1290,30 @@ export const CustomerTripPlannerPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Motivation Box */}
-            <div style={{ backgroundColor: '#e6f4f4', borderRadius: '20px', padding: '18px 24px', border: '1px solid #b2e0e0', marginBottom: '28px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <span style={{ fontSize: '28px' }}>💪</span>
-              <div>
-                <h4 style={{ fontSize: '14.5px', fontWeight: '800', color: '#0f8b8d', margin: '0 0 2px 0' }}>
-                  {savedPercentage >= 100 ? 'Hore! Target Tabunganmu Sudah Tercapai! 🎉' : 'Semangat! Tinggal Sedikit Lagi!'}
-                </h4>
-                <p style={{ fontSize: '12.5px', color: '#334155', margin: 0, fontWeight: '500' }}>
-                  {savedPercentage >= 100
-                    ? `Tabungan untuk liburan impian ke ${activePlan.destination} sudah terkumpul 100%. Yuk langsung booking paketnya!`
-                    : `Ayo semangat! Tinggal sedikit lagi nih tabungan kamu terkumpul untuk liburan impian ke ${activePlan.destination}! Yuk sisihkan tabungan bulan ini! ✨`}
-                </p>
-              </div>
-            </div>
+            {/* Dynamic Motivation Box based on progress tier & target date expiry */}
+            {(() => {
+              const isExpired = (() => {
+                if (!activePlan.targetMonth) return false;
+                const t = new Date(activePlan.targetMonth);
+                const td = new Date();
+                td.setHours(0, 0, 0, 0);
+                return t < td;
+              })();
+              const motivation = getMotivationContent(savedPercentage, isExpired, activePlan.destination);
+              return (
+                <div style={{ backgroundColor: motivation.bg, borderRadius: '20px', padding: '18px 24px', border: `1px solid ${motivation.border}`, marginBottom: '28px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <span style={{ fontSize: '28px' }}>{motivation.icon}</span>
+                  <div>
+                    <h4 style={{ fontSize: '14.5px', fontWeight: '800', color: motivation.titleColor, margin: '0 0 2px 0' }}>
+                      {motivation.title}
+                    </h4>
+                    <p style={{ fontSize: '12.5px', color: motivation.textColor, margin: 0, fontWeight: '500' }}>
+                      {motivation.text}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Grid 2 Columns: Scrollable Checklist & Scrollable History Tabungan */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '32px' }}>
