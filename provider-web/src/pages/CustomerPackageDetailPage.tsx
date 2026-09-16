@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare } from 'lucide-react';
-import { API_BASE_URL } from '../utils/api';
+import { API_BASE_URL, request } from '../utils/api';
 import { TravelokaCalendarModal } from '../components/TravelokaCalendarModal';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
@@ -11,6 +11,20 @@ interface AddOn {
   id: string;
   name: string;
   price: number;
+}
+
+interface PackageReview {
+  id: number;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+interface PublicProviderProfile {
+  id: number;
+  businessName: string;
+  operationalCity: string;
+  rating: number;
 }
 
 export const CustomerPackageDetailPage: React.FC = () => {
@@ -27,16 +41,9 @@ export const CustomerPackageDetailPage: React.FC = () => {
   // Add-ons State
   const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
 
-  // Reviews & Rating State with Pagination
-  const [reviewsList] = useState([
-    { id: 1, name: 'Budi Santoso', avatar: 'BS', rating: 5, date: '15 Mei 2026', comment: 'Pengalaman luar biasa di Bromo! Tour guidenya sangat membantu dan mengambil foto-foto yang ciamik banget.', verified: true },
-    { id: 2, name: 'Siti Rahmawati', avatar: 'SR', rating: 5, date: '10 Mei 2026', comment: 'Penjemputan tepat waktu, armada AC dingin, dan homestay sangat bersih. Pokoknya mantap TripKita!', verified: true },
-    { id: 3, name: 'Andi Wijaya', avatar: 'AW', rating: 4, date: '02 Mei 2026', comment: 'Perjalanan menyenangkan. Driver Jeep ramah banget, rekomendasi sarapan lokalnya mantap.', verified: true },
-    { id: 4, name: 'Dewi Lestari', avatar: 'DL', rating: 5, date: '28 April 2026', comment: 'Sunset dan sunrisenya spektakuler. Sangat cocok buat refreshing akhir pekan.', verified: true },
-    { id: 5, name: 'Rian Hidayat', avatar: 'RH', rating: 5, date: '20 April 2026', comment: 'Pelayanan ramah, tidak ada biaya tersembunyi. Nanti mau booking trip lain lagi di TripKita.', verified: true },
-    { id: 6, name: 'Maya Putri', avatar: 'MP', rating: 4, date: '12 April 2026', comment: 'Semua itinerary terlaksana sesuai jadwal. Pemandu lokalnya sangat berwawasan.', verified: true },
-    { id: 7, name: 'Fikri Pratama', avatar: 'FP', rating: 5, date: '05 April 2026', comment: 'Fasilitas sangat worth it dengan harganya. Top banget!', verified: true },
-  ]);
+  // Reviews & provider identity are loaded from verified backend records.
+  const [reviewsList, setReviewsList] = useState<PackageReview[]>([]);
+  const [publicProvider, setPublicProvider] = useState<PublicProviderProfile | null>(null);
 
   const [reviewPage, setReviewPage] = useState(1);
   const reviewsPerPage = 3;
@@ -63,48 +70,42 @@ export const CustomerPackageDetailPage: React.FC = () => {
     }
   }, []);
 
-  if (!selectedPackageForDetail) {
-    return (
-      <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
-        <p>Sedang memuat detail paket wisata...</p>
-        <button onClick={() => navigateTo('beranda')} style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
-          Kembali ke Beranda
-        </button>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const pkg = selectedPackageForDetail;
+    setReviewPage(1);
+    const packageId = Number(pkg?.id);
+    const providerId = Number(pkg?.providerId || pkg?.provider?.id);
+    if (!packageId || !providerId) {
+      setReviewsList([]);
+      setPublicProvider(null);
+      return;
+    }
 
-  const pkg = selectedPackageForDetail;
+    let cancelled = false;
+    Promise.all([
+      request(`/public/reviews/package/${packageId}`),
+      request(`/public/providers/${providerId}`)
+    ]).then(([reviews, provider]) => {
+      if (cancelled) return;
+      setReviewsList(Array.isArray(reviews) ? reviews : []);
+      setPublicProvider(provider);
+    }).catch((err) => {
+      console.error('Failed to load package reviews or provider:', err);
+      if (!cancelled) {
+        setReviewsList([]);
+        setPublicProvider(null);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [selectedPackageForDetail]);
+
+  const pkg = selectedPackageForDetail || {};
 
   const getSpecificMeetingPoint = (pkgObj: any) => {
     if (pkgObj && pkgObj.meetingPoint && pkgObj.meetingPoint.trim().length > 3) {
       return pkgObj.meetingPoint.trim();
     }
-    const dest = (pkgObj?.destination || '').toLowerCase();
-    const name = (pkgObj?.name || '').toLowerCase();
-
-    if (name.includes('bromo') || dest.includes('probolinggo') || dest.includes('malang')) {
-      return 'Stasiun Malang Kota Baru (Door Depan Utama), Jl. Trunojoyo No.10, Klojen, Kota Malang, Jawa Timur';
-    }
-    if (name.includes('tidung') || dest.includes('seribu') || dest.includes('jakarta')) {
-      return 'Dermaga 16 Marina Ancol, Jl. Lodan Timur No.7, Pademangan, Jakarta Utara';
-    }
-    if (name.includes('cilember') || dest.includes('bogor')) {
-      return 'Alfamart Melati Indah, Cengkareng / Rest Area Ciawi Km.45, Bogor, Jawa Barat';
-    }
-    if (name.includes('bandung') || dest.includes('bandung')) {
-      return 'Stasiun Bandung Door Selatan, Jl. Stasiun Barat No.1, Pasirkaliki, Kota Bandung, Jawa Barat';
-    }
-    if (name.includes('jogja') || name.includes('yogyakarta') || dest.includes('yogyakarta')) {
-      return 'Stasiun Tugu Yogyakarta (Door Timur), Sosromenduran, Gedongtengen, Kota Yogyakarta, DI Yogyakarta';
-    }
-    if (name.includes('raja ampat') || dest.includes('papua')) {
-      return 'Bandara Marinda Waisai, Kabupaten Raja Ampat, Papua Barat';
-    }
-    if (name.includes('bali') || dest.includes('bali')) {
-      return 'Bandara Internasional I Gusti Ngurah Rai (Door Kedatangan Domestik), Badung, Bali';
-    }
-    return pkgObj?.destination || 'Alfamart Melati Indah, Cengkareng, Jawa Barat';
+    return '';
   };
 
   const activeMeetingPoint = getSpecificMeetingPoint(pkg);
@@ -128,12 +129,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
   const isCorporateTrip = pkg.tripType === 'Corporate' || pkg.category === 'Corporate';
 
-  const minRequiredGuests = isOpenTrip ? 1 : (
-    pkg.tripType === 'Honeymoon' ? 2 :
-    pkg.tripType === 'Private Trip' ? 1 :
-    pkg.tripType === 'Family' ? 3 :
-    pkg.tripType === 'Corporate' ? 10 : 1
-  );
+  const minRequiredGuests = Math.max(1, Number(pkg.minGuests) || 1);
 
   const [guestsCount, setGuestsCount] = useState(1);
 
@@ -145,18 +141,9 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const [customEndDate, setCustomEndDate] = useState<string>(customStartDate);
 
-  // Booked / Occupied dates dynamically fetched from database or calculated relative to current date
-  const getAddDaysFromToday = (days: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    return d.toISOString().split('T')[0];
-  };
-
   const currentPkgBookedDates: string[] = Array.isArray(pkg.bookedDates) && pkg.bookedDates.length > 0
     ? pkg.bookedDates
-    : (pkg.id === 9
-        ? [getAddDaysFromToday(9), getAddDaysFromToday(12), getAddDaysFromToday(20)]
-        : [getAddDaysFromToday(((pkg.id || 1) * 3) % 7 + 9), getAddDaysFromToday(((pkg.id || 1) * 3) % 7 + 16)]);
+    : [];
 
   const getBookedDatesInSelectedRange = (startIso: string, endIso: string, bookedList: string[]) => {
     if (!startIso || !endIso) return [];
@@ -181,7 +168,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
     }
   }, [minRequiredGuests]);
   
-  const totalQuotaMax = pkg.quotaMax || 15;
+  const totalQuotaMax = Math.max(0, Number(pkg.quotaMax) || 0);
 
   const getDestinationDefaults = (nameStr: string): string[] => {
     const nameLower = nameStr.toLowerCase();
@@ -319,36 +306,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
     return images;
   })();
 
-  // Dynamic Add-on services list per destination
-  const getPackageAddOns = (name: string): AddOn[] => {
-    const nameLower = name.toLowerCase();
-    if (nameLower.includes('tidung') || nameLower.includes('pantai') || nameLower.includes('palu')) {
-      return [
-        { id: 'snorkel', name: 'Sewa Alat Snorkeling Lengkap & Pelampung', price: 75000 },
-        { id: 'gopro', name: 'Dokumentasi Sewa Kamera GoPro UnderWater', price: 100000 },
-        { id: 'banana', name: 'Wahana Water Sport Banana Boat / Donut', price: 50000 }
-      ];
-    }
-    if (nameLower.includes('bromo') || nameLower.includes('ranu') || nameLower.includes('gunung')) {
-      return [
-        { id: 'jeep', name: 'Sewa Jeep Hardtop Sewa Pribadi (Private)', price: 350000 },
-        { id: 'jacket', name: 'Sewa Jaket Gunung & Sarung Tangan Thermal', price: 45000 },
-        { id: 'tenda', name: 'Upgrade Tenda Camping Exclusive 4 Person', price: 120000 }
-      ];
-    }
-    if (nameLower.includes('baduy')) {
-      return [
-        { id: 'porter', name: 'Jasa Porter Personal Pendamping Warga Baduy', price: 150000 },
-        { id: 'souvenir', name: 'Paket Souvenir Suku Baduy & Kain Tenun', price: 100000 }
-      ];
-    }
-    return [
-      { id: 'drone', name: 'Dokumentasi Sewa Drone & Pilot Pro', price: 250000 },
-      { id: 'vip_van', name: 'Upgrade Armada VIP Van Travel', price: 150000 }
-    ];
-  };
-
-  const addOnsList: AddOn[] = getPackageAddOns(pkg.name);
+  // Add-on dinonaktifkan sampai katalog dan harga dikelola dari database.
+  const addOnsList: AddOn[] = [];
 
   const getActiveSchedules = () => {
     const today = new Date();
@@ -358,6 +317,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
       return copy;
     };
     const formatDate = (d: Date) => d.toISOString().split('T')[0];
+    const durationDays = Math.max(1, Number(pkg.duration) || 1);
     const formatLabel = (start: Date, days: number) => {
       const end = addDays(start, days - 1);
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -367,11 +327,14 @@ export const CustomerPackageDetailPage: React.FC = () => {
     // Generate active schedules for 3 full months ahead (12 departure dates)
     const baseStart = pkg.startDate ? new Date(pkg.startDate) : addDays(today, 3);
     const validStart = !isNaN(baseStart.getTime()) ? baseStart : addDays(today, 3);
+    const configuredEnd = pkg.endDate ? new Date(pkg.endDate) : null;
+    const validEnd = configuredEnd && !isNaN(configuredEnd.getTime()) ? configuredEnd : null;
     const schedules = [];
     for (let i = 0; i < 12; i++) {
       const tripStart = addDays(validStart, i * 7);
+      if (validEnd && tripStart > validEnd) break;
       schedules.push({
-        label: formatLabel(tripStart, 3),
+        label: formatLabel(tripStart, durationDays),
         dateValue: formatDate(tripStart)
       });
     }
@@ -396,24 +359,20 @@ export const CustomerPackageDetailPage: React.FC = () => {
     }
   }, [pkg.bookingDate, pkg.schedule]);
 
+  if (!selectedPackageForDetail) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
+        <p>Sedang memuat detail paket wisata...</p>
+        <button onClick={() => navigateTo('beranda')} style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+          Kembali ke Beranda
+        </button>
+      </div>
+    );
+  }
+
   const getScheduleQuotaUsed = (dateStr: string): number => {
-    const quotaMin = pkg.quotaMin || 4;
-    const idx = availableSchedules.findIndex((s: { dateValue: string }) => s.dateValue === dateStr);
-
-    if (pkg.scheduleQuotas && typeof pkg.scheduleQuotas[dateStr] === 'number') {
-      return pkg.scheduleQuotas[dateStr];
-    }
-
-    const defaultUsed = (typeof pkg.quotaUsed === 'number' && pkg.quotaUsed < quotaMin)
-      ? pkg.quotaUsed
-      : (typeof pkg.quotaUsed === 'number' && pkg.quotaUsed > 0 && pkg.quotaUsed < quotaMin ? pkg.quotaUsed : Math.max(1, quotaMin - 2));
-
-    if (idx <= 0) {
-      return defaultUsed;
-    }
-
-    const pattern = [defaultUsed, quotaMin, Math.max(1, quotaMin - 3), Math.max(1, quotaMin - 1)];
-    return pattern[idx % pattern.length];
+    void dateStr;
+    return Math.max(0, Number(pkg.quotaUsed) || 0);
   };
 
   const currentScheduleQuotaUsed = isOpenTrip ? getScheduleQuotaUsed(selectedScheduleDate) : (pkg.quotaUsed || 0);
@@ -444,7 +403,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 list.push({
                   day: dayLabel,
                   title: act.time ? `${act.time} — ${act.title}` : act.title,
-                  desc: `Aktivitas perjalanan Hari ${item.day} bersama tim pemandu profesional TemenTrip.`
+                  desc: act.description || ''
                 });
               });
             }
@@ -455,11 +414,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
         // ignore
       }
     }
-    return [
-      { day: 'Hari 1', title: 'Kedatangan & Check-in Awal', desc: 'Penjemputan di meeting point oleh tim pemandu lokal TemenTrip. Briefing perjalanan dan pembagian kamar.' },
-      { day: 'Hari 2', title: 'Eksplorasi Destinasi Utama & Sesi Foto', desc: 'Perjalanan seharian menjelajahi spot-spot ikonik. Makan siang bersama di spot alam dengan pemandangan menakjubkan.' },
-      { day: 'Hari 3', title: 'Wisata Kuliner & Kepulangan', desc: 'Berburu oleh-oleh khas lokal, makan siang santai, lalu diantar kembali menuju titik kumpul awal kepulangan.' }
-    ];
+    return [];
   };
 
   const getDynamicIncludedFacilities = () => {
@@ -467,15 +422,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
       const list = pkg.includedFacilities.split('\n').map((s: string) => s.trim()).filter(Boolean);
       if (list.length > 0) return list;
     }
-    return [
-      'Penginapan / Homestay AC Berstandar',
-      'Transportasi Lokal AC Selama Trip',
-      'Makan Sesuai Program Trip (3x Sehari)',
-      'Tiket Masuk Semua Objek Wisata',
-      'Tour Guide Lokal Berpengalaman & Lisensi',
-      'Dokumentasi Foto Selama Perjalanan',
-      'Air Mineral & Snack Perjalanan'
-    ];
+    return [];
   };
 
   const getDynamicExcludedFacilities = () => {
@@ -483,12 +430,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
       const list = pkg.excludedFacilities.split('\n').map((s: string) => s.trim()).filter(Boolean);
       if (list.length > 0) return list;
     }
-    return [
-      'Tiket Pesawat / Kereta menuju Meeting Point',
-      'Pengeluaran Pribadi & Belanja Souvenir',
-      'Obat-obatan Pribadi Khusus',
-      'Tipping Sukarela Guide & Driver'
-    ];
+    return [];
   };
 
   const displayItinerary = getDynamicItinerary();
@@ -801,7 +743,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 Deskripsi Paket Wisata
               </h2>
               <p style={{ fontSize: '14px', color: '#475569', lineHeight: '1.7', margin: 0 }}>
-                {pkg.description || `Nikmati petualangan tak terlupakan bersama tim pemandu profesional TripKita di ${pkg.destination}. Didesain untuk memberikan pengalaman liburan yang aman, nyaman, dan menyenangkan bersama teman maupun keluarga.`}
+                {pkg.description || 'Deskripsi paket belum dilengkapi oleh provider.'}
               </p>
             </div>
 
@@ -811,6 +753,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 Rencana Perjalanan (Itinerary)
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {displayItinerary.length === 0 && <p style={{ color: '#64748b', margin: 0 }}>Itinerary belum dilengkapi oleh provider.</p>}
                 {displayItinerary.map((item, idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                     <span style={{ backgroundColor: '#e0f2fe', color: '#007bff', fontSize: '12px', fontWeight: '700', padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
@@ -838,6 +781,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     <CheckCircle2 size={16} /> Fasilitas Termasuk
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {displayIncludedFacilities.length === 0 && <span style={{ fontSize: '13px', color: '#64748b' }}>Belum diinformasikan.</span>}
                     {displayIncludedFacilities.map((fac: string, idx: number) => (
                       <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: '#334155' }}>
                         <CheckCircle2 size={15} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -853,6 +797,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     <XCircle size={16} /> Fasilitas Tidak Termasuk
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {displayExcludedFacilities.length === 0 && <span style={{ fontSize: '13px', color: '#64748b' }}>Belum diinformasikan.</span>}
                     {displayExcludedFacilities.map((fac: string, idx: number) => (
                       <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: '#64748b' }}>
                         <XCircle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -865,6 +810,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
             </div>
 
             {/* Layanan Add-On Tambahan */}
+            {addOnsList.length > 0 && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <PlusCircle size={18} color="#007bff" /> Layanan Tambahan (Add-On Opsional)
@@ -912,33 +858,41 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 })}
               </div>
             </div>
+            )}
 
             {/* Titik Kumpul / Google Maps Embed (Posisi Tepat Dibawah Layanan Tambahan) */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <MapPin size={18} color="#0284c7" /> Lokasi Titik Kumpul (Meeting Point)
               </h2>
-              <p style={{ fontSize: '14px', color: '#334155', marginBottom: '16px', lineHeight: '1.6' }}>
-                📍 <strong>{activeMeetingPoint}</strong>
-              </p>
-              <div style={{ borderRadius: '12px', overflow: 'hidden', height: '300px', border: '1px solid #cbd5e1' }}>
-                <iframe
-                  title="Titik Kumpul Map"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  allowFullScreen
-                  src={`https://maps.google.com/maps?q=${encodeURIComponent(activeMeetingPoint)}&t=m&z=16&output=embed`}
-                />
-              </div>
+              {activeMeetingPoint ? (
+                <>
+                  <p style={{ fontSize: '14px', color: '#334155', marginBottom: '16px', lineHeight: '1.6' }}>
+                    📍 <strong>{activeMeetingPoint}</strong>
+                  </p>
+                  <div style={{ borderRadius: '12px', overflow: 'hidden', height: '300px', border: '1px solid #cbd5e1' }}>
+                    <iframe
+                      title="Titik Kumpul Map"
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0 }}
+                      loading="lazy"
+                      allowFullScreen
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(activeMeetingPoint)}&t=m&z=16&output=embed`}
+                    />
+                  </div>
+                </>
+              ) : (
+                <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>Titik kumpul belum dilengkapi oleh provider.</p>
+              )}
             </div>
 
             {/* Profil Provider Penyelenggara Section */}
             {(() => {
-              const pId = pkg.providerId || pkg.provider?.id || 1;
-              const currentProviderName = pkg.providerName || pkg.providerDetails?.businessName || pkg.provider?.businessName || (pkg.destination ? `Mitra Tour ${pkg.destination.split(',')[0]}` : 'Mitra Resmi TemenTrip');
-              const currentProviderCity = pkg.providerCity || pkg.providerDetails?.operationalCity || pkg.provider?.operationalCity || pkg.destination || 'Indonesia';
+              const pId = Number(pkg.providerId || pkg.provider?.id);
+              const currentProviderName = publicProvider?.businessName || 'Mitra TripKita';
+              const currentProviderCity = publicProvider?.operationalCity || 'Indonesia';
+              const providerRating = publicProvider?.rating || 0;
 
               return (
                 <div 
@@ -960,7 +914,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     {/* Logo Avatar */}
                     <div 
                       onClick={() => {
-                        if (setSelectedProviderId) setSelectedProviderId(pId);
+                        if (pId && setSelectedProviderId) setSelectedProviderId(pId);
                         navigateTo('provider-public-profile');
                       }}
                       style={{ 
@@ -985,7 +939,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     <div style={{ flex: '1 1 200px' }}>
                       <h3 
                         onClick={() => {
-                          if (setSelectedProviderId) setSelectedProviderId(pId);
+                          if (pId && setSelectedProviderId) setSelectedProviderId(pId);
                           navigateTo('provider-public-profile');
                         }}
                         style={{ 
@@ -1006,7 +960,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                         </span>
                         <span>•</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: '700' }}>
-                          <Star size={13} fill="#f59e0b" color="#f59e0b" /> 4.9 / 5.0 (120 Ulasan)
+                          <Star size={13} fill={providerRating > 0 ? '#f59e0b' : 'none'} color="#f59e0b" /> {providerRating > 0 ? `${providerRating.toFixed(1)} / 5.0` : 'Belum ada rating'}
                         </span>
                       </div>
                     </div>
@@ -1015,7 +969,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     <button 
                       type="button"
                       onClick={() => {
-                        if (setSelectedProviderId) setSelectedProviderId(pId);
+                        if (pId && setSelectedProviderId) setSelectedProviderId(pId);
                         navigateTo('provider-public-profile');
                       }}
                       style={{
@@ -1052,24 +1006,27 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 14px', borderRadius: '30px' }}>
-                  <Star size={18} fill="#f59e0b" color="#f59e0b" />
+                  <Star size={18} fill={reviewsList.length > 0 ? '#f59e0b' : 'none'} color="#f59e0b" />
                   <span style={{ fontSize: '15px', fontWeight: '800', color: '#b45309' }}>
-                    {(reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)} / 5.0
+                    {reviewsList.length > 0 ? `${(reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)} / 5.0` : 'Belum ada rating'}
                   </span>
                 </div>
               </div>
 
               {/* Reviews List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+                {currentReviews.length === 0 && (
+                  <p style={{ color: '#64748b', margin: 0 }}>Belum ada ulasan terverifikasi untuk paket ini.</p>
+                )}
                 {currentReviews.map((rev) => (
                   <div key={rev.id} style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#007bff', color: '#ffffff', fontWeight: '700', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {rev.avatar}
+                          W
                         </div>
                         <div>
-                          <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block' }}>{rev.name}</strong>
+                          <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block' }}>Wisatawan terverifikasi</strong>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
                             <CheckCircle2 size={12} /> Terverifikasi Pembeli
                           </div>
@@ -1082,7 +1039,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                             <Star key={i} size={13} fill={i < rev.rating ? '#f59e0b' : 'none'} color={i < rev.rating ? '#f59e0b' : '#cbd5e1'} />
                           ))}
                         </div>
-                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>{rev.date}</span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>{new Date(rev.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                       </div>
                     </div>
 
@@ -1190,7 +1147,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 </div>
               </div>
               <span style={{ backgroundColor: '#e0f2fe', color: '#0284c7', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>
-                {pkg.tripType || 'Open Trip'} • Min. {pkg.quotaMin || 4} Pax
+                {pkg.tripType || 'Open Trip'} • Min. {minRequiredGuests} Pax
               </span>
             </div>
 
@@ -1225,7 +1182,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 </select>
 
                 {(() => {
-                  const quotaMin = pkg.quotaMin || 4;
+                  const quotaMin = Math.max(1, Number(pkg.quotaMin) || 1);
                   const quotaUsed = totalQuotaUsed;
                   const quotaShortage = Math.max(0, quotaMin - quotaUsed);
 

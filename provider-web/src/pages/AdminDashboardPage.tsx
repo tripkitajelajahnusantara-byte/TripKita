@@ -19,7 +19,7 @@ import {
   DollarSign,
   Wallet
 } from 'lucide-react';
-import { request, HOST_BASE_URL } from '../utils/api';
+import { getProtectedDocumentURL, request } from '../utils/api';
 import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
 
 
@@ -107,11 +107,33 @@ export const AdminDashboardPage: React.FC = () => {
   const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([]);
   const [adminNotes, setAdminNotes] = useState('');
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
+  const [previewObjectUrl, setPreviewObjectUrl] = useState<string | null>(null);
   const [previewDocName, setPreviewDocName] = useState<string>('');
   const [zoomLevel, setZoomLevel] = useState(100);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    let objectURL: string | null = null;
+    setPreviewObjectUrl(null);
+    if (previewDocUrl) {
+      getProtectedDocumentURL('admin', previewDocUrl)
+        .then((url) => {
+          objectURL = url;
+          if (active) setPreviewObjectUrl(url);
+          else URL.revokeObjectURL(url);
+        })
+        .catch((err) => {
+          if (active) setError(err.message || 'Dokumen tidak dapat dibuka.');
+        });
+    }
+    return () => {
+      active = false;
+      if (objectURL) URL.revokeObjectURL(objectURL);
+    };
+  }, [previewDocUrl]);
 
   // Refund States
   const [refunds, setRefunds] = useState<any[]>([]);
@@ -320,7 +342,7 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const handleDeleteProvider = async (id: number) => {
-    if (!window.confirm('Apakah Anda yakin ingin menghapus permanen provider ini beserta seluruh paket dan data booking terkait? Tindakan ini tidak dapat dibatalkan.')) {
+    if (!window.confirm('Nonaktifkan provider ini? Seluruh paket akan dinonaktifkan, sedangkan booking dan data keuangan tetap disimpan untuk audit.')) {
       return;
     }
 
@@ -330,7 +352,7 @@ export const AdminDashboardPage: React.FC = () => {
       await request(`/admin/providers/${id}`, {
         method: 'DELETE',
       });
-      setSuccessMsg('Provider berhasil dihapus permanen.');
+      setSuccessMsg('Provider berhasil dinonaktifkan. Data transaksi tetap tersimpan.');
       setSelectedProvider(null);
       fetchProviders();
     } catch (err: any) {
@@ -1321,19 +1343,21 @@ export const AdminDashboardPage: React.FC = () => {
                       <div className="preview-controls">
                         <button className="ctrl-btn" onClick={() => handleZoom('out')} title="Zoom Out"><ZoomOut size={14} /></button>
                         <button className="ctrl-btn" onClick={() => handleZoom('in')} title="Zoom In"><ZoomIn size={14} /></button>
-                        <a href={`${HOST_BASE_URL}${previewDocUrl}`} target="_blank" rel="noreferrer" className="ctrl-btn" title="Fullscreen"><Maximize2 size={14} /></a>
+                        <button type="button" disabled={!previewObjectUrl} onClick={() => previewObjectUrl && window.open(previewObjectUrl, '_blank', 'noopener,noreferrer')} className="ctrl-btn" title="Fullscreen"><Maximize2 size={14} /></button>
                       </div>
                     </div>
                     <div className="doc-preview-container">
-                      {previewDocUrl.endsWith('.pdf') ? (
+                      {!previewObjectUrl ? (
+                        <div style={{ padding: '24px', color: '#64748b' }}>Memuat dokumen...</div>
+                      ) : previewDocName.toLowerCase().includes('.pdf') ? (
                         <iframe 
-                          src={`${HOST_BASE_URL}${previewDocUrl}`} 
+                          src={previewObjectUrl}
                           title="Legal Document Preview"
                           style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
                         />
                       ) : (
                         <img 
-                          src={`${HOST_BASE_URL}${previewDocUrl}`} 
+                          src={previewObjectUrl}
                           alt="Document Preview" 
                           style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', maxWidth: '100%', height: 'auto' }}
                         />

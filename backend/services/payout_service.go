@@ -2,9 +2,14 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"time"
+	"tripkita-provider/database"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PayoutService interface {
@@ -38,21 +43,11 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 		return nil, errors.New("provider not found")
 	}
 
-	summary, err := s.GetProviderPayoutSummary(providerID)
-	if err != nil {
-		return nil, err
-	}
-
 	if req.Amount <= 0 {
 		return nil, errors.New("nominal pencairan harus lebih dari 0")
 	}
-
-	if req.Type == "PELUNASAN_50" && req.Amount > summary.AvailablePelunasan {
-		return nil, errors.New("pencairan pelunasan 50% kedua belum dapat dilakukan karena trip belum selesai")
-	}
-
-	if req.Type == "DP_50" && req.Amount > summary.AvailableDP {
-		return nil, errors.New("saldo DP 50% belum mencukupi untuk dicairkan")
+	if req.Type != "DP_50" && req.Type != "PELUNASAN_50" {
+		return nil, errors.New("jenis pencairan tidak valid")
 	}
 
 	// Validate bank details exist
@@ -78,7 +73,28 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 		UpdatedAt:       time.Now(),
 	}
 
-	err = s.payoutRepo.Create(payout)
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", int64(providerID)+1_000_000_000).Error; err != nil {
+			return err
+		}
+		lockedSummary, err := s.GetProviderPayoutSummary(providerID)
+		if err != nil {
+			return err
+		}
+		if req.Type == "PELUNASAN_50" && req.Amount > lockedSummary.AvailablePelunasan {
+			return errors.New("pencairan pelunasan belum tersedia atau saldo tidak mencukupi")
+		}
+		if req.Type == "DP_50" && req.Amount > lockedSummary.AvailableDP {
+			return errors.New("saldo DP belum mencukupi untuk dicairkan")
+		}
+		if req.BookingID != nil {
+			var count int64
+			if err := tx.Model(&models.Booking{}).Where("id = ? AND provider_id = ?", *req.BookingID, providerID).Count(&count).Error; err != nil || count != 1 {
+				return fmt.Errorf("booking payout tidak valid")
+			}
+		}
+		return tx.Create(payout).Error
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -87,51 +103,58 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 }
 
 func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.PayoutSummary, error) {
-	bookings, _ := s.bookingRepo.FindAllByProvider(providerID)
-	payouts, _ := s.payoutRepo.GetByProviderID(providerID)
+	bookings, err := s.bookingRepo.FindAllByProvider(providerID)
+	if err != nil {
+		return nil, err
+	}
+	payouts, err := s.payoutRepo.GetByProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
 
-	var grossOmset float64 = 0
-	var totalPlatformFee float64 = 0
-	var totalNetEarnings float64 = 0
-	var dpEligible float64 = 0
-	var pelunasanEligible float64 = 0
-	var heldSettlement float64 = 0
+	var grossOmset int64
+	var totalPlatformFee int64
+	var totalNetEarnings int64
+	var dpEligible int64
+	var pelunasanEligible int64
+	var heldSettlement int64
 
 	now := time.Now()
 
 	for _, b := range bookings {
 		if b.Status == "CONFIRMED" || b.Status == "PAID" || b.Status == "COMPLETED" {
-			totalCustomerPaid := float64(b.TotalPrice)
-			adminFee := 5000.0
+			totalCustomerPaid := b.TotalPrice
+			adminFee := int64(5000)
 			if totalCustomerPaid < adminFee {
-				adminFee = 0.0
+				adminFee = 0
 			}
 
 			packageGross := totalCustomerPaid - adminFee
-			platformFee := (packageGross * 0.15) + adminFee
-			netProviderEarning := packageGross * 0.85
+			platformFee := packageGross*15/100 + adminFee
+			netProviderEarning := packageGross * 85 / 100
 
 			grossOmset += totalCustomerPaid
 			totalPlatformFee += platformFee
 			totalNetEarnings += netProviderEarning
 
-			halfAmount := netProviderEarning * 0.5
-			dpEligible += halfAmount
+			dpAmount := netProviderEarning / 2
+			settlementAmount := netProviderEarning - dpAmount
+			dpEligible += dpAmount
 
 			// Check if trip is finished (either status is COMPLETED or tripDate has passed by 24 hours)
 			isFinished := b.Status == "COMPLETED" || (!b.TripDate.IsZero() && now.After(b.TripDate.Add(24*time.Hour)))
 			if isFinished {
-				pelunasanEligible += halfAmount
+				pelunasanEligible += settlementAmount
 			} else {
-				heldSettlement += halfAmount
+				heldSettlement += settlementAmount
 			}
 		}
 	}
 
-	var dpPaidOut float64 = 0
-	var pelunasanPaidOut float64 = 0
-	var totalPaidOut float64 = 0
-	var pendingPayout float64 = 0
+	var dpPaidOut int64
+	var pelunasanPaidOut int64
+	var totalPaidOut int64
+	var pendingPayout int64
 
 	for _, p := range payouts {
 		if p.Status == "APPROVED" {
@@ -179,5 +202,75 @@ func (s *payoutService) GetAllPayouts() ([]models.Payout, error) {
 }
 
 func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string, proofPath string) (*models.Payout, error) {
-	return s.payoutRepo.UpdateStatus(payoutID, status, notes, proofPath)
+	var payout models.Payout
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&payout, payoutID).Error; err != nil {
+			return errors.New("payout request not found")
+		}
+		if payout.Status != "PENDING" {
+			return errors.New("payout sudah diproses dan tidak dapat diubah kembali")
+		}
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", int64(payout.ProviderID)+1_000_000_000).Error; err != nil {
+			return err
+		}
+
+		if status == "APPROVED" {
+			available, err := availablePayoutAmountTx(tx, &payout)
+			if err != nil {
+				return err
+			}
+			if payout.Amount > available {
+				return errors.New("saldo payout berubah dan tidak lagi mencukupi; tolak pengajuan ini lalu minta provider mengajukan ulang")
+			}
+		}
+
+		updates := map[string]interface{}{
+			"status":     status,
+			"notes":      notes,
+			"updated_at": time.Now(),
+		}
+		if proofPath != "" {
+			updates["proof_path"] = proofPath
+		}
+		return tx.Model(&payout).Updates(updates).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.payoutRepo.GetByID(payoutID)
+}
+
+func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error) {
+	var bookings []models.Booking
+	if err := tx.Where("provider_id = ? AND status IN ?", current.ProviderID, []string{"PAID", "CONFIRMED", "COMPLETED"}).Find(&bookings).Error; err != nil {
+		return 0, err
+	}
+
+	var eligible int64
+	now := time.Now()
+	for _, booking := range bookings {
+		adminFee := int64(5000)
+		if booking.TotalPrice < adminFee {
+			adminFee = 0
+		}
+		providerNet := (booking.TotalPrice - adminFee) * 85 / 100
+		dpAmount := providerNet / 2
+		if current.Type == "DP_50" {
+			eligible += dpAmount
+		} else if booking.Status == "COMPLETED" || (!booking.TripDate.IsZero() && now.After(booking.TripDate.Add(24*time.Hour))) {
+			eligible += providerNet - dpAmount
+		}
+	}
+
+	var reserved int64
+	if err := tx.Model(&models.Payout{}).
+		Where("provider_id = ? AND type = ? AND id <> ? AND status IN ?", current.ProviderID, current.Type, current.ID, []string{"PENDING", "APPROVED"}).
+		Select("COALESCE(SUM(amount), 0)").Scan(&reserved).Error; err != nil {
+		return 0, err
+	}
+	available := eligible - reserved
+	if available < 0 {
+		return 0, nil
+	}
+	return available, nil
 }

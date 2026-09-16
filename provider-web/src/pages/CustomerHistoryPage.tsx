@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, MessageSquare, Star } from 'lucide-react';
@@ -22,54 +22,60 @@ interface BookingItem {
   status: string;
   paymentUrl: string;
   createdAt: string;
+  providerWhatsApp?: string;
+  providerName?: string;
 }
 
+const getWhatsAppURL = (phone?: string): string | null => {
+  if (!phone) return null;
+  let digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('0')) digits = `62${digits.slice(1)}`;
+  if (!digits.startsWith('62') || digits.length < 10 || digits.length > 15) return null;
+  return `https://wa.me/${digits}`;
+};
 
+const getTrustedPaymentURL = (value?: string): string | null => {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    const host = parsed.hostname.toLowerCase();
+    return parsed.protocol === 'https:' && (host === 'xendit.co' || host.endsWith('.xendit.co')) ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+};
 
-const CountdownTimer: React.FC<{ createdAt?: string; bookingCode?: string; onExpire?: () => void }> = ({ createdAt, bookingCode, onExpire }) => {
+const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = ({ createdAt, onExpire }) => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const onExpireRef = useRef(onExpire);
 
   useEffect(() => {
-    let createdMs = 0;
-    if (createdAt) {
-      const parsed = new Date(createdAt).getTime();
-      if (!isNaN(parsed) && parsed > 0) {
-        createdMs = parsed;
-      }
-    }
+    onExpireRef.current = onExpire;
+  }, [onExpire]);
 
-    const storageKey = bookingCode ? `tripkita_booking_created_${bookingCode}` : null;
-
-    if (!createdMs && storageKey) {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        createdMs = parseInt(saved, 10);
-      }
-    }
-
-    if (createdMs && storageKey && !localStorage.getItem(storageKey)) {
-      localStorage.setItem(storageKey, createdMs.toString());
-    } else if (!createdMs) {
-      createdMs = Date.now();
-      if (storageKey) {
-        localStorage.setItem(storageKey, createdMs.toString());
-      }
-    }
+  useEffect(() => {
+    if (!createdAt) return;
+    const createdMs = new Date(createdAt).getTime();
+    if (!Number.isFinite(createdMs) || createdMs <= 0) return;
 
     const expireMs = createdMs + 24 * 60 * 60 * 1000;
 
     const updateTimer = () => {
       const diff = Math.max(0, Math.floor((expireMs - Date.now()) / 1000));
       setTimeLeft(diff);
-      if (diff <= 0 && onExpire) {
-        onExpire();
+      if (diff <= 0 && onExpireRef.current) {
+        onExpireRef.current();
+        return true;
       }
+      return false;
     };
 
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
+    if (updateTimer()) return;
+    const interval = setInterval(() => {
+      if (updateTimer()) clearInterval(interval);
+    }, 1000);
     return () => clearInterval(interval);
-  }, [createdAt, bookingCode]);
+  }, [createdAt]);
 
   const hours = String(Math.floor(timeLeft / 3600)).padStart(2, '0');
   const minutes = String(Math.floor((timeLeft % 3600) / 60)).padStart(2, '0');
@@ -107,21 +113,25 @@ export const CustomerHistoryPage: React.FC = () => {
   const [cancellingLoading, setCancellingLoading] = useState(false);
 
   const handleConfirmCancel = async (bookingToCancel: any) => {
-    if (!bookingToCancel) return;
-    setCancellingLoading(true);
-    try {
-      const targetId = bookingToCancel.id || bookingToCancel.bookingCode;
-      await request(`/public/bookings/${targetId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: 'DIBATALKAN' })
-      });
+	if (!bookingToCancel) return;
+	if (!customerProfile || customerProfile.role !== 'CUSTOMER') {
+	  alert('Pembatalan booking tamu harus dilakukan melalui layanan pelanggan untuk verifikasi identitas.');
+	  return;
+	}
+	setCancellingLoading(true);
+	try {
+	  const cancelledBooking = await request(`/customer/bookings/${bookingToCancel.id}/cancel`, {
+		method: 'PUT',
+		body: JSON.stringify({})
+	  });
+	  const cancelledStatus = cancelledBooking.status || 'CANCELLED_BY_CUSTOMER';
 
       try {
         const historyStr = localStorage.getItem('tripkita_my_bookings') || '[]';
         const history = JSON.parse(historyStr);
         const updatedHistory = history.map((b: any) => {
           if (b.id == bookingToCancel.id || b.bookingCode === bookingToCancel.bookingCode) {
-            return { ...b, status: 'DIBATALKAN' };
+            return { ...b, ...cancelledBooking, status: cancelledStatus };
           }
           return b;
         });
@@ -131,10 +141,10 @@ export const CustomerHistoryPage: React.FC = () => {
       }
 
       if (trackedBooking && (trackedBooking.id == bookingToCancel.id || trackedBooking.bookingCode === bookingToCancel.bookingCode)) {
-        setTrackedBooking({ ...trackedBooking, status: 'DIBATALKAN' });
+        setTrackedBooking({ ...trackedBooking, ...cancelledBooking, status: cancelledStatus });
       }
 
-      setBookings(prev => prev.map(b => (b.id == bookingToCancel.id || b.bookingCode === bookingToCancel.bookingCode) ? { ...b, status: 'DIBATALKAN' } : b));
+      setBookings(prev => prev.map(b => (b.id == bookingToCancel.id || b.bookingCode === bookingToCancel.bookingCode) ? { ...b, ...cancelledBooking, status: cancelledStatus } : b));
       fetchHistory();
       setCancelConfirmBooking(null);
     } catch (err: any) {
@@ -145,61 +155,24 @@ export const CustomerHistoryPage: React.FC = () => {
     }
   };
 
-  const handleExpireBooking = async (bId: string | number) => {
-    try {
-      await request(`/public/bookings/${bId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: 'EXPIRED' })
-      });
-    } catch (e) {
-      console.error('Failed to update expired status to DB:', e);
-    }
-  };
+	const handleExpireBooking = (_bId: string | number) => {
+	  // Expiry is decided by the backend clock; the browser only refreshes the view.
+	};
 
   useEffect(() => {
     // Handle return from Xendit payment gateway
     const urlParams = new URLSearchParams(window.location.search);
-    const paymentStatus = urlParams.get('payment_status');
-    const bookingId = urlParams.get('booking_id');
-    const bookingCode = urlParams.get('code');
+	const paymentResult = urlParams.get('payment_result');
+	const bookingId = urlParams.get('booking_id');
 
-    if (paymentStatus === 'PAID' && (bookingId || bookingCode)) {
-      const targetId = bookingId || bookingCode;
-      // Clean URL params right away so refresh won't repeat this request
-      if (window.history.replaceState) {
-        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-      }
-      request(`/public/bookings/${targetId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: 'PAID' })
-      }).then(() => {
-        try {
-          const historyStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-          const history = JSON.parse(historyStr);
-          const updatedHistory = history.map((b: any) => {
-            if (b.id == bookingId || b.bookingCode === bookingCode) {
-              return { ...b, status: 'PAID' };
-            }
-            return b;
-          });
-          localStorage.setItem('tripkita_my_bookings', JSON.stringify(updatedHistory));
-
-          const recentStr = sessionStorage.getItem('tripkita_recent_guest_booking');
-          if (recentStr) {
-            const recent = JSON.parse(recentStr);
-            sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify({ ...recent, status: 'PAID' }));
-          }
-        } catch (e) {
-          console.error(e);
-        }
-        fetchHistory();
-      }).catch((e) => {
-        console.error('Failed to update payment status:', e);
-        fetchHistory();
-      });
-    } else {
-      fetchHistory();
-    }
+	if (paymentResult && bookingId) {
+	  // Redirect parameters are informational only. Payment status is accepted
+	  // exclusively from the verified backend webhook.
+	  if (window.history.replaceState) {
+		window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+	  }
+	}
+	fetchHistory();
   }, [customerProfile]);
 
   const fetchHistory = async () => {
@@ -479,8 +452,9 @@ export const CustomerHistoryPage: React.FC = () => {
                       <button
                         onClick={() => {
                           const pUrl = trackedBooking.paymentUrl || trackedBooking.payment_url;
-                          if (pUrl && pUrl.startsWith('http')) {
-                            window.location.href = pUrl;
+                          const trustedURL = getTrustedPaymentURL(pUrl);
+                          if (trustedURL) {
+                            window.location.href = trustedURL;
                           } else {
                             alert('Tautan pembayaran Xendit tidak ditemukan. Silakan lakukan pemesanan ulang.');
                           }
@@ -499,9 +473,11 @@ export const CustomerHistoryPage: React.FC = () => {
                         Selesaikan Pembayaran
                       </button>
                     )}
-                    {(trackedBooking.status === 'PAID' || trackedBooking.status === 'CONFIRMED') && (
+                    {(trackedBooking.status === 'PAID' || trackedBooking.status === 'CONFIRMED') && getWhatsAppURL(
+                      trackedBooking.providerWhatsApp || bookings.find(item => item.bookingCode === trackedBooking.bookingCode)?.providerWhatsApp
+                    ) && (
                       <a
-                        href="https://wa.me/6281234567890" 
+                        href={getWhatsAppURL(trackedBooking.providerWhatsApp || bookings.find(item => item.bookingCode === trackedBooking.bookingCode)?.providerWhatsApp) || undefined}
                         target="_blank"
                         rel="noreferrer"
                         style={{
@@ -517,7 +493,7 @@ export const CustomerHistoryPage: React.FC = () => {
                           fontSize: '13px'
                         }}
                       >
-                        <MessageSquare size={14} /> Join WA Group Mitra
+                        <MessageSquare size={14} /> Hubungi Provider
                       </a>
                     )}
                   </div>
@@ -664,7 +640,7 @@ export const CustomerHistoryPage: React.FC = () => {
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                           <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Pembayaran Xendit:</strong>
-                          <CountdownTimer createdAt={booking.createdAt} bookingCode={booking.bookingCode} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
+                          <CountdownTimer createdAt={booking.createdAt} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
                         </div>
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
@@ -698,8 +674,9 @@ export const CustomerHistoryPage: React.FC = () => {
                             <button
                               onClick={() => {
                                 const pUrl = booking.paymentUrl || (booking as any).payment_url;
-                                if (pUrl && pUrl.startsWith('http')) {
-                                  window.location.href = pUrl;
+                                const trustedURL = getTrustedPaymentURL(pUrl);
+                                if (trustedURL) {
+                                  window.location.href = trustedURL;
                                 } else {
                                   alert('Tautan pembayaran Xendit tidak ditemukan. Silakan lakukan pemesanan ulang.');
                                 }
@@ -749,25 +726,27 @@ export const CustomerHistoryPage: React.FC = () => {
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       {(booking.status === 'PAID' || booking.status === 'CONFIRMED' || booking.status === 'Dikonfirmasi' || booking.status === 'COMPLETED') && (
                         <>
-                          <a
-                            href="https://wa.me/6281234567890"
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              backgroundColor: '#25d366',
-                              color: '#ffffff',
-                              textDecoration: 'none',
-                              padding: '8px 16px',
-                              borderRadius: '8px',
-                              fontWeight: '700',
-                              fontSize: '13px'
-                            }}
-                          >
-                            <MessageSquare size={14} /> Grup WhatsApp
-                          </a>
+                          {getWhatsAppURL(booking.providerWhatsApp) && (
+                            <a
+                              href={getWhatsAppURL(booking.providerWhatsApp) || undefined}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                backgroundColor: '#25d366',
+                                color: '#ffffff',
+                                textDecoration: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '8px',
+                                fontWeight: '700',
+                                fontSize: '13px'
+                              }}
+                            >
+                              <MessageSquare size={14} /> Hubungi Provider
+                            </a>
+                          )}
                           
                           {(() => {
                             const isAlreadyReviewed = reviewedMap[booking.id];
@@ -794,17 +773,7 @@ export const CustomerHistoryPage: React.FC = () => {
                               );
                             }
 
-                            const parseDate = (dStr?: string) => {
-                              if (!dStr) return null;
-                              const d = new Date(dStr);
-                              return !isNaN(d.getTime()) ? d : null;
-                            };
-                            const tripD = parseDate(booking.tripDate);
-                            const isFinished = booking.status === 'COMPLETED' || (
-                              (booking.status === 'PAID' || booking.status === 'CONFIRMED') &&
-                              tripD !== null &&
-                              tripD.getTime() + 24 * 60 * 60 * 1000 <= Date.now()
-                            );
+                            const isFinished = booking.status === 'COMPLETED';
 
                             return (
                               <button

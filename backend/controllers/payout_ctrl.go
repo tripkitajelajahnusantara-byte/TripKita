@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
 	"tripkita-provider/services"
@@ -69,7 +70,7 @@ func (ctrl *PayoutController) GetProviderPayoutSummary(c *gin.Context) {
 
 	summary, err := ctrl.service.GetProviderPayoutSummary(providerID.(uint))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat ringkasan payout", err)
 		return
 	}
 
@@ -111,6 +112,16 @@ func (ctrl *PayoutController) GetPayoutPDFReceipt(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Pencairan dana tidak ditemukan"})
 		return
 	}
+	if payout.Status != "APPROVED" {
+		c.JSON(http.StatusConflict, gin.H{"error": "Bukti pencairan hanya tersedia setelah transfer disetujui"})
+		return
+	}
+	role, _ := c.Get("role")
+	requesterID, _ := c.Get("provider_id")
+	if role != "ADMIN" && (role != "PROVIDER" || requesterID == nil || payout.ProviderID != requesterID.(uint)) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Pencairan dana tidak ditemukan"})
+		return
+	}
 
 	provider, _ := ctrl.providerRepo.FindByID(payout.ProviderID)
 	pdfBytes, filename, err := ctrl.pdfService.GeneratePayoutReceiptPDF(payout, provider)
@@ -126,16 +137,16 @@ func (ctrl *PayoutController) GetPayoutPDFReceipt(c *gin.Context) {
 func (ctrl *PayoutController) AdminGetAllPayouts(c *gin.Context) {
 	payouts, err := ctrl.service.GetAllPayouts()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat payout admin", err)
 		return
 	}
 	c.JSON(http.StatusOK, payouts)
 }
 
 type ProcessPayoutRequest struct {
-	Status    string `json:"status" binding:"required"` // APPROVED, REJECTED
-	Notes     string `json:"notes"`
-	ProofPath string `json:"proofPath"`
+	Status    string `json:"status" binding:"required,oneof=APPROVED REJECTED"`
+	Notes     string `json:"notes" binding:"required,min=10,max=1000"`
+	ProofPath string `json:"proofPath" binding:"max=500"`
 }
 
 func (ctrl *PayoutController) AdminProcessPayout(c *gin.Context) {
@@ -149,6 +160,11 @@ func (ctrl *PayoutController) AdminProcessPayout(c *gin.Context) {
 	var req ProcessPayoutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	req.Notes = strings.TrimSpace(req.Notes)
+	if len(req.Notes) < 10 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Catatan proses payout minimal 10 karakter"})
 		return
 	}
 

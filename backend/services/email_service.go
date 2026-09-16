@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"html"
 	"log"
 	"net/smtp"
 
@@ -96,7 +97,7 @@ func (s *EmailService) SendPaymentSuccessEmail(b *models.Booking, pkg *models.Pa
   </div>
 </body>
 </html>
-`, b.CustomerName, b.BookingCode, packageName, destination, meetingPoint, travelDateStr, b.Guests, formatIDRNumber(b.TotalPrice))
+`, html.EscapeString(b.CustomerName), html.EscapeString(b.BookingCode), html.EscapeString(packageName), html.EscapeString(destination), html.EscapeString(meetingPoint), travelDateStr, b.Guests, formatIDRNumber(b.TotalPrice))
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
 }
@@ -135,7 +136,7 @@ func (s *EmailService) SendRefundEmail(b *models.Booking) error {
   </div>
 </body>
 </html>
-`, b.CustomerName, formatIDRNumber(b.TotalPrice), b.BookingCode, packageName)
+`, html.EscapeString(b.CustomerName), formatIDRNumber(b.TotalPrice), html.EscapeString(b.BookingCode), html.EscapeString(packageName))
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
 }
@@ -171,7 +172,7 @@ func (s *EmailService) SendExpiredEmail(b *models.Booking) error {
   </div>
 </body>
 </html>
-`, b.CustomerName, packageName, b.BookingCode)
+`, html.EscapeString(b.CustomerName), html.EscapeString(packageName), html.EscapeString(b.BookingCode))
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, nil, "")
 }
@@ -217,7 +218,7 @@ func (s *EmailService) SendPayoutDisbursedEmail(payout *models.Payout, provider 
   </div>
 </body>
 </html>
-`, provider.BusinessName, payoutTypeLabel, formatIDRNumber(int64(payout.Amount)), payout.BankName, payout.BankAccount, payout.BankAccountName, formatIDRNumber(int64(payout.Amount)))
+`, html.EscapeString(provider.BusinessName), html.EscapeString(payoutTypeLabel), formatIDRNumber(payout.Amount), html.EscapeString(payout.BankName), html.EscapeString(payout.BankAccount), html.EscapeString(payout.BankAccountName), formatIDRNumber(payout.Amount))
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
 }
@@ -256,7 +257,7 @@ func (s *EmailService) SendCancelledEmail(b *models.Booking) error {
   </div>
 </body>
 </html>
-`, b.CustomerName, b.BookingCode, packageName)
+`, html.EscapeString(b.CustomerName), html.EscapeString(b.BookingCode), html.EscapeString(packageName))
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
 }
@@ -296,7 +297,7 @@ func (s *EmailService) SendRescheduleEmail(b *models.Booking) error {
   </div>
 </body>
 </html>
-`, b.CustomerName, b.BookingCode, packageName, newDateStr)
+`, html.EscapeString(b.CustomerName), html.EscapeString(b.BookingCode), html.EscapeString(packageName), newDateStr)
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
 }
@@ -304,7 +305,7 @@ func (s *EmailService) SendRescheduleEmail(b *models.Booking) error {
 // SendResetPasswordEmail sends a 6-digit OTP for password reset
 func (s *EmailService) SendResetPasswordEmail(email string, otp string) error {
 	subject := "TripKita - Kode Reset Password"
-	
+
 	htmlBody := fmt.Sprintf(`
 		<h2>Reset Password Anda</h2>
 		<p>Seseorang telah meminta untuk mereset password akun TripKita Anda.</p>
@@ -327,7 +328,7 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 	fromAddr := s.cfg.SMTPFrom
 
 	if smtpUser == "" || smtpPass == "" || smtpHost == "" {
-		log.Printf("[EmailService] SMTP credentials not fully set. Logged Email dispatch to: %s | Subject: %s\n", to, subject)
+		log.Printf("[EmailService] SMTP credentials not fully set; email dispatch skipped")
 		return nil
 	}
 
@@ -372,10 +373,10 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 	addr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
 	err := smtp.SendMail(addr, auth, fromAddr, []string{to}, bodyBuf.Bytes())
 	if err != nil {
-		log.Printf("[EmailService] SMTP error sending to %s: %v\n", to, err)
+		log.Printf("[EmailService] SMTP dispatch failed: %v\n", err)
 		return err
 	}
 
-	log.Printf("[EmailService] Successfully sent email to %s | Subject: %s\n", to, subject)
+	log.Printf("[EmailService] Email dispatched successfully")
 	return nil
 }

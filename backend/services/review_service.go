@@ -34,8 +34,11 @@ func (s *reviewService) CreateReview(customerID uint, req *models.CreateReviewRe
 	}
 
 	// Validate ownership
-	if booking.CustomerID != nil && *booking.CustomerID != customerID {
+	if booking.CustomerID == nil || *booking.CustomerID != customerID {
 		return nil, errors.New("anda tidak memiliki akses ke pesanan ini")
+	}
+	if booking.Status != "COMPLETED" {
+		return nil, errors.New("ulasan hanya dapat dikirim setelah perjalanan selesai")
 	}
 
 	// Check if already reviewed

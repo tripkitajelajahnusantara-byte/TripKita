@@ -22,12 +22,12 @@ import { ProviderLandingPage } from './pages/ProviderLandingPage';
 import { CustomerSearchPage } from './pages/CustomerSearchPage';
 import { CustomerConfirmationPage } from './pages/CustomerConfirmationPage';
 import { CustomerPaymentInvoicePage } from './pages/CustomerPaymentInvoicePage';
-import { CustomerXenditCheckoutPage } from './pages/CustomerXenditCheckoutPage';
 import { ProviderFinancePage } from './pages/ProviderFinancePage';
 import { ProviderPublicProfilePage } from './pages/ProviderPublicProfilePage';
 import { CustomerSettingsPage } from './pages/CustomerSettingsPage';
 import { CustomerTripPlannerPage } from './pages/CustomerTripPlannerPage';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from './components/LegalModals';
+import { getProviderToken } from './utils/api';
 
 const AppContent: React.FC = () => {
   const { route, loadingProfile, providerProfile, customerProfile, navigateTo } = useNavigation();
@@ -60,7 +60,7 @@ const AppContent: React.FC = () => {
     if (loadingProfile) return;
 
     if (privateProviderRoutes.includes(route)) {
-      const hasProviderToken = typeof window !== 'undefined' && (localStorage.getItem('tementrip_partner_token') || localStorage.getItem('tripkita_partner_token'));
+      const hasProviderToken = typeof window !== 'undefined' && getProviderToken();
       if (!hasProviderToken) {
         navigateTo('provider-login');
         return;
@@ -196,14 +196,6 @@ const AppContent: React.FC = () => {
         <Footer />
         {renderGlobalTermsModal()}
       </div>
-    );
-  }
-  if (route === 'xendit-checkout') {
-    return (
-      <>
-        <CustomerXenditCheckoutPage />
-        {renderGlobalTermsModal()}
-      </>
     );
   }
   if (route === 'riwayat-booking') {

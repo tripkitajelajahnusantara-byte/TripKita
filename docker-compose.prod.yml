@@ -1,0 +1,47 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT:-8080}:8080"
+    env_file:
+      - ./backend/.env
+    environment:
+      APP_ENV: production
+    volumes:
+      - backend-uploads:/app/uploads
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - tripkita-network
+
+  provider-web:
+    build:
+      context: ./provider-web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?VITE_API_BASE_URL must point to the public backend /api/v1 URL}
+    ports:
+      - "${WEB_PORT:-8081}:8080"
+    depends_on:
+      - backend
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - tripkita-network
+
+networks:
+  tripkita-network:
+    driver: bridge
+
+volumes:
+  backend-uploads:

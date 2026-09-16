@@ -26,126 +26,78 @@ interface TripPackage {
   highlights?: string[];
 }
 
+interface PublicProviderProfile {
+  id: number;
+  businessName: string;
+  businessCategory: string;
+  operationalProvince: string;
+  operationalCity: string;
+  description: string;
+  isVerified: boolean;
+  rating: number;
+  totalTravelers: number;
+  createdAt: string;
+}
+
+interface PublicReview {
+  id: number;
+  packageId: number;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
 export const ProviderPublicProfilePage: React.FC = () => {
   const { navigateTo, selectedProviderId, setSelectedPackageForDetail } = useNavigation();
-  const [providerInfo, setProviderInfo] = useState<any>(null);
+  const [providerInfo, setProviderInfo] = useState<PublicProviderProfile | null>(null);
   const [packages, setPackages] = useState<TripPackage[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<PublicReview[]>([]);
   const [activeTab, setActiveTab] = useState<'packages' | 'reviews'>('packages');
   const [loading, setLoading] = useState(true);
-
-  // Provider Directory Mock Data Map matching all 8 seed providers in DB
-  const providerDataMap: { [key: number]: any } = {
-    1: {
-      id: 1,
-      businessName: 'Wisata Bromo Nusantara',
-      businessCategory: 'Tour Operator Specialist',
-      operationalProvince: 'Jawa Timur',
-      operationalCity: 'Probolinggo',
-      description: 'Penyedia layanan open trip & private trip Bromo terpercaya dengan pengalaman 10+ tahun. Armada Jeep Hardtop milik sendiri, pemandu lokal berlisensi, dan jaminan dokumentasi foto terbaik.',
-      picName: 'Budi Santoso',
-      email: 'partner@wisatanusantara.id',
-      whatsApp: '+62 812 3456 7890',
-      isVerified: true,
-      rating: 4.9,
-      totalBookings: 1420,
-      joinedYear: 2021,
-      bannerImage: 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=1200&q=80',
-    },
-    2: {
-      id: 2,
-      businessName: 'Tidung Paradise Tour',
-      businessCategory: 'Wisata Bahari & Island Hopping',
-      operationalProvince: 'DKI Jakarta',
-      operationalCity: 'Kepulauan Seribu',
-      description: 'Spesialis tour jelajah Kepulauan Seribu dan Pulau Tidung. Menyediakan penginapan pinggir pantai, perahu private, alat snorkeling berkualitas, dan pemandu lokal profesional.',
-      picName: 'Ahmad Fauzi',
-      email: 'partner2@tidung.id',
-      whatsApp: '+62 813 9876 5432',
-      isVerified: true,
-      rating: 4.8,
-      totalBookings: 980,
-      joinedYear: 2022,
-      bannerImage: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
-    },
-    3: {
-      id: 3,
-      businessName: 'Bogor Curug Explorer',
-      businessCategory: 'Petualangan Alam & Outdoor',
-      operationalProvince: 'Jawa Barat',
-      operationalCity: 'Bogor',
-      description: 'Mitra eksplorasi wisata air terjun, trekking hutan pinus, dan outbound alam di seputar Bogor. Pilihan utama untuk liburan keluarga & event corporate gathering.',
-      picName: 'Rian Hidayat',
-      email: 'partner3@cilember.id',
-      whatsApp: '+62 815 1122 3344',
-      isVerified: true,
-      rating: 4.7,
-      totalBookings: 760,
-      joinedYear: 2022,
-      bannerImage: 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80',
-    },
-    4: {
-      id: 4,
-      businessName: 'Bandung Juara Tour',
-      businessCategory: 'City Tour & Cultural Specialist',
-      operationalProvince: 'Jawa Barat',
-      operationalCity: 'Bandung',
-      description: 'Layanan tour keliling kota Bandung, tempat bersejarah, wisata kuliner, dan destinasi populer. Didukung armada bus VIP & van travel ber-AC dingin.',
-      picName: 'Deni Kurniawan',
-      email: 'partner4@bandung.id',
-      whatsApp: '+62 812 7788 9900',
-      isVerified: true,
-      rating: 4.9,
-      totalBookings: 1150,
-      joinedYear: 2020,
-      bannerImage: 'https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=1200&q=80',
-    },
-    8: {
-      id: 8,
-      businessName: 'Jogja Istimewa Tour',
-      businessCategory: 'Wisata Budaya & Heritage Specialist',
-      operationalProvince: 'DI Yogyakarta',
-      operationalCity: 'Yogyakarta',
-      description: 'Penyedia paket liburan Yogyakarta, Borobudur, Candi Prambanan, dan wisata kuliner khas. Menyediakan pemandu ramah anak & lansia serta mobil family AC private.',
-      picName: 'Suryo Putro',
-      email: 'partner8@jogja.id',
-      whatsApp: '+62 811 2233 4455',
-      isVerified: true,
-      rating: 4.9,
-      totalBookings: 1300,
-      joinedYear: 2021,
-      bannerImage: 'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?auto=format&fit=crop&w=1200&q=80',
-    }
-  };
-
-  const defaultMockReviews = [
-    { id: 1, name: 'Budi Santoso', avatar: 'BS', rating: 5, date: '15 Mei 2026', comment: 'Pelayanan sangat profesional! Tour guidenya tepat waktu dan tempat penjemputan sangat nyaman. Sangat direkomendasikan!', packageName: 'Open Trip Gunung Bromo' },
-    { id: 2, name: 'Siti Rahmawati', avatar: 'SR', rating: 5, date: '10 Mei 2026', comment: 'Fasilitas transportasi dingin & bersih, itinerary terlaksana 100% tanpa molor. Pemandu lokalnya ramah sekali.', packageName: 'Private Trip Wisata Raja Ampat' },
-    { id: 3, name: 'Andi Wijaya', avatar: 'AW', rating: 4, date: '02 Mei 2026', comment: 'Sangat recommended untuk liburan keluarga. Penginapan bersih dan makanan yang disediakan enak-enak.', packageName: 'Family Vacation Yogyakarta' },
-    { id: 4, name: 'Dewi Lestari', avatar: 'DL', rating: 5, date: '28 April 2026', comment: 'Honeymoon trip yang luar biasa manis! Keramahan tim mitra provider ini patut diacungi dua jempol.', packageName: 'Honeymoon Romantic Bali Villa' },
-  ];
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    const pId = selectedProviderId || 1;
-    const fallbackInfo = providerDataMap[pId] || providerDataMap[1];
+    let cancelled = false;
 
     const fetchProviderDetail = async () => {
+      if (!selectedProviderId) {
+        setLoadError('Provider tidak dipilih.');
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setLoadError('');
       try {
-        const allPkgs = await request('/public/packages');
-        if (Array.isArray(allPkgs) && allPkgs.length > 0) {
-          const filtered = allPkgs.filter((p: TripPackage) => p.providerId === pId);
+        const [profile, allPkgs] = await Promise.all([
+          request(`/public/providers/${selectedProviderId}`),
+          request('/public/packages')
+        ]);
+        const filtered = Array.isArray(allPkgs)
+          ? allPkgs.filter((p: TripPackage) => p.providerId === selectedProviderId)
+          : [];
+        const reviewResponses = await Promise.all(
+          filtered.map((pkg: TripPackage) => request(`/public/reviews/package/${pkg.id}`).catch(() => []))
+        );
+        if (!cancelled) {
+          setProviderInfo(profile);
           setPackages(filtered);
+          setReviews(reviewResponses.flat().filter(Boolean));
         }
       } catch (err) {
         console.error('Failed to load provider packages:', err);
+        if (!cancelled) {
+          setProviderInfo(null);
+          setPackages([]);
+          setReviews([]);
+          setLoadError('Profil provider tidak tersedia.');
+        }
       } finally {
-        setProviderInfo(fallbackInfo);
-        setReviews(defaultMockReviews);
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchProviderDetail();
+    return () => { cancelled = true; };
   }, [selectedProviderId]);
 
   const formatIDR = (price: number) => {
@@ -161,13 +113,25 @@ export const ProviderPublicProfilePage: React.FC = () => {
     navigateTo('paket-detail');
   };
 
-  if (loading || !providerInfo) {
+  if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
         <p>Memuat profil mitra provider...</p>
       </div>
     );
   }
+  if (!providerInfo) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
+        <p>{loadError || 'Profil provider tidak tersedia.'}</p>
+        <button type="button" onClick={() => navigateTo('cari-trip')}>Kembali ke daftar trip</button>
+      </div>
+    );
+  }
+
+  const bannerImage = packages.length > 0
+    ? getTripImage(packages[0].id, packages[0].name, packages[0].category)
+    : getTripImage(providerInfo.id, providerInfo.businessName, providerInfo.businessCategory);
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '80px', fontFamily: 'Inter, sans-serif' }}>
@@ -177,7 +141,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
         style={{ 
           position: 'relative', 
           height: '240px', 
-          backgroundImage: `linear-gradient(to bottom, rgba(15,23,42,0.4), rgba(15,23,42,0.8)), url(${providerInfo.bannerImage})`,
+          backgroundImage: `linear-gradient(to bottom, rgba(15,23,42,0.4), rgba(15,23,42,0.8)), url(${bannerImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center 40%',
           color: '#ffffff'
@@ -258,7 +222,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
                 <span>•</span>
                 <span style={{ color: '#0f172a', fontWeight: '600' }}>{providerInfo.businessCategory}</span>
                 <span>•</span>
-                <span>Bergabung sejak {providerInfo.joinedYear}</span>
+                <span>Bergabung sejak {new Date(providerInfo.createdAt).getFullYear()}</span>
               </div>
 
               <p style={{ fontSize: '14px', color: '#475569', margin: '0 0 16px 0', lineHeight: '1.6' }}>
@@ -280,7 +244,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
           >
             <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '12px', textAlign: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: '#f59e0b', fontWeight: '800', fontSize: '18px' }}>
-                <Star size={18} fill="#f59e0b" color="#f59e0b" /> {providerInfo.rating} / 5.0
+                <Star size={18} fill="#f59e0b" color="#f59e0b" /> {providerInfo.rating > 0 ? `${providerInfo.rating.toFixed(1)} / 5.0` : 'Belum ada rating'}
               </div>
               <span style={{ fontSize: '12px', color: '#64748b' }}>Rating Kepuasan Wisatawan</span>
             </div>
@@ -294,7 +258,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
 
             <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '12px', textAlign: 'center' }}>
               <div style={{ color: '#10b981', fontWeight: '800', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                <Award size={18} /> {providerInfo.totalBookings}+
+                <Award size={18} /> {providerInfo.totalTravelers}
               </div>
               <span style={{ fontSize: '12px', color: '#64748b' }}>Wisatawan Diberangkatkan</span>
             </div>
@@ -434,7 +398,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#f59e0b', fontWeight: '700' }}>
                           <Star size={12} fill="#f59e0b" color="#f59e0b" />
-                          <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : '4.8'}</span>
+                          <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Belum ada'}</span>
                         </div>
 
                         <span style={{ fontSize: '13px', fontWeight: '800', color: '#007bff' }}>
@@ -457,16 +421,19 @@ export const ProviderPublicProfilePage: React.FC = () => {
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {reviews.length === 0 && (
+                <p style={{ color: '#64748b', margin: 0 }}>Belum ada ulasan terverifikasi untuk provider ini.</p>
+              )}
               {reviews.map((rev) => (
                 <div key={rev.id} style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#007bff', color: '#ffffff', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {rev.avatar}
+                        W
                       </div>
                       <div>
-                        <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block' }}>{rev.name}</strong>
-                        <span style={{ fontSize: '11px', color: '#007bff', fontWeight: '600' }}>Paket: {rev.packageName}</span>
+                        <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block' }}>Wisatawan terverifikasi</strong>
+                        <span style={{ fontSize: '11px', color: '#007bff', fontWeight: '600' }}>Paket: {packages.find(pkg => pkg.id === rev.packageId)?.name || 'Paket wisata'}</span>
                       </div>
                     </div>
 
@@ -476,7 +443,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
                           <Star key={i} size={13} fill={i < rev.rating ? '#f59e0b' : 'none'} color={i < rev.rating ? '#f59e0b' : '#cbd5e1'} />
                         ))}
                       </div>
-                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>{rev.date}</span>
+                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>{new Date(rev.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                     </div>
                   </div>
 

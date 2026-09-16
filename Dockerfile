@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 ENV GOTOOLCHAIN=auto
 
@@ -12,11 +12,15 @@ RUN go mod download
 COPY backend/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -o main .
 
-FROM alpine:latest
+FROM alpine:3.22
 RUN apk --no-cache add ca-certificates tzdata
 
-WORKDIR /root/
-COPY --from=builder /app/main .
+RUN addgroup -S -g 10001 tripkita && adduser -S -D -H -u 10001 -G tripkita tripkita
+WORKDIR /app
+RUN mkdir -p /app/uploads && chown -R tripkita:tripkita /app
+COPY --from=builder --chown=tripkita:tripkita /app/main ./main
+
+USER tripkita
 
 EXPOSE 8080
 CMD ["./main"]

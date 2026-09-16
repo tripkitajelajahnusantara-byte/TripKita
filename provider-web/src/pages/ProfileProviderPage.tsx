@@ -16,7 +16,7 @@ import {
   Upload,
   Clock
 } from 'lucide-react';
-import { request, HOST_BASE_URL } from '../utils/api';
+import { openProtectedDocument, request } from '../utils/api';
 
 interface DashboardStats {
   totalPackages: number;
@@ -190,7 +190,7 @@ export const ProfileProviderPage: React.FC = () => {
             <span style={{ color: '#10b981' }}>Terverifikasi</span>
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <a href={`${HOST_BASE_URL}${activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
+            <button type="button" disabled={!activePath} onClick={() => openProtectedDocument('provider', activePath || '').catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
             <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
           </div>
         </div>
@@ -209,7 +209,7 @@ export const ProfileProviderPage: React.FC = () => {
             {pendingPath ? 'Review Berkas Baru' : 'Menunggu Verifikasi'}
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <a href={`${HOST_BASE_URL}${pendingPath || activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
+            <button type="button" onClick={() => openProtectedDocument('provider', pendingPath || activePath || '').catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
             {activePath && (
               <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
             )}
@@ -233,7 +233,7 @@ export const ProfileProviderPage: React.FC = () => {
           )}
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
             {activePath && (
-              <a href={`${HOST_BASE_URL}${activePath}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px' }}>Lihat</a>
+              <button type="button" onClick={() => openProtectedDocument('provider', activePath).catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
             )}
             <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
           </div>
@@ -244,11 +244,7 @@ export const ProfileProviderPage: React.FC = () => {
     return null;
   };
 
-  const reviews = [
-    { name: 'Anisa R.', date: '10 Des 2024', rating: 5, comment: 'Pelayanan sangat profesional! Guide sangat informatif dan ramah. Pasti akan kembali lagi.', trip: 'Raja Ampat Diving' },
-    { name: 'Dimas P.', date: '5 Des 2024', rating: 5, comment: 'Pengalaman tak terlupakan. Semua sesuai deskripsi bahkan lebih dari ekspektasi.', trip: 'Bali Cultural Tour' },
-    { name: 'Rika S.', date: '1 Dis 2024', rating: 4, comment: 'Overall bagus. Hanya penginapan bisa ditingkatkan kualitasnya sedikit.', trip: 'Komodo Adventure' },
-  ];
+  const reviews: Array<{ name: string; date: string; rating: number; comment: string; trip: string }> = [];
 
   return (
     <div className="dashboard-layout animate-fade-in">
@@ -353,6 +349,7 @@ export const ProfileProviderPage: React.FC = () => {
             <div className="profile-sub-card">
               <h4>Ulasan Terbaru</h4>
               <div className="reviews-list">
+                {reviews.length === 0 && <p className="rev-comment">Belum ada ulasan terverifikasi.</p>}
                 {reviews.map((rev, i) => (
                   <div key={i} className="review-log-item">
                     <div className="rev-log-header">

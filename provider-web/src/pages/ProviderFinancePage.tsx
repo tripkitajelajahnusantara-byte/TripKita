@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { Sidebar } from '../components/Sidebar';
-import { request, API_BASE_URL, getAuthHeaders } from '../utils/api';
+import { request, API_BASE_URL, getAuthHeaders, openProtectedFile } from '../utils/api';
 import { 
   Wallet, 
   DollarSign, 
@@ -89,13 +89,18 @@ export const ProviderFinancePage: React.FC = () => {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (err: any) {
       showAlert({ type: 'error', message: err.message || 'Gagal mendownload laporan Excel' });
     }
   };
 
-  const handleDownloadPDF = (id: number) => {
-    window.open(`${API_BASE_URL}/public/payouts/${id}/pdf-receipt`, '_blank');
+  const handleDownloadPDF = async (id: number) => {
+    try {
+      await openProtectedFile(`/provider/payouts/${id}/pdf-receipt`);
+    } catch (err: any) {
+      showAlert({ type: 'error', message: err.message || 'Bukti payout tidak dapat dibuka' });
+    }
   };
 
   const isBankConfigured = !!(providerProfile?.bankName && providerProfile?.bankAccount && providerProfile?.bankAccountName);
@@ -141,7 +146,7 @@ export const ProviderFinancePage: React.FC = () => {
       setShowRequestModal(false);
       setModalNotice({
         title: 'Pengajuan Berhasil Dikirim!',
-        message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan Akhir 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim dan akan langsung ditransfer ke rekening bank Mitra Anda.`
+		message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan Akhir 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim dan menunggu verifikasi transfer oleh admin.`
       });
       fetchSummary();
     } catch (err: any) {

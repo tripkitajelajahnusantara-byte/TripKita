@@ -33,7 +33,7 @@ func (ctrl *PackageController) Create(c *gin.Context) {
 
 	pkg, err := ctrl.service.CreatePackage(providerID.(uint), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "membuat paket", err)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (ctrl *PackageController) GetAll(c *gin.Context) {
 
 	packages, err := ctrl.service.GetAllPackages(providerID.(uint))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat paket provider", err)
 		return
 	}
 
@@ -59,11 +59,26 @@ func (ctrl *PackageController) GetAll(c *gin.Context) {
 func (ctrl *PackageController) GetAllPublic(c *gin.Context) {
 	packages, err := ctrl.service.GetAllPublic()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat paket publik", err)
 		return
 	}
 
 	c.JSON(http.StatusOK, packages)
+}
+
+func (ctrl *PackageController) GetPublicProviderProfile(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID provider tidak valid"})
+		return
+	}
+
+	profile, err := ctrl.service.GetPublicProviderProfile(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Profil provider tidak ditemukan"})
+		return
+	}
+	c.JSON(http.StatusOK, profile)
 }
 
 func (ctrl *PackageController) GetByID(c *gin.Context) {
@@ -111,7 +126,7 @@ func (ctrl *PackageController) Update(c *gin.Context) {
 
 	pkg, err := ctrl.service.UpdatePackage(uint(id), providerID.(uint), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memperbarui paket", err)
 		return
 	}
 
@@ -134,7 +149,7 @@ func (ctrl *PackageController) Delete(c *gin.Context) {
 
 	err = ctrl.service.DeletePackage(uint(id), providerID.(uint))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "menghapus paket", err)
 		return
 	}
 

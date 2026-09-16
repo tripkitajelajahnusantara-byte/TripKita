@@ -1,0 +1,109 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tripkita}
+      POSTGRES_USER: ${POSTGRES_USER:-tripkita}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tripkita_local_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - tripkita-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      APP_ENV: development
+      PORT: "8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-tripkita}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-tripkita_local_password}
+      DB_NAME: ${POSTGRES_DB:-tripkita}
+      DB_SSLMODE: disable
+      JWT_SECRET: ${JWT_SECRET:-local-development-jwt-secret-change-me-2026}
+      FRONTEND_URL: http://localhost:${WEB_PORT:-8081}
+      BACKEND_URL: http://localhost:${API_PORT:-8080}
+      ALLOWED_ORIGINS: http://localhost:${WEB_PORT:-8081}
+      TRUSTED_PROXIES: ""
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: http://localhost:${API_PORT:-8080}/api/v1/public/auth/google/callback
+      XENDIT_SECRET_KEY: ${XENDIT_SECRET_KEY:-}
+      XENDIT_WEBHOOK_TOKEN: ${XENDIT_WEBHOOK_TOKEN:-}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      RUN_MIGRATIONS: "true"
+      SEED_DB: ${SEED_DB:-false}
+      ENABLE_DEV_MOCKS: ${ENABLE_DEV_MOCKS:-false}
+      ENABLE_BACKGROUND_JOBS: ${ENABLE_BACKGROUND_JOBS:-false}
+      DEV_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-TripKitaAdminLocal2026!}
+      DEV_PROVIDER_PASSWORD: ${DEV_PROVIDER_PASSWORD:-TripKitaProviderLocal2026!}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      - backend-uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/healthz > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - tripkita-network
+
+  provider-web:
+    build:
+      context: ./provider-web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    ports:
+      - "${WEB_PORT:-8081}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - tripkita-network
+
+networks:
+  tripkita-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  backend-uploads:

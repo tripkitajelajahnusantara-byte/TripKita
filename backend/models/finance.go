@@ -15,7 +15,7 @@ type ProviderBalance struct {
 
 type HeldSettlement struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
-	BookingID   uint      `gorm:"not null;index" json:"bookingId"`
+	BookingID   uint      `gorm:"not null;uniqueIndex" json:"bookingId"`
 	ProviderID  uint      `gorm:"not null;index" json:"providerId"`
 	Amount      int64     `gorm:"not null" json:"amount"`
 	Status      string    `gorm:"size:50;default:'HELD'" json:"status"` // HELD, RELEASED

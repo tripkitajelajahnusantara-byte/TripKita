@@ -1,15 +1,22 @@
 package services
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
-	"time"
-	"math/rand"
 	"fmt"
+	"math/big"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	"tripkita-provider/config"
+	"tripkita-provider/database"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
 )
@@ -30,15 +37,26 @@ type authService struct {
 	emailService *EmailService
 }
 
+type AuthInputError struct{ Message string }
+
+func (e *AuthInputError) Error() string { return e.Message }
+
 func NewAuthService(repo repositories.ProviderRepository, cfg *config.Config, emailService *EmailService) AuthService {
 	return &authService{repo: repo, cfg: cfg, emailService: emailService}
 }
 
 func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, error) {
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	if req.KtpPath == "" {
+		return nil, &AuthInputError{Message: "dokumen KTP wajib diunggah"}
+	}
+	if err := validateManagedDocumentPaths(req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
+		return nil, &AuthInputError{Message: err.Error()}
+	}
 	// Check if email already exists
 	existing, _ := s.repo.FindByEmail(req.Email)
 	if existing != nil {
-		return nil, errors.New("email is already registered")
+		return nil, &AuthInputError{Message: "email is already registered"}
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -48,26 +66,26 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 
 	provider := &models.Provider{
 		BusinessName:        req.BusinessName,
-		BusinessCategory:     req.BusinessCategory,
+		BusinessCategory:    req.BusinessCategory,
 		OperationalProvince: req.OperationalProvince,
 		OperationalCity:     req.OperationalCity,
-		Description:      req.Description,
-		DocumentUploaded: req.DocumentUploaded,
-		DocumentPath:     req.DocumentPath,
-		KtpPath:          req.KtpPath,
-		NibPath:          req.NibPath,
-		NpwpPath:         req.NpwpPath,
-		AktaPath:         req.AktaPath,
-		SertifikatPath:   req.SertifikatPath,
-		Instagram:        req.Instagram,
-		TikTok:           req.TikTok,
-		PicName:          req.PicName,
-		Email:            req.Email,
-		PasswordHash:     string(hashedPassword),
-		WhatsApp:         req.WhatsApp,
-		Role:             "PROVIDER",
-		Status:           "PENDING",
-		IsVerified:       false,
+		Description:         req.Description,
+		DocumentUploaded:    req.DocumentUploaded,
+		DocumentPath:        req.DocumentPath,
+		KtpPath:             req.KtpPath,
+		NibPath:             req.NibPath,
+		NpwpPath:            req.NpwpPath,
+		AktaPath:            req.AktaPath,
+		SertifikatPath:      req.SertifikatPath,
+		Instagram:           req.Instagram,
+		TikTok:              req.TikTok,
+		PicName:             req.PicName,
+		Email:               req.Email,
+		PasswordHash:        string(hashedPassword),
+		WhatsApp:            req.WhatsApp,
+		Role:                "PROVIDER",
+		Status:              "PENDING",
+		IsVerified:          false,
 	}
 
 	err = s.repo.Create(provider)
@@ -88,10 +106,11 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 }
 
 func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*models.LoginResponse, error) {
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	// Check if email already exists
 	existing, _ := s.repo.FindByEmail(req.Email)
 	if existing != nil {
-		return nil, errors.New("email is already registered")
+		return nil, &AuthInputError{Message: "email is already registered"}
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -115,11 +134,20 @@ func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*mo
 		return nil, err
 	}
 
-	// Generate JWT Token (30 days persistent login)
+	// Generate a short-lived JWT. The browser keeps it only for the current session.
+	now := time.Now()
+	tokenID, err := generateTokenID()
+	if err != nil {
+		return nil, err
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"provider_id": customer.ID,
 		"role":        customer.Role,
-		"exp":         time.Now().Add(time.Hour * 24 * 30).Unix(),
+		"iss":         "tripkita-api",
+		"aud":         "tripkita-web",
+		"iat":         now.Unix(),
+		"jti":         tokenID,
+		"exp":         now.Add(8 * time.Hour).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(s.cfg.JWTSecret))
@@ -134,32 +162,42 @@ func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*mo
 }
 
 func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, error) {
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	provider, err := s.repo.FindByEmail(req.Email)
 	if err != nil {
-		return nil, errors.New("invalid email or password")
+		return nil, &AuthInputError{Message: "invalid email or password"}
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(provider.PasswordHash), []byte(req.Password))
 	if err != nil {
-		return nil, errors.New("invalid email or password")
+		return nil, &AuthInputError{Message: "invalid email or password"}
 	}
 
 	// Check status for providers
 	if provider.Role == "PROVIDER" && provider.Status != "APPROVED" {
 		if provider.Status == "PENDING" {
-			return nil, errors.New("pendaftaran Anda sedang menunggu verifikasi admin")
+			return nil, &AuthInputError{Message: "pendaftaran Anda sedang menunggu verifikasi admin"}
 		}
 		if provider.Status == "REJECTED" {
-			return nil, errors.New("pendaftaran Anda ditolak oleh admin")
+			return nil, &AuthInputError{Message: "pendaftaran Anda ditolak oleh admin"}
 		}
-		return nil, errors.New("akun Anda belum aktif")
+		return nil, &AuthInputError{Message: "akun Anda belum aktif"}
 	}
 
-	// Generate JWT Token (30 days persistent login)
+	// Generate a short-lived JWT. The browser keeps it only for the current session.
+	now := time.Now()
+	tokenID, err := generateTokenID()
+	if err != nil {
+		return nil, err
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"provider_id": provider.ID,
 		"role":        provider.Role,
-		"exp":         time.Now().Add(time.Hour * 24 * 30).Unix(), // 30 days
+		"iss":         "tripkita-api",
+		"aud":         "tripkita-web",
+		"iat":         now.Unix(),
+		"jti":         tokenID,
+		"exp":         now.Add(8 * time.Hour).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(s.cfg.JWTSecret))
@@ -173,27 +211,45 @@ func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 	}, nil
 }
 
-// Generate random 6 digit string
-func generateOTP() string {
-	// This is just a quick local pseudo-rand for a 6-digit OTP
-	rand.Seed(time.Now().UnixNano())
-	return fmt.Sprintf("%06d", rand.Intn(1000000))
+func generateOTP() (string, error) {
+	value, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", value.Int64()), nil
+}
+
+func generateTokenID() (string, error) {
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(raw), nil
+}
+
+func hashResetToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func (s *authService) ForgotPassword(email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
 	provider, err := s.repo.FindByEmail(email)
 	if err != nil {
 		// Do not leak whether email exists
 		return nil
 	}
 
-	otp := generateOTP()
-	
+	otp, err := generateOTP()
+	if err != nil {
+		return err
+	}
+
 	// Save to provider
 	expiry := time.Now().Add(15 * time.Minute)
-	provider.ResetToken = otp
+	provider.ResetToken = hashResetToken(otp)
 	provider.ResetTokenExpiry = &expiry
-	
+
 	if err := s.repo.Update(provider); err != nil {
 		return err
 	}
@@ -203,27 +259,28 @@ func (s *authService) ForgotPassword(email string) error {
 }
 
 func (s *authService) ResetPassword(email string, otp string, newPassword string) error {
-	provider, err := s.repo.FindByEmail(email)
-	if err != nil {
-		return errors.New("invalid or expired reset token")
-	}
-
-	if provider.ResetToken != otp || provider.ResetTokenExpiry == nil || time.Now().After(*provider.ResetTokenExpiry) {
-		return errors.New("invalid or expired reset token")
-	}
-
+	email = strings.ToLower(strings.TrimSpace(email))
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
-	provider.PasswordHash = string(hashedPassword)
-	provider.ResetToken = ""
-	provider.ResetTokenExpiry = nil
-
-	return s.repo.Update(provider)
+	result := database.DB.Model(&models.Provider{}).
+		Where("LOWER(email) = LOWER(?) AND reset_token = ? AND reset_token_expiry IS NOT NULL AND reset_token_expiry > ?", email, hashResetToken(strings.TrimSpace(otp)), time.Now()).
+		Updates(map[string]interface{}{
+			"password_hash":      string(hashedPassword),
+			"reset_token":        "",
+			"reset_token_expiry": nil,
+			"updated_at":         time.Now(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return &AuthInputError{Message: "invalid or expired reset token"}
+	}
+	return nil
 }
-
 
 func (s *authService) GetProfile(providerID uint) (*models.Provider, error) {
 	return s.repo.FindByID(providerID)
@@ -254,6 +311,9 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 		err = s.repo.Update(provider)
 		return provider, err
 	}
+	if err := validateManagedDocumentPaths(req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
+		return nil, err
+	}
 
 	// 1. Validation for Contact & Social Media changes (Max 1 update in 7 days)
 	contactChanged := false
@@ -263,8 +323,8 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 	if req.WhatsApp != "" && req.WhatsApp != provider.WhatsApp {
 		contactChanged = true
 	}
-	if req.Email != "" && req.Email != provider.Email {
-		contactChanged = true
+	if req.Email != "" && strings.ToLower(strings.TrimSpace(req.Email)) != provider.Email {
+		return nil, errors.New("perubahan email harus dilakukan melalui layanan pelanggan agar kepemilikan alamat baru dapat diverifikasi")
 	}
 	if req.Instagram != "" && req.Instagram != provider.Instagram {
 		contactChanged = true
@@ -289,14 +349,6 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 		}
 		if req.WhatsApp != "" {
 			provider.WhatsApp = req.WhatsApp
-		}
-		if req.Email != "" {
-			// Check if email already registered by other
-			existing, _ := s.repo.FindByEmail(req.Email)
-			if existing != nil && existing.ID != provider.ID {
-				return nil, errors.New("email is already registered by another account")
-			}
-			provider.Email = req.Email
 		}
 		if req.Instagram != "" {
 			provider.Instagram = req.Instagram
@@ -409,4 +461,29 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 	}
 
 	return provider, nil
+}
+
+func validateManagedDocumentPaths(paths ...string) error {
+	for _, documentPath := range paths {
+		if documentPath == "" {
+			continue
+		}
+		filename := strings.TrimPrefix(documentPath, "/uploads/")
+		if filename == documentPath || filepath.Base(filename) != filename {
+			return errors.New("path dokumen tidak valid")
+		}
+		ext := strings.ToLower(filepath.Ext(filename))
+		if ext != ".pdf" && ext != ".jpg" && ext != ".png" {
+			return errors.New("format dokumen tidak valid")
+		}
+		identifier := strings.TrimSuffix(strings.TrimPrefix(filename, "doc_"), ext)
+		decoded, err := hex.DecodeString(identifier)
+		if !strings.HasPrefix(filename, "doc_") || err != nil || len(decoded) != 16 {
+			return errors.New("identitas dokumen tidak valid")
+		}
+		if _, err := os.Stat(filepath.Join("uploads", filename)); err != nil {
+			return errors.New("dokumen yang diunggah tidak ditemukan")
+		}
+	}
+	return nil
 }
