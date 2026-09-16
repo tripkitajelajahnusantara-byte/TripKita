@@ -710,49 +710,70 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 </div>
               ) : (
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '18px', marginBottom: '24px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '20px', marginBottom: '24px' }}>
                     {plans.map(p => {
                       const pct = Math.min(100, Math.round((p.savedAmount / p.targetBudget) * 100));
+                      const remaining = Math.max(0, p.targetBudget - p.savedAmount);
                       return (
                         <div
                           key={p.id}
                           style={{
-                            backgroundColor: '#f8fafc',
-                            borderRadius: '18px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '20px',
                             border: '1px solid #e2e8f0',
-                            padding: '20px',
+                            overflow: 'hidden',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
-                            transition: 'all 0.2s ease'
+                            boxShadow: '0 6px 18px rgba(0,0,0,0.04)',
+                            transition: 'transform 0.2s ease, box-shadow 0.2s ease'
                           }}
                         >
-                          <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                              <span style={{ fontSize: '11px', fontWeight: '800', padding: '3px 10px', borderRadius: '12px', backgroundColor: p.status === 'SAVED' ? '#dcfce7' : '#fef3c7', color: p.status === 'SAVED' ? '#166534' : '#92400e' }}>
+                          <div style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                              <span style={{ fontSize: '11px', fontWeight: '800', padding: '4px 10px', borderRadius: '12px', backgroundColor: p.status === 'SAVED' ? '#dcfce7' : '#fef3c7', color: p.status === 'SAVED' ? '#166534' : '#92400e' }}>
                                 {p.status === 'SAVED' ? 'Tersimpan' : 'Draft'}
                               </span>
-                              <span style={{ fontSize: '12px', fontWeight: '800', color: '#0f8b8d' }}>{pct}%</span>
+                              <span style={{ fontSize: '13px', fontWeight: '800', color: '#0f8b8d', backgroundColor: '#e6f4f4', padding: '3px 10px', borderRadius: '12px' }}>
+                                {pct}% Terkumpul
+                              </span>
                             </div>
 
-                            <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>
+                            <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0' }}>
                               🏝️ {p.destination}
                             </h3>
 
-                            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div style={{ fontSize: '12.5px', color: '#64748b', marginBottom: '14px', display: 'flex', gap: '16px', fontWeight: '600' }}>
                               <span><Calendar size={13} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {p.targetMonthLabel}</span>
                               <span><Users size={13} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {p.participants} Peserta</span>
                             </div>
 
+                            {/* Financial Stats Summary Box */}
+                            <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '12px', border: '1px solid #f1f5f9', marginBottom: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                              <div>
+                                <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Terkumpul</div>
+                                <div style={{ fontSize: '13px', fontWeight: '800', color: '#10b981', marginTop: '2px' }}>{formatRupiah(p.savedAmount)}</div>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Target Budget</div>
+                                <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>{formatRupiah(p.targetBudget)}</div>
+                              </div>
+                              <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #e2e8f0', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Sisa Dibutuhkan:</span>
+                                <strong style={{ fontSize: '12px', color: remaining > 0 ? '#ef4444' : '#10b981', fontWeight: '800' }}>
+                                  {remaining > 0 ? formatRupiah(remaining) : 'Lunas'}
+                                </strong>
+                              </div>
+                            </div>
+
                             {/* Progress bar */}
-                            <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '6px', overflow: 'hidden', marginBottom: '14px' }}>
-                              <div style={{ width: `${pct}%`, height: '100%', backgroundColor: '#0f8b8d', borderRadius: '6px' }} />
+                            <div style={{ width: '100%', height: '8px', backgroundColor: '#e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                              <div style={{ width: `${pct}%`, height: '100%', backgroundColor: '#0f8b8d', borderRadius: '8px', transition: 'width 0.4s ease' }} />
                             </div>
                           </div>
 
-                          {/* Plan Card Actions (Point 1) */}
-                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                          {/* Plan Card Actions (Point 1 & Edit Icon Fix) */}
+                          <div style={{ backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                             <button
                               onClick={() => {
                                 setActivePlan(p);
@@ -762,32 +783,36 @@ export const CustomerTripPlannerPage: React.FC = () => {
                                 backgroundColor: '#0f8b8d',
                                 color: '#ffffff',
                                 border: 'none',
-                                padding: '8px 14px',
+                                padding: '9px 16px',
                                 borderRadius: '10px',
-                                fontSize: '12px',
+                                fontSize: '12.5px',
                                 fontWeight: '800',
                                 cursor: 'pointer',
-                                flex: 1
+                                flex: 1,
+                                boxShadow: '0 2px 8px rgba(15,139,141,0.2)'
                               }}
                             >
                               Lihat Detail &rarr;
                             </button>
 
-                            {/* Edit & Hapus appear ONLY for saved/draft plans in the list */}
+                            {/* Edit Icon (Pencil) & Hapus Icon */}
                             <button
                               onClick={() => handleStartEditPlan(p)}
                               title="Edit Rencana"
                               style={{
                                 backgroundColor: '#ffffff',
                                 border: '1px solid #cbd5e1',
-                                padding: '8px 10px',
+                                padding: '9px 12px',
                                 borderRadius: '10px',
                                 fontSize: '12px',
                                 color: '#334155',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
                               }}
                             >
-                              <RefreshCw size={14} color="#0f8b8d" />
+                              <Edit3 size={15} color="#0f8b8d" />
                             </button>
 
                             <button
@@ -796,14 +821,17 @@ export const CustomerTripPlannerPage: React.FC = () => {
                               style={{
                                 backgroundColor: '#fef2f2',
                                 border: '1px solid #fecaca',
-                                padding: '8px 10px',
+                                padding: '9px 12px',
                                 borderRadius: '10px',
                                 fontSize: '12px',
                                 color: '#ef4444',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
                               }}
                             >
-                              <Trash2 size={14} color="#ef4444" />
+                              <Trash2 size={15} color="#ef4444" />
                             </button>
                           </div>
                         </div>
