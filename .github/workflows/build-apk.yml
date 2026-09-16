@@ -34,11 +34,9 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
           yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses 2>/dev/null || true
 
-      - name: Generate Fresh Android Project & Get Dependencies
+      - name: Get Dependencies
         run: |
           cd customer-mobile
-          flutter create . --platforms=android --org com.tementrip.app --project-name customer_mobile
-          chmod +x android/gradlew 2>/dev/null || true
           flutter pub get
 
       - name: Build Release APK
