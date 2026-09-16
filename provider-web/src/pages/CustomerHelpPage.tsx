@@ -8,7 +8,8 @@ import {
   Mail, 
   PhoneCall, 
   ChevronDown, 
-  Search
+  Search,
+  MapPin
 } from 'lucide-react';
 
 interface FAQItem {
@@ -52,7 +53,7 @@ export const CustomerHelpPage: React.FC = () => {
       id: 'faq-5',
       category: 'tiket',
       question: 'Bagaimana jika saya tidak sengaja lupa atau kehilangan Kode Booking?',
-      answer: 'Jangan khawatir! Anda dapat masuk (login) ke akun Customer Anda untuk melihat seluruh e-voucher dan riwayat transaksi. Atau Anda dapat menghubungi tim Customer Service kami melalui email support@tripkita.id.'
+      answer: 'Jangan khawatir! Anda dapat masuk (login) ke akun Customer Anda untuk melihat seluruh e-voucher dan riwayat transaksi. Atau Anda dapat menghubungi tim Customer Service kami melalui email tripkitajelajahnusantara@gmail.com.'
     },
     {
       id: 'faq-6',
@@ -182,7 +183,7 @@ export const CustomerHelpPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="method-label">Email Dukungan Pelanggan Resmi:</span>
-                    <a href="mailto:support@tripkita.id" className="method-value">support@tripkita.id</a>
+                    <a href="mailto:tripkitajelajahnusantara@gmail.com" className="method-value">tripkitajelajahnusantara@gmail.com</a>
                   </div>
                 </div>
 
@@ -203,6 +204,16 @@ export const CustomerHelpPage: React.FC = () => {
                   <div>
                     <span className="method-label">Jam Operasional Layanan:</span>
                     <span className="method-value-text">24 Jam / 7 Hari Seminggu (Senin - Minggu)</span>
+                  </div>
+                </div>
+
+                <div className="contact-method-item">
+                  <div className="method-icon-box">
+                    <MapPin size={20} color="#f59e0b" />
+                  </div>
+                  <div>
+                    <span className="method-label">Alamat Kantor / Operasional Resmi:</span>
+                    <span className="method-value-text">Jl. Puskesmas No.35-22, RT.11/RW.7, Duri Kosambi, Kecamatan Cengkareng, Kota Jakarta Barat, Daerah Khusus Ibukota Jakarta</span>
                   </div>
                 </div>
               </div>

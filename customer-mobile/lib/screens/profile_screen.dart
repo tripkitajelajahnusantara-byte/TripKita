@@ -126,14 +126,14 @@ class ProfileScreen extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     // Back to Home
-                    widget.onNavigate(0);
+                    onNavigate(0);
                   },
                   icon: const Icon(Icons.logout, size: 18),
                   label: const Text('Keluar dari Akun', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.red.shade600,
-                    borderSide: BorderSide(color: Colors.red.shade100, width: 1.5),
+                    side: BorderSide(color: Colors.red.shade100, width: 1.5),
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -148,7 +148,7 @@ class ProfileScreen extends StatelessWidget {
       bottomNavigationBar: TripKitaBottomNavigation(
         currentIndex: 4, // Profile tab is index 4
         onTap: (index) {
-          widget.onNavigate(index);
+          onNavigate(index);
         },
       ),
     );

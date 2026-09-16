@@ -392,8 +392,8 @@ const DEFAULT_PACKAGES: TripPackage[] = [
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  const getImageUrl = (pkgId: number, name: string, category: string) => {
-    return getTripImage(pkgId, name, category);
+  const getImageUrl = (pkgId: number, name: string, category: string, uploadedImage?: string) => {
+    return getTripImage(pkgId, name, category, uploadedImage);
   };
 
   const dateInputRef = React.useRef<HTMLInputElement>(null);
@@ -725,7 +725,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                       {/* Image & Badges */}
                       <div style={{ position: 'relative', height: '150px', overflow: 'hidden', flexShrink: 0 }}>
                         <img 
-                          src={getImageUrl(pkg.id, pkg.name, pkg.category)} 
+                          src={getImageUrl(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image || (pkg as any).imageUrl)} 
                           alt={pkg.name} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={(e) => {
@@ -891,7 +891,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                       {/* Image & Badges */}
                       <div style={{ position: 'relative', height: '150px', overflow: 'hidden', flexShrink: 0 }}>
                         <img 
-                          src={getImageUrl(pkg.id, pkg.name, pkg.category)} 
+                          src={getImageUrl(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image || (pkg as any).imageUrl)} 
                           alt={pkg.name} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={(e) => {
@@ -1057,7 +1057,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                       {/* Image & Badges */}
                       <div style={{ position: 'relative', height: '150px', overflow: 'hidden', flexShrink: 0 }}>
                         <img 
-                          src={getImageUrl(pkg.id, pkg.name, pkg.category)} 
+                          src={getImageUrl(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image || (pkg as any).imageUrl)} 
                           alt={pkg.name} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={(e) => {

@@ -339,7 +339,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
                     {/* Image & Badges */}
                     <div style={{ position: 'relative', height: '150px', overflow: 'hidden' }}>
                       <img 
-                        src={getTripImage(pkg.id, pkg.name, pkg.category)} 
+                        src={getTripImage(pkg.id, pkg.name, pkg.category, (pkg as any).images || (pkg as any).image || (pkg as any).imageUrl)} 
                         alt={pkg.name} 
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />

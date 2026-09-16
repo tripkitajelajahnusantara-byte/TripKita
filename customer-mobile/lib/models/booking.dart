@@ -58,6 +58,8 @@ class Booking {
   final DateTime createdAt;
   final List<Participant> participants;
 
+  DateTime get bookingDate => tripDate;
+
   Booking({
     required this.id,
     required this.bookingCode,

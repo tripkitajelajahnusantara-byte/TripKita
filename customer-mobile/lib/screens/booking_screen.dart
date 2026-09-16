@@ -560,7 +560,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       // Create Booking details model
                       DateTime parsedTripDate;
                       try {
-                        parsedTripDate = DateFormat('dd MMM yyyy').parse(selectedDate);
+                        parsedTripDate = DateFormat('dd MMM yyyy').parse(selectedDateStr);
                       } catch (e) {
                         parsedTripDate = DateTime(2024, 5, 28);
                       }

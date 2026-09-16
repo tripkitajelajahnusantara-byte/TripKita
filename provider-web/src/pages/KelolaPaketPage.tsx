@@ -205,7 +205,7 @@ export const KelolaPaketPage: React.FC = () => {
                       <td>
                         <div className="pkg-item-cell">
                           <img 
-                            src={getTripImage(Number(pkg.id), pkg.name, (pkg as any).category)} 
+                            src={getTripImage(Number(pkg.id), pkg.name, (pkg as any).category, (pkg as any).images || (pkg as any).image || (pkg as any).imageUrl)} 
                             alt={pkg.name} 
                             style={{ width: '42px', height: '42px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} 
                           />

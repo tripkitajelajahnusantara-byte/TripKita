@@ -24,6 +24,8 @@ class TripPackage {
   final String meetingPoint;
   final int reviewCount;
 
+  int get quotaMin => minParticipants;
+
   TripPackage({
     required this.id,
     required this.providerId,
