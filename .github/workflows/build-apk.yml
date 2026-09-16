@@ -29,7 +29,12 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Prepare Android Project & Permissions
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+          yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses 2>/dev/null || true
+
+      - name: Prepare Android Project & Dependencies
         run: |
           cd customer-mobile
           flutter create . --platforms=android --org com.tementrip.app
