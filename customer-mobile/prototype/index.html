@@ -20,7 +20,7 @@
                     <i class="fa-solid fa-globe logo-icon"></i>
                 </div>
                 <div>
-                    <h1>TripKita</h1>
+                    <h1>TemenTrip</h1>
                     <p class="tagline">Premium Mobile App Prototype</p>
                 </div>
             </div>
@@ -55,7 +55,7 @@
             </div>
             
             <div class="sidebar-footer">
-                <p>&copy; 2026 TripKita Team. All rights reserved.</p>
+                <p>&copy; 2026 TemenTrip Team. All rights reserved.</p>
             </div>
         </div>
 
@@ -75,13 +75,13 @@
                     <div class="screen active" id="screen-home">
                         <!-- Hero Section -->
                         <div class="hero-section" style="background-image: url('https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600');">
-                            <div class="hero-overlay"></div>
+                            <div class="hero-overlay" style="background: linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0) 100%);"></div>
                             
                             <!-- Header Bar -->
                             <div class="screen-header">
                                 <div class="header-logo">
                                     <i class="fa-solid fa-globe logo-small-icon"></i>
-                                    <span>TripKita</span>
+                                    <span>TemenTrip</span>
                                 </div>
                                 <div class="header-actions">
                                     <div class="action-badge-wrapper">
@@ -93,204 +93,300 @@
                                 </div>
                             </div>
 
-                            <!-- Tagline -->
-                            <div class="hero-content">
-                                <h2>Temukan perjalanan terbaik untukmu ✨</h2>
-                                <p>Jelajahi destinasi impian dan ciptakan momen tak terlupakan bersama TripKita.</p>
+                            <!-- Tagline (Natural & Clean Overlay Typography) -->
+                            <div class="hero-content" style="margin-top: 16px; position: relative; z-index: 2;">
+                                <h2 style="font-size: 18px; font-weight: 800; color: #ffffff !important; text-shadow: 0 2px 8px rgba(0,0,0,0.7); margin: 0 0 6px 0; line-height: 1.25;">Cari Open Trip Indonesia dengan Mudah</h2>
+                                <p style="font-size: 11px; color: #ffffff !important; text-shadow: 0 1px 5px rgba(0,0,0,0.85); margin: 0; font-weight: 500; line-height: 1.4; opacity: 0.95;">Temukan berbagai open trip seru dan tour guide terpercaya di seluruh Indonesia.</p>
                             </div>
                         </div>
 
-                        <!-- Prominent Quick Auth Banner (Google + Email) -->
-                        <div class="auth-banner-card p-16" style="margin: 12px 16px 0 16px; background: white; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                            <div style="flex: 1;">
-                                <h4 style="font-size: 12px; color: #1f2937; margin: 0; font-weight: 800;">Masuk / Daftar Akun ✨</h4>
-                                <p style="font-size: 10px; color: #6b7280; margin: 2px 0 0 0;">Akses grup chat & simpan wishlist</p>
-                            </div>
-                            <div style="display: flex; gap: 6px;">
-                                <button class="btn-sm" onclick="openAuthModal('login')" style="background: white; border: 1px solid #d1d5db; color: #374151; padding: 8px 10px; border-radius: 10px; font-size: 10px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                                    <svg width="12" height="12" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.1.83-.64 2.08-1.84 2.92l2.84 2.2c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.84-2.2c-.76.53-1.78.9-3.12.9-2.38 0-4.41-1.57-5.13-3.74L.97 13.04C2.45 15.98 5.48 18 9 18z"/><path fill="#FBBC05" d="M3.87 10.78c-.18-.53-.28-1.09-.28-1.78s.1-1.25.28-1.78L.97 4.96C.35 6.18 0 7.55 0 9s.35 2.82.97 4.04l2.9-2.26z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.45 2.02.97 4.96l2.9 2.26C4.59 5.05 6.62 3.58 9 3.58z"/></svg> Google
-                                </button>
-                                <button class="btn-sm bg-teal text-white" onclick="openAuthModal('login')" style="background: #0f8b8d; border: none; color: white; padding: 8px 10px; border-radius: 10px; font-size: 10px; font-weight: bold; cursor: pointer;">
-                                    Masuk
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Floating Search Widget (5 Interactive Fields) -->
-                        <div class="search-widget-container">
-                            <div class="search-widget glass" style="padding: 12px 14px; gap: 8px;">
-                                <!-- Row 1: Destinasi & Tanggal -->
+                        <!-- Floating Search Widget (4 Fields Presisi Gambar 1) -->
+                        <div class="search-widget-container" style="margin-top: -30px; padding: 0 16px; position: relative; z-index: 10;">
+                            <div class="search-widget glass" style="padding: 14px; gap: 10px; background: white; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); border: 1px solid #e5e7eb;">
+                                <!-- Row 1: Destination & Tanggal -->
                                 <div class="search-row" style="display: flex; gap: 8px; align-items: center;">
                                     <div class="search-col" style="flex: 1; display: flex; align-items: center; gap: 6px;">
                                         <i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i>
                                         <div style="width: 100%;">
-                                            <label style="font-size: 9px; color: #6b7280; text-transform: uppercase; font-weight: 700; display: block;">Destinasi (Provinsi)</label>
+                                            <label style="font-size: 9px; color: #6b7280; text-transform: uppercase; font-weight: 700; display: block;">Destination</label>
                                             <select id="select-home-dest" style="width: 100%; border: none; background: transparent; font-size: 11px; font-weight: bold; color: #111827; outline: none; cursor: pointer;">
-                                                <option value="">Semua Provinsi</option>
-                                                <option value="Aceh">Aceh</option>
-                                                <option value="Sumatera Utara">Sumatera Utara</option>
-                                                <option value="Sumatera Barat">Sumatera Barat</option>
-                                                <option value="Riau">Riau</option>
-                                                <option value="Kepulauan Riau">Kepulauan Riau</option>
-                                                <option value="Jambi">Jambi</option>
-                                                <option value="Sumatera Selatan">Sumatera Selatan</option>
-                                                <option value="Bangka Belitung">Bangka Belitung</option>
-                                                <option value="Bengkulu">Bengkulu</option>
-                                                <option value="Lampung">Lampung</option>
-                                                <option value="DKI Jakarta" selected>DKI Jakarta</option>
+                                                <option value="">Pilih destinasi</option>
                                                 <option value="Jawa Barat">Jawa Barat</option>
-                                                <option value="Banten">Banten</option>
+                                                <option value="Bandung">Bandung, Jawa Barat</option>
+                                                <option value="Bogor">Bogor, Jawa Barat</option>
+                                                <option value="DKI Jakarta">DKI Jakarta</option>
                                                 <option value="Jawa Tengah">Jawa Tengah</option>
-                                                <option value="DI Yogyakarta">DI Yogyakarta</option>
-                                                <option value="Jawa Timur">Jawa Timur</option>
                                                 <option value="Bali">Bali</option>
-                                                <option value="Nusa Tenggara Barat (NTB)">Nusa Tenggara Barat (NTB)</option>
-                                                <option value="Nusa Tenggara Timur (NTT)">Nusa Tenggara Timur (NTT)</option>
-                                                <option value="Kalimantan Barat">Kalimantan Barat</option>
-                                                <option value="Kalimantan Tengah">Kalimantan Tengah</option>
-                                                <option value="Kalimantan Selatan">Kalimantan Selatan</option>
-                                                <option value="Kalimantan Timur">Kalimantan Timur</option>
-                                                <option value="Kalimantan Utara">Kalimantan Utara</option>
-                                                <option value="Sulawesi Utara">Sulawesi Utara</option>
-                                                <option value="Gorontalo">Gorontalo</option>
-                                                <option value="Sulawesi Tengah">Sulawesi Tengah</option>
-                                                <option value="Sulawesi Barat">Sulawesi Barat</option>
-                                                <option value="Sulawesi Selatan">Sulawesi Selatan</option>
-                                                <option value="Sulawesi Tenggara">Sulawesi Tenggara</option>
-                                                <option value="Maluku">Maluku</option>
-                                                <option value="Maluku Utara">Maluku Utara</option>
-                                                <option value="Papua">Papua</option>
                                                 <option value="Papua Barat">Papua Barat</option>
-                                                <option value="Papua Barat Daya">Papua Barat Daya</option>
-                                                <option value="Papua Tengah">Papua Tengah</option>
-                                                <option value="Papua Pegunungan">Papua Pegunungan</option>
-                                                <option value="Papua Selatan">Papua Selatan</option>
+                                                <option value="Jawa Timur">Jawa Timur</option>
                                             </select>
                                         </div>
                                     </div>
                                     <div class="divider-y" style="width: 1px; height: 28px; background: #e5e7eb;"></div>
-                                    <div class="search-col" style="flex: 1; display: flex; align-items: center; gap: 6px;">
+                                    <div class="search-col" style="flex: 1; display: flex; align-items: center; gap: 6px; position: relative; cursor: pointer;" onclick="openCustomDateModal()">
                                         <i class="fa-regular fa-calendar-days" style="color: #0f8b8d;"></i>
                                         <div style="width: 100%;">
-                                            <label style="font-size: 9px; color: #6b7280; text-transform: uppercase; font-weight: 700; display: block;">Tanggal</label>
-                                            <input type="date" id="input-home-date" style="width: 100%; border: none; background: transparent; font-size: 10px; font-weight: bold; color: #111827; outline: none; cursor: pointer;">
+                                            <label style="font-size: 9px; color: #6b7280; text-transform: uppercase; font-weight: 700; display: block; pointer-events: none;">Tanggal <span style="color: #ef4444;">*</span></label>
+                                            <div id="txt-home-date-display" style="font-size: 10px; font-weight: bold; color: #111827; height: 16px; display: flex; align-items: center; cursor: pointer; white-space: nowrap; overflow: hidden; pointer-events: none;">17 September 2026</div>
+                                            <input type="hidden" id="input-home-date" value="2026-09-17">
                                         </div>
                                     </div>
                                 </div>
                                 
                                 <hr class="divider-x" style="border: none; border-top: 1px solid #f3f4f6; margin: 4px 0;">
 
-                                <!-- Row 2: Jumlah Peserta, Tipe Trip & Kategori Trip -->
-                                <div class="search-row" style="display: flex; gap: 6px; align-items: center;">
-                                    <div class="search-col" style="flex: 1; display: flex; align-items: center; gap: 4px;">
-                                        <i class="fa-solid fa-users" style="color: #0f8b8d;"></i>
-                                        <div style="width: 100%;">
-                                            <label style="font-size: 9px; color: #6b7280; text-transform: uppercase; font-weight: 700; display: block;">Peserta</label>
-                                            <input type="number" id="input-home-guests" value="1" min="1" max="50" style="width: 100%; border: none; background: transparent; font-size: 11px; font-weight: bold; color: #111827; outline: none;">
-                                        </div>
-                                    </div>
-                                    <div class="divider-y" style="width: 1px; height: 28px; background: #e5e7eb;"></div>
-                                    <div class="search-col" style="flex: 1; display: flex; align-items: center; gap: 4px;">
+                                <!-- Row 2: Type Trip & Kategori -->
+                                <div class="search-row" style="display: flex; gap: 8px; align-items: center;">
+                                    <div class="search-col" style="flex: 1; display: flex; align-items: center; gap: 6px;">
                                         <i class="fa-solid fa-tags" style="color: #0f8b8d;"></i>
                                         <div style="width: 100%;">
-                                            <label style="font-size: 9px; color: #6b7280; text-transform: uppercase; font-weight: 700; display: block;">Tipe Trip</label>
+                                            <label style="font-size: 9px; color: #6b7280; text-transform: uppercase; font-weight: 700; display: block;">Type Trip</label>
                                             <select id="select-home-type" style="width: 100%; border: none; background: transparent; font-size: 10px; font-weight: bold; color: #111827; outline: none; cursor: pointer;">
-                                                <option value="">Semua Tipe</option>
                                                 <option value="Open Trip">Open Trip</option>
                                                 <option value="Private Trip">Private Trip</option>
-                                                <option value="Custom Trip">Custom Trip</option>
+                                                <option value="Honeymoon">Honeymoon</option>
+                                                <option value="Family">Family</option>
+                                                <option value="Corporate">Corporate</option>
                                             </select>
                                         </div>
                                     </div>
                                     <div class="divider-y" style="width: 1px; height: 28px; background: #e5e7eb;"></div>
-                                    <div class="search-col" style="flex: 1; display: flex; align-items: center; gap: 4px;">
+                                    <div class="search-col" style="flex: 1; display: flex; align-items: center; gap: 6px;">
                                         <i class="fa-solid fa-layer-group" style="color: #0f8b8d;"></i>
                                         <div style="width: 100%;">
                                             <label style="font-size: 9px; color: #6b7280; text-transform: uppercase; font-weight: 700; display: block;">Kategori</label>
                                             <select id="select-home-category" style="width: 100%; border: none; background: transparent; font-size: 10px; font-weight: bold; color: #111827; outline: none; cursor: pointer;">
-                                                <option value="">Semua</option>
+                                                <option value="">Semua Kategori</option>
                                                 <option value="City Tour">City Tour</option>
                                                 <option value="Diving & Snorkeling">Diving & Snorkeling</option>
                                                 <option value="Wisata Budaya & Sejarah">Wisata Budaya & Sejarah</option>
                                                 <option value="Pantai">Pantai</option>
                                                 <option value="Gunung">Gunung</option>
+                                                <option value="Curug">Curug</option>
                                                 <option value="Keluarga Santai">Keluarga Santai</option>
                                             </select>
                                         </div>
                                     </div>
                                 </div>
 
-                                <button class="btn-search" id="btn-search-trips" style="margin-top: 6px;">
+                                <button class="btn-search" id="btn-search-trips" onclick="switchScreen('screen-list')" style="margin-top: 6px; background: #0f8b8d; border-radius: 10px; font-weight: bold; width: 100%; padding: 10px; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                     <i class="fa-solid fa-magnifying-glass"></i> Cari Trip
                                 </button>
                             </div>
                         </div>
 
-                        <!-- Categories Shortcuts (6 Kategori Resmi) -->
-                        <div class="section-title-row">
-                            <h3>Kategori Trip</h3>
-                            <a href="#" class="btn-view-all">Lihat Semua <i class="fa-solid fa-chevron-right"></i></a>
+                        <!-- Section 1: Trip Populer (Open Trip) -->
+                        <div class="section-title-row" style="padding: 16px 16px 0 16px; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div>
+                                <h3 style="font-size: 13px; margin: 0; color: #111827; font-weight: 800;">Trip Populer (Open Trip)</h3>
+                                <p style="font-size: 9px; color: #6b7280; margin: 2px 0 0 0;">Paket wisata gabungan hemat & seru dengan jadwal teratur</p>
+                            </div>
+                            <a href="#" class="btn-view-all" onclick="switchScreen('screen-list')" style="font-size: 10px; color: #0f8b8d; font-weight: bold; text-decoration: none;">Lihat semua ></a>
                         </div>
-                        <div class="categories-shortcuts" style="overflow-x: auto; padding-bottom: 8px;">
-                            <div class="shortcut-item" data-category="City Tour" onclick="setCategoryFilter('City Tour')">
-                                <div class="icon-wrap bg-orange-light" style="background:#fff7ed;color:#ea580c;"><i class="fa-solid fa-city"></i></div>
-                                <span>City Tour</span>
-                            </div>
-                            <div class="shortcut-item" data-category="Diving & Snorkeling" onclick="setCategoryFilter('Diving & Snorkeling')">
-                                <div class="icon-wrap bg-teal-light"><i class="fa-solid fa-mask-snorkel"></i></div>
-                                <span>Diving</span>
-                            </div>
-                            <div class="shortcut-item" data-category="Wisata Budaya & Sejarah" onclick="setCategoryFilter('Wisata Budaya & Sejarah')">
-                                <div class="icon-wrap bg-purple-light"><i class="fa-solid fa-monument"></i></div>
-                                <span>Budaya</span>
-                            </div>
-                            <div class="shortcut-item" data-category="Pantai" onclick="setCategoryFilter('Pantai')">
-                                <div class="icon-wrap bg-blue-light"><i class="fa-solid fa-umbrella-beach"></i></div>
-                                <span>Pantai</span>
-                            </div>
-                            <div class="shortcut-item" data-category="Gunung" onclick="setCategoryFilter('Gunung')">
-                                <div class="icon-wrap bg-green-light"><i class="fa-solid fa-mountain"></i></div>
-                                <span>Gunung</span>
-                            </div>
-                            <div class="shortcut-item" data-category="Keluarga Santai" onclick="setCategoryFilter('Keluarga Santai')">
-                                <div class="icon-wrap bg-pink-light"><i class="fa-solid fa-users"></i></div>
-                                <span>Keluarga</span>
-                            </div>
-                        </div>
-
-                        <!-- Popular Trips (Horizontal Cards) -->
-                        <div class="section-title-row">
-                            <h3>Trip Populer</h3>
-                            <a href="#" class="btn-view-all" id="btn-view-all-popular">Lihat Semua <i class="fa-solid fa-chevron-right"></i></a>
-                        </div>
-                        <div class="horizontal-scroll" id="popular-trips-scroll">
-                            <!-- Cards populated dynamically by app.js -->
-                        </div>
-
-                        <!-- Special Promo Banner -->
-                        <div class="promo-banner-container">
-                            <div class="promo-banner">
-                                <div class="promo-info">
-                                    <span class="promo-tag">Promo Spesial</span>
-                                    <h4>Diskon Hingga 15% OFF</h4>
-                                    <p>Periode promo: 1 - 31 Mei 2024</p>
+                        <div class="horizontal-scroll" id="popular-trips-scroll" style="display: flex; overflow-x: auto; padding: 0; gap: 0;">
+                            <div class="scroll-slide">
+                            <div class="trip-card-compact" onclick="viewTripDetail(1)" style=" background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="height: 100px; width: 100%; position: relative;">
+                                    <img src="https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600" style="width: 100%; height: 100%; object-fit: cover;">
+                                    <span style="position: absolute; top: 6px; left: 6px; background: #0f8b8d; color: white; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">Open Trip • Wisata Budaya & Sejarah</span>
+                                    <button class="btn-wishlist" style="position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;"><i class="fa-regular fa-heart"></i></button>
                                 </div>
-                                <div class="promo-plane">
-                                    <i class="fa-solid fa-plane-departure"></i>
+                                <div style="padding: 8px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h4 style="font-size: 11px; margin: 0 0 2px 0; font-weight: 800; color: #111827; line-height: 1.3;">Rumah Ayu Ting-Ting</h4>
+                                        <p style="font-size: 9px; color: #6b7280; margin: 0;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> Jawa Barat</p>
+                                    </div>
+                                    <div style="display: flex; gap: 3px; margin: 6px 0; flex-wrap: wrap;">
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Tour Guide Sertifikasi</span>
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Dokumentasi Lengkap</span>
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Armada Transport AC</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f3f4f6; padding-top: 4px; margin-top: 4px;">
+                                        <span style="font-size: 9px; color: #d97706; font-weight: 800;">⭐ 4.8 <span style="color: #6b7280; font-weight: normal;">(50)</span></span>
+                                        <strong style="font-size: 10px; color: #0f8b8d;">Rp 2.000.000</strong>
+                                    </div>
                                 </div>
                             </div>
+                            <div class="trip-card-compact" onclick="viewTripDetail(2)" style=" background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="height: 100px; width: 100%; position: relative;">
+                                    <img src="https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=600" style="width: 100%; height: 100%; object-fit: cover;">
+                                    <span style="position: absolute; top: 6px; left: 6px; background: #0f8b8d; color: white; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">Open Trip • City Tour</span>
+                                    <button class="btn-wishlist" style="position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;"><i class="fa-regular fa-heart"></i></button>
+                                </div>
+                                <div style="padding: 8px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h4 style="font-size: 11px; margin: 0 0 2px 0; font-weight: 800; color: #111827; line-height: 1.3;">Wisata Margo City</h4>
+                                        <p style="font-size: 9px; color: #6b7280; margin: 0;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> Jawa Barat</p>
+                                    </div>
+                                    <div style="display: flex; gap: 3px; margin: 6px 0; flex-wrap: wrap;">
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Tour Guide Sertifikasi</span>
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Dokumentasi Lengkap</span>
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Armada Transport AC</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f3f4f6; padding-top: 4px; margin-top: 4px;">
+                                        <span style="font-size: 9px; color: #d97706; font-weight: 800;">⭐ 5.0 <span style="color: #6b7280; font-weight: normal;">(50)</span></span>
+                                        <strong style="font-size: 10px; color: #0f8b8d;">Rp 120.000</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                            <div class="scroll-slide">
+                            <div class="trip-card-compact" onclick="viewTripDetail(3)" style=" background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="height: 100px; width: 100%; position: relative;">
+                                    <img src="https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=600" style="width: 100%; height: 100%; object-fit: cover;">
+                                    <span style="position: absolute; top: 6px; left: 6px; background: #0f8b8d; color: white; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">Open Trip • City Tour</span>
+                                    <button class="btn-wishlist" style="position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;"><i class="fa-regular fa-heart"></i></button>
+                                </div>
+                                <div style="padding: 8px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h4 style="font-size: 11px; margin: 0 0 2px 0; font-weight: 800; color: #111827; line-height: 1.3;">Bandung City Tour</h4>
+                                        <p style="font-size: 9px; color: #6b7280; margin: 0;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> Bandung, Jawa Barat</p>
+                                    </div>
+                                    <div style="display: flex; gap: 3px; margin: 6px 0; flex-wrap: wrap;">
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Tour Guide Sertifikasi</span>
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Dokumentasi Lengkap</span>
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Armada Transport AC</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f3f4f6; padding-top: 4px; margin-top: 4px;">
+                                        <span style="font-size: 9px; color: #d97706; font-weight: 800;">⭐ 4.0 <span style="color: #6b7280; font-weight: normal;">(50)</span></span>
+                                        <strong style="font-size: 10px; color: #0f8b8d;">Rp 420.000</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="trip-card-compact" onclick="viewTripDetail(4)" style=" background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="height: 100px; width: 100%; position: relative;">
+                                    <img src="https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600" style="width: 100%; height: 100%; object-fit: cover;">
+                                    <span style="position: absolute; top: 6px; left: 6px; background: #0f8b8d; color: white; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">Open Trip • Curug</span>
+                                    <button class="btn-wishlist" style="position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;"><i class="fa-regular fa-heart"></i></button>
+                                </div>
+                                <div style="padding: 8px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h4 style="font-size: 11px; margin: 0 0 2px 0; font-weight: 800; color: #111827; line-height: 1.3;">Trip Curug Cilember</h4>
+                                        <p style="font-size: 9px; color: #6b7280; margin: 0;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> Bogor, Jawa Barat</p>
+                                    </div>
+                                    <div style="display: flex; gap: 3px; margin: 6px 0; flex-wrap: wrap;">
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">7 Tingkat Air Terjun</span>
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Hutan Pinus Asri</span>
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Api Unggun Malam</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f3f4f6; padding-top: 4px; margin-top: 4px;">
+                                        <span style="font-size: 9px; color: #d97706; font-weight: 800;">⭐ 4.0 <span style="color: #6b7280; font-weight: normal;">(50)</span></span>
+                                        <strong style="font-size: 10px; color: #0f8b8d;">Rp 275.000</strong>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Recommendations Section -->
-                        <div class="section-title-row">
-                            <h3>Rekomendasi Untuk Kamu</h3>
-                            <a href="#" class="btn-view-all">Lihat Semua <i class="fa-solid fa-chevron-right"></i></a>
+                            </div>
+                        <!-- Section 2: Private Trip & Honeymoon Spesial -->
+                        <div class="section-title-row" style="padding: 16px 16px 0 16px; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div>
+                                <h3 style="font-size: 13px; margin: 0; color: #111827; font-weight: 800;">Private Trip & Honeymoon Spesial</h3>
+                                <p style="font-size: 9px; color: #6b7280; margin: 2px 0 0 0;">Jadwal bebas pilih customer (Min 2 Orang) + Fasilitas eksklusif & privat</p>
+                            </div>
+                            <a href="#" class="btn-view-all" onclick="switchScreen('screen-list')" style="font-size: 10px; color: #0f8b8d; font-weight: bold; text-decoration: none;">Lihat semua ></a>
                         </div>
-                        <div class="recommendations-grid" id="recommendations-grid">
-                            <!-- Grid populated dynamically by app.js -->
+                        <div class="horizontal-scroll" id="private-honeymoon-scroll" style="display: flex; overflow-x: auto; padding: 0; gap: 0;">
+                            <div class="scroll-slide">
+                            <div class="trip-card-compact" onclick="viewTripDetail(5)" style=" background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="height: 100px; width: 100%; position: relative;">
+                                    <img src="https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=600" style="width: 100%; height: 100%; object-fit: cover;">
+                                    <span style="position: absolute; top: 6px; left: 6px; background: #0f8b8d; color: white; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">Private Trip • Gunung</span>
+                                    <button class="btn-wishlist" style="position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;"><i class="fa-regular fa-heart"></i></button>
+                                </div>
+                                <div style="padding: 8px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h4 style="font-size: 11px; margin: 0 0 2px 0; font-weight: 800; color: #111827; line-height: 1.3;">Baturaden 3D2N</h4>
+                                        <p style="font-size: 9px; color: #6b7280; margin: 0;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> Jawa Tengah</p>
+                                    </div>
+                                    <div style="display: flex; gap: 3px; margin: 6px 0; flex-wrap: wrap;">
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Mobil Private & Driver</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f3f4f6; padding-top: 4px; margin-top: 4px;">
+                                        <span style="font-size: 9px; color: #d97706; font-weight: 800;">⭐ 5 <span style="color: #6b7280; font-weight: normal;">(50)</span></span>
+                                        <strong style="font-size: 10px; color: #0f8b8d;">Rp 500.000</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="trip-card-compact" onclick="viewTripDetail(8)" style=" background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="height: 100px; width: 100%; position: relative;">
+                                    <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600" style="width: 100%; height: 100%; object-fit: cover;">
+                                    <span style="position: absolute; top: 6px; left: 6px; background: #0f8b8d; color: white; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">Honeymoon • Pantai</span>
+                                    <button class="btn-wishlist" style="position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;"><i class="fa-regular fa-heart"></i></button>
+                                </div>
+                                <div style="padding: 8px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h4 style="font-size: 11px; margin: 0 0 2px 0; font-weight: 800; color: #111827; line-height: 1.3;">Honeymoon Island Sunset Tidung 3D2N</h4>
+                                        <p style="font-size: 9px; color: #6b7280; margin: 0;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> Kepulauan Seribu, Jakarta</p>
+                                    </div>
+                                    <div style="display: flex; gap: 3px; margin: 6px 0; flex-wrap: wrap;">
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Floating Breakfast</span>
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Private Pool Villa</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f3f4f6; padding-top: 4px; margin-top: 4px;">
+                                        <span style="font-size: 9px; color: #d97706; font-weight: 800;">⭐ 5 <span style="color: #6b7280; font-weight: normal;">(50)</span></span>
+                                        <strong style="font-size: 10px; color: #0f8b8d;">Rp 1.650.000</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
                         </div>
-                        
-                        <div class="scroll-spacing"></div>
+
+                        <!-- Section 3: Family & Corporate Gathering -->
+                        <div class="section-title-row" style="padding: 16px 16px 0 16px; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div>
+                                <h3 style="font-size: 13px; margin: 0; color: #111827; font-weight: 800;">Family & Corporate Gathering</h3>
+                                <p style="font-size: 9px; color: #6b7280; margin: 2px 0 0 0;">Family (Min 5 orang) • Corporate Gathering (Min 10 orang)</p>
+                            </div>
+                            <a href="#" class="btn-view-all" onclick="switchScreen('screen-list')" style="font-size: 10px; color: #0f8b8d; font-weight: bold; text-decoration: none;">Lihat semua ></a>
+                        </div>
+                        <div class="horizontal-scroll" id="family-corporate-scroll" style="display: flex; overflow-x: auto; padding: 0; gap: 0;">
+                            <div class="scroll-slide">
+                            <div class="trip-card-compact" onclick="viewTripDetail(9)" style=" background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="height: 100px; width: 100%; position: relative;">
+                                    <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600" style="width: 100%; height: 100%; object-fit: cover;">
+                                    <span style="position: absolute; top: 6px; left: 6px; background: #0f8b8d; color: white; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">Corporate • Pantai</span>
+                                    <button class="btn-wishlist" style="position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;"><i class="fa-regular fa-heart"></i></button>
+                                </div>
+                                <div style="padding: 8px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h4 style="font-size: 11px; margin: 0 0 2px 0; font-weight: 800; color: #111827; line-height: 1.3;">Pantai Muara Gembong</h4>
+                                        <p style="font-size: 9px; color: #6b7280; margin: 0;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> Jawa Barat</p>
+                                    </div>
+                                    <div style="display: flex; gap: 3px; margin: 6px 0; flex-wrap: wrap;">
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Snorkeling Terumbu Karang</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f3f4f6; padding-top: 4px; margin-top: 4px;">
+                                        <span style="font-size: 9px; color: #d97706; font-weight: 800;">⭐ 5 <span style="color: #6b7280; font-weight: normal;">(50)</span></span>
+                                        <strong style="font-size: 10px; color: #0f8b8d;">Rp 150.000</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="trip-card-compact" onclick="viewTripDetail(12)" style=" background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                                <div style="height: 100px; width: 100%; position: relative;">
+                                    <img src="https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600" style="width: 100%; height: 100%; object-fit: cover;">
+                                    <span style="position: absolute; top: 6px; left: 6px; background: #0f8b8d; color: white; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">Corporate • Keluarga Santai</span>
+                                    <button class="btn-wishlist" style="position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;"><i class="fa-regular fa-heart"></i></button>
+                                </div>
+                                <div style="padding: 8px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h4 style="font-size: 11px; margin: 0 0 2px 0; font-weight: 800; color: #111827; line-height: 1.3;">Corporate Team Building Bogor 2D1N</h4>
+                                        <p style="font-size: 9px; color: #6b7280; margin: 0;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> Bogor, Jawa Barat</p>
+                                    </div>
+                                    <div style="display: flex; gap: 3px; margin: 6px 0; flex-wrap: wrap;">
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Outbound Team Building</span>
+                                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">Bus Luxury VIP</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f3f4f6; padding-top: 4px; margin-top: 4px;">
+                                        <span style="font-size: 9px; color: #d97706; font-weight: 800;">⭐ 4.9 <span style="color: #6b7280; font-weight: normal;">(50)</span></span>
+                                        <strong style="font-size: 10px; color: #0f8b8d;">Rp 680.000</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+
+                        <div class="scroll-spacing" style="height: 30px;"></div>
                     </div>
 
                     <!-- SCREEN 2: TRIP LIST -->
@@ -1222,6 +1318,36 @@
 
                 <!-- Home bar/Indicator -->
                 <div class="phone-home-indicator"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Datepicker Modal (100% Lock Tanggal Lalu e.g. Sep 16) -->
+    <div class="modal-overlay" id="custom-date-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; padding: 16px;">
+        <div style="background: white; border-radius: 20px; width: 100%; max-width: 320px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #f3f4f6; padding-bottom: 12px;">
+                <h4 style="margin: 0; font-size: 14px; font-weight: 800; color: #111827;"><i class="fa-regular fa-calendar-days text-teal" style="color: #0f8b8d;"></i> Pilih Tanggal Keberangkatan</h4>
+                <button onclick="closeCustomDateModal()" style="background: none; border: none; font-size: 16px; color: #6b7280; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <strong id="custom-calendar-month-title" style="font-size: 13px; color: #111827;">September 2026</strong>
+                <div style="display: flex; gap: 6px;">
+                    <button id="btn-calendar-prev" onclick="changeCalendarMonth(-1)" style="background: #f3f4f6; border: none; border-radius: 6px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: #0f8b8d; cursor: pointer;"><i class="fa-solid fa-chevron-left" style="font-size: 10px;"></i></button>
+                    <button id="btn-calendar-next" onclick="changeCalendarMonth(1)" style="background: #e6f4f4; border: none; border-radius: 6px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: #0f8b8d; cursor: pointer;"><i class="fa-solid fa-chevron-right" style="font-size: 10px;"></i></button>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 10px; font-weight: 700; color: #6b7280; margin-bottom: 8px;">
+                <div>Ming</div><div>Sen</div><div>Sel</div><div>Rab</div><div>Kam</div><div>Jum</div><div>Sab</div>
+            </div>
+
+            <div id="custom-calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center;">
+                <!-- Populated dynamically by app.js -->
+            </div>
+
+            <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                <button onclick="closeCustomDateModal()" style="background: #0f8b8d; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer;">Terapkan</button>
             </div>
         </div>
     </div>

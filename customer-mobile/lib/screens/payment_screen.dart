@@ -352,11 +352,26 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       onPressed: () {
+                        // Set booking status to PAID & payment method in shared mock store
+                        booking.status = 'PAID';
+                        final methodStr = 'Xendit ($activePaymentTab)';
+                        final index = Booking.mockBookings.indexWhere((b) => b.id == booking.id || b.bookingCode == booking.bookingCode);
+                        if (index != -1) {
+                          Booking.mockBookings[index].status = 'PAID';
+                        } else {
+                          Booking.mockBookings.add(booking);
+                        }
+
                         // Navigate to Payment Verification Screen (Index 8)
                         widget.onNavigate(8, arguments: {'booking': booking});
                       },
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: const Text(
+                        'Bayar via Xendit (Simulasi Lunas)',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F8B8D),
                         foregroundColor: Colors.white,
@@ -365,10 +380,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         elevation: 0,
-                      ),
-                      child: const Text(
-                        'Verifikasi Pembayaran Saya',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ),
                   ),
@@ -511,11 +522,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
       case 'Virtual Account':
         return Column(
           children: [
-            _buildVaItem('Bank Central Asia (BCA)', '8033202418919001', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
+            _buildVaItem('Bank Central Asia (BCA)', '88001894124029', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
             const SizedBox(height: 12),
-            _buildVaItem('Bank Mandiri', '8902202418918224', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
+            _buildVaItem('Bank Mandiri', '89008894124029', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
             const SizedBox(height: 12),
-            _buildVaItem('Bank Negara Indonesia (BNI)', '8271202418917833', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
+            _buildVaItem('Bank Rakyat Indonesia (BRI)', '12388894124029', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
+            const SizedBox(height: 12),
+            _buildVaItem('Bank Negara Indonesia (BNI)', '98888894124029', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
           ],
         );
       case 'E-Wallet':

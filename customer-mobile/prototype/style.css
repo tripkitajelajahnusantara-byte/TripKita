@@ -280,8 +280,10 @@ body {
     overflow-y: auto;
     position: relative;
     padding-top: 40px; /* Safe area notch top */
+    padding-bottom: 75px !important; /* Safe clearance for fixed bottom nav bar */
     display: flex;
     flex-direction: column;
+    box-sizing: border-box !important;
 }
 
 /* Hide scrollbar for mobile viewport */
@@ -289,15 +291,126 @@ body {
     display: none;
 }
 
-/* Screens Wrapper */
 .screen {
     display: none;
     flex-direction: column;
     min-height: 100%;
+    flex-shrink: 0;
 }
 
 .screen.active {
     display: flex;
+}
+
+/* Hero Section Overlay & Typography Legibility */
+.hero-section {
+    position: relative;
+    background-size: cover;
+    background-position: center;
+}
+
+.hero-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(13, 30, 45, 0.75) 0%, rgba(15, 139, 141, 0.65) 60%, rgba(13, 30, 45, 0.85) 100%);
+    z-index: 1;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+}
+
+.hero-content h2 {
+    font-size: 18px;
+    font-weight: 800;
+    color: #ffffff !important;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+    margin: 0 0 6px 0;
+}
+
+.hero-content p {
+    font-size: 11px;
+    color: #f3f4f6 !important;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+    margin: 0;
+}
+
+/* Horizontal Scroll Section for Trip Cards */
+.horizontal-scroll {
+    display: flex !important;
+    gap: 0px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 0px !important;
+    margin: 0px !important;
+    flex-shrink: 0 !important;
+    min-height: 220px !important;
+    height: 220px !important;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    scroll-snap-type: x mandatory;
+    cursor: grab;
+    user-select: none;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.horizontal-scroll:active {
+    cursor: grabbing;
+}
+
+.horizontal-scroll::-webkit-scrollbar {
+    height: 5px;
+}
+
+.horizontal-scroll::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 10px;
+}
+
+.horizontal-scroll::-webkit-scrollbar-thumb {
+    background: #0f8b8d;
+    border-radius: 10px;
+}
+
+.scroll-slide {
+    display: flex !important;
+    gap: 10px !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    flex-shrink: 0 !important;
+    padding: 10px 16px 14px 16px !important;
+    margin: 0 !important;
+    scroll-snap-align: start;
+    box-sizing: border-box !important;
+}
+
+.scroll-slide .trip-card-compact,
+.trip-card-compact {
+    flex: 1 1 calc((100% - 10px) / 2) !important;
+    width: calc((100% - 10px) / 2) !important;
+    min-width: calc((100% - 10px) / 2) !important;
+    max-width: calc((100% - 10px) / 2) !important;
+    min-height: 205px !important;
+    height: 205px !important;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    box-sizing: border-box !important;
+}
+
+.section-title-row {
+    flex-shrink: 0 !important;
 }
 
 /* Spacers */
@@ -676,13 +789,7 @@ button {
 .bg-green-light { background-color: #E8F5E9; }
 .bg-purple-light { background-color: #F3E5F5; }
 
-/* Horizontal scrolling Trip cards */
-.horizontal-scroll {
-    display: flex;
-    overflow-x: auto;
-    padding: 0 16px 16px;
-    gap: 16px;
-}
+/* Horizontal scrolling Trip cards - configured at top */
 
 .horizontal-scroll::-webkit-scrollbar {
     display: none;

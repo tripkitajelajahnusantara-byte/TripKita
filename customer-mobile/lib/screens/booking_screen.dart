@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:customer_mobile/models/package.dart';
 import 'package:customer_mobile/models/booking.dart';
+import 'package:customer_mobile/services/api_service.dart';
 import 'package:customer_mobile/widgets/bottom_navigation.dart';
 import 'package:intl/intl.dart';
 
@@ -552,44 +553,31 @@ class _BookingScreenState extends State<BookingScreen> {
                     ],
                   ),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      // Generate mock booking code (e.g. TK-2824-1891)
-                      final randomSuffix = (1000 + (DateTime.now().millisecond % 9000)).toString();
-                      final bookingCode = 'TK-2824-$randomSuffix';
-
-                      // Create Booking details model
+                    onPressed: () async {
                       DateTime parsedTripDate;
                       try {
                         parsedTripDate = DateFormat('dd MMM yyyy').parse(selectedDateStr);
                       } catch (e) {
-                        parsedTripDate = DateTime(2024, 5, 28);
+                        parsedTripDate = DateTime.now().add(const Duration(days: 14));
                       }
 
-                      final bookingId = 500 + Booking.mockBookings.length;
-                      final mockBooking = Booking(
-                        id: bookingId,
-                        bookingCode: bookingCode,
-                        providerId: package.providerId,
+                      final String mainCustomerName = participants.isNotEmpty && participants[0].fullName.isNotEmpty
+                          ? participants[0].fullName
+                          : 'Pelanggan TripKita';
+
+                      // Call Railway backend to generate real Xendit Invoice
+                      final bookingResult = await ApiService.createBooking(
                         packageId: package.id,
                         packageDetails: package,
-                        customerName: participants[0].fullName.isNotEmpty ? participants[0].fullName : 'Budi Santoso',
-                        customerInitial: 'BS',
-                        tripDate: parsedTripDate,
+                        customerName: mainCustomerName,
                         guests: participantCount,
                         totalPrice: totalPrice,
-                        dpAmount: 0,
-                        paymentMethod: 'QRIS',
-                        status: 'PENDING_PAYMENT',
-                        paymentUrl: 'https://checkout.xendit.co/v2/invoice/TK-$randomSuffix',
-                        createdAt: DateTime.now(),
+                        tripDate: parsedTripDate,
                         participants: participants,
                       );
 
-                      // Persist booking to mock list
-                      Booking.mockBookings.add(mockBooking);
-
-                      // Navigate to Payment Screen (Index 7)
-                      widget.onNavigate(7, arguments: {'booking': mockBooking});
+                      // Navigate to Payment Screen (Index 7) with created booking
+                      widget.onNavigate(7, arguments: {'booking': bookingResult});
                     },
                     icon: const Text('Lanjut Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     label: const Icon(Icons.arrow_forward, size: 18),

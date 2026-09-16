@@ -27,193 +27,295 @@ const TRIP_CATEGORIES = [
 
 const TRIP_TYPES = ["Semua Tipe", "Open Trip", "Private Trip", "Custom Trip"];
 
-// 3. Mock Database Packages (Synced with Provider "Wisata Nusantara")
+// 3. Mock Database Packages (Synced 1-to-1 with Provider "Wisata Nusantara" & Database)
 const packagesDB = [
     {
         id: 1,
-        name: "Open Trip Raja Ampat Diving & Snorkeling",
-        destination: "Papua Barat",
-        province: "Papua Barat",
-        price: 4200000,
-        quotaMin: 4,
-        quotaUsed: 8,
-        quotaMax: 12,
-        schedule: ["01 Agu", "02 Agu", "03 Agu", "04 Agu", "05 Agu"],
+        name: "Rumah Ayu Ting-Ting",
+        destination: "Jawa Barat",
+        province: "Jawa Barat",
+        price: 2000000,
+        quotaMin: 5,
+        quotaUsed: 3,
+        quotaMax: 15,
+        schedule: ["16 Sep - 18 Sep 2026 (3 Hari)"],
         status: "Aktif",
-        rating: 4.97,
-        reviewCount: 120,
-        duration: "5 Hari 4 Malam",
+        rating: 4.8,
+        reviewCount: 50,
+        duration: "3 Hari 2 Malam",
         tripType: "Open Trip",
-        category: "Diving & Snorkeling",
-        minParticipants: 4,
-        availableSeats: 4,
+        category: "Wisata Budaya & Sejarah",
+        minParticipants: 5,
+        availableSeats: 12,
+        highlights: [" Tour Guide Sertifikasi", " Dokumentasi Lengkap", " Armada Transport AC"],
         providerName: "Wisata Nusantara",
         providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-        description: "Wisata Nusantara menghadirkan petualangan diving & snorkeling terbaik di surga karst Raja Ampat.",
-        images: [
-            "https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600",
-            "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600"
-        ],
-        itinerary: [
-            "Hari 1: Penjemputan di Bandara Sorong - Waisai - Check-in Resort",
-            "Hari 2: Snorkeling di Pulau Wayag - Trekking Puncak Wayag - Lunch di Pantai",
-            "Hari 3: Island Hopping Pianemo Viewpoint - Snorkeling Manta Point",
-            "Hari 4: Morning walk di Resort - Transfer Sorong"
-        ],
-        facilities: ["Resort AC", "Speedboat Premium", "Makan 3x Sehari", "Alat Snorkeling", "GoPro Documentation"],
-        includes: ["Pianemo Entry Fee", "Raja Ampat Pin Kartu", "Asuransi Perjalanan"],
-        excludes: ["Tiket Pesawat ke Sorong", "Pengeluaran Pribadi"],
-        meetingPoint: "Bandara Domine Eduard Osok, Sorong"
+        description: "Nikmati wisata budaya dan sejarah di Rumah Ayu Ting-Ting.",
+        images: ["https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600"]
     },
     {
         id: 2,
-        name: "Private Trip Bali Cultural & Heritage Tour",
-        destination: "Bali",
-        province: "Bali",
-        price: 1550000,
-        quotaMin: 2,
-        quotaUsed: 18,
-        quotaMax: 20,
-        schedule: ["10 Agu", "11 Agu", "12 Agu"],
+        name: "Wisata Margo City",
+        destination: "Jawa Barat",
+        province: "Jawa Barat",
+        price: 120000,
+        quotaMin: 4,
+        quotaUsed: 2,
+        quotaMax: 12,
+        schedule: ["16 Sep - 17 Sep 2026 (2 Hari)"],
         status: "Aktif",
-        rating: 4.91,
-        reviewCount: 85,
-        duration: "3 Hari 2 Malam",
-        tripType: "Private Trip",
-        category: "Wisata Budaya & Sejarah",
-        minParticipants: 2,
-        availableSeats: 2,
+        rating: 5.0,
+        reviewCount: 50,
+        duration: "2 Hari 1 Malam",
+        tripType: "Open Trip",
+        category: "City Tour",
+        minParticipants: 4,
+        availableSeats: 10,
+        highlights: [" Tour Guide Sertifikasi", " Dokumentasi Lengkap", " Armada Transport AC"],
         providerName: "Wisata Nusantara",
         providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-        description: "Jelajahi kekayaan budaya dan keindahan pura di Bali bersama pemandu profesional Wisata Nusantara.",
-        images: [
-            "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=600"
-        ],
-        itinerary: ["Hari 1: Arrival - Check-in Villa", "Hari 2: Ubud Cultural Tour & Tirta Empul", "Hari 3: Souvenir & Departure"],
-        facilities: ["Mobil AC Private", "Hotel Bintang 4", "Makan Siang & Malam"],
-        includes: ["Tiket Masuk Wisata", "Air Mineral"],
-        excludes: ["Tiket Pesawat"],
-        meetingPoint: "Bandara I Gusti Ngurah Rai, Bali"
+        description: "Jelajahi keindahan dan pusat hiburan Margo City.",
+        images: ["https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=600"]
     },
     {
         id: 3,
-        name: "Open Trip Komodo Island Beach & Snorkeling",
-        destination: "Nusa Tenggara Timur (NTT)",
-        province: "Nusa Tenggara Timur (NTT)",
-        price: 3900000,
+        name: "Bandung City Tour",
+        destination: "Bandung, Jawa Barat",
+        province: "Jawa Barat",
+        price: 420000,
         quotaMin: 4,
-        quotaUsed: 7,
-        quotaMax: 10,
-        schedule: ["15 Agu", "16 Agu", "17 Agu", "18 Agu"],
+        quotaUsed: 3,
+        quotaMax: 15,
+        schedule: ["16 Sep - 17 Sep 2026 (2 Hari)"],
         status: "Aktif",
-        rating: 4.95,
-        reviewCount: 94,
-        duration: "4 Hari 3 Malam",
+        rating: 4.0,
+        reviewCount: 50,
+        duration: "2 Hari 1 Malam",
         tripType: "Open Trip",
-        category: "Pantai",
+        category: "City Tour",
         minParticipants: 4,
-        availableSeats: 3,
+        availableSeats: 12,
+        highlights: [" Tour Guide Sertifikasi", " Dokumentasi Lengkap", " Armada Transport AC"],
         providerName: "Wisata Nusantara",
         providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-        description: "Saksikan habitat Komodo dan nikmati pantai Pink Beach yang eksotis bersama Wisata Nusantara.",
-        images: [
-            "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600"
-        ],
-        itinerary: ["Hari 1: Labuan Bajo - Pulau Kelor", "Hari 2: Pulau Padar - Pink Beach", "Hari 3: Manta Point - Kanawa", "Hari 4: Return"],
-        facilities: ["Kapal Phinisi AC", "Alat Snorkeling", "Makan 3x"],
-        includes: ["Tiket Taman Nasional", "Pemandu Lokal"],
-        excludes: ["Flight Ticket"],
-        meetingPoint: "Bandara Komodo, Labuan Bajo"
+        description: "Kelilingi destinasi favorit di Kota Bandung.",
+        images: ["https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=600"]
     },
     {
         id: 4,
-        name: "Open Trip Bromo Mountain Trekking",
-        destination: "Jawa Timur",
-        province: "Jawa Timur",
-        price: 1200000,
+        name: "Trip Curug Cilember",
+        destination: "Bogor, Jawa Barat",
+        province: "Jawa Barat",
+        price: 275000,
         quotaMin: 5,
-        quotaUsed: 11,
-        quotaMax: 15,
-        schedule: ["20 Agu", "21 Agu", "22 Agu"],
+        quotaUsed: 4,
+        quotaMax: 10,
+        schedule: ["16 Sep - 17 Sep 2026 (2 Hari)"],
         status: "Aktif",
-        rating: 4.89,
-        reviewCount: 110,
-        duration: "3 Hari 2 Malam",
+        rating: 4.0,
+        reviewCount: 50,
+        duration: "2 Hari 1 Malam",
         tripType: "Open Trip",
-        category: "Gunung",
+        category: "Curug",
         minParticipants: 5,
-        availableSeats: 4,
+        availableSeats: 6,
+        highlights: [" 7 Tingkat Air Terjun", " Hutan Pinus Asri", " Api Unggun Malam"],
         providerName: "Wisata Nusantara",
         providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-        description: "Petualangan trekking dan berburu sunrise indah di Bromo bersama tim Wisata Nusantara.",
-        images: [
-            "https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600"
-        ],
-        itinerary: ["Hari 1: Malang - Tosari", "Hari 2: Sunrise Penanjakan - Kawah Bromo - Pasir Berbisik", "Hari 3: Kembali ke Malang"],
-        facilities: ["Jeep 4x4", "Homestay AC", "Makan"],
-        includes: ["Tiket Masuk Bromo"],
-        excludes: ["Pengeluaran Pribadi"],
-        meetingPoint: "Stasiun Malang"
+        description: "Wisata 7 air terjun Curug Cilember Bogor.",
+        images: ["https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600"]
     },
     {
         id: 5,
-        name: "Private Trip Yogyakarta City Tour & Culture",
-        destination: "DI Yogyakarta",
-        province: "DI Yogyakarta",
-        price: 850000,
-        quotaMin: 2,
-        quotaUsed: 22,
-        quotaMax: 30,
-        schedule: ["05 Agu", "06 Agu"],
+        name: "Baturaden 3D2N",
+        destination: "Jawa Tengah",
+        province: "Jawa Tengah",
+        price: 500000,
+        quotaMin: 1,
+        quotaUsed: 1,
+        quotaMax: 10,
+        schedule: ["Fleksibel (Pilihan Customer)"],
         status: "Aktif",
-        rating: 4.85,
-        reviewCount: 140,
-        duration: "2 Hari 1 Malam",
+        rating: 5.0,
+        reviewCount: 50,
+        duration: "3 Hari 2 Malam",
         tripType: "Private Trip",
-        category: "City Tour",
-        minParticipants: 2,
-        availableSeats: 8,
+        category: "Gunung",
+        minParticipants: 1,
+        availableSeats: 9,
+        highlights: [" Mobil Private & Driver", " Pemandu & Dokumen Pro", " Jam Trip Fleksibel"],
         providerName: "Wisata Nusantara",
         providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-        description: "Kelilingi destinasi bersejarah di kota Jogja secara privat dan nyaman.",
-        images: [
-            "https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=600"
-        ],
-        itinerary: ["Hari 1: Keraton - Tamansari - Malioboro", "Hari 2: Borobudur / Prambanan - Transfer Out"],
-        facilities: ["Mobil Private AC", "Driver & BBM"],
-        includes: ["Tiket Objek Wisata"],
-        excludes: ["Hotel & Flight"],
-        meetingPoint: "Stasiun Tugu / Bandara YIA"
+        description: "Wisata eksklusif Baturaden 3 hari 2 malam.",
+        images: ["https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600"]
     },
     {
         id: 6,
-        name: "Liburan Keluarga Santai Malang-Batu",
-        destination: "Jawa Timur",
-        province: "Jawa Timur",
-        price: 2100000,
-        quotaMin: 4,
-        quotaUsed: 6,
-        quotaMax: 10,
-        schedule: ["25 Agu", "26 Agu", "27 Agu", "28 Agu"],
+        name: "Honeymoon Island Sunset Tidung 3D2N",
+        destination: "Kepulauan Seribu, Jakarta",
+        province: "DKI Jakarta",
+        price: 1650000,
+        quotaMin: 2,
+        quotaUsed: 2,
+        quotaMax: 2,
+        schedule: ["Fleksibel (Pilihan Customer)"],
         status: "Aktif",
-        rating: 4.90,
-        reviewCount: 65,
-        duration: "4 Hari 3 Malam",
-        tripType: "Private Trip",
-        category: "Keluarga Santai",
-        minParticipants: 4,
-        availableSeats: 4,
+        rating: 5.0,
+        reviewCount: 50,
+        duration: "3 Hari 2 Malam",
+        tripType: "Honeymoon",
+        category: "Pantai",
+        minParticipants: 2,
+        availableSeats: 2,
+        highlights: [" Floating Breakfast", " Private Pool Villa", " Candlelight Dinner"],
         providerName: "Wisata Nusantara",
         providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-        description: "Liburan keluarga yang ramah anak dan nyaman di Malang dan Batu.",
-        images: [
-            "https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600"
-        ],
-        itinerary: ["Hari 1: Arrival Malang - Museum Angkut", "Hari 2: Jatim Park 3 & Apple Picking", "Hari 3: Flora Wisata San Terra", "Hari 4: Oleh-oleh & Transfer"],
-        facilities: ["Innova Reborn AC", "Hotel Bintang 4", "Breakfast"],
-        includes: ["Tiket Seluruh Wahana"],
-        excludes: ["Flight Ticket"],
-        meetingPoint: "Bandara Abdulrachman Saleh, Malang"
+        description: "Honeymoon romantis di Pulau Tidung Kepulauan Seribu.",
+        images: ["https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600"]
+    },
+    {
+        id: 7,
+        name: "Honeymoon Romantic Bali Villa 3D2N",
+        destination: "Bali",
+        province: "Bali",
+        price: 2950000,
+        quotaMin: 2,
+        quotaUsed: 2,
+        quotaMax: 2,
+        schedule: ["Fleksibel (Pilihan Customer)"],
+        status: "Aktif",
+        rating: 5.0,
+        reviewCount: 50,
+        duration: "3 Hari 2 Malam",
+        tripType: "Honeymoon",
+        category: "Pantai",
+        minParticipants: 2,
+        availableSeats: 2,
+        highlights: [" Floating Breakfast", " Private Pool Villa", " Candlelight Dinner"],
+        providerName: "Wisata Nusantara",
+        providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+        description: "Paket honeymoon romantis di villa private Bali.",
+        images: ["https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=600"]
+    },
+    {
+        id: 8,
+        name: "Private Trip Wisata Raja Ampat 4D3N",
+        destination: "Papua Barat",
+        province: "Papua Barat",
+        price: 3850000,
+        quotaMin: 1,
+        quotaUsed: 1,
+        quotaMax: 8,
+        schedule: ["Fleksibel (Pilihan Customer)"],
+        status: "Aktif",
+        rating: 5.0,
+        reviewCount: 50,
+        duration: "4 Hari 3 Malam",
+        tripType: "Private Trip",
+        category: "Diving & Snorkeling",
+        minParticipants: 1,
+        availableSeats: 7,
+        highlights: [" Mobil Private & Driver", " Pemandu & Dokumen Pro", " Jam Trip Fleksibel"],
+        providerName: "Wisata Nusantara",
+        providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+        description: "Jelajahi surga bawah laut Raja Ampat Papua Barat.",
+        images: ["https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600"]
+    },
+    {
+        id: 9,
+        name: "Pantai Muara Gembong",
+        destination: "Jawa Barat",
+        province: "Jawa Barat",
+        price: 150000,
+        quotaMin: 10,
+        quotaUsed: 10,
+        quotaMax: 50,
+        schedule: ["Fleksibel (Pilihan Group)"],
+        status: "Aktif",
+        rating: 5.0,
+        reviewCount: 50,
+        duration: "1 Hari",
+        tripType: "Corporate",
+        category: "Pantai",
+        minParticipants: 10,
+        availableSeats: 40,
+        highlights: [" Snorkeling Terumbu Karang", " Free Foto Underwater", " Sepeda Keliling Pulau"],
+        providerName: "Wisata Nusantara",
+        providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+        description: "Wisata pantai dan ekosistem mangrove Pantai Muara Gembong.",
+        images: ["https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600"]
+    },
+    {
+        id: 10,
+        name: "Corporate Team Building Bogor 2D1N",
+        destination: "Bogor, Jawa Barat",
+        province: "Jawa Barat",
+        price: 680000,
+        quotaMin: 10,
+        quotaUsed: 10,
+        quotaMax: 100,
+        schedule: ["Fleksibel (Pilihan Group)"],
+        status: "Aktif",
+        rating: 4.9,
+        reviewCount: 50,
+        duration: "2 Hari 1 Malam",
+        tripType: "Corporate",
+        category: "Keluarga Santai",
+        minParticipants: 10,
+        availableSeats: 90,
+        highlights: [" Outbound Team Building", " Bus Luxury VIP", " Gala Dinner & BBQ"],
+        providerName: "Wisata Nusantara",
+        providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+        description: "Kegiatan team building & gathering perusahaan di Bogor.",
+        images: ["https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=600"]
+    },
+    {
+        id: 11,
+        name: "Corporate Gathering & Outbound Bandung",
+        destination: "Bandung, Jawa Barat",
+        province: "Jawa Barat",
+        price: 750000,
+        quotaMin: 10,
+        quotaUsed: 10,
+        quotaMax: 100,
+        schedule: ["Fleksibel (Pilihan Group)"],
+        status: "Aktif",
+        rating: 4.9,
+        reviewCount: 50,
+        duration: "2 Hari 1 Malam",
+        tripType: "Corporate",
+        category: "Keluarga Santai",
+        minParticipants: 10,
+        availableSeats: 90,
+        highlights: [" Outbound Team Building", " Bus Luxury VIP", " Gala Dinner & BBQ"],
+        providerName: "Wisata Nusantara",
+        providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+        description: "Acara gathering outbound kantor seru di Bandung.",
+        images: ["https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=600"]
+    },
+    {
+        id: 12,
+        name: "Family Nature Retreat Cilember 2D1N",
+        destination: "Bogor, Jawa Barat",
+        province: "Jawa Barat",
+        price: 650000,
+        quotaMin: 5,
+        quotaUsed: 5,
+        quotaMax: 20,
+        schedule: ["Fleksibel (Pilihan Keluarga)"],
+        status: "Aktif",
+        rating: 4.9,
+        reviewCount: 50,
+        duration: "2 Hari 1 Malam",
+        tripType: "Family",
+        category: "Curug",
+        minParticipants: 5,
+        availableSeats: 15,
+        highlights: [" 7 Tingkat Air Terjun", " Hutan Pinus Asri", " Api Unggun Malam"],
+        providerName: "Wisata Nusantara",
+        providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+        description: "Liburan keluarga santai menikmati alam Cilember Bogor.",
+        images: ["https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600"]
     }
 ];
 
@@ -329,7 +431,177 @@ document.addEventListener("DOMContentLoaded", () => {
     initApp();
 });
 
+function formatIndonesianDateStr(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const day = parseInt(parts[2], 10);
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const year = parts[0];
+    const months = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    return `${day} ${months[monthIdx]} ${year}`;
+}
+
+function updateDateDisplay(val) {
+    const txtDisplay = document.getElementById('txt-home-date-display');
+    if (txtDisplay) {
+        txtDisplay.innerText = formatIndonesianDateStr(val);
+    }
+}
+
+function getLocalTodayIso() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+let currentCalendarYear = new Date().getFullYear();
+let currentCalendarMonth = new Date().getMonth();
+
+window.openCustomDateModal = function() {
+    const modal = document.getElementById('custom-date-modal');
+    if (!modal) return;
+
+    const input = document.getElementById('input-home-date');
+    const todayIso = getLocalTodayIso();
+    const val = (input && input.value) ? input.value : todayIso;
+
+    const parts = val.split('-');
+    if (parts.length === 3) {
+        currentCalendarYear = parseInt(parts[0], 10);
+        currentCalendarMonth = parseInt(parts[1], 10) - 1;
+    } else {
+        const now = new Date();
+        currentCalendarYear = now.getFullYear();
+        currentCalendarMonth = now.getMonth();
+    }
+
+    modal.style.display = 'flex';
+    renderCustomCalendarGrid();
+};
+
+window.closeCustomDateModal = function() {
+    const modal = document.getElementById('custom-date-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+};
+
+window.openHomeDatePicker = function() {
+    window.openCustomDateModal();
+};
+
+window.changeCalendarMonth = function(delta) {
+    currentCalendarMonth += delta;
+    if (currentCalendarMonth < 0) {
+        currentCalendarMonth = 11;
+        currentCalendarYear -= 1;
+    } else if (currentCalendarMonth > 11) {
+        currentCalendarMonth = 0;
+        currentCalendarYear += 1;
+    }
+    renderCustomCalendarGrid();
+};
+
+window.selectCustomDate = function(dateStr) {
+    const homeDateInput = document.getElementById('input-home-date');
+    if (homeDateInput) {
+        homeDateInput.value = dateStr;
+        updateDateDisplay(dateStr);
+    }
+    window.closeCustomDateModal();
+};
+
+window.renderCustomCalendarGrid = function() {
+    const grid = document.getElementById('custom-calendar-grid');
+    if (!grid) return;
+
+    const monthsIndo = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    const titleEl = document.getElementById('custom-calendar-month-title');
+    if (titleEl) {
+        titleEl.innerText = `${monthsIndo[currentCalendarMonth]} ${currentCalendarYear}`;
+    }
+
+    const input = document.getElementById('input-home-date');
+    const todayIso = getLocalTodayIso();
+    const selectedVal = (input && input.value) ? input.value : todayIso;
+
+    const firstDay = new Date(currentCalendarYear, currentCalendarMonth, 1);
+    const lastDay = new Date(currentCalendarYear, currentCalendarMonth + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay();
+
+    const prevMonthLastDay = new Date(currentCalendarYear, currentCalendarMonth, 0).getDate();
+
+    let html = '';
+
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+        const prevDayNum = prevMonthLastDay - i;
+        html += `<div style="padding: 6px; font-size: 11px; color: #cbd5e1; pointer-events: none; user-select: none;">${prevDayNum}</div>`;
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const mmStr = String(currentCalendarMonth + 1).padStart(2, '0');
+        const ddStr = String(d).padStart(2, '0');
+        const dateStr = `${currentCalendarYear}-${mmStr}-${ddStr}`;
+
+        const isSelected = (dateStr === selectedVal);
+        const isDisabled = (dateStr < todayIso);
+
+        if (isDisabled) {
+            html += `<div style="padding: 6px; font-size: 11px; color: #cbd5e1; background: #f8fafc; border-radius: 6px; cursor: not-allowed; opacity: 0.5; pointer-events: none; user-select: none; text-decoration: line-through;">${d}</div>`;
+        } else if (isSelected) {
+            html += `<div onclick="selectCustomDate('${dateStr}')" style="padding: 6px; font-size: 11px; color: white; background: #0f8b8d; border-radius: 6px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(15,139,141,0.3);">${d}</div>`;
+        } else {
+            html += `<div onclick="selectCustomDate('${dateStr}')" style="padding: 6px; font-size: 11px; color: #111827; border-radius: 6px; font-weight: 600; cursor: pointer; background: #ffffff;" onmouseover="this.style.background='#e6f4f4'" onmouseout="this.style.background='#ffffff'">${d}</div>`;
+        }
+    }
+
+    const totalCellsSoFar = startDayOfWeek + daysInMonth;
+    const remainingCells = (7 - (totalCellsSoFar % 7)) % 7;
+    for (let n = 1; n <= remainingCells; n++) {
+        html += `<div style="padding: 6px; font-size: 11px; color: #cbd5e1; pointer-events: none; user-select: none;">${n}</div>`;
+    }
+
+    grid.innerHTML = html;
+};
+
 function initApp() {
+    const homeDateInput = document.getElementById('input-home-date');
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const localTodayIso = `${yyyy}-${mm}-${dd}`;
+
+    if (homeDateInput) {
+        homeDateInput.min = localTodayIso;
+        homeDateInput.value = localTodayIso;
+        homeDateInput.defaultValue = localTodayIso;
+        homeDateInput.setAttribute('min', localTodayIso);
+        homeDateInput.setAttribute('value', localTodayIso);
+
+        updateDateDisplay(localTodayIso);
+
+        const onDateChange = function() {
+            if (!this.value || this.value < localTodayIso) {
+                this.value = localTodayIso;
+            }
+            updateDateDisplay(this.value);
+        };
+
+        homeDateInput.addEventListener('change', onDateChange);
+        homeDateInput.addEventListener('input', onDateChange);
+    }
     fetchPackagesFromBackend();
     renderHomeScreenData();
     renderTripListData();
@@ -937,79 +1209,145 @@ function setCategoryFilter(catName) {
     switchScreen("screen-list");
 }
 
-// 13. Render Home Screen & Popular Trips
-function renderHomeScreenData() {
-    const scrollContainer = document.getElementById("popular-trips-scroll");
-    if (!scrollContainer) return;
+// Helper functions needed by card renderers
+function formatIDRCurrency(amount) {
+    if (typeof amount !== 'number') amount = Number(amount) || 0;
+    return 'Rp ' + amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
 
-    scrollContainer.innerHTML = "";
-    packagesDB.slice(0, 3).forEach(pkg => {
-        const cardHtml = `
-            <div class="trip-card" onclick="viewTripDetail(${pkg.id})">
-                <div class="card-img-wrapper">
-                    <img src="${pkg.images[0]}" alt="${pkg.name}">
-                    <span class="badge-tag ${pkg.tripType === 'Open Trip' ? 'badge-open' : 'badge-private'}">${pkg.tripType.toUpperCase()}</span>
-                    <button class="btn-wishlist" onclick="event.stopPropagation(); toggleWishlist(this);"><i class="fa-regular fa-heart"></i></button>
-                </div>
-                <div class="card-body">
-                    <h4>${pkg.name}</h4>
-                    <div class="card-meta">
-                        <i class="fa-solid fa-location-dot"></i> <span>${pkg.destination}</span>
-                        <i class="fa-solid fa-star text-amber" style="margin-left: 8px;"></i> <strong>${pkg.rating}</strong>
-                    </div>
-                    <div class="card-specs">
-                        <span><i class="fa-regular fa-clock"></i> ${pkg.duration}</span>
-                        <span><i class="fa-solid fa-user-friends"></i> Min. ${pkg.minParticipants} org</span>
-                    </div>
-                    <hr class="card-divider">
-                    <div class="card-footer">
-                        <div class="price-col">
-                            <span>Mulai dari</span>
-                            <strong>${formatIDRCurrency(pkg.price)}</strong>
-                        </div>
-                        <button class="btn-detail">Detail</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        scrollContainer.insertAdjacentHTML("beforeend", cardHtml);
-    });
-
-    const recGrid = document.getElementById("recommendations-grid");
-    if (recGrid) {
-        recGrid.innerHTML = "";
-        packagesDB.slice(1, 4).forEach(pkg => {
-            const recHtml = `
-                <div class="rec-item" onclick="viewTripDetail(${pkg.id})">
-                    <img src="${pkg.images[0]}" alt="${pkg.name}">
-                    <div class="rec-info">
-                        <h5>${pkg.name}</h5>
-                        <p class="loc"><i class="fa-solid fa-location-dot"></i> ${pkg.destination.split(',')[0]}</p>
-                        <span class="price">${formatIDRCurrency(pkg.price)}</span>
-                    </div>
-                </div>
-            `;
-            recGrid.insertAdjacentHTML("beforeend", recHtml);
-        });
+function toggleWishlist(btn) {
+    if (!btn) return;
+    const icon = btn.querySelector("i");
+    if (icon) {
+        if (icon.classList.contains("fa-regular")) {
+            icon.classList.remove("fa-regular");
+            icon.classList.add("fa-solid");
+            icon.style.color = "#ef4444";
+        } else {
+            icon.classList.remove("fa-solid");
+            icon.classList.add("fa-regular");
+            icon.style.color = "";
+        }
     }
 }
 
-// 14. Render Trip List Screen with Search + Province + Category Filters
-function renderTripListData(sortBy = "Terpopuler") {
-    const searchInput = document.getElementById("txt-list-search");
-    const searchVal = searchInput ? searchInput.value.toLowerCase() : "";
-    
-    let filtered = packagesDB.filter(pkg => {
-        const matchesProvince = selectedProvinceFilter === "Semua" || pkg.province === selectedProvinceFilter || pkg.destination.includes(selectedProvinceFilter);
-        const matchesCategory = selectedCategoryFilter === "Semua" || pkg.category === selectedCategoryFilter || pkg.tripType === selectedCategoryFilter;
-        const matchesSearch = pkg.name.toLowerCase().includes(searchVal) || pkg.destination.toLowerCase().includes(searchVal);
-        return matchesProvince && matchesCategory && matchesSearch;
+function viewTripDetail(id) {
+    const pkg = packagesDB.find(p => p.id === id);
+    if (pkg) {
+        currentActivePackage = pkg;
+        if (typeof renderTripDetailData === 'function') renderTripDetailData();
+        if (typeof switchScreen === 'function') switchScreen("screen-detail");
+    }
+}
+
+function enableDragToScroll(container) {
+    if (!container) return;
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+
+    container.addEventListener('mousedown', (e) => {
+        isDown = true;
+        startX = e.pageX - container.offsetLeft;
+        scrollLeft = container.scrollLeft;
     });
+    container.addEventListener('mouseleave', () => {
+        isDown = false;
+    });
+    container.addEventListener('mouseup', () => {
+        isDown = false;
+    });
+    container.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - container.offsetLeft;
+        const walk = (x - startX) * 1.5;
+        container.scrollLeft = scrollLeft - walk;
+    });
+}
+
+// 13. Render Home Screen 3 Sections (Presisi Gambar 1)
+function renderHomeScreenData() {
+    const renderCardCompact = (pkg) => `
+        <div class="trip-card-compact" onclick="viewTripDetail(${pkg.id})">
+            <div style="height: 95px; width: 100%; position: relative; background: #f3f4f6;">
+                <img src="${pkg.images[0]}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600'">
+                <span style="position: absolute; top: 5px; left: 5px; background: #0f8b8d; color: white; font-size: 7.5px; font-weight: 800; padding: 2px 5px; border-radius: 4px;">${pkg.tripType} • ${pkg.category}</span>
+                <button class="btn-wishlist" onclick="event.stopPropagation(); toggleWishlist(this);" style="position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 9px; cursor: pointer;"><i class="fa-regular fa-heart"></i></button>
+            </div>
+            <div style="padding: 7px 8px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <h4 style="font-size: 10.5px; margin: 0 0 2px 0; font-weight: 800; color: #111827; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${pkg.name}">${pkg.name}</h4>
+                    <p style="font-size: 8.5px; color: #6b7280; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> ${pkg.destination}</p>
+                </div>
+                
+                <div style="display: flex; gap: 3px; margin: 3px 0; flex-wrap: wrap; height: 18px; overflow: hidden;">
+                    ${(pkg.highlights || []).slice(0, 2).map(h => `<span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px; white-space: nowrap;">${h}</span>`).join('')}
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f3f4f6; padding-top: 4px; margin-top: 2px;">
+                    <span style="font-size: 8.5px; color: #d97706; font-weight: 800;">⭐ ${pkg.rating} <span style="color: #6b7280; font-weight: normal;">(${pkg.reviewCount})</span></span>
+                    <strong style="font-size: 9.5px; color: #0f8b8d;">${formatIDRCurrency(pkg.price)}</strong>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const renderTwoSlideCarousel = (packages) => {
+        const slide1 = packages.slice(0, 2).map(renderCardCompact).join('');
+        const slide2 = packages.slice(2, 4).map(renderCardCompact).join('');
+        return `
+            <div class="scroll-slide">${slide1}</div>
+            ${slide2 ? `<div class="scroll-slide">${slide2}</div>` : ''}
+        `;
+    };
+
+    // Section 1: Trip Populer (Open Trip) - Max 4 Rekomendasi (2 Slides)
+    const popContainer = document.getElementById("popular-trips-scroll");
+    if (popContainer) {
+        const openTrips = packagesDB.filter(p => p.tripType === 'Open Trip').slice(0, 4);
+        popContainer.innerHTML = renderTwoSlideCarousel(openTrips);
+        enableDragToScroll(popContainer);
+    }
+
+    // Section 2: Private Trip & Honeymoon Spesial - Max 4 Rekomendasi (2 Slides)
+    const privContainer = document.getElementById("private-honeymoon-scroll");
+    if (privContainer) {
+        const privTrips = packagesDB.filter(p => p.tripType === 'Private Trip' || p.tripType === 'Honeymoon').slice(0, 4);
+        privContainer.innerHTML = renderTwoSlideCarousel(privTrips);
+        enableDragToScroll(privContainer);
+    }
+
+    // Section 3: Family & Corporate Gathering - Max 4 Rekomendasi (2 Slides)
+    const famContainer = document.getElementById("family-corporate-scroll");
+    if (famContainer) {
+        const famTrips = packagesDB.filter(p => p.tripType === 'Family' || p.tripType === 'Corporate').slice(0, 4);
+        famContainer.innerHTML = renderTwoSlideCarousel(famTrips);
+        enableDragToScroll(famContainer);
+    }
+}
+
+// 14. Render Trip List Screen with Search + Province + Category Filters (Presisi Gambar 2)
+function renderTripListData(sortBy = "Rekomendasi") {
+    let filtered = [...packagesDB];
+
+    const destFilter = document.getElementById("select-home-dest")?.value;
+    if (destFilter) {
+        filtered = filtered.filter(p => p.destination.toLowerCase().includes(destFilter.toLowerCase()) || p.province.toLowerCase().includes(destFilter.toLowerCase()));
+    }
+
+    const typeFilter = document.getElementById("select-home-type")?.value;
+    if (typeFilter && typeFilter !== 'Semua Tipe') {
+        filtered = filtered.filter(p => p.tripType.toLowerCase().includes(typeFilter.toLowerCase()));
+    }
+
+    const catFilter = document.getElementById("select-home-category")?.value;
+    if (catFilter && catFilter !== 'Semua Kategori') {
+        filtered = filtered.filter(p => p.category.toLowerCase().includes(catFilter.toLowerCase()));
+    }
 
     if (sortBy === "Harga Terendah") {
         filtered.sort((a, b) => a.price - b.price);
-    } else if (sortBy === "Harga Tertinggi") {
-        filtered.sort((a, b) => b.price - a.price);
     } else if (sortBy === "Rating Tertinggi") {
         filtered.sort((a, b) => b.rating - a.rating);
     }
@@ -1017,52 +1355,57 @@ function renderTripListData(sortBy = "Terpopuler") {
     const container = document.getElementById("trips-vertical-list");
     if (!container) return;
 
-    container.innerHTML = "";
     const resCount = document.getElementById("lbl-result-count");
-    if (resCount) resCount.innerText = `Menampilkan ${filtered.length} Paket Trip`;
+    if (resCount) resCount.innerText = `Menampilkan ${filtered.length} paket wisata`;
 
     if (filtered.length === 0) {
         container.innerHTML = `
-            <div class="no-result" style="text-align: center; padding: 40px 0; color: var(--text-light);">
-                <i class="fa-solid fa-search-minus" style="font-size: 48px; margin-bottom: 12px; color: #ccc;"></i>
-                <h4 style="color: var(--text-dark); margin-bottom: 4px;">Trip tidak ditemukan</h4>
-                <p style="font-size: 12px;">Coba atur ulang kata kunci atau filter provinsi/kategori.</p>
+            <div class="no-result" style="text-align: center; padding: 40px 0; color: #6b7280;">
+                <i class="fa-solid fa-search-minus" style="font-size: 36px; margin-bottom: 8px; color: #ccc;"></i>
+                <h4 style="color: #111827; margin: 0 0 4px 0; font-size: 13px;">Trip tidak ditemukan</h4>
+                <p style="font-size: 10px; margin: 0;">Coba atur ulang kata kunci atau filter destinasi/kategori.</p>
             </div>
         `;
         return;
     }
 
-    filtered.forEach(pkg => {
-        const cardHtml = `
-            <div class="trip-card" onclick="viewTripDetail(${pkg.id})">
-                <div class="card-img-wrapper">
-                    <img src="${pkg.images[0]}" alt="${pkg.name}">
-                    <span class="badge-tag ${pkg.tripType === 'Open Trip' ? 'badge-open' : 'badge-private'}">${pkg.tripType.toUpperCase()}</span>
-                    <button class="btn-wishlist" onclick="event.stopPropagation(); toggleWishlist(this);"><i class="fa-regular fa-heart"></i></button>
+    container.innerHTML = filtered.map(pkg => `
+        <div class="trip-card-v2" onclick="viewTripDetail(${pkg.id})" style="background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+            <div style="display: flex; gap: 10px; padding: 10px;">
+                <div style="width: 100px; height: 85px; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0;">
+                    <img src="${pkg.images[0]}" style="width: 100%; height: 100%; object-fit: cover;">
+                    <button class="btn-wishlist" onclick="event.stopPropagation(); toggleWishlist(this);" style="position: absolute; top: 4px; right: 4px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 9px; cursor: pointer;"><i class="fa-regular fa-heart"></i></button>
                 </div>
-                <div class="card-body">
-                    <h4>${pkg.name}</h4>
-                    <div class="card-meta">
-                        <i class="fa-solid fa-location-dot"></i> <span>${pkg.destination}</span>
-                        <i class="fa-solid fa-star text-amber" style="margin-left: 8px;"></i> <strong>${pkg.rating}</strong>
-                    </div>
-                    <div class="card-specs">
-                        <span><i class="fa-regular fa-clock"></i> ${pkg.duration}</span>
-                        <span><i class="fa-solid fa-user-friends"></i> Min. ${pkg.minParticipants} org</span>
-                    </div>
-                    <hr class="card-divider">
-                    <div class="card-footer">
-                        <div class="price-col">
-                            <span>Mulai dari</span>
-                            <strong>${formatIDRCurrency(pkg.price)}</strong>
+                <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 4px;">
+                            <span style="background: #0f8b8d; color: white; font-size: 8px; font-weight: 800; padding: 2px 5px; border-radius: 4px;">${pkg.tripType} • ${pkg.category}</span>
+                            <div style="text-align: right;">
+                                <span style="font-size: 8px; color: #6b7280; display: block;">Mulai dari</span>
+                                <strong style="font-size: 11px; color: #0f8b8d;">${formatIDRCurrency(pkg.price)} <span style="font-size: 8px; font-weight: normal; color: #6b7280;">/orang</span></strong>
+                            </div>
                         </div>
-                        <button class="btn-detail">Lihat Detail</button>
+                        <h4 style="font-size: 11px; margin: 3px 0 1px 0; font-weight: 800; color: #111827;">${pkg.name}</h4>
+                        <p style="font-size: 8px; color: #6b7280; margin: 0;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> ${pkg.destination}</p>
+                    </div>
+                    
+                    <div style="display: flex; gap: 3px; flex-wrap: wrap; margin-top: 3px;">
+                        ${(pkg.highlights || []).slice(0, 3).map(h => `<span style="background: #e6f4f4; color: #0f8b8d; font-size: 7px; font-weight: 600; padding: 1px 4px; border-radius: 3px;">${h}</span>`).join('')}
                     </div>
                 </div>
             </div>
-        `;
-        container.insertAdjacentHTML("beforeend", cardHtml);
-    });
+
+            <div style="padding: 6px 10px; background: #f9fafb; border-top: 1px dashed #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: #4b5563;">
+                <div>
+                    <span style="color: #d97706; font-weight: 800;">⭐ ${pkg.rating}</span> <span style="color: #6b7280;">(${pkg.reviewCount} ulasan)</span> | <span style="color: #0f8b8d; font-weight: bold;">Sisa ${pkg.availableSeats} seat</span>
+                </div>
+                <div style="display: flex; gap: 4px;">
+                    <button onclick="event.stopPropagation(); alert('Link tersalin!');" style="background: white; border: 1px solid #d1d5db; color: #374151; padding: 3px 6px; border-radius: 5px; font-size: 8px; font-weight: bold; cursor: pointer;"><i class="fa-solid fa-share-nodes"></i> Bagikan</button>
+                    <button style="background: #0f8b8d; border: none; color: white; padding: 3px 8px; border-radius: 5px; font-size: 8px; font-weight: bold; cursor: pointer;">Lihat Detail ></button>
+                </div>
+            </div>
+        </div>
+    `).join('');
 }
 
 // 15. Render Trip Detail Screen
@@ -1683,8 +2026,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const dateInput = document.getElementById("input-home-date");
     if (dateInput) {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
         dateInput.setAttribute("min", todayStr);
+        
+        const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const formattedToday = `${today.getDate()} ${months[today.getMonth()]} ${today.getFullYear()}`;
+        dateInput.value = formattedToday;
     }
 
     const searchBtn = document.getElementById("btn-search-trips");
@@ -1850,3 +2198,18 @@ function generateQRISCode() {
         }
     }
 }
+
+// Immediate Top-Level Execution (Script at bottom of <body>)
+try {
+    renderHomeScreenData();
+    renderTripListData();
+} catch (e) {
+    console.error("Auto-render error:", e);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    try { renderHomeScreenData(); renderTripListData(); } catch (e) {}
+});
+window.addEventListener("load", () => {
+    try { renderHomeScreenData(); renderTripListData(); } catch (e) {}
+});

@@ -278,6 +278,10 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
                   ),
 
                   const SizedBox(height: 20),
+                  // Provider Public Profile Card
+                  _buildProviderPublicCard(),
+
+                  const SizedBox(height: 16),
                   // Summary Information Cards Grid
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -588,7 +592,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
   }
 
   Widget _buildTabNavBar() {
-    final tabs = ['Deskripsi', 'Itinerary', 'Fasilitas', 'Include', 'Exclude', 'Meeting Point'];
+    final tabs = ['Deskripsi', 'Itinerary', 'Fasilitas', 'Include', 'Exclude', 'Meeting Point', 'Ulasan'];
     return SizedBox(
       height: 38,
       child: ListView.builder(
@@ -733,9 +737,179 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
             ),
           ],
         );
+      case 'Ulasan':
+        final reviews = package.reviews.isNotEmpty
+            ? package.reviews
+            : [
+                ReviewItem(
+                  id: 1,
+                  packageId: package.id,
+                  customerName: 'Rian Hidayat',
+                  customerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+                  rating: 5.0,
+                  comment: 'Trip paling berkesan! Pemandu ramah, resort bersih, dan spot snorkeling-nya luar biasa indah.',
+                  date: '12 Mei 2024',
+                  providerResponse: 'Terima kasih Kak Rian! Sampai jumpa di trip berikutnya bersama kami.',
+                ),
+                ReviewItem(
+                  id: 2,
+                  packageId: package.id,
+                  customerName: 'Anisa Putri',
+                  customerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
+                  rating: 4.5,
+                  comment: 'Makanan enak dan jadwal tepat waktu. Sangat direkomendasikan untuk liburan keluarga!',
+                  date: '28 April 2024',
+                ),
+              ];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.star, color: Colors.amber, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  package.rating > 0 ? package.rating.toStringAsFixed(1) : '4.8',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1F2937)),
+                ),
+                Text(
+                  ' / 5.0 (${reviews.length} Ulasan)',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...reviews.map((rev) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundImage: NetworkImage(rev.customerAvatar.isNotEmpty ? rev.customerAvatar : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(rev.customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              Text(rev.date, style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
+                            ],
+                          ),
+                        ),
+                        Row(
+                          children: List.generate(
+                            5,
+                            (starIndex) => Icon(
+                              starIndex < rev.rating ? Icons.star : Icons.star_border,
+                              color: Colors.amber,
+                              size: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(rev.comment, style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.4)),
+                    if (rev.providerResponse != null && rev.providerResponse!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0F2F1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Respon Provider: ${rev.providerResponse}',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF0F8B8D), fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        );
       default:
         return const SizedBox();
     }
+  }
+
+  Widget _buildProviderPublicCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF0F8B8D).withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F8B8D).withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundImage: NetworkImage(package.providerAvatar),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        package.providerName,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.verified, size: 16, color: Color(0xFF0F8B8D)),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                const Text('Official Travel Partner TripKita', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.star, size: 14, color: Colors.amber.shade600),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${package.rating} Rating',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 10),
+                    const Icon(Icons.check_circle_outline, size: 14, color: Color(0xFF0F8B8D)),
+                    const SizedBox(width: 4),
+                    const Text('120+ Trip Selesai', style: TextStyle(fontSize: 11, color: Color(0xFF4B5563))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

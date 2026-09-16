@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:customer_mobile/models/booking.dart';
+import 'package:customer_mobile/models/review.dart';
 import 'package:customer_mobile/widgets/bottom_navigation.dart';
 import 'package:intl/intl.dart';
 
@@ -92,6 +93,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   if (isSuccess) ...[
                     _buildCountdownCard(),
                     const SizedBox(height: 20),
+                    if (booking.status == 'COMPLETED') ...[
+                      _buildReviewCard(),
+                      const SizedBox(height: 20),
+                    ],
                     _buildDigitalVoucherCard(),
                     const SizedBox(height: 20),
                     _buildItineraryCard(),
@@ -706,6 +711,243 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildReviewCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF0F8B8D).withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F8B8D).withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.star_rounded, color: Colors.amber, size: 24),
+              SizedBox(width: 8),
+              Text(
+                'Ulasan & Rating Trip',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            booking.hasReviewed
+                ? 'Terima kasih telah memberikan ulasan untuk trip ini!'
+                : 'Trip Anda telah selesai. Bagikan pengalaman terbaik Anda bersama provider ini!',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          if (booking.hasReviewed) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      ...List.generate(5, (index) {
+                        return Icon(
+                          index < (booking.reviewRating ?? 5.0).toInt() ? Icons.star : Icons.star_border,
+                          size: 16,
+                          color: Colors.amber.shade600,
+                        );
+                      }),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${booking.reviewRating ?? 5.0} / 5.0',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  if (booking.reviewComment != null && booking.reviewComment!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '"${booking.reviewComment}"',
+                      style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF4B5563)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ] else ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  _showReviewBottomSheet(context);
+                },
+                icon: const Icon(Icons.rate_review_outlined, size: 18),
+                label: const Text('Beri Ulasan & Rating ⭐', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F8B8D),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showReviewBottomSheet(BuildContext context) {
+    double selectedRating = 5.0;
+    final TextEditingController commentController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Beri Ulasan & Rating ⭐',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1F2937)),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Bagaimana pengalaman Anda saat mengikuti ${booking.packageDetails?.name ?? "trip ini"}?',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 20),
+                  // Bintang Rating Selector
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      final starVal = (index + 1).toDouble();
+                      return IconButton(
+                        iconSize: 36,
+                        icon: Icon(
+                          starVal <= selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: Colors.amber.shade600,
+                        ),
+                        onPressed: () {
+                          setModalState(() {
+                            selectedRating = starVal;
+                          });
+                        },
+                      );
+                    }),
+                  ),
+                  Center(
+                    child: Text(
+                      'Rating: $selectedRating / 5.0',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F8B8D)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Comment TextField
+                  TextField(
+                    controller: commentController,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: 'Tuliskan ulasan jujur Anda tentang pelayanan, fasilitas, dan kebersihan...',
+                      hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF0F8B8D), width: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          booking.hasReviewed = true;
+                          booking.reviewRating = selectedRating;
+                          booking.reviewComment = commentController.text.trim();
+
+                          // Add new ReviewItem to packageDetails if present
+                          if (booking.packageDetails != null) {
+                            booking.packageDetails!.reviews.insert(
+                              0,
+                              ReviewItem(
+                                id: DateTime.now().millisecondsSinceEpoch,
+                                packageId: booking.packageDetails!.id,
+                                customerName: booking.customerName,
+                                customerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+                                rating: selectedRating,
+                                comment: commentController.text.trim().isNotEmpty
+                                    ? commentController.text.trim()
+                                    : 'Pengalaman trip yang luar biasa!',
+                                date: DateFormat('dd MMM yyyy').format(DateTime.now()),
+                              ),
+                            );
+                          }
+                        });
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Ulasan berhasil dikirim! Terima kasih.'),
+                            backgroundColor: Color(0xFF0F8B8D),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F8B8D),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      child: const Text('Kirim Ulasan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

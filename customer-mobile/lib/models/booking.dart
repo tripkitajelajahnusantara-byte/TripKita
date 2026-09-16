@@ -53,10 +53,13 @@ class Booking {
   final int totalPrice;
   final int dpAmount;
   final String paymentMethod;
-  final String status; // PENDING_PAYMENT, PAID, CONFIRMED, COMPLETED, etc.
+  String status; // PENDING_PAYMENT, PAID, CONFIRMED, COMPLETED, CANCELLED, EXPIRED
   final String paymentUrl;
   final DateTime createdAt;
   final List<Participant> participants;
+  bool hasReviewed;
+  double? reviewRating;
+  String? reviewComment;
 
   DateTime get bookingDate => tripDate;
 
@@ -77,6 +80,9 @@ class Booking {
     required this.paymentUrl,
     required this.createdAt,
     required this.participants,
+    this.hasReviewed = false,
+    this.reviewRating,
+    this.reviewComment,
   });
 
   static final List<Booking> mockBookings = [
@@ -85,43 +91,10 @@ class Booking {
       bookingCode: 'TK-2824-9988',
       providerId: 101,
       packageId: 1,
-      packageDetails: TripPackage(
-        id: 1,
-        providerId: 101,
-        name: 'Open Trip Raja Ampat',
-        destination: 'Raja Ampat, Papua',
-        price: 2750000,
-        quotaUsed: 4,
-        quotaMax: 16,
-        schedule: '2024-05-25, 2024-05-26, 2024-05-27, 2024-05-28, 2024-05-29, 2024-05-30, 2024-05-31',
-        status: 'Aktif',
-        rating: 4.8,
-        reviewCount: 120,
-        duration: '4 Hari 3 Malam',
-        tripType: 'Open Trip',
-        minParticipants: 4,
-        availableSeats: 12,
-        description: 'Jelajahi keindahan surga tersembunyi di Raja Ampat. Nikmati laut biru jernih, gugusan pulau karst yang memukau, dan pengalaman snorkeling tak terlupakan bersama trip open trip seru ini!',
-        images: [
-          'https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=800',
-          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
-          'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800',
-          'https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=800'
-        ],
-        itinerary: [
-          'Hari 1: Penjemputan di Bandara Sorong - Menuju Waisai - Check-in Resort - Sunset di Pantai',
-          'Hari 2: Snorkeling di Pulau Wayag - Menikmati Pemandangan Puncak Wayag - Makan Siang di Pantai',
-          'Hari 3: Island Hopping ke Pianemo Viewpoint - Snorkeling di Manta Point - Pasir Timbul',
-          'Hari 4: Menikmati pagi di Resort - Kembali ke Sorong - Pengantaran ke Bandara Sorong'
-        ],
-        facilities: ['Resort Ac', 'Speedboat Premium', 'Makan 3x Sehari', 'Alat Snorkeling', 'Dokumentasi GoPro', 'Pemandu Lokal'],
-        includes: ['Pianemo Entry Fee', 'Raja Ampat Pin Kartu', 'Asuransi Perjalanan', 'Transportasi Sorong - Resort (PP)'],
-        excludes: ['Tiket Pesawat ke Sorong', 'Pengeluaran Pribadi', 'Tips Pemandu & Kru'],
-        meetingPoint: 'Bandara Domine Eduard Osok, Sorong',
-      ),
+      packageDetails: TripPackage.allPackages[0], // Raja Ampat
       customerName: 'Budi Santoso',
       customerInitial: 'BS',
-      tripDate: DateTime.now().add(const Duration(days: 5, hours: 6)), // Dynamically 5 days from now
+      tripDate: DateTime.now().add(const Duration(days: 5, hours: 6)),
       guests: 2,
       totalPrice: 5500000,
       dpAmount: 0,
@@ -139,47 +112,18 @@ class Booking {
       bookingCode: 'TK-2824-1122',
       providerId: 102,
       packageId: 2,
-      packageDetails: TripPackage(
-        id: 2,
-        providerId: 102,
-        name: 'Open Trip Labuan Bajo',
-        destination: 'Labuan Bajo, NTT',
-        price: 2190000,
-        quotaUsed: 8,
-        quotaMax: 20,
-        schedule: '2024-05-25, 2024-05-28, 2024-06-01',
-        status: 'Aktif',
-        rating: 4.7,
-        reviewCount: 98,
-        duration: '3 Hari 2 Malam',
-        tripType: 'Open Trip',
-        minParticipants: 4,
-        availableSeats: 12,
-        description: 'Saksikan naga purba Komodo di habitat aslinya dan nikmati keindahan panorama Pulau Padar yang menakjubkan.',
-        images: [
-          'https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=800',
-          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800'
-        ],
-        itinerary: [
-          'Hari 1: Penjemputan di Bandara Komodo - Check-in Kapal Phinisi - Sunset di Pulau Kalong',
-          'Hari 2: Trekking Pulau Padar - Snorkeling di Pink Beach - Melihat Komodo di Pulau Rinca',
-          'Hari 3: Snorkeling dengan Manta Ray di Manta Point - Kembali ke Labuan Bajo - Bandara'
-        ],
-        facilities: ['Sewa Kapal Phinisi', 'Makan 3x Sehari', 'Alat Snorkeling', 'Kamera Air / GoPro', 'Pemandu Wisata'],
-        includes: ['Tiket Taman Nasional Komodo', 'Air Mineral & Cemilan', 'Penjemputan Hotel/Bandara'],
-        excludes: ['Tiket Pesawat ke Labuan Bajo', 'Tips ABK & Pemandu'],
-        meetingPoint: 'Bandara Udara Komodo, Labuan Bajo',
-      ),
+      packageDetails: TripPackage.allPackages[1], // Labuan Bajo
       customerName: 'Budi Santoso',
       customerInitial: 'BS',
-      tripDate: DateTime.now().subtract(const Duration(days: 2)), // 2 days ago
+      tripDate: DateTime.now().subtract(const Duration(days: 10)),
       guests: 1,
       totalPrice: 2190000,
       dpAmount: 0,
       paymentMethod: 'Virtual Account',
-      status: 'FAILED',
+      status: 'COMPLETED',
       paymentUrl: '',
-      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      createdAt: DateTime.now().subtract(const Duration(days: 15)),
+      hasReviewed: false,
       participants: [
         Participant(fullName: 'Budi Santoso', email: 'budi.santoso@gmail.com', whatsappNumber: '08123456789', gender: 'Laki-laki', dateOfBirth: '1990-05-15'),
       ],
@@ -210,6 +154,9 @@ class Booking {
               .map((p) => Participant.fromJson(p as Map<String, dynamic>))
               .toList()
           : [],
+      hasReviewed: json['hasReviewed'] as bool? ?? false,
+      reviewRating: json['reviewRating'] != null ? (json['reviewRating'] as num).toDouble() : null,
+      reviewComment: json['reviewComment'] as String?,
     );
   }
 
@@ -231,6 +178,9 @@ class Booking {
       'paymentUrl': paymentUrl,
       'createdAt': createdAt.toIso8601String(),
       'participants': participants.map((p) => p.toJson()).toList(),
+      'hasReviewed': hasReviewed,
+      'reviewRating': reviewRating,
+      'reviewComment': reviewComment,
     };
   }
 }

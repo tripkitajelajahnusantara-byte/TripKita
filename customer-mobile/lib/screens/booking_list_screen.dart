@@ -315,6 +315,23 @@ class _BookingListScreenState extends State<BookingListScreen> {
                       // Action indicator
                       Row(
                         children: [
+                          if (booking.status == 'COMPLETED' || booking.status == 'PAID' || booking.status == 'CONFIRMED')
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: OutlinedButton.icon(
+                                onPressed: () => _showReviewDialog(context, booking),
+                                icon: Icon(Icons.star, size: 14, color: booking.hasReviewed ? Colors.grey : Colors.amber),
+                                label: Text(
+                                  booking.hasReviewed ? 'Ulasan Ada' : 'Beri Ulasan',
+                                  style: TextStyle(fontSize: 11, color: booking.hasReviewed ? Colors.grey.shade600 : Colors.amber.shade900),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  side: BorderSide(color: booking.hasReviewed ? Colors.grey.shade300 : Colors.amber.shade400),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                            ),
                           Text(
                             booking.status == 'PENDING_PAYMENT' ? 'Bayar Sekarang' : 'Lihat Detail',
                             style: TextStyle(
@@ -339,6 +356,94 @@ class _BookingListScreenState extends State<BookingListScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _showReviewDialog(BuildContext context, Booking booking) {
+    double stars = booking.reviewRating ?? 5.0;
+    final textController = TextEditingController(text: booking.reviewComment ?? '');
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulWidget(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Beri Ulasan & Rating', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Paket: ${booking.packageDetails?.name ?? "Trip Kita"}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F8B8D))),
+                    const SizedBox(height: 12),
+                    const Text('Rating Bintang:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (idx) {
+                        return IconButton(
+                          icon: Icon(
+                            idx < stars ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 28,
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              stars = (idx + 1).toDouble();
+                            });
+                          },
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Ulasan / Pengalaman Anda:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: textController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Tuliskan pengalaman menyenangkan selama trip ini...',
+                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.all(10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      booking.hasReviewed = true;
+                      booking.reviewRating = stars;
+                      booking.reviewComment = textController.text;
+                    });
+                    Navigator.pop(dialogCtx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Terima kasih! Ulasan Anda telah terkirim ke Provider.'),
+                        backgroundColor: Color(0xFF0F8B8D),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F8B8D),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Kirim Ulasan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
