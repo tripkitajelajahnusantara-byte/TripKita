@@ -60,14 +60,29 @@ export function getHighlightsForPackage(pkg: { name?: string; tripType?: string;
   return ['⭐ Tour Guide Berlisensi', '📸 Dokumentasi Lengkap', '🚗 Armada Transport AC'];
 }
 
-// Centralized mapping of authentic, verified photos for all TripKita packages
-export function getTripImage(id?: number, name: string = '', category: string = '', uploadedImage?: string): string {
-  if (uploadedImage && uploadedImage.trim() !== '') {
-    const firstImg = uploadedImage.split(',')[0].trim();
-    if (firstImg) return firstImg;
+export function getTripImage(id?: any, name: string = '', category: string = '', uploadedImage?: string): string {
+  // If first argument is an object (e.g. package object)
+  if (id && typeof id === 'object') {
+    const pkg = id;
+    const img = pkg.images || pkg.image || pkg.imageUrl || pkg.uploadedImage;
+    if (img && typeof img === 'string' && img.trim() !== '') {
+      const first = img.split(',')[0].trim();
+      if (first && first !== 'undefined' && first !== 'null') return first;
+    }
+    id = pkg.id;
+    name = pkg.name || '';
+    category = pkg.category || '';
+    uploadedImage = img;
   }
-  const nameLower = name.toLowerCase();
-  const catLower = category.toLowerCase();
+
+  if (uploadedImage && typeof uploadedImage === 'string' && uploadedImage.trim() !== '') {
+    const firstImg = uploadedImage.split(',')[0].trim();
+    if (firstImg && firstImg !== 'undefined' && firstImg !== 'null') {
+      return firstImg;
+    }
+  }
+  const nameLower = (name || '').toLowerCase();
+  const catLower = (category || '').toLowerCase();
 
   // 1. Match by exact package ID or specific landmark keywords
   if (id === 1 || nameLower.includes('bromo')) {
