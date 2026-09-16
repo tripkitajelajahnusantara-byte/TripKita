@@ -423,9 +423,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Status Open Trip: Min. Kuota ${package.quotaMin > 0 ? package.quotaMin : 4} pax. '
-                            'Terisi: ${package.quotaUsed}/${package.quotaMin > 0 ? package.quotaMin : 4} pax '
-                            '${(package.quotaMin > 0 ? package.quotaMin : 4) > package.quotaUsed ? "(Kurang ${(package.quotaMin > 0 ? package.quotaMin : 4) - package.quotaUsed} pax lagi agar PASTI BERANGKAT)" : "(PASTI BERANGKAT)"}',
+                            'Status Open Trip: Min. Kuota ${package.minParticipants > 0 ? package.minParticipants : 4} pax. '
+                            'Terisi: ${package.quotaUsed}/${package.minParticipants > 0 ? package.minParticipants : 4} pax '
+                            '${(package.minParticipants > 0 ? package.minParticipants : 4) > package.quotaUsed ? "(Kurang ${(package.minParticipants > 0 ? package.minParticipants : 4) - package.quotaUsed} pax lagi agar PASTI BERANGKAT)" : "(PASTI BERANGKAT)"}',
                             style: const TextStyle(fontSize: 11, color: Color(0xFF92400E), fontWeight: FontWeight.bold, height: 1.3),
                           ),
                         ),
