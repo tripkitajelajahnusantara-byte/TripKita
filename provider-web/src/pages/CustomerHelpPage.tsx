@@ -52,7 +52,7 @@ export const CustomerHelpPage: React.FC = () => {
       id: 'faq-5',
       category: 'tiket',
       question: 'Bagaimana jika saya tidak sengaja lupa atau kehilangan Kode Booking?',
-      answer: 'Jangan khawatir! Anda dapat masuk (login) ke akun Customer Anda untuk melihat seluruh e-voucher dan riwayat transaksi. Atau Anda dapat menghubungi tim Customer Service kami melalui email support@tripkita.id.'
+      answer: 'Jangan khawatir! Anda dapat masuk (login) ke akun Customer Anda untuk melihat seluruh e-voucher dan riwayat transaksi. Atau Anda dapat menghubungi tim Customer Service kami melalui email tripkitajelajahnusantara@gmail.com.'
     },
     {
       id: 'faq-6',
@@ -182,7 +182,7 @@ export const CustomerHelpPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="method-label">Email Dukungan Pelanggan Resmi:</span>
-                    <a href="mailto:support@tripkita.id" className="method-value">support@tripkita.id</a>
+                    <a href="mailto:tripkitajelajahnusantara@gmail.com" className="method-value">tripkitajelajahnusantara@gmail.com</a>
                   </div>
                 </div>
 

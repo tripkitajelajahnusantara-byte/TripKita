@@ -629,7 +629,7 @@ export const RegisterPage: React.FC = () => {
               11.3 Keseluruhan Perjanjian: Ketentuan ini merupakan keseluruhan perjanjian antara TemenTrip dan Mitra.</p>
 
               <strong>12. HUBUNGI KAMI</strong>
-              <p>Jika Anda memiliki pertanyaan mengenai Ketentuan ini, Anda dapat menghubungi kami melalui email support@tripkita.id atau WhatsApp +62 813 2008 875.</p>
+              <p>Jika Anda memiliki pertanyaan mengenai Ketentuan ini, Anda dapat menghubungi kami melalui email tripkitajelajahnusantara@gmail.com atau WhatsApp +62 813 2008 875.</p>
             </div>
             <div className="modal-footer">
               <button 
