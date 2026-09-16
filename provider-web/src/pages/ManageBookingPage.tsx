@@ -36,40 +36,12 @@ export const ManageBookingPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // Simulation States
-  const [packages, setPackages] = useState<any[]>([]);
-  const [simulateName, setSimulateName] = useState('Alice');
-  const [simulateGuests, setSimulateGuests] = useState(2);
-  const [simulatePkgId, setSimulatePkgId] = useState('');
-  const [simulateDate, setSimulateDate] = useState('2026-07-15');
-  const [showSimulateModal, setShowSimulateModal] = useState(false);
-  const [createdBookingUrl, setCreatedBookingUrl] = useState('');
-  const [simulateLoading, setSimulateLoading] = useState(false);
-
   // Cancel/Reschedule Modal States
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelBookingId, setCancelBookingId] = useState<number | null>(null);
   const [cancelActionType, setCancelActionType] = useState<'REFUND' | 'RESCHEDULE' | null>(null);
   const [newRescheduleDate, setNewRescheduleDate] = useState('');
   const [cancelLoading, setCancelLoading] = useState(false);
-
-  const loadPackages = async () => {
-    try {
-      const data = await request('/provider/packages');
-      setPackages(data);
-      if (data.length > 0) {
-        setSimulatePkgId(data[0].id.toString());
-      }
-    } catch (err) {
-      console.error('Failed to load packages:', err);
-    }
-  };
-
-  useEffect(() => {
-    if (showSimulateModal) {
-      loadPackages();
-    }
-  }, [showSimulateModal]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -95,6 +67,8 @@ export const ManageBookingPage: React.FC = () => {
           dbId: b.id, // Keep numeric ID for API requests
           customerName: b.customerName || 'Pelanggan',
           customerInitial: b.customerInitial || (b.customerName ? b.customerName.charAt(0) : 'P'),
+          customerEmail: b.customerEmail || '',
+          customerPhone: b.customerPhone || '',
           package: b.packageDetails?.name || 'Paket Wisata',
           tripDate: b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
           guests: b.guests || 1,
@@ -513,10 +487,10 @@ export const ManageBookingPage: React.FC = () => {
                     <span className="detail-label">Pelanggan</span>
                     <span className="detail-value">{selectedBooking.customerName}</span>
                     <span style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                      Email: {selectedBooking.customerName.toLowerCase().replace(/\s+/g, '')}@gmail.com
+                      Email: {selectedBooking.customerEmail || 'Tidak tersedia'}
                     </span>
                     <span style={{ fontSize: '11px', color: '#64748b' }}>
-                      WA: +62 812-{selectedBooking.id.replace(/[^0-9]/g, '').substring(0, 4) || '5432'}-{selectedBooking.id.replace(/[^0-9]/g, '').substring(4, 8) || '9876'}
+                      WA: {selectedBooking.customerPhone || 'Tidak tersedia'}
                     </span>
                   </div>
 
@@ -701,149 +675,6 @@ export const ManageBookingPage: React.FC = () => {
           background-color: #fef2f2 !important;
         }
       `}</style>
-
-      {/* Simulation Modal */}
-      {showSimulateModal && (
-        <div className="detail-modal-overlay">
-          <div className="detail-modal-card animate-scale-up" style={{ maxWidth: '480px' }}>
-            <div className="modal-header">
-              <h2>Simulasikan Customer Booking</h2>
-              <button 
-                type="button" 
-                className="close-modal-btn" 
-                onClick={() => { setShowSimulateModal(false); setCreatedBookingUrl(''); }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="modal-body" style={{ padding: '24px' }}>
-              {createdBookingUrl ? (
-                <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
-                  <h3 style={{ marginBottom: '12px' }}>Booking Berhasil Dibuat!</h3>
-                  <p style={{ fontSize: '13px', color: 'var(--color-text-medium)', marginBottom: '24px' }}>
-                    Sistem telah membuat booking baru dengan status <strong>PENDING_PAYMENT</strong>. Silakan selesaikan pembayaran melalui portal simulasi Xendit.
-                  </p>
-                  <a 
-                    href={createdBookingUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="submit-form-btn"
-                    style={{ display: 'inline-flex', width: 'auto', padding: '12px 24px', textDecoration: 'none', backgroundColor: '#0d9488', color: '#ffffff', fontWeight: 600, borderRadius: '8px' }}
-                  >
-                    Buka Portal Simulasi Xendit
-                  </a>
-                </div>
-              ) : (
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!simulatePkgId) {
-                    alert('Harap pilih paket wisata terlebih dahulu.');
-                    return;
-                  }
-                  setSimulateLoading(true);
-                  try {
-                    const res = await request('/public/bookings', {
-                      method: 'POST',
-                      body: JSON.stringify({
-                        packageId: parseInt(simulatePkgId),
-                        customerName: simulateName,
-                        guests: simulateGuests,
-                        tripDate: new Date(simulateDate).toISOString(),
-                        paymentMethod: 'Xendit Invoice'
-                      })
-                    });
-                    
-                    if (res.paymentUrl) {
-                      setCreatedBookingUrl(res.paymentUrl);
-                    } else {
-                      alert('Berhasil membuat pesanan, tapi URL Xendit kosong. Pastikan backend terhubung ke Xendit.');
-                      setShowSimulateModal(false);
-                    }
-                    
-                    loadData();
-                  } catch (err: any) {
-                    alert(err.message || 'Gagal membuat simulasi booking');
-                  } finally {
-                    setSimulateLoading(false);
-                  }
-                }}>
-                  <div className="input-group" style={{ marginBottom: '16px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary-dark)' }}>Pilih Paket Wisata *</label>
-                    <select 
-                      value={simulatePkgId} 
-                      onChange={(e) => setSimulatePkgId(e.target.value)} 
-                      className="filter-select"
-                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', marginTop: '4px' }}
-                    >
-                      {packages.length === 0 ? (
-                        <option value="">Tidak ada paket aktif</option>
-                      ) : (
-                        packages.map(p => <option key={p.id} value={p.id}>{p.name} (Rp {p.price.toLocaleString('id-ID')})</option>)
-                      )}
-                    </select>
-                  </div>
-
-                  <div className="input-group" style={{ marginBottom: '16px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary-dark)' }}>Nama Customer *</label>
-                    <input 
-                      type="text" 
-                      value={simulateName} 
-                      onChange={(e) => setSimulateName(e.target.value)} 
-                      placeholder="Nama Lengkap" 
-                      required
-                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', marginTop: '4px' }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-                    <div className="input-group">
-                      <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary-dark)' }}>Jumlah Peserta *</label>
-                      <input 
-                        type="number" 
-                        value={simulateGuests} 
-                        onChange={(e) => setSimulateGuests(parseInt(e.target.value))} 
-                        min="1" 
-                        required
-                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', marginTop: '4px' }}
-                      />
-                    </div>
-                    <div className="input-group">
-                      <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary-dark)' }}>Tanggal Perjalanan *</label>
-                      <input 
-                        type="date" 
-                        value={simulateDate} 
-                        onChange={(e) => setSimulateDate(e.target.value)} 
-                        required
-                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', marginTop: '4px' }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                    <button 
-                      type="button" 
-                      className="cancel-btn" 
-                      onClick={() => setShowSimulateModal(false)}
-                      style={{ border: '1px solid var(--color-border)', backgroundColor: '#ffffff', color: '#334155', fontWeight: 600, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
-                    >
-                      Batal
-                    </button>
-                    <button 
-                      type="submit" 
-                      className="submit-form-btn" 
-                      disabled={simulateLoading}
-                      style={{ width: 'auto', padding: '10px 24px', backgroundColor: '#0d9488' }}
-                    >
-                      {simulateLoading ? 'Memproses...' : 'Buat Booking'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Cancel Action Modal */}
       {showCancelModal && (

@@ -3,6 +3,7 @@ package controllers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -58,7 +59,7 @@ func (ctrl *ReviewController) GetReviewByBooking(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"reviewed": true, "review": review})
+	c.JSON(http.StatusOK, gin.H{"reviewed": true})
 }
 
 func (ctrl *ReviewController) GetReviewsByPackage(c *gin.Context) {
@@ -71,9 +72,23 @@ func (ctrl *ReviewController) GetReviewsByPackage(c *gin.Context) {
 
 	reviews, err := ctrl.service.GetReviewsByPackageID(uint(packageID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat ulasan paket", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, reviews)
+	type publicReview struct {
+		ID        uint      `json:"id"`
+		PackageID uint      `json:"packageId"`
+		Rating    int       `json:"rating"`
+		Comment   string    `json:"comment"`
+		CreatedAt time.Time `json:"createdAt"`
+	}
+	result := make([]publicReview, 0, len(reviews))
+	for _, review := range reviews {
+		result = append(result, publicReview{
+			ID: review.ID, PackageID: review.PackageID, Rating: review.Rating,
+			Comment: review.Comment, CreatedAt: review.CreatedAt,
+		})
+	}
+	c.JSON(http.StatusOK, result)
 }

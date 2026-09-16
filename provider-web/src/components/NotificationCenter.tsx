@@ -31,26 +31,9 @@ export const NotificationCenter: React.FC = () => {
         setUnreadCount(list.filter((n) => !n.isRead).length);
       }
     } catch (err) {
-      // Mock fallback if offline or initial state
-      setNotifications([
-        {
-          id: 101,
-          title: '🎉 Pembayaran Berhasil',
-          message: 'Booking #TK-8821 terkonfirmasi. Bukti E-Voucher PDF telah dikirim ke email.',
-          type: 'PAYMENT',
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 102,
-          title: '💰 Pencairan Dana Uang Muka (DP 50%)',
-          message: 'Pencairan dana sebesar Rp 1.750.000 berhasil ditransfer ke rekening bank Anda.',
-          type: 'PAYOUT',
-          isRead: false,
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-        },
-      ]);
-      setUnreadCount(2);
+      console.error('Failed to load notifications:', err);
+      setNotifications([]);
+      setUnreadCount(0);
     }
   };
 

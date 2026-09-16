@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -35,7 +36,12 @@ func (ctrl *AuthController) Register(c *gin.Context) {
 
 	provider, err := ctrl.service.Register(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		var inputErr *services.AuthInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Error()})
+			return
+		}
+		respondInternalError(c, "mendaftarkan provider", err)
 		return
 	}
 
@@ -51,7 +57,12 @@ func (ctrl *AuthController) RegisterCustomer(c *gin.Context) {
 
 	res, err := ctrl.service.RegisterCustomer(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		var inputErr *services.AuthInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Error()})
+			return
+		}
+		respondInternalError(c, "mendaftarkan pelanggan", err)
 		return
 	}
 
@@ -72,7 +83,12 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 
 	res, err := ctrl.service.Login(&req)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		var inputErr *services.AuthInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": inputErr.Error()})
+			return
+		}
+		respondInternalError(c, "login", err)
 		return
 	}
 
@@ -114,7 +130,6 @@ func (ctrl *AuthController) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-
 	c.JSON(http.StatusOK, provider)
 }
 
@@ -139,8 +154,8 @@ func (ctrl *AuthController) ProviderForgotPassword(c *gin.Context) {
 func (ctrl *AuthController) ProviderResetPassword(c *gin.Context) {
 	var req struct {
 		Email       string `json:"email" binding:"required,email"`
-		OTP         string `json:"otp" binding:"required"`
-		NewPassword string `json:"newPassword" binding:"required,min=6"`
+		OTP         string `json:"otp" binding:"required,len=6,numeric"`
+		NewPassword string `json:"newPassword" binding:"required,min=8,max=72"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -149,7 +164,12 @@ func (ctrl *AuthController) ProviderResetPassword(c *gin.Context) {
 
 	err := ctrl.service.ResetPassword(req.Email, req.OTP, req.NewPassword)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		var inputErr *services.AuthInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Error()})
+			return
+		}
+		respondInternalError(c, "reset password", err)
 		return
 	}
 

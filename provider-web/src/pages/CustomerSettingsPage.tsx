@@ -517,14 +517,14 @@ export const CustomerSettingsPage: React.FC = () => {
                             <Star
                               key={i}
                               size={16}
-                              fill={i < (rev.rating || 5) ? '#f59e0b' : '#e2e8f0'}
-                              color={i < (rev.rating || 5) ? '#f59e0b' : '#e2e8f0'}
+                              fill={i < (rev.rating || 0) ? '#f59e0b' : '#e2e8f0'}
+                              color={i < (rev.rating || 0) ? '#f59e0b' : '#e2e8f0'}
                             />
                           ))}
                         </div>
 
                         <p style={{ margin: 0, fontSize: '13.5px', color: '#334155', lineHeight: '1.6' }}>
-                          "{rev.comment || rev.content || 'Pelayanan sangat memuaskan!'}"
+                          "{rev.comment || rev.content || 'Tidak ada komentar.'}"
                         </p>
                       </div>
                     ))}

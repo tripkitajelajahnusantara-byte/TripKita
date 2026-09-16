@@ -40,24 +40,24 @@ type Package struct {
 }
 
 type CreatePackageRequest struct {
-	Name               string `json:"name" binding:"required"`
-	Destination        string `json:"destination"`
-	MeetingPoint       string `json:"meetingPoint"`
-	Category           string `json:"category"`
-	TripType           string `json:"tripType"`
-	Price              int64  `json:"price"`
-	QuotaMin           int    `json:"quotaMin"`
-	QuotaMax           int    `json:"quotaMax"`
-	StartDate          string `json:"startDate"`
-	EndDate            string `json:"endDate"`
-	Schedule           string `json:"schedule"`
+	Name               string `json:"name" binding:"required,max=255"`
+	Destination        string `json:"destination" binding:"required,max=255"`
+	MeetingPoint       string `json:"meetingPoint" binding:"required,max=255"`
+	Category           string `json:"category" binding:"required,max=100"`
+	TripType           string `json:"tripType" binding:"required,max=100"`
+	Price              int64  `json:"price" binding:"required,gt=0,lte=1000000000000"`
+	QuotaMin           int    `json:"quotaMin" binding:"gte=0"`
+	QuotaMax           int    `json:"quotaMax" binding:"required,gt=0,lte=10000"`
+	StartDate          string `json:"startDate" binding:"required,datetime=2006-01-02"`
+	EndDate            string `json:"endDate" binding:"required,datetime=2006-01-02"`
+	Schedule           string `json:"schedule" binding:"required,max=255"`
 	Duration           int    `json:"duration"`
 	MinGuests          int    `json:"minGuests"`
 	MaxGuests          int    `json:"maxGuests"`
 	MinAge             int    `json:"minAge"`
 	MaxAge             int    `json:"maxAge"`
-	Status             string `json:"status" binding:"required"` // Convert to Aktif, Draft, Nonaktif
-	Description        string `json:"description"`
+	Status             string `json:"status" binding:"required,oneof=Aktif Draft Nonaktif"`
+	Description        string `json:"description" binding:"required,max=5000"`
 	IncludedFacilities string `json:"includedFacilities"`
 	ExcludedFacilities string `json:"excludedFacilities"`
 	Itinerary          string `json:"itinerary"`

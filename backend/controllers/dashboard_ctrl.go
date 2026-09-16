@@ -25,7 +25,7 @@ func (ctrl *DashboardController) GetStats(c *gin.Context) {
 
 	stats, err := ctrl.service.GetStats(providerID.(uint))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternalError(c, "memuat statistik dashboard", err)
 		return
 	}
 

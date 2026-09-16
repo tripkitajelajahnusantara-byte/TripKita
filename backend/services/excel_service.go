@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"time"
 	"tripkita-provider/models"
 )
@@ -34,15 +35,23 @@ func (s *ExcelService) GenerateProviderFinanceCSV(provider *models.Provider, boo
 
 	// Section 1: Bookings & Revenue Breakdown
 	buf.WriteString("1. RIWAYAT PEMESANAN & PENDAPATAN BERSIH\n")
-	buf.WriteString("ID Booking,Kode Invoice,Nama Paket,Pelanggan,Tanggal Trip,Status,Gross Sales (Rp),Platform Fee 10% (Rp),Net Revenue (Rp)\n")
+	buf.WriteString("ID Booking,Kode Invoice,Nama Paket,Pelanggan,Tanggal Trip,Status,Gross Sales (Rp),Platform Fee 15% + Biaya Layanan (Rp),Net Revenue Provider (Rp)\n")
 
 	var totalGross int64 = 0
+	var totalFee int64 = 0
 	var totalNet int64 = 0
 
 	for _, b := range bookings {
-		fee := b.TotalPrice * 10 / 100
-		net := b.TotalPrice - fee
+		adminFee := int64(5000)
+		if b.TotalPrice < adminFee {
+			adminFee = 0
+		}
+		packageGross := b.TotalPrice - adminFee
+		commission := packageGross * 15 / 100
+		fee := commission + adminFee
+		net := packageGross - commission
 		totalGross += b.TotalPrice
+		totalFee += fee
 		totalNet += net
 
 		pkgName := "Paket Wisata"
@@ -64,7 +73,7 @@ func (s *ExcelService) GenerateProviderFinanceCSV(provider *models.Provider, boo
 			net,
 		))
 	}
-	buf.WriteString(fmt.Sprintf("TOTAL AUDIT,,,,,,%d,%d,%d\n\n", totalGross, totalGross*10/100, totalNet))
+	buf.WriteString(fmt.Sprintf("TOTAL AUDIT,,,,,,%d,%d,%d\n\n", totalGross, totalFee, totalNet))
 
 	// Section 2: Payouts & Disbursement History
 	buf.WriteString("2. RIWAYAT PENCAIRAN DANA (PAYOUT DISBURSEMENT)\n")
@@ -79,7 +88,7 @@ func (s *ExcelService) GenerateProviderFinanceCSV(provider *models.Provider, boo
 			payoutTypeLabel = "Pelunasan Sisa (50%)"
 		}
 
-		amountInt := int64(p.Amount)
+		amountInt := p.Amount
 		totalDisbursed += amountInt
 
 		buf.WriteString(fmt.Sprintf("%d,\"%s\",\"%s\",\"%s\",\"%s\",%s,%s,%d\n",
@@ -99,5 +108,9 @@ func (s *ExcelService) GenerateProviderFinanceCSV(provider *models.Provider, boo
 }
 
 func sanitizeCSV(s string) string {
-	return fmt.Sprintf("%v", s)
+	s = strings.ReplaceAll(strings.ReplaceAll(s, "\r", " "), "\n", " ")
+	if len(s) > 0 && strings.ContainsRune("=+-@", rune(s[0])) {
+		s = "'" + s
+	}
+	return strings.ReplaceAll(s, `"`, `""`)
 }

@@ -21,7 +21,6 @@ export type Route =
   | 'keuangan-provider'
   | 'customer-confirmation'
   | 'halaman-pembayaran'
-  | 'xendit-checkout'
   | 'provider-public-profile'
   | 'admin-login'
   | 'pengaturan';
@@ -33,6 +32,8 @@ export interface Booking {
   bookingCode?: string;
   customerName: string;
   customerInitial: string;
+  customerEmail?: string;
+  customerPhone?: string;
   package: string;
   tripDate: string;
   guests: number;
@@ -41,7 +42,7 @@ export interface Booking {
   paymentMethod?: string;
   paymentUrl?: string;
   rawEndDate?: string;
-  status: 'PENDING_PAYMENT' | 'WAITING_CONFIRMATION' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED';
+  status: 'PENDING_PAYMENT' | 'WAITING_CONFIRMATION' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED' | 'RESCHEDULE_OFFERED';
 }
 
 export interface PopularPackage {

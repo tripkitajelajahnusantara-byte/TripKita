@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"time"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
 )
@@ -10,20 +11,28 @@ type PackageService interface {
 	CreatePackage(providerID uint, req *models.CreatePackageRequest) (*models.Package, error)
 	GetAllPackages(providerID uint) ([]models.Package, error)
 	GetAllPublic() ([]models.Package, error)
+	GetPublicProviderProfile(id uint) (*models.PublicProviderProfile, error)
 	GetPackageByID(id uint, providerID uint) (*models.Package, error)
 	UpdatePackage(id uint, providerID uint, req *models.UpdatePackageRequest) (*models.Package, error)
 	DeletePackage(id uint, providerID uint) error
 }
 
 type packageService struct {
-	repo repositories.PackageRepository
+	repo         repositories.PackageRepository
+	providerRepo repositories.ProviderRepository
 }
 
-func NewPackageService(repo repositories.PackageRepository) PackageService {
-	return &packageService{repo: repo}
+func NewPackageService(repo repositories.PackageRepository, providerRepo repositories.ProviderRepository) PackageService {
+	return &packageService{repo: repo, providerRepo: providerRepo}
 }
 
 func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackageRequest) (*models.Package, error) {
+	if req.Price <= 0 {
+		return nil, fmt.Errorf("harga paket harus lebih besar dari 0")
+	}
+	if req.Price > 1_000_000_000_000 || req.QuotaMax > 10_000 {
+		return nil, fmt.Errorf("harga atau kuota paket melebihi batas yang diizinkan")
+	}
 	if req.QuotaMax <= 0 {
 		return nil, fmt.Errorf("kuota maksimal harus lebih besar dari 0")
 	}
@@ -32,6 +41,15 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 	}
 	if req.QuotaMax < req.QuotaMin {
 		return nil, fmt.Errorf("kuota maksimal (%d) tidak boleh lebih kecil dari kuota minimal (%d)", req.QuotaMax, req.QuotaMin)
+	}
+	if req.MaxGuests > 0 && req.MinGuests > req.MaxGuests {
+		return nil, fmt.Errorf("jumlah tamu minimal tidak boleh melebihi jumlah tamu maksimal")
+	}
+	if req.MaxAge > 0 && req.MinAge > req.MaxAge {
+		return nil, fmt.Errorf("usia minimal tidak boleh melebihi usia maksimal")
+	}
+	if err := validatePackageDates(req.StartDate, req.EndDate); err != nil {
+		return nil, err
 	}
 
 	pkg := &models.Package{
@@ -78,6 +96,10 @@ func (s *packageService) GetAllPublic() ([]models.Package, error) {
 	return s.repo.FindAllPublic()
 }
 
+func (s *packageService) GetPublicProviderProfile(id uint) (*models.PublicProviderProfile, error) {
+	return s.providerRepo.FindPublicByID(id)
+}
+
 func (s *packageService) GetPackageByID(id uint, providerID uint) (*models.Package, error) {
 	return s.repo.FindByIDAndProvider(id, providerID)
 }
@@ -103,7 +125,16 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	if req.TripType != "" {
 		pkg.TripType = req.TripType
 	}
-	if req.Price != 0 {
+	if req.Price < 0 || req.QuotaMin < 0 || req.QuotaMax < 0 || req.Duration < 0 || req.MinGuests < 0 || req.MaxGuests < 0 || req.MinAge < 0 || req.MaxAge < 0 {
+		return nil, fmt.Errorf("nilai harga, kuota, durasi, jumlah tamu, dan usia tidak boleh negatif")
+	}
+	if req.Price > 1_000_000_000_000 || req.QuotaMax > 10_000 {
+		return nil, fmt.Errorf("harga atau kuota paket melebihi batas yang diizinkan")
+	}
+	if req.Status != "" && req.Status != "Aktif" && req.Status != "Draft" && req.Status != "Nonaktif" {
+		return nil, fmt.Errorf("status paket tidak valid")
+	}
+	if req.Price > 0 {
 		pkg.Price = req.Price
 	}
 	if req.QuotaMin != 0 {
@@ -124,6 +155,9 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	if req.EndDate != "" {
 		pkg.EndDate = req.EndDate
 	}
+	if err := validatePackageDates(pkg.StartDate, pkg.EndDate); err != nil {
+		return nil, err
+	}
 	if req.Schedule != "" {
 		pkg.Schedule = req.Schedule
 	}
@@ -141,6 +175,12 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	}
 	if req.MaxAge != 0 {
 		pkg.MaxAge = req.MaxAge
+	}
+	if pkg.MaxGuests > 0 && pkg.MinGuests > pkg.MaxGuests {
+		return nil, fmt.Errorf("jumlah tamu minimal tidak boleh melebihi jumlah tamu maksimal")
+	}
+	if pkg.MaxAge > 0 && pkg.MinAge > pkg.MaxAge {
+		return nil, fmt.Errorf("usia minimal tidak boleh melebihi usia maksimal")
 	}
 	if req.Status != "" {
 		pkg.Status = req.Status
@@ -170,6 +210,27 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	}
 
 	return pkg, nil
+}
+
+func validatePackageDates(startDate, endDate string) error {
+	var start, end time.Time
+	var err error
+	if startDate != "" {
+		start, err = time.Parse("2006-01-02", startDate)
+		if err != nil {
+			return fmt.Errorf("tanggal mulai paket harus berformat YYYY-MM-DD")
+		}
+	}
+	if endDate != "" {
+		end, err = time.Parse("2006-01-02", endDate)
+		if err != nil {
+			return fmt.Errorf("tanggal selesai paket harus berformat YYYY-MM-DD")
+		}
+	}
+	if !start.IsZero() && !end.IsZero() && end.Before(start) {
+		return fmt.Errorf("tanggal selesai paket tidak boleh sebelum tanggal mulai")
+	}
+	return nil
 }
 
 func (s *packageService) DeletePackage(id uint, providerID uint) error {

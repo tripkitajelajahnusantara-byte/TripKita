@@ -92,7 +92,7 @@ export const ProviderLandingPage: React.FC = () => {
               </div>
               <div className="widget-footer-pill">
                 <TrendingUp size={14} color="#00a896" />
-                <span>Pendapatan rata-rata partner: <strong>Rp 28.5 Juta/bulan</strong></span>
+                <span>Kelola paket dan pencairan dana melalui dashboard partner</span>
               </div>
             </div>
           </div>

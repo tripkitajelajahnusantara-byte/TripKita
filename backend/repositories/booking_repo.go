@@ -49,9 +49,8 @@ func (r *bookingRepository) FindAll() ([]models.Booking, error) {
 
 func (r *bookingRepository) FindAllByProvider(providerID uint) ([]models.Booking, error) {
 	var bookings []models.Booking
-	threeMonthsAgo := time.Now().AddDate(0, -3, 0)
 	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Where("provider_id = ? AND (created_at >= ? OR created_at IS NULL)", providerID, threeMonthsAgo).
+		Where("provider_id = ?", providerID).
 		Order("id desc").Find(&bookings).Error
 	return bookings, err
 }
@@ -142,8 +141,11 @@ func (r *bookingRepository) SumRevenueByProvider(providerID uint) (int64, error)
 func (r *bookingRepository) FindAllByCustomer(customerID uint) ([]models.Booking, error) {
 	var bookings []models.Booking
 	threeMonthsAgo := time.Now().AddDate(0, -3, 0)
-	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Where("customer_id = ? AND (created_at >= ? OR created_at IS NULL)", customerID, threeMonthsAgo).
-		Order("id desc").Find(&bookings).Error
+	err := r.db.Model(&models.Booking{}).
+		Select("bookings.*, providers.whats_app AS provider_whats_app, providers.business_name AS provider_name").
+		Joins("JOIN providers ON providers.id = bookings.provider_id").
+		Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Where("bookings.customer_id = ? AND (bookings.created_at >= ? OR bookings.created_at IS NULL)", customerID, threeMonthsAgo).
+		Order("bookings.id desc").Find(&bookings).Error
 	return bookings, err
 }

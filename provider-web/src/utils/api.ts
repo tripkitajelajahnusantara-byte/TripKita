@@ -3,26 +3,30 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
     ? '/api/v1'
     : 'http://localhost:8080/api/v1');
 
-export const HOST_BASE_URL = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
-
-
 export function getProviderToken(): string | null {
-  return localStorage.getItem('tementrip_partner_token') ||
-         localStorage.getItem('tripkita_partner_token') ||
-         localStorage.getItem('tripkita_provider_token') ||
-         localStorage.getItem('tripkita_token') ||
-         localStorage.getItem('provider_token') ||
-         localStorage.getItem('token');
+  const sessionToken = sessionStorage.getItem('tementrip_partner_token');
+  if (sessionToken) return sessionToken;
+
+  const legacyToken = localStorage.getItem('tementrip_partner_token') ||
+    localStorage.getItem('tripkita_partner_token') ||
+    localStorage.getItem('tripkita_provider_token') ||
+    localStorage.getItem('tripkita_token') ||
+    localStorage.getItem('provider_token') ||
+    localStorage.getItem('token');
+  if (legacyToken) {
+    removeProviderToken();
+    sessionStorage.setItem('tementrip_partner_token', legacyToken);
+  }
+  return legacyToken;
 }
 
 export function setProviderToken(token: string) {
-  localStorage.setItem('tementrip_partner_token', token);
-  localStorage.setItem('tripkita_partner_token', token);
-  localStorage.setItem('tripkita_provider_token', token);
-  localStorage.setItem('tripkita_token', token);
+	removeProviderToken();
+	sessionStorage.setItem('tementrip_partner_token', token);
 }
 
 export function removeProviderToken() {
+	sessionStorage.removeItem('tementrip_partner_token');
   localStorage.removeItem('tementrip_partner_token');
   localStorage.removeItem('tripkita_partner_token');
   localStorage.removeItem('tripkita_provider_token');
@@ -32,17 +36,26 @@ export function removeProviderToken() {
 }
 
 export function getCustomerToken(): string | null {
-  return localStorage.getItem('tementrip_customer_token') ||
-         localStorage.getItem('tripkita_customer_token') ||
-         localStorage.getItem('customer_token');
+  const sessionToken = sessionStorage.getItem('tementrip_customer_token');
+  if (sessionToken) return sessionToken;
+
+  const legacyToken = localStorage.getItem('tementrip_customer_token') ||
+	localStorage.getItem('tripkita_customer_token') ||
+	localStorage.getItem('customer_token');
+  if (legacyToken) {
+	removeCustomerToken();
+	sessionStorage.setItem('tementrip_customer_token', legacyToken);
+  }
+  return legacyToken;
 }
 
 export function setCustomerToken(token: string) {
-  localStorage.setItem('tementrip_customer_token', token);
-  localStorage.setItem('tripkita_customer_token', token);
+	removeCustomerToken();
+	sessionStorage.setItem('tementrip_customer_token', token);
 }
 
 export function removeCustomerToken() {
+	sessionStorage.removeItem('tementrip_customer_token');
   localStorage.removeItem('tementrip_customer_token');
   localStorage.removeItem('tripkita_customer_token');
   localStorage.removeItem('customer_token');
@@ -70,7 +83,7 @@ export function removeAuthToken() {
 }
 
 export function getAuthHeaders(): Record<string, string> {
-  const token = getProviderToken() || getCustomerToken();
+  const token = getAuthToken();
   const headers: Record<string, string> = {};
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -115,5 +128,49 @@ export async function request(endpoint: string, options: RequestInit = {}) {
   }
 
   return response.json().catch(() => ({}));
+}
+
+export async function getProtectedDocumentURL(scope: 'provider' | 'admin', documentPath: string): Promise<string> {
+  const token = getProviderToken();
+  if (!token) {
+    throw new Error('Sesi login tidak ditemukan');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/${scope}/documents?path=${encodeURIComponent(documentPath)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Dokumen tidak dapat dibuka');
+  }
+  return URL.createObjectURL(await response.blob());
+}
+
+export async function openProtectedDocument(scope: 'provider' | 'admin', documentPath: string): Promise<void> {
+  const objectURL = await getProtectedDocumentURL(scope, documentPath);
+  openObjectURL(objectURL);
+}
+
+export async function openProtectedFile(endpoint: string): Promise<void> {
+  const token = getProviderToken();
+  if (!token) throw new Error('Sesi login tidak ditemukan');
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'File tidak dapat dibuka');
+  }
+  openObjectURL(URL.createObjectURL(await response.blob()));
+}
+
+function openObjectURL(objectURL: string): void {
+  const link = document.createElement('a');
+  link.href = objectURL;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(objectURL), 60_000);
 }
 
