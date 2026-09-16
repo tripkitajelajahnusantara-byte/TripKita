@@ -24,7 +24,35 @@ export type Route =
   | 'xendit-checkout'
   | 'provider-public-profile'
   | 'admin-login'
-  | 'pengaturan';
+  | 'pengaturan'
+  | 'rencana-trip';
+
+export interface TripChecklistItem {
+  id: string;
+  label: string;
+  completed: boolean;
+}
+
+export interface TripSavingsLog {
+  id: string;
+  date: string;
+  amount: number;
+  note?: string;
+}
+
+export interface TripPlan {
+  id: string;
+  destination: string;
+  targetMonth: string; // "YYYY-MM" format e.g. "2026-12"
+  targetMonthLabel: string; // e.g. "Desember 2026"
+  participants: number;
+  targetBudget: number;
+  savedAmount: number;
+  checklist: TripChecklistItem[];
+  savingsLogs: TripSavingsLog[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Booking {
   id: string;

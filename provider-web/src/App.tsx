@@ -26,6 +26,7 @@ import { CustomerXenditCheckoutPage } from './pages/CustomerXenditCheckoutPage';
 import { ProviderFinancePage } from './pages/ProviderFinancePage';
 import { ProviderPublicProfilePage } from './pages/ProviderPublicProfilePage';
 import { CustomerSettingsPage } from './pages/CustomerSettingsPage';
+import { CustomerTripPlannerPage } from './pages/CustomerTripPlannerPage';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from './components/LegalModals';
 
 const AppContent: React.FC = () => {
@@ -264,6 +265,7 @@ const AppContent: React.FC = () => {
         {route === 'tentang-kami' && <AboutPage />}
         {route === 'bantuan' && <CustomerHelpPage />}
         {route === 'pengaturan' && <CustomerSettingsPage />}
+        {route === 'rencana-trip' && <CustomerTripPlannerPage />}
       </main>
       <Footer />
       {renderGlobalTermsModal()}

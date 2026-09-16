@@ -39,6 +39,7 @@ export function getRouteFromHash(): Route {
   if (hash.includes('/customer-register') || hash.includes('/daftar')) return 'customer-register';
   if (hash.includes('/masuk')) return 'masuk';
   if (hash.includes('/pengaturan')) return 'pengaturan';
+  if (hash.includes('/rencana-trip')) return 'rencana-trip';
 
   return 'beranda';
 }
@@ -69,6 +70,7 @@ export function getHashFromRoute(r: Route): string {
     case 'customer-register': return '#/customer-register';
     case 'masuk': return '#/masuk';
     case 'pengaturan': return '#/pengaturan';
+    case 'rencana-trip': return '#/rencana-trip';
     default: return '#/';
   }
 }

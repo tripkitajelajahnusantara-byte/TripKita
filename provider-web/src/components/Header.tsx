@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { Menu, X, User, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, X, User, Settings, LogOut, ChevronDown, Target } from 'lucide-react';
 import { NotificationCenter } from './NotificationCenter';
 
 export const Header: React.FC = () => {
@@ -149,6 +149,31 @@ export const Header: React.FC = () => {
                           {customerProfile.email || ''}
                         </span>
                       </div>
+
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          navigateTo('rencana-trip');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          color: '#0f8b8d',
+                          fontSize: '13.5px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e6f4f4'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <Target size={16} color="#0f8b8d" /> Rencana Trip
+                      </button>
 
                       <button
                         onClick={() => {
