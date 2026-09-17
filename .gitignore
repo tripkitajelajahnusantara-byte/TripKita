@@ -39,3 +39,14 @@ build/
 .flutter-plugins
 .flutter-plugins-dependencies
 
+
+# Build artefak & keluaran tooling yang tidak boleh masuk repository
+tsc_output.txt
+.vite/
+*.tsbuildinfo
+backend/main
+backend/tripkita-provider*
+
+# Dokumen identitas / berkas verifikasi tidak boleh pernah masuk repository
+ktp.jpg
+*_ktp.*

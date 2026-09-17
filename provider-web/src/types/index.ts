@@ -69,11 +69,12 @@ export interface Booking {
   tripDate: string;
   guests: number;
   totalPrice: string;
-  dpAmount?: string;
   paymentMethod?: string;
+  createdAt?: string;
+  paidAt?: string;
   paymentUrl?: string;
   rawEndDate?: string;
-  status: 'PENDING_PAYMENT' | 'WAITING_CONFIRMATION' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED' | 'RESCHEDULE_OFFERED';
+  status: 'PENDING_PAYMENT' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED' | 'RESCHEDULE_OFFERED';
 }
 
 export interface PopularPackage {

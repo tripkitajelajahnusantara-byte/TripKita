@@ -73,8 +73,9 @@ export const ManageBookingPage: React.FC = () => {
           tripDate: b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
           guests: b.guests || 1,
           totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice || 0),
-          dpAmount: b.dpAmount ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.dpAmount) : '—',
-          paymentMethod: b.paymentMethod || 'Transfer Bank',
+          paymentMethod: b.paymentMethod || 'Xendit Invoice',
+          createdAt: b.createdAt || '',
+          paidAt: b.updatedAt || '',
           paymentUrl: b.paymentUrl,
           rawEndDate: b.endDate || b.tripDate,
           status: b.status,
@@ -173,7 +174,7 @@ export const ManageBookingPage: React.FC = () => {
       return;
     }
 
-    const headers = ['Kode Booking', 'Nama Pelanggan', 'Paket Wisata', 'Tanggal Trip', 'Jumlah Peserta', 'Total Harga', 'DP', 'Status', 'Metode Pembayaran'];
+    const headers = ['Kode Booking', 'Nama Pelanggan', 'Paket Wisata', 'Tanggal Trip', 'Jumlah Peserta', 'Total Harga', 'Status', 'Metode Pembayaran'];
     const rows = bookings.map(b => [
       `"${b.bookingCode || b.id || ''}"`,
       `"${b.customerName || ''}"`,
@@ -181,7 +182,6 @@ export const ManageBookingPage: React.FC = () => {
       `"${b.tripDate || ''}"`,
       `"${b.guests || 1}"`,
       `"${b.totalPrice || 0}"`,
-      `"${b.dpAmount || '-'}"`,
       `"${b.status || ''}"`,
       `"${b.paymentMethod || ''}"`
     ]);
@@ -287,7 +287,6 @@ export const ManageBookingPage: React.FC = () => {
                   <th>TGL TRIP</th>
                   <th>PESERTA</th>
                   <th>TOTAL</th>
-                  <th>DP</th>
                   <th>STATUS</th>
                   <th style={{ textAlign: 'center' }}>AKSI</th>
                 </tr>
@@ -330,7 +329,6 @@ export const ManageBookingPage: React.FC = () => {
                       <td className="price-cell">{b.totalPrice}</td>
                       <td>
                         <div className="dp-cell">
-                          <span className="dp-amount">{b.dpAmount}</span>
                           <span className="dp-method">{b.paymentMethod}</span>
                         </div>
                       </td>
@@ -515,43 +513,36 @@ export const ManageBookingPage: React.FC = () => {
                         <span style={{ fontWeight: 600, color: '#0f172a' }}>{selectedBooking.totalPrice}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                        <span style={{ color: '#64748b' }}>Uang Muka (DP):</span>
-                        <span style={{ fontWeight: 600, color: '#00a896' }}>{selectedBooking.dpAmount !== '—' ? selectedBooking.dpAmount : '—'}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                         <span style={{ color: '#64748b' }}>Metode:</span>
                         <span style={{ fontWeight: 500, color: '#1e293b' }}>{selectedBooking.paymentMethod || 'Transfer Bank'}</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Proof of Payment Preview */}
+                  {/* Status Pembayaran (data sebenarnya dari payment gateway) */}
                   <div className="detail-item">
-                    <span className="detail-label">Bukti Pembayaran</span>
+                    <span className="detail-label">Status Pembayaran</span>
                     <div className="proof-preview-container" style={{ display: 'block', padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginTop: '4px' }}>
-                      <div style={{ textAlign: 'center', borderBottom: '1px dashed #cbd5e1', paddingBottom: '6px', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '8px', fontWeight: 700, color: '#64748b', letterSpacing: '0.5px' }}>E-RECEIPT TRANSFER</span>
-                      </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: '#64748b' }}>Pengirim:</span>
-                          <span style={{ fontWeight: 600, color: '#1e293b' }}>{selectedBooking.customerName}</span>
+                          <span style={{ color: '#64748b' }}>Dibayar Pelanggan:</span>
+                          <span style={{ fontWeight: 700, color: '#10b981' }}>{selectedBooking.totalPrice}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: '#64748b' }}>Tujuan:</span>
-                          <span style={{ fontWeight: 600, color: '#1e293b' }}>BCA - TEMENTRIP</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: '#64748b' }}>Jumlah:</span>
-                          <span style={{ fontWeight: 700, color: '#10b981' }}>{selectedBooking.dpAmount !== '—' ? selectedBooking.dpAmount : selectedBooking.totalPrice}</span>
+                          <span style={{ color: '#64748b' }}>Kanal:</span>
+                          <span style={{ fontWeight: 600, color: '#1e293b' }}>{selectedBooking.paymentMethod}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#64748b' }}>Status:</span>
-                          <span style={{ fontWeight: 700, color: isCancelled ? '#ef4444' : '#10b981' }}>
-                            {isCancelled ? 'BATAL' : 'BERHASIL'}
+                          <span style={{ fontWeight: 700, color: isCancelled ? '#ef4444' : (isPending ? '#f59e0b' : '#10b981') }}>
+                            {isCancelled ? 'BATAL' : (isPending ? 'MENUNGGU PEMBAYARAN' : 'LUNAS')}
                           </span>
                         </div>
                       </div>
+                      <p style={{ margin: '8px 0 0', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontSize: '9px', color: '#64748b', lineHeight: 1.5 }}>
+                        Pelanggan membayar penuh di muka melalui payment gateway. Dana diteruskan ke Anda
+                        melalui menu Keuangan sesuai jadwal pencairan, bukan melalui transfer langsung.
+                      </p>
                     </div>
                   </div>
 
@@ -569,8 +560,8 @@ export const ManageBookingPage: React.FC = () => {
                       <div className="timeline-step">
                         <div className="timeline-dot active"></div>
                         <div className="timeline-content">
-                          <span className="timeline-title">Uang Muka (DP) Diterima Sistem</span>
-                          <span className="timeline-time">1 Hari Lalu • BCA Transfer</span>
+                          <span className="timeline-title">Pembayaran Diterima Sistem</span>
+                          <span className="timeline-time">{selectedBooking.paymentMethod}</span>
                         </div>
                       </div>
                       {isCancelled ? (
@@ -640,11 +631,6 @@ export const ManageBookingPage: React.FC = () => {
         .dp-cell {
           display: flex;
           flex-direction: column;
-        }
-
-        .dp-amount {
-          font-weight: 600;
-          color: var(--color-primary-medium);
         }
 
         .dp-method {

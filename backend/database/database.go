@@ -10,7 +10,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 
 	"tripkita-provider/config"
@@ -57,8 +56,8 @@ func ConnectDB(cfg *config.Config) {
 	if err != nil {
 		log.Fatalf("Gagal menyiapkan connection pool database: %v", err)
 	}
-	sqlDB.SetMaxOpenConns(25)
-	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(cfg.DBMaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.DBMaxIdleConns)
 	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 	sqlDB.SetConnMaxLifetime(30 * time.Minute)
 
@@ -75,6 +74,7 @@ func ConnectDB(cfg *config.Config) {
 			&models.Notification{},
 			&models.HeldSettlement{},
 			&models.OAuthLoginCode{},
+			&models.RefundRecord{},
 		)
 		if err != nil {
 			log.Fatalf("Migrasi database gagal: %v", err)
@@ -82,41 +82,42 @@ func ConnectDB(cfg *config.Config) {
 		fmt.Println("Migrasi database selesai")
 
 		// Ensure RLS (Row Level Security) is enabled on all tables for Supabase security compliance
-		DB.Exec(`ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;`)
-		DB.Exec(`ALTER TABLE IF EXISTS bookings ENABLE ROW LEVEL SECURITY;`)
-		DB.Exec(`ALTER TABLE IF EXISTS packages ENABLE ROW LEVEL SECURITY;`)
-		DB.Exec(`ALTER TABLE IF EXISTS providers ENABLE ROW LEVEL SECURITY;`)
-		DB.Exec(`ALTER TABLE IF EXISTS payouts ENABLE ROW LEVEL SECURITY;`)
-		DB.Exec(`ALTER TABLE IF EXISTS reviews ENABLE ROW LEVEL SECURITY;`)
-		DB.Exec(`ALTER TABLE IF EXISTS held_settlements ENABLE ROW LEVEL SECURITY;`)
-		DB.Exec(`ALTER TABLE IF EXISTS provider_balances ENABLE ROW LEVEL SECURITY;`)
-		DB.Exec(`ALTER TABLE IF EXISTS provider_status_histories ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS bookings ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS packages ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS providers ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS payouts ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS reviews ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS held_settlements ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS provider_balances ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS provider_status_histories ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS refund_records ENABLE ROW LEVEL SECURITY;`)
 
 		// Pastikan kolom meeting_point, customer_email, customer_phone, description, included_facilities, excluded_facilities, itinerary ada di database Supabase
-		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS meeting_point TEXT;`)
-		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS description TEXT;`)
-		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS included_facilities TEXT;`)
-		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS excluded_facilities TEXT;`)
-		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS itinerary TEXT;`)
-		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 1;`)
-		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_guests INTEGER DEFAULT 1;`)
-		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_guests INTEGER DEFAULT 10;`)
-		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_age INTEGER DEFAULT 0;`)
-		DB.Exec(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_age INTEGER DEFAULT 100;`)
-		DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT;`)
-		DB.Exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT;`)
+		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS meeting_point TEXT;`)
+		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS description TEXT;`)
+		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS included_facilities TEXT;`)
+		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS excluded_facilities TEXT;`)
+		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS itinerary TEXT;`)
+		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 1;`)
+		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_guests INTEGER DEFAULT 1;`)
+		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_guests INTEGER DEFAULT 10;`)
+		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_age INTEGER DEFAULT 0;`)
+		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_age INTEGER DEFAULT 100;`)
+		execMigration(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT;`)
+		execMigration(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT;`)
 
 		// Update data titik kumpul spesifik untuk paket yang belum memiliki meeting_point
-		DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Bandung Door Selatan, Jl. Stasiun Barat No.1, Pasirkaliki, Kota Bandung, Jawa Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bandung%'`)
-		DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Malang Kota Baru (Door Depan Utama), Jl. Trunojoyo No.10, Klojen, Kota Malang, Jawa Timur' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bromo%'`)
-		DB.Exec(`UPDATE packages SET meeting_point = 'Dermaga 16 Marina Ancol, Jl. Lodan Timur No.7, Pademangan, Jakarta Utara' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Tidung%'`)
-		DB.Exec(`UPDATE packages SET meeting_point = 'Alfamart Melati Indah, Cengkareng / Rest Area Ciawi Km.45, Bogor, Jawa Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Cilember%'`)
-		DB.Exec(`UPDATE packages SET meeting_point = 'Stasiun Tugu Yogyakarta (Door Timur), Sosromenduran, Gedongtengen, Kota Yogyakarta, DI Yogyakarta' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Yogyakarta%'`)
-		DB.Exec(`UPDATE packages SET meeting_point = 'Bandara Marinda Waisai, Kabupaten Raja Ampat, Papua Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Raja Ampat%'`)
-		DB.Exec(`UPDATE packages SET meeting_point = 'Bandara Internasional I Gusti Ngurah Rai (Door Kedatangan Domestik), Badung, Bali' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bali%'`)
+		execMigration(`UPDATE packages SET meeting_point = 'Stasiun Bandung Door Selatan, Jl. Stasiun Barat No.1, Pasirkaliki, Kota Bandung, Jawa Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bandung%'`)
+		execMigration(`UPDATE packages SET meeting_point = 'Stasiun Malang Kota Baru (Door Depan Utama), Jl. Trunojoyo No.10, Klojen, Kota Malang, Jawa Timur' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bromo%'`)
+		execMigration(`UPDATE packages SET meeting_point = 'Dermaga 16 Marina Ancol, Jl. Lodan Timur No.7, Pademangan, Jakarta Utara' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Tidung%'`)
+		execMigration(`UPDATE packages SET meeting_point = 'Alfamart Melati Indah, Cengkareng / Rest Area Ciawi Km.45, Bogor, Jawa Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Cilember%'`)
+		execMigration(`UPDATE packages SET meeting_point = 'Stasiun Tugu Yogyakarta (Door Timur), Sosromenduran, Gedongtengen, Kota Yogyakarta, DI Yogyakarta' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Yogyakarta%'`)
+		execMigration(`UPDATE packages SET meeting_point = 'Bandara Marinda Waisai, Kabupaten Raja Ampat, Papua Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Raja Ampat%'`)
+		execMigration(`UPDATE packages SET meeting_point = 'Bandara Internasional I Gusti Ngurah Rai (Door Kedatangan Domestik), Badung, Bali' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bali%'`)
 
 		// Reset hardcoded 5.0 ratings for packages without reviews
-		DB.Exec(`UPDATE packages SET rating = 0 WHERE NOT EXISTS (SELECT 1 FROM reviews WHERE reviews.package_id = packages.id)`)
+		execMigration(`UPDATE packages SET rating = 0 WHERE NOT EXISTS (SELECT 1 FROM reviews WHERE reviews.package_id = packages.id)`)
 	}
 
 	// Data demo tidak pernah dibuat otomatis di production.
@@ -129,121 +130,19 @@ func ConnectDB(cfg *config.Config) {
 		EnsureAllTestProvidersAndSeats()
 	}
 
-	if cfg.EnableJobs {
-		StartPeriodicCleanup()
-	}
 }
 
-func CleanOldBookings() {
-	log.Println("[Pembersihan] Penghapusan booking lama dinonaktifkan; data transaksi wajib dipertahankan untuk audit.")
-}
-
-func ExpirePendingBookings() {
-	cutoff := time.Now().Add(-24 * time.Hour)
-	var candidates []models.Booking
-	if err := DB.Select("id").Where("status = ? AND created_at < ?", "PENDING_PAYMENT", cutoff).Find(&candidates).Error; err != nil {
-		log.Printf("[Auto Expire] Gagal mencari booking kedaluwarsa: %v", err)
-		return
-	}
-
-	expired := 0
-	for _, candidate := range candidates {
-		err := DB.Transaction(func(tx *gorm.DB) error {
-			var booking models.Booking
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-				Where("id = ? AND status = ? AND created_at < ?", candidate.ID, "PENDING_PAYMENT", cutoff).
-				First(&booking).Error; err != nil {
-				return err
-			}
-			if err := tx.Model(&booking).Update("status", "EXPIRED").Error; err != nil {
-				return err
-			}
-			return tx.Exec(`
-				UPDATE packages p
-				SET quota_used = COALESCE((
-					SELECT SUM(b.guests) FROM bookings b
-					WHERE b.package_id = p.id
-					AND b.status IN ('PENDING_PAYMENT', 'WAITING_CONFIRMATION', 'PAID', 'CONFIRMED', 'COMPLETED')
-				), 0)
-				WHERE p.id = ?
-			`, booking.PackageID).Error
-		})
-		if err != nil {
-			if err != gorm.ErrRecordNotFound {
-				log.Printf("[Auto Expire] Booking %d gagal diproses: %v", candidate.ID, err)
-			}
-			continue
+// execMigration menjalankan pernyataan penyesuaian skema dan mencatat
+// kegagalannya. Sebelumnya error diabaikan diam-diam, sehingga skema yang gagal
+// berubah baru ketahuan sebagai error runtime yang menyesatkan.
+func execMigration(statement string) {
+	if err := DB.Exec(statement).Error; err != nil {
+		summary := strings.Join(strings.Fields(statement), " ")
+		if len(summary) > 120 {
+			summary = summary[:120] + "..."
 		}
-		expired++
+		log.Printf("[Migrasi] Pernyataan gagal (%s): %v", summary, err)
 	}
-	if expired > 0 {
-		log.Printf("[Auto Expire] %d booking kedaluwarsa dan kuota dilepas.", expired)
-	}
-}
-
-func AutoCompleteFinishedBookings() {
-	cutoff := time.Now().Add(-24 * time.Hour)
-	var finishedBookings []models.Booking
-	if err := DB.Select("id").Where("status IN ? AND trip_date < ?", []string{"PAID", "CONFIRMED"}, cutoff).Find(&finishedBookings).Error; err != nil {
-		log.Printf("[Auto Complete] Gagal mencari booking selesai: %v", err)
-		return
-	}
-
-	completed := 0
-	for _, candidate := range finishedBookings {
-		err := DB.Transaction(func(tx *gorm.DB) error {
-			var booking models.Booking
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND status IN ? AND trip_date < ?", candidate.ID, []string{"PAID", "CONFIRMED"}, cutoff).First(&booking).Error; err != nil {
-				return err
-			}
-			if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", int64(booking.ProviderID)+1_000_000_000).Error; err != nil {
-				return err
-			}
-			var settlement models.HeldSettlement
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("booking_id = ? AND status = ?", booking.ID, "HELD").First(&settlement).Error; err == nil {
-				result := tx.Model(&models.ProviderBalance{}).Where("provider_id = ? AND held_balance >= ?", booking.ProviderID, settlement.Amount).Updates(map[string]interface{}{
-					"available_balance": gorm.Expr("available_balance + ?", settlement.Amount),
-					"held_balance":      gorm.Expr("held_balance - ?", settlement.Amount),
-					"updated_at":        time.Now(),
-				})
-				if result.Error != nil || result.RowsAffected != 1 {
-					return fmt.Errorf("saldo provider %d tidak konsisten", booking.ProviderID)
-				}
-				settlement.Status = "RELEASED"
-				if err := tx.Save(&settlement).Error; err != nil {
-					return err
-				}
-			} else if err != gorm.ErrRecordNotFound {
-				return err
-			}
-			return tx.Model(&booking).Update("status", "COMPLETED").Error
-		})
-		if err != nil {
-			if err != gorm.ErrRecordNotFound {
-				log.Printf("[Auto Complete] Booking %d gagal diproses: %v", candidate.ID, err)
-			}
-			continue
-		}
-		completed++
-	}
-	if completed > 0 {
-		log.Printf("[Auto Complete] %d booking diselesaikan dan settlement dilepas.", completed)
-	}
-}
-
-func StartPeriodicCleanup() {
-	go func() {
-		// Transaksi lama tidak boleh dihapus otomatis karena dibutuhkan untuk audit.
-		ExpirePendingBookings()
-		AutoCompleteFinishedBookings()
-
-		// Jalankan pembersihan berkala di latar belakang setiap 1 jam
-		ticker := time.NewTicker(1 * time.Hour)
-		for range ticker.C {
-			ExpirePendingBookings()
-			AutoCompleteFinishedBookings()
-		}
-	}()
 }
 
 func SeedDatabase() {
@@ -696,7 +595,6 @@ func SeedDatabase() {
 			TripDate:        time.Now().AddDate(0, 0, 10),
 			Guests:          2,
 			TotalPrice:      700000,
-			DPAmount:        140000,
 			PaymentMethod:   "Xendit Invoice",
 			Status:          "CONFIRMED",
 		},
@@ -709,10 +607,8 @@ func SeedDatabase() {
 			TripDate:        time.Now().AddDate(0, 0, 13),
 			Guests:          4,
 			TotalPrice:      1800000,
-			DPAmount:        360000,
 			PaymentMethod:   "Xendit Invoice",
 			Status:          "CONFIRMED",
-			PaymentProof:    "/uploads/bukti_dummy.png",
 		},
 		{
 			BookingCode:     "TK-20260906-7889",
@@ -723,7 +619,6 @@ func SeedDatabase() {
 			TripDate:        time.Now().AddDate(0, 0, 15),
 			Guests:          3,
 			TotalPrice:      825000,
-			DPAmount:        165000,
 			PaymentMethod:   "Manual Transfer",
 			Status:          "CONFIRMED",
 		},
@@ -736,7 +631,6 @@ func SeedDatabase() {
 			TripDate:        time.Now().AddDate(0, 0, 8),
 			Guests:          2,
 			TotalPrice:      400000,
-			DPAmount:        80000,
 			PaymentMethod:   "Manual Transfer",
 			Status:          "CONFIRMED",
 		},
@@ -1000,7 +894,7 @@ func EnsureAllTestProvidersAndSeats() {
 			SELECT SUM(b.guests)
 			FROM bookings b
 			WHERE b.package_id = p.id
-			AND b.status IN ('PENDING_PAYMENT', 'WAITING_CONFIRMATION', 'PAID', 'CONFIRMED', 'COMPLETED')
+			AND b.status IN ('PENDING_PAYMENT', 'PAID', 'CONFIRMED', 'COMPLETED')
 		), 0)
 	`).Error
 
@@ -1008,5 +902,20 @@ func EnsureAllTestProvidersAndSeats() {
 		log.Println("[DB Sync] Quota used successfully recalculated from active bookings.")
 	} else {
 		log.Printf("[DB Sync Error] Failed to sync quota used: %v", err)
+	}
+}
+
+// Close menutup connection pool database saat proses dihentikan agar koneksi
+// tidak menggantung di sisi server database.
+func Close() {
+	if DB == nil {
+		return
+	}
+	sqlDB, err := DB.DB()
+	if err != nil {
+		return
+	}
+	if err := sqlDB.Close(); err != nil {
+		log.Printf("Gagal menutup koneksi database: %v", err)
 	}
 }

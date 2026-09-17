@@ -49,7 +49,7 @@ export const NotificationCenter: React.FC = () => {
         method: 'PUT',
         headers: getAuthHeaders(),
       });
-    } catch (err) {
+    } catch {
       // ignore
     }
     setNotifications((prev) =>

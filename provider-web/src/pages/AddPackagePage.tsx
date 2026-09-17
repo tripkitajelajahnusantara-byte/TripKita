@@ -184,7 +184,7 @@ export const AddPackagePage: React.FC = () => {
             try {
               const parsed = JSON.parse(pkg.itinerary);
               if (Array.isArray(parsed) && parsed.length > 0) setItineraries(parsed);
-            } catch (e) {
+            } catch {
               // ignore
             }
           }

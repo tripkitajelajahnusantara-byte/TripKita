@@ -316,13 +316,6 @@ export const CustomerHistoryPage: React.FC = () => {
           bgColor: '#fffbeb',
           icon: <Clock size={14} color="#f59e0b" />
         };
-      case 'WAITING_CONFIRMATION':
-        return {
-          label: 'Lunas & Aktif',
-          color: '#10b981',
-          bgColor: '#ecfdf5',
-          icon: <CheckCircle2 size={14} color="#10b981" />
-        };
       case 'REFUND_REQUIRED':
         return {
           label: 'Proses Refund',

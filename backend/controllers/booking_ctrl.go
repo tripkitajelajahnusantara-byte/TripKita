@@ -607,7 +607,28 @@ func (ctrl *BookingController) GetRefunds(c *gin.Context) {
 		respondInternalError(c, "memuat daftar refund", err)
 		return
 	}
-	c.JSON(http.StatusOK, refunds)
+
+	bookingIDs := make([]uint, 0, len(refunds))
+	for _, refund := range refunds {
+		bookingIDs = append(bookingIDs, refund.ID)
+	}
+	records, err := ctrl.service.GetRefundRecords(bookingIDs)
+	if err != nil {
+		respondInternalError(c, "memuat catatan refund", err)
+		return
+	}
+
+	// Catatan audit disertakan agar admin melihat nominal, metode, referensi, dan
+	// pemroses tiap refund, bukan sekadar status booking.
+	response := make([]gin.H, 0, len(refunds))
+	for _, refund := range refunds {
+		item := gin.H{"booking": refund}
+		if record, ok := records[refund.ID]; ok {
+			item["refundRecord"] = record
+		}
+		response = append(response, item)
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 func (ctrl *BookingController) CompleteRefund(c *gin.Context) {
@@ -618,12 +639,32 @@ func (ctrl *BookingController) CompleteRefund(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.service.CompleteRefund(uint(id)); err != nil {
+	var req models.CompleteRefundRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Nominal, metode, dan nomor referensi transfer wajib diisi"})
+		return
+	}
+
+	// Identitas admin diambil dari token, tidak pernah dari badan permintaan,
+	// supaya catatan audit tidak dapat diatasnamakan orang lain.
+	adminID, exists := c.Get("provider_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi admin tidak valid"})
+		return
+	}
+
+	record, err := ctrl.service.CompleteRefund(uint(id), adminID.(uint), &req)
+	if err != nil {
+		var inputErr *services.BookingInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+			return
+		}
 		respondInternalError(c, "menyelesaikan refund", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Refund completed"})
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Refund completed", "record": record})
 }
 
 func (ctrl *BookingController) AdminListBookings(c *gin.Context) {
@@ -633,21 +674,4 @@ func (ctrl *BookingController) AdminListBookings(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, bookings)
-}
-
-func (ctrl *BookingController) AdminConfirmPayment(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
-		return
-	}
-
-	booking, err := ctrl.service.AdminConfirmPayment(uint(id))
-	if err != nil {
-		respondInternalError(c, "mengonfirmasi pembayaran manual", err)
-		return
-	}
-
-	c.JSON(http.StatusOK, booking)
 }

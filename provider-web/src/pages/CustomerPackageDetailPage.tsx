@@ -57,15 +57,17 @@ export const CustomerPackageDetailPage: React.FC = () => {
     if (match && match[1]) {
       const targetId = Number(match[1]);
       if (!selectedPackageForDetail || Number(selectedPackageForDetail.id) !== targetId) {
-        API_BASE_URL && fetch(`${API_BASE_URL}/public/packages`)
-          .then(res => res.json())
-          .then(data => {
-            if (Array.isArray(data)) {
-              const found = data.find((p: any) => Number(p.id) === targetId);
-              if (found) setSelectedPackageForDetail(found);
-            }
-          })
-          .catch(() => {});
+        if (API_BASE_URL) {
+          fetch(`${API_BASE_URL}/public/packages`)
+            .then(res => res.json())
+            .then(data => {
+              if (Array.isArray(data)) {
+                const found = data.find((p: any) => Number(p.id) === targetId);
+                if (found) setSelectedPackageForDetail(found);
+              }
+            })
+            .catch(() => {});
+        }
       }
     }
   }, []);
@@ -410,7 +412,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
           });
           if (list.length > 0) return list;
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }

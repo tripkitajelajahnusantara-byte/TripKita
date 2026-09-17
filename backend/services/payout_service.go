@@ -3,7 +3,11 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log"
+	"strconv"
+	"strings"
 	"time"
+	"tripkita-provider/config"
 	"tripkita-provider/database"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
@@ -17,23 +21,28 @@ type PayoutService interface {
 	GetProviderPayoutSummary(providerID uint) (*models.PayoutSummary, error)
 	GetAllPayouts() ([]models.Payout, error)
 	ProcessPayout(payoutID uint, status string, notes string, proofPath string) (*models.Payout, error)
+	HandlePayoutCallback(payoutID string, referenceID string, status string, failureCode string) error
 }
 
 type payoutService struct {
-	payoutRepo   repositories.PayoutRepository
-	providerRepo repositories.ProviderRepository
-	bookingRepo  repositories.BookingRepository
-	emailService *EmailService
-	notifService *NotificationService
+	payoutRepo    repositories.PayoutRepository
+	providerRepo  repositories.ProviderRepository
+	bookingRepo   repositories.BookingRepository
+	emailService  *EmailService
+	notifService  *NotificationService
+	xenditService XenditService
+	cfg           *config.Config
 }
 
-func NewPayoutService(payoutRepo repositories.PayoutRepository, providerRepo repositories.ProviderRepository, bookingRepo repositories.BookingRepository, emailService *EmailService, notifService *NotificationService) PayoutService {
+func NewPayoutService(payoutRepo repositories.PayoutRepository, providerRepo repositories.ProviderRepository, bookingRepo repositories.BookingRepository, emailService *EmailService, notifService *NotificationService, xenditService XenditService, cfg *config.Config) PayoutService {
 	return &payoutService{
-		payoutRepo:   payoutRepo,
-		providerRepo: providerRepo,
-		bookingRepo:  bookingRepo,
-		emailService: emailService,
-		notifService: notifService,
+		payoutRepo:    payoutRepo,
+		providerRepo:  providerRepo,
+		bookingRepo:   bookingRepo,
+		emailService:  emailService,
+		notifService:  notifService,
+		xenditService: xenditService,
+		cfg:           cfg,
 	}
 }
 
@@ -157,20 +166,20 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 	var pendingPayout int64
 
 	for _, p := range payouts {
-		if p.Status == "APPROVED" {
+		switch p.Status {
+		case models.PayoutStatusApproved:
 			totalPaidOut += p.Amount
-			if p.Type == "DP_50" {
-				dpPaidOut += p.Amount
-			} else {
-				pelunasanPaidOut += p.Amount
-			}
-		} else if p.Status == "PENDING" {
+		case models.PayoutStatusPending, models.PayoutStatusProcessing:
+			// Dana sudah dipesan meski belum sampai ke rekening mitra.
 			pendingPayout += p.Amount
-			if p.Type == "DP_50" {
-				dpPaidOut += p.Amount
-			} else {
-				pelunasanPaidOut += p.Amount
-			}
+		default:
+			// REJECTED dan FAILED melepas kembali dananya.
+			continue
+		}
+		if p.Type == "DP_50" {
+			dpPaidOut += p.Amount
+		} else {
+			pelunasanPaidOut += p.Amount
 		}
 	}
 
@@ -184,6 +193,13 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 		availablePelunasan = 0
 	}
 
+	ledger, err := GetLedgerBalance(database.DB, providerID)
+	if err != nil {
+		return nil, err
+	}
+	// Pengajuan PENDING sudah dipotong dari hak cair tetapi belum dari buku besar.
+	expectedAvailable := availableDP + availablePelunasan + pendingPayout
+
 	return &models.PayoutSummary{
 		TotalEarnings:      grossOmset,
 		PlatformFee:        totalPlatformFee,
@@ -194,6 +210,9 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 		TotalPaidOut:       totalPaidOut,
 		PendingPayout:      pendingPayout,
 		Payouts:            payouts,
+		LedgerAvailable:    ledger.Available,
+		LedgerHeld:         ledger.Held,
+		LedgerConsistent:   ledger.Available == expectedAvailable && ledger.Held == heldSettlement,
 	}, nil
 }
 
@@ -201,20 +220,41 @@ func (s *payoutService) GetAllPayouts() ([]models.Payout, error) {
 	return s.payoutRepo.GetAll()
 }
 
+// ProcessPayout menindaklanjuti pengajuan pencairan dari admin.
+//
+// Saat ENABLE_AUTOMATIC_PAYOUT aktif, persetujuan mengirim instruksi transfer ke
+// payment gateway dan pengajuan berhenti di status PROCESSING sampai callback
+// menyatakan dana benar-benar sampai. Saat flag mati, perilakunya tetap seperti
+// semula: admin mentransfer manual lalu mencatat buktinya.
 func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string, proofPath string) (*models.Payout, error) {
+	automatic := s.cfg != nil && s.cfg.EnableAutoPayout && status == models.PayoutStatusApproved
+
 	var payout models.Payout
+	var channelCode string
+
+	// Tahap 1: kunci pengajuan, potong buku besar, lalu tandai status transisi.
+	// Dana dipesan sebelum instruksi dikirim supaya kegagalan di tengah jalan
+	// tidak pernah menghasilkan transfer yang tidak tercatat.
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&payout, payoutID).Error; err != nil {
 			return errors.New("payout request not found")
 		}
-		if payout.Status != "PENDING" {
+		if payout.Status != models.PayoutStatusPending {
 			return errors.New("payout sudah diproses dan tidak dapat diubah kembali")
 		}
 		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", int64(payout.ProviderID)+1_000_000_000).Error; err != nil {
 			return err
 		}
 
-		if status == "APPROVED" {
+		updates := map[string]interface{}{
+			"notes":      notes,
+			"updated_at": time.Now(),
+		}
+		if proofPath != "" {
+			updates["proof_path"] = proofPath
+		}
+
+		if status == models.PayoutStatusApproved {
 			available, err := availablePayoutAmountTx(tx, &payout)
 			if err != nil {
 				return err
@@ -222,22 +262,168 @@ func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string
 			if payout.Amount > available {
 				return errors.New("saldo payout berubah dan tidak lagi mencukupi; tolak pengajuan ini lalu minta provider mengajukan ulang")
 			}
+			// Buku besar wajib ikut berkurang. Tanpa ini ProviderBalance hanya
+			// bertambah dan tidak pernah mencerminkan dana yang sudah dicairkan.
+			if err := debitProviderBalanceTx(tx, payout.ProviderID, payout.Amount); err != nil {
+				return err
+			}
+
+			if automatic {
+				code, err := ResolveBankChannelCode(payout.BankName)
+				if err != nil {
+					return err
+				}
+				channelCode = code
+				updates["status"] = models.PayoutStatusProcessing
+				updates["channel_code"] = code
+			} else {
+				updates["status"] = models.PayoutStatusApproved
+			}
+		} else {
+			updates["status"] = status
 		}
 
-		updates := map[string]interface{}{
-			"status":     status,
-			"notes":      notes,
-			"updated_at": time.Now(),
-		}
-		if proofPath != "" {
-			updates["proof_path"] = proofPath
-		}
 		return tx.Model(&payout).Updates(updates).Error
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	if !automatic {
+		return s.payoutRepo.GetByID(payoutID)
+	}
+
+	// Tahap 2: kirim instruksi ke gateway di luar transaksi database, supaya
+	// panggilan jaringan yang lambat tidak menahan lock baris pencairan.
+	result, sendErr := s.xenditService.CreatePayout(XenditPayoutRequest{
+		ReferenceID:       payoutReferenceID(payoutID),
+		ChannelCode:       channelCode,
+		AccountNumber:     payout.BankAccount,
+		AccountHolderName: payout.BankAccountName,
+		Amount:            payout.Amount,
+		Description:       fmt.Sprintf("Pencairan TemenTrip #%d (%s)", payoutID, payout.Type),
+	})
+	if sendErr != nil {
+		// Instruksi ditolak gateway: pengajuan dikembalikan agar dapat diulang,
+		// dan saldo yang sempat dipotong dikembalikan ke buku besar.
+		if failErr := s.markPayoutFailed(payoutID, "", sendErr.Error()); failErr != nil {
+			log.Printf("[Payout] Payout %d gagal dikirim dan gagal dikembalikan: %v", payoutID, failErr)
+		}
+		return nil, fmt.Errorf("pencairan tidak dapat dikirim: %w", sendErr)
+	}
+
+	if err := database.DB.Model(&models.Payout{}).
+		Where("id = ? AND status = ?", payoutID, models.PayoutStatusProcessing).
+		Updates(map[string]interface{}{
+			"xendit_payout_id": result.ID,
+			"updated_at":       time.Now(),
+		}).Error; err != nil {
+		// Instruksi sudah terkirim; kehilangan id hanya menyulitkan penelusuran,
+		// jadi dicatat keras dan tidak membatalkan pencairan.
+		log.Printf("[Payout] PENTING: payout %d terkirim ke gateway (id=%s) tetapi id gagal disimpan: %v", payoutID, result.ID, err)
+	}
+
+	log.Printf("[Payout] Payout %d dikirim ke gateway id=%s status=%s", payoutID, result.ID, result.Status)
 	return s.payoutRepo.GetByID(payoutID)
+}
+
+// HandlePayoutCallback menerapkan hasil akhir pencairan dari payment gateway.
+// Operasi ini idempoten: callback yang sama dikirim ulang tidak mengubah apa pun.
+func (s *payoutService) HandlePayoutCallback(gatewayPayoutID string, referenceID string, status string, failureCode string) error {
+	payoutID, err := payoutIDFromReference(referenceID)
+	if err != nil {
+		return err
+	}
+
+	switch strings.ToUpper(status) {
+	case "SUCCEEDED", "COMPLETED":
+		result := database.DB.Model(&models.Payout{}).
+			Where("id = ? AND status = ?", payoutID, models.PayoutStatusProcessing).
+			Updates(map[string]interface{}{
+				"status":           models.PayoutStatusApproved,
+				"xendit_payout_id": gatewayPayoutID,
+				"updated_at":       time.Now(),
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 1 {
+			log.Printf("[Payout] Payout %d dikonfirmasi berhasil oleh gateway.", payoutID)
+		}
+		return nil
+
+	case "FAILED", "REVERSED", "CANCELLED":
+		return s.markPayoutFailed(payoutID, gatewayPayoutID, failureCode)
+
+	default:
+		// Status antara (mis. ACCEPTED/PENDING) tidak mengubah apa pun.
+		return nil
+	}
+}
+
+// markPayoutFailed mengembalikan dana yang sudah dipotong ke buku besar dan
+// menandai pengajuan sebagai gagal, sekali saja.
+func (s *payoutService) markPayoutFailed(payoutID uint, gatewayPayoutID string, failureCode string) error {
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var payout models.Payout
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&payout, payoutID).Error; err != nil {
+			return err
+		}
+		if payout.Status != models.PayoutStatusProcessing {
+			// Sudah difinalkan sebelumnya; tidak ada yang perlu dikembalikan.
+			return nil
+		}
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", int64(payout.ProviderID)+1_000_000_000).Error; err != nil {
+			return err
+		}
+		if err := creditProviderBalanceTx(tx, payout.ProviderID, payout.Amount); err != nil {
+			return err
+		}
+
+		updates := map[string]interface{}{
+			"status":       models.PayoutStatusFailed,
+			"failure_code": truncateText(failureCode, 100),
+			"updated_at":   time.Now(),
+		}
+		if gatewayPayoutID != "" {
+			updates["xendit_payout_id"] = gatewayPayoutID
+		}
+		if err := tx.Model(&payout).Updates(updates).Error; err != nil {
+			return err
+		}
+		log.Printf("[Payout] Payout %d gagal (%s); saldo dikembalikan ke provider %d.", payoutID, failureCode, payout.ProviderID)
+		return nil
+	})
+}
+
+// ErrUnknownPayoutReference menandai callback yang tidak merujuk pencairan milik
+// kita. Ini kesalahan permanen, sehingga pemanggil menjawab 4xx agar gateway
+// berhenti mengirim ulang event yang tidak akan pernah berhasil.
+var ErrUnknownPayoutReference = errors.New("reference id pencairan tidak dikenali")
+
+const payoutReferencePrefix = "tementrip-payout-"
+
+func payoutReferenceID(payoutID uint) string {
+	return fmt.Sprintf("%s%d", payoutReferencePrefix, payoutID)
+}
+
+func payoutIDFromReference(referenceID string) (uint, error) {
+	trimmed := strings.TrimSpace(referenceID)
+	if !strings.HasPrefix(trimmed, payoutReferencePrefix) {
+		return 0, ErrUnknownPayoutReference
+	}
+	value, err := strconv.ParseUint(strings.TrimPrefix(trimmed, payoutReferencePrefix), 10, 32)
+	if err != nil || value == 0 {
+		return 0, ErrUnknownPayoutReference
+	}
+	return uint(value), nil
+}
+
+func truncateText(value string, max int) string {
+	if len(value) <= max {
+		return value
+	}
+	return value[:max]
 }
 
 func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error) {
@@ -264,7 +450,7 @@ func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error)
 
 	var reserved int64
 	if err := tx.Model(&models.Payout{}).
-		Where("provider_id = ? AND type = ? AND id <> ? AND status IN ?", current.ProviderID, current.Type, current.ID, []string{"PENDING", "APPROVED"}).
+		Where("provider_id = ? AND type = ? AND id <> ? AND status IN ?", current.ProviderID, current.Type, current.ID, models.PayoutReservedStatuses).
 		Select("COALESCE(SUM(amount), 0)").Scan(&reserved).Error; err != nil {
 		return 0, err
 	}
@@ -273,4 +459,66 @@ func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error)
 		return 0, nil
 	}
 	return available, nil
+}
+
+// debitProviderBalanceTx mengurangi saldo tersedia provider saat pencairan
+// disetujui. Pengurangan dijaga di level SQL (available_balance >= amount)
+// sehingga dua persetujuan bersamaan tidak dapat menghasilkan saldo negatif.
+func debitProviderBalanceTx(tx *gorm.DB, providerID uint, amount int64) error {
+	result := tx.Model(&models.ProviderBalance{}).
+		Where("provider_id = ? AND available_balance >= ?", providerID, amount).
+		Updates(map[string]interface{}{
+			"available_balance": gorm.Expr("available_balance - ?", amount),
+			"updated_at":        time.Now(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return fmt.Errorf("saldo buku besar provider tidak mencukupi untuk pencairan sebesar %d", amount)
+	}
+	return nil
+}
+
+// LedgerBalance adalah saldo provider menurut buku besar (ProviderBalance).
+type LedgerBalance struct {
+	Available int64
+	Held      int64
+	Earned    int64
+}
+
+// GetLedgerBalance membaca saldo buku besar provider. Nilai nol dikembalikan
+// bila provider belum pernah memiliki transaksi.
+func GetLedgerBalance(db *gorm.DB, providerID uint) (LedgerBalance, error) {
+	var balance models.ProviderBalance
+	err := db.Where("provider_id = ?", providerID).First(&balance).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return LedgerBalance{}, nil
+	}
+	if err != nil {
+		return LedgerBalance{}, err
+	}
+	return LedgerBalance{
+		Available: balance.AvailableBalance,
+		Held:      balance.HeldBalance,
+		Earned:    balance.TotalEarned,
+	}, nil
+}
+
+// creditProviderBalanceTx mengembalikan dana ke saldo tersedia provider saat
+// pencairan gagal di payment gateway.
+func creditProviderBalanceTx(tx *gorm.DB, providerID uint, amount int64) error {
+	result := tx.Model(&models.ProviderBalance{}).
+		Where("provider_id = ?", providerID).
+		Updates(map[string]interface{}{
+			"available_balance": gorm.Expr("available_balance + ?", amount),
+			"updated_at":        time.Now(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return fmt.Errorf("saldo provider %d tidak ditemukan saat pengembalian dana", providerID)
+	}
+	return nil
 }

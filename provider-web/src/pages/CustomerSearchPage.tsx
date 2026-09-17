@@ -142,7 +142,7 @@ export const CustomerSearchPage: React.FC = () => {
   };
 
   // Filter packages based on active search parameters
-  let processedPackages = packages.filter((pkg) => {
+  const processedPackages = packages.filter((pkg) => {
     if (searchParams.destination && !pkg.destination.toLowerCase().includes(searchParams.destination.toLowerCase())) {
       return false;
     }

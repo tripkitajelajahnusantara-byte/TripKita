@@ -26,12 +26,12 @@ type BookingService interface {
 	CancelBookingByCustomer(id uint, customerID uint) (*models.Booking, error)
 	UpdateStatusByWebhook(invoiceID string, externalID string, xenditStatus string, paymentMethod string, amount int64, currency string) error
 	GetRefunds() ([]models.Booking, error)
-	CompleteRefund(id uint) error
+	CompleteRefund(bookingID uint, adminID uint, req *models.CompleteRefundRequest) (*models.RefundRecord, error)
+	GetRefundRecords(bookingIDs []uint) (map[uint]models.RefundRecord, error)
 	GetBookingByID(id uint) (*models.Booking, error)
 	GetCustomerBookings(customerID uint) ([]models.Booking, error)
 	GetBookingByCode(code string) (*models.Booking, error)
 	AdminGetAllBookings() ([]models.Booking, error)
-	AdminConfirmPayment(id uint) (*models.Booking, error)
 }
 
 type bookingService struct {
@@ -384,7 +384,6 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		booking.ProviderID = pkg.ProviderID
 		const serviceFee int64 = 5000
 		booking.TotalPrice = int64(booking.Guests)*pkg.Price + addOnTotal + serviceFee
-		booking.DPAmount = booking.TotalPrice / 2
 		booking.Status = "PENDING_PAYMENT"
 		booking.PaymentMethod = "Xendit Invoice"
 		booking.BookingCode = ""
@@ -464,28 +463,88 @@ func (s *bookingService) GetRefunds() ([]models.Booking, error) {
 	return s.repo.FindAllRefunds()
 }
 
-func (s *bookingService) CompleteRefund(id uint) error {
-	booking, err := s.repo.FindByID(id)
-	if err != nil {
-		return err
-	}
-	if booking.Status != "REFUND_REQUIRED" {
-		return fmt.Errorf("hanya refund yang masih menunggu proses yang dapat diselesaikan")
-	}
-	oldStatus := booking.Status
-	result := database.DB.Model(&models.Booking{}).Where("id = ? AND status = ?", id, "REFUND_REQUIRED").Updates(map[string]interface{}{
-		"status":     "REFUNDED",
-		"updated_at": time.Now(),
+// CompleteRefund mencatat bahwa dana benar-benar sudah dikembalikan ke pelanggan.
+//
+// Penyelesaian refund menuntut nominal, metode, referensi transfer, dan identitas
+// admin yang memprosesnya. Sebelumnya fungsi ini hanya membalik status booking,
+// sehingga booking dapat ditandai REFUNDED tanpa ada dana yang berpindah dan
+// tanpa jejak yang dapat diaudit.
+func (s *bookingService) CompleteRefund(bookingID uint, adminID uint, req *models.CompleteRefundRequest) (*models.RefundRecord, error) {
+	var booking models.Booking
+	var record models.RefundRecord
+
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var admin models.Provider
+		if err := tx.Select("id", "email").First(&admin, adminID).Error; err != nil {
+			return fmt.Errorf("akun admin pemroses tidak ditemukan")
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&booking, bookingID).Error; err != nil {
+			return err
+		}
+		if booking.Status != models.StatusRefundRequired {
+			return &BookingInputError{Message: "hanya refund yang masih menunggu proses yang dapat diselesaikan"}
+		}
+		if req.Amount > booking.RefundAmount {
+			return &BookingInputError{Message: fmt.Sprintf("nominal refund melebihi hak pelanggan sebesar %d", booking.RefundAmount)}
+		}
+
+		record = models.RefundRecord{
+			BookingID:        booking.ID,
+			EntitledAmount:   booking.RefundAmount,
+			Amount:           req.Amount,
+			Method:           req.Method,
+			Reference:        strings.TrimSpace(req.Reference),
+			Notes:            strings.TrimSpace(req.Notes),
+			ProcessedByID:    admin.ID,
+			ProcessedByEmail: admin.Email,
+			ProcessedAt:      time.Now(),
+		}
+		// Unique index pada booking_id menolak pencatatan ganda meski dua admin
+		// menekan tombol bersamaan.
+		if err := tx.Create(&record).Error; err != nil {
+			return fmt.Errorf("refund untuk booking ini sudah pernah dicatat: %w", err)
+		}
+
+		result := tx.Model(&models.Booking{}).
+			Where("id = ? AND status = ?", bookingID, models.StatusRefundRequired).
+			Updates(map[string]interface{}{
+				"status":     models.StatusRefunded,
+				"updated_at": time.Now(),
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return fmt.Errorf("refund sudah diproses atau status telah berubah")
+		}
+		return nil
 	})
-	if result.Error != nil {
-		return result.Error
+	if err != nil {
+		return nil, err
 	}
-	if result.RowsAffected != 1 {
-		return fmt.Errorf("refund sudah diproses atau status telah berubah")
+
+	log.Printf("[Refund] Booking %d selesai: nominal=%d metode=%s admin=%d", bookingID, req.Amount, req.Method, adminID)
+
+	booking.Status = models.StatusRefunded
+	s.sendNotificationsAndEmails(&booking, models.StatusRefundRequired, models.StatusRefunded)
+	return &record, nil
+}
+
+// GetRefundRecords mengembalikan catatan refund untuk sekumpulan booking,
+// dipetakan berdasarkan booking id.
+func (s *bookingService) GetRefundRecords(bookingIDs []uint) (map[uint]models.RefundRecord, error) {
+	records := make(map[uint]models.RefundRecord)
+	if len(bookingIDs) == 0 {
+		return records, nil
 	}
-	booking.Status = "REFUNDED"
-	s.sendNotificationsAndEmails(booking, oldStatus, "REFUNDED")
-	return nil
+	var rows []models.RefundRecord
+	if err := database.DB.Where("booking_id IN ?", bookingIDs).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		records[row.BookingID] = row
+	}
+	return records, nil
 }
 
 func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID string, xenditStatus string, paymentMethod string, amount int64, currency string) error {
@@ -603,7 +662,7 @@ func recalculatePackageQuotaTx(tx *gorm.DB, packageID uint) error {
 		SET quota_used = COALESCE((
 			SELECT SUM(b.guests) FROM bookings b
 			WHERE b.package_id = p.id
-			AND b.status IN ('PENDING_PAYMENT', 'WAITING_CONFIRMATION', 'PAID', 'CONFIRMED', 'COMPLETED')
+			AND b.status IN ('PENDING_PAYMENT', 'PAID', 'CONFIRMED', 'COMPLETED')
 		), 0)
 		WHERE p.id = ?
 	`, packageID).Error
@@ -622,32 +681,6 @@ func (s *bookingService) adjustQuota(booking *models.Booking, oldStatus, newStat
 
 func (s *bookingService) AdminGetAllBookings() ([]models.Booking, error) {
 	return s.repo.FindAll()
-}
-
-func (s *bookingService) AdminConfirmPayment(id uint) (*models.Booking, error) {
-	var booking models.Booking
-	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&booking, id).Error; err != nil {
-			return err
-		}
-		if booking.Status != "WAITING_CONFIRMATION" {
-			return fmt.Errorf("hanya pembayaran manual yang menunggu verifikasi yang dapat dikonfirmasi")
-		}
-		if err := recordFinanceOnPaymentTx(tx, &booking); err != nil {
-			return err
-		}
-		booking.Status = "CONFIRMED"
-		booking.PaymentMethod = "Manual Transfer"
-		if err := tx.Save(&booking).Error; err != nil {
-			return err
-		}
-		return recalculatePackageQuotaTx(tx, booking.PackageID)
-	})
-	if err != nil {
-		return nil, err
-	}
-	s.sendNotificationsAndEmails(&booking, "WAITING_CONFIRMATION", "CONFIRMED")
-	return &booking, nil
 }
 
 func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, oldStatus, newStatus string) {

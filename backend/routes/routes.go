@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -10,16 +11,15 @@ import (
 	"tripkita-provider/config"
 	"tripkita-provider/controllers"
 	"tripkita-provider/middleware"
-	"tripkita-provider/repositories"
 	"tripkita-provider/services"
 )
 
-func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
+func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.Engine {
 	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.New()
-	r.Use(middleware.AccessLogger(), middleware.SafeRecovery())
+	r.Use(middleware.RequestID(), middleware.AccessLogger(), middleware.SafeRecovery())
 	if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		panic("TRUSTED_PROXIES tidak valid: " + err.Error())
 	}
@@ -28,47 +28,30 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	r.Use(middleware.SecurityHeaders(), middleware.CORSMiddleware(cfg), middleware.RequestSizeLimit(10*1024*1024))
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 	r.GET("/readyz", func(c *gin.Context) {
+		// Probe dibatasi waktu agar database yang menggantung tidak menahan
+		// worker health check sampai server timeout.
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		defer cancel()
 		sqlDB, err := db.DB()
-		if err != nil || sqlDB.PingContext(c.Request.Context()) != nil {
+		if err != nil || sqlDB.PingContext(ctx) != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not_ready"})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
 
-	// Initialize Repositories
-	providerRepo := repositories.NewProviderRepository(db)
-	packageRepo := repositories.NewPackageRepository(db)
-	bookingRepo := repositories.NewBookingRepository(db)
-	payoutRepo := repositories.NewPayoutRepository(db)
-	reviewRepo := repositories.NewReviewRepository(db)
-
-	// Initialize Services
-	pdfService := services.NewPDFService()
-	emailService := services.NewEmailService(cfg, pdfService)
-	excelService := services.NewExcelService()
-	notifService := services.NewNotificationService(db)
-
-	authService := services.NewAuthService(providerRepo, cfg, emailService)
-	adminService := services.NewAdminService(providerRepo)
-	packageService := services.NewPackageService(packageRepo, providerRepo)
-	xenditService := services.NewXenditService(cfg)
-	bookingService := services.NewBookingService(bookingRepo, packageRepo, xenditService, emailService, notifService)
-	dashboardService := services.NewDashboardService(packageRepo, bookingRepo, providerRepo)
-	payoutService := services.NewPayoutService(payoutRepo, providerRepo, bookingRepo, emailService, notifService)
-	reviewService := services.NewReviewService(reviewRepo, bookingRepo, packageRepo)
-
-	// Initialize Controllers
-	authCtrl := controllers.NewAuthController(authService, cfg)
-	adminCtrl := controllers.NewAdminController(adminService)
-	packageCtrl := controllers.NewPackageController(packageService)
-	bookingCtrl := controllers.NewBookingController(bookingService, cfg)
-	dashboardCtrl := controllers.NewDashboardController(dashboardService)
+	// Seluruh service dibangun sekali di services.Container agar router HTTP dan
+	// job latar belakang berbagi instance yang sama.
+	authCtrl := controllers.NewAuthController(c.AuthService, cfg)
+	adminCtrl := controllers.NewAdminController(c.AdminService)
+	packageCtrl := controllers.NewPackageController(c.PackageService)
+	bookingCtrl := controllers.NewBookingController(c.BookingService, cfg)
+	dashboardCtrl := controllers.NewDashboardController(c.DashService)
 	uploadCtrl := controllers.NewUploadController(db)
 	oauthCtrl := controllers.NewOAuthController(db, cfg)
-	payoutCtrl := controllers.NewPayoutController(payoutService, excelService, pdfService, providerRepo, bookingRepo, payoutRepo)
-	reviewCtrl := controllers.NewReviewController(reviewService)
-	notifCtrl := controllers.NewNotificationController(notifService)
+	payoutCtrl := controllers.NewPayoutController(c.PayoutService, c.ExcelService, c.PDFService, c.ProviderRepo, c.BookingRepo, c.PayoutRepo, cfg)
+	reviewCtrl := controllers.NewReviewController(c.ReviewService)
+	notifCtrl := controllers.NewNotificationController(c.NotifService)
 
 	// Dokumen verifikasi tidak boleh menjadi file publik di production.
 	if !cfg.IsProduction() {
@@ -94,6 +77,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			public.POST("/bookings", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.CreateBooking)
 			public.GET("/bookings/status/:code", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.GetPublicStatus)
 			public.POST("/webhooks/xendit", middleware.RateLimit(120, time.Minute), bookingCtrl.XenditWebhook)
+			public.POST("/webhooks/xendit/payout", middleware.RateLimit(120, time.Minute), payoutCtrl.XenditPayoutWebhook)
 
 			if cfg.EnableDevMocks {
 				public.GET("/xendit-mock-checkout/:id", bookingCtrl.RenderMockCheckout)
@@ -178,7 +162,6 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			admin.GET("/refunds", bookingCtrl.GetRefunds)
 			admin.POST("/refunds/:id/complete", bookingCtrl.CompleteRefund)
 			admin.GET("/bookings", bookingCtrl.AdminListBookings)
-			admin.PUT("/bookings/:id/confirm-payment", bookingCtrl.AdminConfirmPayment)
 
 			// Admin Payout management
 			admin.GET("/payouts", payoutCtrl.AdminGetAllPayouts)

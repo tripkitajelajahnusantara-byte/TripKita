@@ -91,12 +91,47 @@ export function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
+/** Batas waktu permintaan supaya UI tidak menggantung saat jaringan atau API bermasalah. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/** Error API yang membawa status HTTP dan request id untuk pelaporan gangguan. */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly requestId: string | null;
+
+  constructor(message: string, status: number, requestId: string | null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.requestId = requestId;
+  }
+}
+
+/**
+ * Sesi yang sudah tidak berlaku dibersihkan lalu pengguna diarahkan ke halaman
+ * masuk yang sesuai, agar tidak terjebak pada layar yang terus gagal memuat.
+ */
+function handleExpiredSession(isProviderRoute: boolean) {
+  if (typeof window === 'undefined') return;
+  if (isProviderRoute) {
+    removeProviderToken();
+    if (!window.location.hash.includes('/provider-login')) {
+      window.location.hash = '#/provider-login';
+    }
+    return;
+  }
+  removeCustomerToken();
+  if (!window.location.hash.includes('/masuk')) {
+    window.location.hash = '#/masuk';
+  }
+}
+
 export async function request(endpoint: string, options: RequestInit = {}) {
-  let token: string | null = null;
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
   const isProviderRoute = hash.includes('/provider') || hash.includes('/admin');
 
   // Decide which token to attach based on endpoint or current route
+  let token: string | null;
   if (endpoint.startsWith('/provider/profile')) {
     token = isProviderRoute ? getProviderToken() : (getCustomerToken() || getProviderToken());
   } else if (endpoint.startsWith('/provider') || endpoint.startsWith('/admin') || isProviderRoute) {
@@ -117,14 +152,40 @@ export async function request(endpoint: string, options: RequestInit = {}) {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const timeoutController = new AbortController();
+  const timeoutId = window.setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      signal: options.signal ?? timeoutController.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError' && !options.signal) {
+      throw new ApiError('Permintaan terlalu lama. Periksa koneksi Anda lalu coba lagi.', 0, null);
+    }
+    throw new ApiError('Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.', 0, null);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
+    const requestId = response.headers.get('X-Request-ID');
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+
+    // Token kedaluwarsa atau dicabut: bersihkan sesi dan arahkan ke halaman masuk.
+    if (response.status === 401 && token) {
+      handleExpiredSession(isProviderRoute);
+      throw new ApiError(errorData.error || 'Sesi Anda telah berakhir. Silakan masuk kembali.', 401, requestId);
+    }
+
+    throw new ApiError(
+      errorData.error || `Terjadi gangguan pada server (${response.status}).`,
+      response.status,
+      requestId,
+    );
   }
 
   return response.json().catch(() => ({}));

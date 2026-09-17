@@ -41,6 +41,10 @@ type Config struct {
 	RunMigrations      bool
 	SeedDatabase       bool
 	EnableJobs         bool
+	DBMaxOpenConns     int
+	DBMaxIdleConns     int
+	EnableAutoPayout   bool
+	XenditPayoutToken  string
 }
 
 func LoadConfig() (*Config, error) {
@@ -83,6 +87,14 @@ func LoadConfig() (*Config, error) {
 		RunMigrations:      getBoolEnv("RUN_MIGRATIONS", !isProduction),
 		SeedDatabase:       getBoolEnv("SEED_DB", false) && !isProduction,
 		EnableJobs:         getBoolEnv("ENABLE_BACKGROUND_JOBS", true),
+		// Pool dibuat dapat diatur karena batas koneksi database berbeda antar
+		// penyedia (mis. Supabase pooler) dan antar jumlah replica aplikasi.
+		DBMaxOpenConns: getIntEnv("DB_MAX_OPEN_CONNS", 25),
+		DBMaxIdleConns: getIntEnv("DB_MAX_IDLE_CONNS", 10),
+		// Pencairan otomatis memindahkan uang sungguhan, jadi default-nya mati
+		// dan harus dinyalakan secara sadar setelah saldo Xendit disiapkan.
+		EnableAutoPayout:  getBoolEnv("ENABLE_AUTOMATIC_PAYOUT", false),
+		XenditPayoutToken: getEnv("XENDIT_PAYOUT_WEBHOOK_TOKEN", getEnv("XENDIT_WEBHOOK_TOKEN", "")),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -109,6 +121,15 @@ func (c *Config) Validate() error {
 	}
 	if err := validatePort("PORT", c.Port); err != nil {
 		return err
+	}
+	if c.EnableAutoPayout && strings.TrimSpace(c.XenditPayoutToken) == "" {
+		return fmt.Errorf("XENDIT_PAYOUT_WEBHOOK_TOKEN wajib diisi saat ENABLE_AUTOMATIC_PAYOUT=true")
+	}
+	if c.DBMaxOpenConns < 1 {
+		return fmt.Errorf("DB_MAX_OPEN_CONNS wajib minimal 1")
+	}
+	if c.DBMaxIdleConns < 0 || c.DBMaxIdleConns > c.DBMaxOpenConns {
+		return fmt.Errorf("DB_MAX_IDLE_CONNS wajib antara 0 dan DB_MAX_OPEN_CONNS")
 	}
 	if c.DatabaseURL == "" && (c.DBHost == "" || c.DBUser == "" || c.DBPass == "" || c.DBName == "") {
 		return fmt.Errorf("konfigurasi database belum lengkap")
@@ -204,6 +225,18 @@ func getBoolEnv(key string, defaultVal bool) bool {
 		return defaultVal
 	}
 	parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+	if err != nil {
+		return defaultVal
+	}
+	return parsed
+}
+
+func getIntEnv(key string, defaultVal int) int {
+	value, exists := os.LookupEnv(key)
+	if !exists || strings.TrimSpace(value) == "" {
+		return defaultVal
+	}
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
 	if err != nil {
 		return defaultVal
 	}

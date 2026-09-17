@@ -5,13 +5,13 @@ import (
 )
 
 type DashboardStats struct {
-	TotalPackages      int64   `json:"totalPackages"`
-	TotalBookings      int64   `json:"totalBookings"`
-	PendingBookings    int64   `json:"pendingBookings"`
-	CompletedBookings  int64   `json:"completedBookings"`
-	TotalRevenue       int64   `json:"totalRevenue"`
-	Rating             float64 `json:"rating"`
-	ActivePackages     int64   `json:"activePackages"`
+	TotalPackages     int64   `json:"totalPackages"`
+	TotalBookings     int64   `json:"totalBookings"`
+	PendingBookings   int64   `json:"pendingBookings"`
+	CompletedBookings int64   `json:"completedBookings"`
+	TotalRevenue      int64   `json:"totalRevenue"`
+	Rating            float64 `json:"rating"`
+	ActivePackages    int64   `json:"activePackages"`
 }
 
 type DashboardService interface {
@@ -19,8 +19,8 @@ type DashboardService interface {
 }
 
 type dashboardService struct {
-	packageRepo repositories.PackageRepository
-	bookingRepo repositories.BookingRepository
+	packageRepo  repositories.PackageRepository
+	bookingRepo  repositories.BookingRepository
 	providerRepo repositories.ProviderRepository
 }
 

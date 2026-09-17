@@ -1,10 +1,14 @@
 package controllers
 
 import (
+	"crypto/subtle"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"tripkita-provider/config"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
 	"tripkita-provider/services"
@@ -13,6 +17,7 @@ import (
 )
 
 type PayoutController struct {
+	cfg          *config.Config
 	service      services.PayoutService
 	excelService *services.ExcelService
 	pdfService   *services.PDFService
@@ -28,8 +33,10 @@ func NewPayoutController(
 	providerRepo repositories.ProviderRepository,
 	bookingRepo repositories.BookingRepository,
 	payoutRepo repositories.PayoutRepository,
+	cfg *config.Config,
 ) *PayoutController {
 	return &PayoutController{
+		cfg:          cfg,
 		service:      service,
 		excelService: excelService,
 		pdfService:   pdfService,
@@ -175,4 +182,67 @@ func (ctrl *PayoutController) AdminProcessPayout(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, payout)
+}
+
+// XenditPayoutWebhook menerima status akhir pencairan dari payment gateway.
+//
+// Token callback dibandingkan constant-time seperti webhook pembayaran, dan
+// respons non-2xx sengaja dikembalikan saat pemrosesan gagal agar gateway
+// mengirim ulang eventnya.
+func (ctrl *PayoutController) XenditPayoutWebhook(c *gin.Context) {
+	expectedToken := ctrl.cfg.XenditPayoutToken
+	if expectedToken == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Webhook pencairan belum dikonfigurasi"})
+		return
+	}
+	callbackToken := c.GetHeader("x-callback-token")
+	if len(callbackToken) != len(expectedToken) || subtle.ConstantTimeCompare([]byte(callbackToken), []byte(expectedToken)) != 1 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Invalid Xendit callback token"})
+		return
+	}
+
+	// Payouts v2 membungkus payload di dalam "data"; sebagian event lama
+	// mengirim field di level teratas.
+	var req struct {
+		Event string `json:"event" binding:"max=100"`
+		Data  struct {
+			ID          string `json:"id" binding:"max=255"`
+			ReferenceID string `json:"reference_id" binding:"max=255"`
+			Status      string `json:"status" binding:"max=50"`
+			FailureCode string `json:"failure_code" binding:"max=100"`
+		} `json:"data"`
+		ID          string `json:"id" binding:"max=255"`
+		ReferenceID string `json:"reference_id" binding:"max=255"`
+		Status      string `json:"status" binding:"max=50"`
+		FailureCode string `json:"failure_code" binding:"max=100"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	payoutID, referenceID, status, failureCode := req.Data.ID, req.Data.ReferenceID, req.Data.Status, req.Data.FailureCode
+	if referenceID == "" {
+		payoutID, referenceID, status, failureCode = req.ID, req.ReferenceID, req.Status, req.FailureCode
+	}
+	if status == "" && req.Event != "" {
+		// Bentuk event: "payout.succeeded" / "payout.failed".
+		if parts := strings.Split(req.Event, "."); len(parts) == 2 {
+			status = parts[1]
+		}
+	}
+
+	if err := ctrl.service.HandlePayoutCallback(payoutID, referenceID, status, failureCode); err != nil {
+		// Reference asing tidak akan pernah berhasil diproses, jadi dijawab 4xx
+		// supaya gateway berhenti mengirim ulang. Kegagalan lain dijawab 5xx agar
+		// event dikirim ulang.
+		if errors.Is(err, services.ErrUnknownPayoutReference) {
+			log.Printf("[Payout Webhook] Callback dengan reference tidak dikenali diabaikan")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Reference pencairan tidak dikenali"})
+			return
+		}
+		respondInternalError(c, "memproses callback pencairan", err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

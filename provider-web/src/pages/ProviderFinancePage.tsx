@@ -21,7 +21,8 @@ interface PayoutItem {
   id: number;
   amount: number;
   type: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'FAILED' | 'REJECTED';
+  failureCode?: string;
   bankName: string;
   bankAccount: string;
   bankAccountName: string;
@@ -409,12 +410,26 @@ export const ProviderFinancePage: React.FC = () => {
                             borderRadius: '30px',
                             fontSize: '12px',
                             fontWeight: '700',
-                            backgroundColor: p.status === 'APPROVED' ? '#dcfce7' : p.status === 'REJECTED' ? '#fee2e2' : '#fef3c7',
-                            color: p.status === 'APPROVED' ? '#16a34a' : p.status === 'REJECTED' ? '#dc2626' : '#d97706'
+                            backgroundColor:
+                              p.status === 'APPROVED' ? '#dcfce7' :
+                              (p.status === 'REJECTED' || p.status === 'FAILED') ? '#fee2e2' :
+                              p.status === 'PROCESSING' ? '#e0f2fe' : '#fef3c7',
+                            color:
+                              p.status === 'APPROVED' ? '#16a34a' :
+                              (p.status === 'REJECTED' || p.status === 'FAILED') ? '#dc2626' :
+                              p.status === 'PROCESSING' ? '#0284c7' : '#d97706'
                           }}
                         >
-                          {p.status === 'APPROVED' ? '✓ Berhasil Transfer' : p.status === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Transfer Admin'}
+                          {p.status === 'APPROVED' ? '✓ Dana Diterima' :
+                           p.status === 'PROCESSING' ? '↻ Sedang Ditransfer' :
+                           p.status === 'FAILED' ? '✕ Transfer Gagal' :
+                           p.status === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Diproses'}
                         </span>
+                        {p.status === 'FAILED' && (
+                          <div style={{ marginTop: '4px', fontSize: '11px', color: '#dc2626' }}>
+                            Dana dikembalikan ke saldo Anda. Periksa data rekening lalu ajukan ulang.
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '14px 12px', color: '#64748b', fontSize: '13px' }}>
                         {p.notes || '-'}

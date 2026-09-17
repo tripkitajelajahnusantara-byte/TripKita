@@ -12,15 +12,34 @@ type Payout struct {
 	Booking         *Booking  `gorm:"foreignKey:BookingID" json:"booking,omitempty"`
 	Amount          int64     `gorm:"not null" json:"amount"`
 	Type            string    `gorm:"size:50;not null" json:"type"`                     // DP_50, PELUNASAN_50, FULL
-	Status          string    `gorm:"size:50;not null;default:'PENDING'" json:"status"` // PENDING, APPROVED, REJECTED
+	Status          string    `gorm:"size:50;not null;default:'PENDING'" json:"status"` // PENDING, PROCESSING, APPROVED, FAILED, REJECTED
 	BankName        string    `gorm:"size:100;not null" json:"bankName"`
 	BankAccount     string    `gorm:"size:100;not null" json:"bankAccount"`
 	BankAccountName string    `gorm:"size:255;not null" json:"bankAccountName"`
 	ProofPath       string    `gorm:"size:500" json:"proofPath"`
 	Notes           string    `gorm:"type:text" json:"notes"`
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
+
+	// Terisi hanya bila pencairan dikirim otomatis lewat payment gateway.
+	// XenditPayoutID juga menjadi penanda idempotensi agar satu pengajuan tidak
+	// pernah dikirim dua kali ke gateway.
+	XenditPayoutID string    `gorm:"size:255;index" json:"xenditPayoutId,omitempty"`
+	ChannelCode    string    `gorm:"size:50" json:"channelCode,omitempty"`
+	FailureCode    string    `gorm:"size:100" json:"failureCode,omitempty"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
+
+const (
+	PayoutStatusPending    = "PENDING"
+	PayoutStatusProcessing = "PROCESSING"
+	PayoutStatusApproved   = "APPROVED"
+	PayoutStatusFailed     = "FAILED"
+	PayoutStatusRejected   = "REJECTED"
+)
+
+// PayoutReservedStatuses adalah status yang dananya sudah dipesan dan tidak
+// boleh dihitung ulang sebagai saldo yang masih dapat dicairkan.
+var PayoutReservedStatuses = []string{PayoutStatusPending, PayoutStatusProcessing, PayoutStatusApproved}
 
 type CreatePayoutRequest struct {
 	Amount    int64  `json:"amount" binding:"required,gt=0"`
@@ -38,4 +57,10 @@ type PayoutSummary struct {
 	TotalPaidOut       int64    `json:"totalPaidOut"`
 	PendingPayout      int64    `json:"pendingPayout"`
 	Payouts            []Payout `json:"payouts"`
+
+	// Saldo menurut buku besar. Dibawa agar selisih terhadap hak cair yang
+	// dihitung dari booking terlihat langsung, bukan hanya di log server.
+	LedgerAvailable  int64 `json:"ledgerAvailable"`
+	LedgerHeld       int64 `json:"ledgerHeld"`
+	LedgerConsistent bool  `json:"ledgerConsistent"`
 }

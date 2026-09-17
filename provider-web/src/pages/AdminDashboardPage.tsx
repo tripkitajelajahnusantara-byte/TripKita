@@ -44,7 +44,8 @@ interface ProviderAdminData {
   whatsapp: string;
   isVerified: boolean;
   role: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'FAILED' | 'REJECTED';
+  failureCode?: string;
   verificationNotes?: string;
   createdAt: string;
 
@@ -137,6 +138,14 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Refund States
   const [refunds, setRefunds] = useState<any[]>([]);
+  const [refundTarget, setRefundTarget] = useState<any | null>(null);
+  const [refundSubmitting, setRefundSubmitting] = useState(false);
+  const [refundForm, setRefundForm] = useState({
+    amount: '',
+    method: 'MANUAL_TRANSFER',
+    reference: '',
+    notes: '',
+  });
   const [refundLoading, setRefundLoading] = useState(false);
   const [refundError, setRefundError] = useState('');
   const [refundSuccess, setRefundSuccess] = useState('');
@@ -162,7 +171,7 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const handleProcessPayout = async (payoutId: number, status: 'APPROVED' | 'REJECTED') => {
-    const notesPrompt = window.prompt(`Masukkan catatan transfer/alasan (${status}):`, status === 'APPROVED' ? 'Telah ditransfer oleh Admin TripKita' : 'Pengajuan ditolak');
+    const notesPrompt = window.prompt(`Masukkan catatan transfer/alasan (${status}):`, status === 'APPROVED' ? 'Pencairan disetujui' : 'Pengajuan ditolak');
     if (notesPrompt === null) return;
 
     try {
@@ -200,7 +209,13 @@ export const AdminDashboardPage: React.FC = () => {
     setRefundError('');
     try {
       const data = await request('/admin/refunds');
-      setRefunds(data);
+      // Respons membawa booking beserta catatan auditnya bila refund sudah diproses.
+      setRefunds(
+        (data || []).map((item: any) => ({
+          ...(item.booking ?? item),
+          refundRecord: item.refundRecord ?? null,
+        })),
+      );
     } catch (err: any) {
       console.error('Failed to fetch refunds:', err);
       setRefundError(err.message || 'Gagal memuat data refund.');
@@ -223,43 +238,56 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const handleConfirmPayment = async (bookingId: number) => {
-    if (!window.confirm('Apakah Anda yakin sudah memverifikasi mutasi bank OCBC dan ingin mengubah status pembayaran booking ini menjadi LUNAS (PAID)?')) {
+  const handleSubmitRefund = async () => {
+    if (!refundTarget) return;
+    const amount = Number(refundForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setRefundError('Nominal yang dikembalikan wajib diisi.');
       return;
     }
-    setLoading(true);
-    try {
-      setError('');
-      setSuccessMsg('');
-      await request(`/admin/bookings/${bookingId}/confirm-payment`, {
-        method: 'PUT',
-      });
-      setSuccessMsg('Berhasil memverifikasi pembayaran booking.');
-      fetchAdminBookings();
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Gagal mengonfirmasi pembayaran.');
-    } finally {
-      setLoading(false);
+    if (amount > (refundTarget.refundAmount || 0)) {
+      setRefundError('Nominal melebihi hak refund pelanggan.');
+      return;
     }
-  };
+    if (refundForm.reference.trim().length < 4) {
+      setRefundError('Nomor referensi transfer wajib diisi (minimal 4 karakter).');
+      return;
+    }
 
-  const handleCompleteRefund = async (bookingId: number) => {
-    if (!window.confirm('Apakah Anda yakin sudah memproses refund ini secara manual di dashboard Xendit dan ingin menandai transaksi ini sebagai SELESAI (REFUNDED)?')) {
-      return;
-    }
+    setRefundSubmitting(true);
     try {
       setRefundError('');
       setRefundSuccess('');
-      await request(`/admin/refunds/${bookingId}/complete`, {
+      await request(`/admin/refunds/${refundTarget.id}/complete`, {
         method: 'POST',
+        body: JSON.stringify({
+          amount,
+          method: refundForm.method,
+          reference: refundForm.reference.trim(),
+          notes: refundForm.notes.trim(),
+        }),
       });
-      setRefundSuccess('Berhasil mengubah status refund menjadi SELESAI.');
+      setRefundSuccess('Refund tercatat beserta bukti dan pemrosesnya.');
+      setRefundTarget(null);
       fetchRefunds();
     } catch (err: any) {
       console.error('Failed to complete refund:', err);
       setRefundError(err.message || 'Gagal memproses refund.');
+    } finally {
+      setRefundSubmitting(false);
     }
+  };
+
+  const openRefundForm = (refund: any) => {
+    setRefundError('');
+    setRefundSuccess('');
+    setRefundTarget(refund);
+    setRefundForm({
+      amount: String(refund.refundAmount || 0),
+      method: 'MANUAL_TRANSFER',
+      reference: '',
+      notes: '',
+    });
   };
 
   useEffect(() => {
@@ -595,7 +623,7 @@ export const AdminDashboardPage: React.FC = () => {
               className={`menu-btn ${activeView === 'kelola-pembayaran' ? 'active' : ''}`}
               onClick={() => { setActiveView('kelola-pembayaran'); setSelectedProvider(null); }}
             >
-              <DollarSign size={18} /> Kelola Pembayaran
+              <DollarSign size={18} /> Monitor Pembayaran
             </button>
             <button 
               className={`menu-btn ${activeView === 'pencairan-provider' ? 'active' : ''}`}
@@ -654,7 +682,7 @@ export const AdminDashboardPage: React.FC = () => {
                 {activeView === 'administrasi-refund' 
                   ? 'Administrasi Refund' 
                   : activeView === 'kelola-pembayaran'
-                  ? 'Kelola Pembayaran Manual'
+                  ? 'Monitor Pembayaran'
                   : activeView === 'pencairan-provider'
                   ? 'Pengajuan Pencairan Dana Provider (Payouts)'
                   : 'Provider Verification Center'}
@@ -663,7 +691,7 @@ export const AdminDashboardPage: React.FC = () => {
                 {activeView === 'administrasi-refund' 
                   ? 'Pantau dan kelola proses refund dana customer.' 
                   : activeView === 'kelola-pembayaran'
-                  ? 'Verifikasi bukti transfer pembayaran manual Bank OCBC.'
+                  ? 'Pantau status pembayaran booking. Pembayaran diterima otomatis melalui payment gateway; tidak ada verifikasi manual.'
                   : activeView === 'pencairan-provider'
                   ? 'Kelola pengajuan pencairan saldo DP 50% & pelunasan dari mitra provider.'
                   : 'Kelola dan verifikasi semua provider yang terdaftar di TripKita.'}
@@ -694,7 +722,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
             ) : activeView === 'kelola-pembayaran' ? (
-              /* View 4: Kelola Pembayaran (Verifikasi Manual Transfer) Panel */
+              /* View 4: Monitor Pembayaran (baca saja; settlement ditangani payment gateway) */
               <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
                 <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
                   {bookingsLoading ? (
@@ -708,15 +736,12 @@ export const AdminDashboardPage: React.FC = () => {
                           <th>Paket Wisata</th>
                           <th>Total Pembayaran</th>
                           <th>Metode</th>
-                          <th>Bukti Transfer</th>
                           <th>Status</th>
-                          <th>Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
                         {adminBookings.length > 0 ? (
                           adminBookings.map((b) => {
-                            const isPendingVerification = b.status === 'WAITING_CONFIRMATION';
                             return (
                               <tr key={b.id}>
                                 <td><strong>{b.bookingCode}</strong></td>
@@ -728,45 +753,14 @@ export const AdminDashboardPage: React.FC = () => {
                                 <td><strong style={{ color: '#00a896' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(b.totalPrice)}</strong></td>
                                 <td>{b.paymentMethod}</td>
                                 <td>
-                                  {b.paymentProof ? (
-                                    <button 
-                                      className="view-doc-btn" 
-                                      onClick={() => { 
-                                        setPreviewDocUrl(b.paymentProof); 
-                                        setPreviewDocName(`Bukti Transfer ${b.bookingCode}`); 
-                                      }}
-                                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', fontSize: '12px' }}
-                                    >
-                                      <Eye size={14} /> Lihat Bukti
-                                    </button>
-                                  ) : (
-                                    <span style={{ fontSize: '12px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>Belum diupload</span>
-                                  )}
-                                </td>
-                                <td>
-                                  <span className={`status-badge-inline ${b.status.toLowerCase()}`}>
-                                    {b.status === 'WAITING_CONFIRMATION' ? 'Menunggu Verifikasi' : b.status}
-                                  </span>
-                                </td>
-                                <td>
-                                  {isPendingVerification ? (
-                                    <button 
-                                      className="approve-action-btn"
-                                      onClick={() => handleConfirmPayment(b.id)}
-                                      style={{ padding: '6px 12px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                    >
-                                      Verifikasi Lunas
-                                    </button>
-                                  ) : (
-                                    <span style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>—</span>
-                                  )}
+                                  <span className={`status-badge-inline ${b.status.toLowerCase()}`}>{b.status}</span>
                                 </td>
                               </tr>
                             );
                           })
                         ) : (
                           <tr>
-                            <td colSpan={8} className="empty-table-state" style={{ padding: '40px 0' }}>
+                            <td colSpan={6} className="empty-table-state" style={{ padding: '40px 0' }}>
                               Tidak ada data transaksi pembayaran saat ini.
                             </td>
                           </tr>
@@ -781,6 +775,74 @@ export const AdminDashboardPage: React.FC = () => {
               <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
                 {refundSuccess && <div className="alert-message success-alert">{refundSuccess}</div>}
                 {refundError && <div className="alert-message error-alert">{refundError}</div>}
+
+                {refundTarget && (
+                  <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+                    <div style={{ backgroundColor: '#ffffff', borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto' }}>
+                      <h2 style={{ margin: '0 0 4px', fontSize: '18px' }}>Catat Pengembalian Dana</h2>
+                      <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--color-text-medium)' }}>
+                        Booking <strong>{refundTarget.bookingCode}</strong> &bull; hak refund{' '}
+                        <strong>Rp {(refundTarget.refundAmount || 0).toLocaleString('id-ID')}</strong>.
+                        Isi setelah dana benar-benar dikirim ke pelanggan.
+                      </p>
+
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Nominal dikembalikan (Rp)</label>
+                      <input
+                        type="number"
+                        value={refundForm.amount}
+                        onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })}
+                        style={{ width: '100%', padding: '10px', marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }}
+                      />
+
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Metode pengembalian</label>
+                      <select
+                        value={refundForm.method}
+                        onChange={(e) => setRefundForm({ ...refundForm, method: e.target.value })}
+                        style={{ width: '100%', padding: '10px', marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }}
+                      >
+                        <option value="MANUAL_TRANSFER">Transfer manual dari rekening platform</option>
+                        <option value="GATEWAY_REFUND">Refund via payment gateway</option>
+                        <option value="GATEWAY_PAYOUT">Payout ke rekening pelanggan</option>
+                      </select>
+
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Nomor referensi transfer</label>
+                      <input
+                        type="text"
+                        value={refundForm.reference}
+                        onChange={(e) => setRefundForm({ ...refundForm, reference: e.target.value })}
+                        placeholder="Nomor referensi mutasi bank atau id transaksi gateway"
+                        style={{ width: '100%', padding: '10px', marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }}
+                      />
+
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Catatan (opsional)</label>
+                      <textarea
+                        value={refundForm.notes}
+                        onChange={(e) => setRefundForm({ ...refundForm, notes: e.target.value })}
+                        rows={3}
+                        style={{ width: '100%', padding: '10px', marginBottom: '16px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', resize: 'vertical' }}
+                      />
+
+                      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <button
+                          className="back-form-btn"
+                          onClick={() => setRefundTarget(null)}
+                          disabled={refundSubmitting}
+                          style={{ width: 'auto', padding: '10px 18px' }}
+                        >
+                          Batal
+                        </button>
+                        <button
+                          className="submit-form-btn"
+                          onClick={handleSubmitRefund}
+                          disabled={refundSubmitting}
+                          style={{ width: 'auto', padding: '10px 18px', backgroundColor: '#0d9488' }}
+                        >
+                          {refundSubmitting ? 'Menyimpan...' : 'Simpan Catatan Refund'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
                   {refundLoading ? (
@@ -792,9 +854,9 @@ export const AdminDashboardPage: React.FC = () => {
                           <th>Kode Booking</th>
                           <th>Pelanggan</th>
                           <th>Paket Wisata</th>
-                          <th>Total Refund</th>
-                          <th>Metode Pembayaran</th>
-                          <th>Terakhir Diperbarui</th>
+                          <th>Hak Refund</th>
+                          <th>Kanal Bayar</th>
+                          <th>Bukti Pengembalian</th>
                           <th>Status</th>
                           <th>Aksi</th>
                         </tr>
@@ -806,13 +868,26 @@ export const AdminDashboardPage: React.FC = () => {
                               <td style={{ fontWeight: 700, color: 'var(--color-primary-dark)' }}>{refund.bookingCode}</td>
                               <td>{refund.customerName}</td>
                               <td>{refund.packageDetails ? refund.packageDetails.name : `Paket #${refund.packageId}`} &bull; {refund.guests} pax</td>
-                              <td style={{ fontWeight: 700, color: 'var(--color-accent)' }}>Rp {refund.totalPrice.toLocaleString('id-ID')}</td>
-                              <td style={{ textTransform: 'uppercase' }}>{refund.paymentMethod || 'QRIS'}</td>
-                              <td>
-                                {new Date(refund.updatedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}<br/>
-                                <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>
-                                  {new Date(refund.updatedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
-                                </span>
+                              <td style={{ fontWeight: 700, color: 'var(--color-accent)' }}>Rp {(refund.refundAmount || 0).toLocaleString('id-ID')}</td>
+                              <td style={{ textTransform: 'uppercase' }}>{refund.paymentMethod || '-'}</td>
+                              <td style={{ fontSize: '12px' }}>
+                                {refund.refundRecord ? (
+                                  <>
+                                    <div style={{ fontWeight: 700 }}>Rp {refund.refundRecord.amount.toLocaleString('id-ID')}</div>
+                                    <div style={{ color: 'var(--color-text-light)' }}>{refund.refundRecord.method}</div>
+                                    <div style={{ color: 'var(--color-text-light)' }}>Ref: {refund.refundRecord.reference}</div>
+                                    <div style={{ color: 'var(--color-text-light)' }}>
+                                      oleh {refund.refundRecord.processedByEmail} &bull;{' '}
+                                      {new Date(refund.refundRecord.processedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </div>
+                                  </>
+                                ) : refund.status === 'REFUNDED' ? (
+                                  <span style={{ color: '#b45309', fontStyle: 'italic' }}>
+                                    Tanpa catatan (diproses sebelum jejak audit ada)
+                                  </span>
+                                ) : (
+                                  <span style={{ color: 'var(--color-text-light)', fontStyle: 'italic' }}>Belum dikembalikan</span>
+                                )}
                               </td>
                               <td>
                                 <span className={`status-pill-small ${refund.status === 'REFUNDED' ? 'approved' : 'rejected'}`}>
@@ -823,10 +898,10 @@ export const AdminDashboardPage: React.FC = () => {
                                 {refund.status === 'REFUND_REQUIRED' ? (
                                   <button 
                                     className="submit-form-btn" 
-                                    onClick={() => handleCompleteRefund(refund.id)}
+                                    onClick={() => openRefundForm(refund)}
                                     style={{ padding: '6px 12px', fontSize: '12px', width: 'auto', backgroundColor: '#0d9488' }}
                                   >
-                                    Tandai Selesai
+                                    Catat Pengembalian
                                   </button>
                                 ) : (
                                   <span style={{ fontSize: '12px', color: 'var(--color-text-light)', fontWeight: 600 }}>Selesai</span>

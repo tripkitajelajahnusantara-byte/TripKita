@@ -73,7 +73,7 @@ export const toggleWishlistStorage = (pkg: any): WishlistItem[] => {
       request('/provider/profile', {
         method: 'PUT',
         body: JSON.stringify({ wishlistData: JSON.stringify(updated) })
-      }).catch((err) => console.log('Wishlist DB sync skipped:', err));
+      }).catch((err) => console.warn('Wishlist DB sync skipped:', err));
     }
 
     return updated;

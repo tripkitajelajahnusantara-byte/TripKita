@@ -24,10 +24,15 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
   tripType = 'Private Trip',
   durationDays
 }) => {
+  // Hook wajib dipanggil sebelum early return. Sebelumnya `return null` saat
+  // modal tertutup membuat jumlah hook berubah ketika modal dibuka, sehingga
+  // React melempar "Rendered more hooks than during the previous render" dan
+  // halaman detail paket ikut gagal dirender.
+  const [monthOffset, setMonthOffset] = useState(0);
+
   if (!isOpen) return null;
 
   const baseDate = new Date(minDateIso || new Date());
-  const [monthOffset, setMonthOffset] = useState(0);
 
   const getMonthDate = (offset: number) => {
     const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + offset, 1);

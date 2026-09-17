@@ -2,32 +2,36 @@ import React from 'react';
 import { NavigationProvider, useNavigation } from './context/NavigationContext';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
-import { AboutPage } from './pages/AboutPage';
-import { CustomerHelpPage } from './pages/CustomerHelpPage';
-import { RegisterPage } from './pages/RegisterPage';
-import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { KelolaPaketPage } from './pages/KelolaPaketPage';
-import { ManageBookingPage } from './pages/ManageBookingPage';
-import { ProfileProviderPage } from './pages/ProfileProviderPage';
-import { AddPackagePage } from './pages/AddPackagePage';
-import { AdminDashboardPage } from './pages/AdminDashboardPage';
-import { CustomerLandingPage } from './pages/CustomerLandingPage';
-import { CustomerPackageDetailPage } from './pages/CustomerPackageDetailPage';
-import { CustomerBookingPage } from './pages/CustomerBookingPage';
-import { CustomerHistoryPage } from './pages/CustomerHistoryPage';
-import { CustomerRegisterPage } from './pages/CustomerRegisterPage';
-import { CustomerLoginPage } from './pages/CustomerLoginPage';
-import { ProviderLandingPage } from './pages/ProviderLandingPage';
-import { CustomerSearchPage } from './pages/CustomerSearchPage';
-import { CustomerConfirmationPage } from './pages/CustomerConfirmationPage';
-import { CustomerPaymentInvoicePage } from './pages/CustomerPaymentInvoicePage';
-import { ProviderFinancePage } from './pages/ProviderFinancePage';
-import { ProviderPublicProfilePage } from './pages/ProviderPublicProfilePage';
-import { CustomerSettingsPage } from './pages/CustomerSettingsPage';
-import { CustomerTripPlannerPage } from './pages/CustomerTripPlannerPage';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from './components/LegalModals';
 import { getProviderToken } from './utils/api';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+// Setiap halaman dimuat sebagai chunk terpisah supaya kunjungan pertama tidak
+// perlu mengunduh seluruh aplikasi sekaligus.
+const AboutPage = React.lazy(() => import('./pages/AboutPage').then((m) => ({ default: m.AboutPage })));
+const CustomerHelpPage = React.lazy(() => import('./pages/CustomerHelpPage').then((m) => ({ default: m.CustomerHelpPage })));
+const RegisterPage = React.lazy(() => import('./pages/RegisterPage').then((m) => ({ default: m.RegisterPage })));
+const LoginPage = React.lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
+const DashboardPage = React.lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const KelolaPaketPage = React.lazy(() => import('./pages/KelolaPaketPage').then((m) => ({ default: m.KelolaPaketPage })));
+const ManageBookingPage = React.lazy(() => import('./pages/ManageBookingPage').then((m) => ({ default: m.ManageBookingPage })));
+const ProfileProviderPage = React.lazy(() => import('./pages/ProfileProviderPage').then((m) => ({ default: m.ProfileProviderPage })));
+const AddPackagePage = React.lazy(() => import('./pages/AddPackagePage').then((m) => ({ default: m.AddPackagePage })));
+const AdminDashboardPage = React.lazy(() => import('./pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })));
+const CustomerLandingPage = React.lazy(() => import('./pages/CustomerLandingPage').then((m) => ({ default: m.CustomerLandingPage })));
+const CustomerPackageDetailPage = React.lazy(() => import('./pages/CustomerPackageDetailPage').then((m) => ({ default: m.CustomerPackageDetailPage })));
+const CustomerBookingPage = React.lazy(() => import('./pages/CustomerBookingPage').then((m) => ({ default: m.CustomerBookingPage })));
+const CustomerHistoryPage = React.lazy(() => import('./pages/CustomerHistoryPage').then((m) => ({ default: m.CustomerHistoryPage })));
+const CustomerRegisterPage = React.lazy(() => import('./pages/CustomerRegisterPage').then((m) => ({ default: m.CustomerRegisterPage })));
+const CustomerLoginPage = React.lazy(() => import('./pages/CustomerLoginPage').then((m) => ({ default: m.CustomerLoginPage })));
+const ProviderLandingPage = React.lazy(() => import('./pages/ProviderLandingPage').then((m) => ({ default: m.ProviderLandingPage })));
+const CustomerSearchPage = React.lazy(() => import('./pages/CustomerSearchPage').then((m) => ({ default: m.CustomerSearchPage })));
+const CustomerConfirmationPage = React.lazy(() => import('./pages/CustomerConfirmationPage').then((m) => ({ default: m.CustomerConfirmationPage })));
+const CustomerPaymentInvoicePage = React.lazy(() => import('./pages/CustomerPaymentInvoicePage').then((m) => ({ default: m.CustomerPaymentInvoicePage })));
+const ProviderFinancePage = React.lazy(() => import('./pages/ProviderFinancePage').then((m) => ({ default: m.ProviderFinancePage })));
+const ProviderPublicProfilePage = React.lazy(() => import('./pages/ProviderPublicProfilePage').then((m) => ({ default: m.ProviderPublicProfilePage })));
+const CustomerSettingsPage = React.lazy(() => import('./pages/CustomerSettingsPage').then((m) => ({ default: m.CustomerSettingsPage })));
+const CustomerTripPlannerPage = React.lazy(() => import('./pages/CustomerTripPlannerPage').then((m) => ({ default: m.CustomerTripPlannerPage })));
 
 const AppContent: React.FC = () => {
   const { route, loadingProfile, providerProfile, customerProfile, navigateTo } = useNavigation();
@@ -267,13 +271,23 @@ const AppContent: React.FC = () => {
 
 import { CustomAlertProvider } from './components/CustomAlertModal';
 
+const PageLoadingFallback: React.FC = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', fontFamily: 'sans-serif', color: '#475569' }}>
+    <p>Memuat halaman...</p>
+  </div>
+);
+
 function App() {
   return (
-    <CustomAlertProvider>
-      <NavigationProvider>
-        <AppContent />
-      </NavigationProvider>
-    </CustomAlertProvider>
+    <ErrorBoundary>
+      <CustomAlertProvider>
+        <NavigationProvider>
+          <React.Suspense fallback={<PageLoadingFallback />}>
+            <AppContent />
+          </React.Suspense>
+        </NavigationProvider>
+      </CustomAlertProvider>
+    </ErrorBoundary>
   );
 }
 

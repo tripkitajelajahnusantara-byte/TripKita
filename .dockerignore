@@ -1,0 +1,13 @@
+.git
+.github
+.vite
+node_modules
+**/node_modules
+**/dist
+backend/uploads
+backend/.env
+**/.env
+*.exe
+*.log
+customer-mobile
+tsc_output.txt
