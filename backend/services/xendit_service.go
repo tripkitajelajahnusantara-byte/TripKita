@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -26,6 +27,7 @@ type XenditService interface {
 	CreateInvoice(booking *models.Booking, packageName string) (string, string, error)
 	GetInvoice(invoiceID string) (*XenditInvoiceStatus, error)
 	CreatePayout(req XenditPayoutRequest) (*XenditPayoutResult, error)
+	GetPayout(payoutID string) (*XenditPayoutResult, error)
 }
 
 type xenditService struct {
@@ -203,15 +205,17 @@ func basicAuthHeader(secretKey string) string {
 	return base64.StdEncoding.EncodeToString([]byte(secretKey + ":"))
 }
 
-// xenditPayoutAPIVersion adalah versi API Payouts v2 yang dipakai. Xendit
-// mewajibkan header ini; menaikkannya tanpa membaca changelog dapat mengubah
-// bentuk payload callback.
-const xenditPayoutAPIVersion = "2024-11-11"
+// xenditPayoutAPIVersion mengikuti kontrak Payouts v3. Versi invoice tetap v2
+// karena merupakan produk/endpoint yang berbeda dari Payouts.
+const xenditPayoutAPIVersion = "2025-09-01"
+
+var ErrPayoutStatusUnknown = errors.New("status pencairan di gateway belum dapat dipastikan")
 
 // XenditPayoutRequest adalah instruksi pencairan ke rekening mitra.
 type XenditPayoutRequest struct {
 	ReferenceID       string
-	ChannelCode       string
+	RoutingType       string
+	RoutingValue      string
 	AccountNumber     string
 	AccountHolderName string
 	Amount            int64
@@ -226,7 +230,7 @@ type XenditPayoutResult struct {
 	FailureCode string
 }
 
-// CreatePayout mengirim instruksi pencairan ke Xendit Payouts API v2.
+// CreatePayout mengirim instruksi pencairan ke Xendit Payouts API v3.
 //
 // ReferenceID dipakai sekaligus sebagai idempotency key sehingga percobaan ulang
 // karena timeout jaringan tidak menghasilkan transfer ganda ke mitra.
@@ -239,7 +243,8 @@ func (s *xenditService) CreatePayout(req XenditPayoutRequest) (*XenditPayoutResu
 	}
 	for label, value := range map[string]string{
 		"reference_id":        req.ReferenceID,
-		"channel_code":        req.ChannelCode,
+		"routing_type":        req.RoutingType,
+		"routing_value":       req.RoutingValue,
 		"account_number":      req.AccountNumber,
 		"account_holder_name": req.AccountHolderName,
 	} {
@@ -248,16 +253,21 @@ func (s *xenditService) CreatePayout(req XenditPayoutRequest) (*XenditPayoutResu
 		}
 	}
 
+	recipient := payoutRecipient(req)
 	payload := map[string]interface{}{
 		"reference_id": req.ReferenceID,
-		"channel_code": req.ChannelCode,
-		"channel_properties": map[string]string{
-			"account_number":      req.AccountNumber,
-			"account_holder_name": req.AccountHolderName,
+		"recipient":    recipient,
+		"payout_details": map[string]interface{}{
+			"source_currency":      "IDR",
+			"source_amount":        req.Amount,
+			"destination_currency": "IDR",
 		},
-		"amount":      req.Amount,
-		"currency":    "IDR",
-		"description": req.Description,
+		"source_of_fund": "BUSINESS_REVENUE",
+		"purpose_code":   "TRAVEL",
+		"description":    truncateText(req.Description, 100),
+		"metadata": map[string]string{
+			"tripkita_reference_id": req.ReferenceID,
+		},
 	}
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
@@ -267,7 +277,7 @@ func (s *xenditService) CreatePayout(req XenditPayoutRequest) (*XenditPayoutResu
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.xendit.co/v2/payouts", bytes.NewBuffer(jsonPayload))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.xendit.co/v3/payouts", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return nil, err
 	}
@@ -282,37 +292,139 @@ func (s *xenditService) CreatePayout(req XenditPayoutRequest) (*XenditPayoutResu
 		// mungkin sudah diterima Xendit, jadi status harus dipastikan lewat
 		// callback atau pengecekan manual sebelum dikirim ulang.
 		log.Printf("[Xendit Payout] Koneksi gagal untuk reference_id=%s: %v", req.ReferenceID, err)
-		return nil, fmt.Errorf("payment gateway tidak dapat dihubungi; status pencairan belum pasti")
+		return nil, fmt.Errorf("%w: payment gateway tidak dapat dihubungi", ErrPayoutStatusUnknown)
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 
 	var payoutResp struct {
-		ID          string `json:"id"`
+		PayoutID    string `json:"payout_id"`
 		ReferenceID string `json:"reference_id"`
 		Status      string `json:"status"`
 		FailureCode string `json:"failure_code"`
 		ErrorCode   string `json:"error_code"`
 		Message     string `json:"message"`
 	}
-	_ = json.Unmarshal(bodyBytes, &payoutResp)
+	if err := json.Unmarshal(bodyBytes, &payoutResp); err != nil {
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			return nil, fmt.Errorf("%w: respons gateway tidak dapat dibaca", ErrPayoutStatusUnknown)
+		}
+		return nil, fmt.Errorf("payment gateway mengembalikan respons tidak valid (HTTP %d)", resp.StatusCode)
+	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		log.Printf("[Xendit Payout] Ditolak reference_id=%s status=%d error_code=%s", req.ReferenceID, resp.StatusCode, payoutResp.ErrorCode)
+		if resp.StatusCode >= 500 {
+			return nil, fmt.Errorf("%w: gateway mengembalikan HTTP %d", ErrPayoutStatusUnknown, resp.StatusCode)
+		}
 		if payoutResp.ErrorCode != "" {
 			return nil, fmt.Errorf("payment gateway menolak pencairan (%s)", payoutResp.ErrorCode)
 		}
 		return nil, fmt.Errorf("payment gateway menolak pencairan (HTTP %d)", resp.StatusCode)
 	}
-	if payoutResp.ID == "" {
-		return nil, fmt.Errorf("payment gateway tidak mengembalikan id pencairan")
+	if payoutResp.PayoutID == "" {
+		return nil, fmt.Errorf("%w: gateway tidak mengembalikan payout_id", ErrPayoutStatusUnknown)
 	}
 
 	return &XenditPayoutResult{
-		ID:          payoutResp.ID,
+		ID:          payoutResp.PayoutID,
 		ReferenceID: payoutResp.ReferenceID,
 		Status:      payoutResp.Status,
 		FailureCode: payoutResp.FailureCode,
 	}, nil
+}
+
+// GetPayout mengambil status gateway sebagai jaring pengaman ketika callback
+// terlambat atau gagal terkirim.
+func (s *xenditService) GetPayout(payoutID string) (*XenditPayoutResult, error) {
+	if s.cfg.XenditAPIKey == "" {
+		return nil, fmt.Errorf("Xendit belum dikonfigurasi")
+	}
+	if strings.TrimSpace(payoutID) == "" {
+		return nil, fmt.Errorf("payout id kosong")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.xendit.co/v3/payouts/"+url.PathEscape(payoutID), nil)
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("API-VERSION", xenditPayoutAPIVersion)
+	httpReq.Header.Set("Authorization", "Basic "+basicAuthHeader(s.cfg.XenditAPIKey))
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("payment gateway tidak dapat dihubungi: %w", err)
+	}
+	defer resp.Body.Close()
+	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("payment gateway menolak permintaan status payout (HTTP %d)", resp.StatusCode)
+	}
+
+	var payoutResp struct {
+		PayoutID    string `json:"payout_id"`
+		ReferenceID string `json:"reference_id"`
+		Status      string `json:"status"`
+		FailureCode string `json:"failure_code"`
+	}
+	if err := json.Unmarshal(bodyBytes, &payoutResp); err != nil {
+		return nil, fmt.Errorf("respons status payout tidak valid: %w", err)
+	}
+	if payoutResp.PayoutID == "" || payoutResp.ReferenceID == "" {
+		return nil, fmt.Errorf("respons status payout tidak lengkap")
+	}
+	return &XenditPayoutResult{
+		ID:          payoutResp.PayoutID,
+		ReferenceID: payoutResp.ReferenceID,
+		Status:      payoutResp.Status,
+		FailureCode: payoutResp.FailureCode,
+	}, nil
+}
+
+func payoutRecipient(req XenditPayoutRequest) map[string]interface{} {
+	accountDetails := map[string]string{
+		"currency":            "IDR",
+		"account_country":     "ID",
+		"account_holder_name": req.AccountHolderName,
+		"account_number":      req.AccountNumber,
+		"routing_type_1":      req.RoutingType,
+		"routing_value_1":     req.RoutingValue,
+	}
+
+	holderName := strings.TrimSpace(req.AccountHolderName)
+	recipient := map[string]interface{}{
+		"relationship":    "BUSINESS_PARTNER",
+		"account_details": accountDetails,
+		"address":         map[string]string{"country": "ID"},
+	}
+	if looksLikeBusinessName(holderName) {
+		recipient["type"] = "BUSINESS"
+		recipient["business_name"] = truncateText(holderName, 50)
+		return recipient
+	}
+
+	parts := strings.Fields(holderName)
+	givenName, surname := holderName, holderName
+	if len(parts) > 1 {
+		givenName = parts[0]
+		surname = strings.Join(parts[1:], " ")
+	}
+	recipient["type"] = "INDIVIDUAL"
+	recipient["given_name"] = truncateText(givenName, 50)
+	recipient["surname"] = truncateText(surname, 50)
+	return recipient
+}
+
+func looksLikeBusinessName(name string) bool {
+	normalized := strings.ToUpper(strings.TrimSpace(name))
+	for _, prefix := range []string{"PT ", "PT. ", "CV ", "CV. ", "UD ", "UD. ", "KOPERASI ", "YAYASAN "} {
+		if strings.HasPrefix(normalized, prefix) {
+			return true
+		}
+	}
+	return false
 }

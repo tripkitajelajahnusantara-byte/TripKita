@@ -11,7 +11,7 @@ type Payout struct {
 	BookingID       *uint     `gorm:"index" json:"bookingId,omitempty"`
 	Booking         *Booking  `gorm:"foreignKey:BookingID" json:"booking,omitempty"`
 	Amount          int64     `gorm:"not null" json:"amount"`
-	Type            string    `gorm:"size:50;not null" json:"type"`                     // DP_50, PELUNASAN_50, FULL
+	Type            string    `gorm:"size:50;not null" json:"type"`                     // DP_50, PELUNASAN_50
 	Status          string    `gorm:"size:50;not null;default:'PENDING'" json:"status"` // PENDING, PROCESSING, APPROVED, FAILED, REJECTED
 	BankName        string    `gorm:"size:100;not null" json:"bankName"`
 	BankAccount     string    `gorm:"size:100;not null" json:"bankAccount"`
@@ -23,7 +23,9 @@ type Payout struct {
 	// XenditPayoutID juga menjadi penanda idempotensi agar satu pengajuan tidak
 	// pernah dikirim dua kali ke gateway.
 	XenditPayoutID string    `gorm:"size:255;index" json:"xenditPayoutId,omitempty"`
-	ChannelCode    string    `gorm:"size:50" json:"channelCode,omitempty"`
+	ChannelCode    string    `gorm:"size:50" json:"channelCode,omitempty"` // legacy Payouts v2
+	RoutingType    string    `gorm:"size:50" json:"routingType,omitempty"`
+	RoutingValue   string    `gorm:"size:100" json:"routingValue,omitempty"`
 	FailureCode    string    `gorm:"size:100" json:"failureCode,omitempty"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`

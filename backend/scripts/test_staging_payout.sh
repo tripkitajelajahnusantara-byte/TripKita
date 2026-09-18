@@ -255,11 +255,11 @@ reset_state $((PAYOUT_ID_BASE + 9)) "1234567890" "Mitra Uji Pencairan"
 curl -s -o /dev/null -X PUT "$API_BASE_URL/admin/payouts/$((PAYOUT_ID_BASE + 9))/process" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
   -d '{"status":"APPROVED","notes":"Pemeriksaan flag pencairan otomatis"}'
-probe_channel=$(psql_q "SELECT COALESCE(channel_code,'') FROM payouts WHERE id = $((PAYOUT_ID_BASE + 9))")
-if [ -z "$probe_channel" ]; then
-  die "Pencairan diproses tanpa channel code: ENABLE_AUTOMATIC_PAYOUT tampaknya masih false."
+probe_routing=$(psql_q "SELECT COALESCE(routing_type,'') || '/' || COALESCE(routing_value,'') FROM payouts WHERE id = $((PAYOUT_ID_BASE + 9))")
+if [ "$probe_routing" = "/" ]; then
+  die "Pencairan diproses tanpa routing Xendit v3: ENABLE_AUTOMATIC_PAYOUT tampaknya masih false."
 fi
-echo "  flag menyala      : ya (channel $probe_channel)"
+echo "  flag menyala      : ya (routing $probe_routing)"
 echo
 
 info "== Menjalankan skenario Xendit test mode =="

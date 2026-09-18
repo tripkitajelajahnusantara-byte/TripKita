@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -22,6 +23,7 @@ type PayoutService interface {
 	GetAllPayouts() ([]models.Payout, error)
 	ProcessPayout(payoutID uint, status string, notes string, proofPath string) (*models.Payout, error)
 	HandlePayoutCallback(payoutID string, referenceID string, status string, failureCode string) error
+	ReconcileProcessingPayouts(ctx context.Context)
 }
 
 type payoutService struct {
@@ -66,6 +68,11 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 
 	if bankName == "" || bankAccount == "" || bankAccountName == "" {
 		return nil, errors.New("rekening bank tujuan belum diatur. Silakan atur informasi bank di menu Profil Provider terlebih dahulu")
+	}
+	if s.cfg != nil && s.cfg.EnableAutoPayout {
+		if _, err := ResolveBankRouting(bankName); err != nil {
+			return nil, err
+		}
 	}
 
 	payout := &models.Payout{
@@ -230,7 +237,7 @@ func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string
 	automatic := s.cfg != nil && s.cfg.EnableAutoPayout && status == models.PayoutStatusApproved
 
 	var payout models.Payout
-	var channelCode string
+	var routing BankRouting
 
 	// Tahap 1: kunci pengajuan, potong buku besar, lalu tandai status transisi.
 	// Dana dipesan sebelum instruksi dikirim supaya kegagalan di tengah jalan
@@ -269,13 +276,14 @@ func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string
 			}
 
 			if automatic {
-				code, err := ResolveBankChannelCode(payout.BankName)
+				resolved, err := ResolveBankRouting(payout.BankName)
 				if err != nil {
 					return err
 				}
-				channelCode = code
+				routing = resolved
 				updates["status"] = models.PayoutStatusProcessing
-				updates["channel_code"] = code
+				updates["routing_type"] = resolved.Type
+				updates["routing_value"] = resolved.Value
 			} else {
 				updates["status"] = models.PayoutStatusApproved
 			}
@@ -295,27 +303,50 @@ func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string
 
 	// Tahap 2: kirim instruksi ke gateway di luar transaksi database, supaya
 	// panggilan jaringan yang lambat tidak menahan lock baris pencairan.
-	result, sendErr := s.xenditService.CreatePayout(XenditPayoutRequest{
-		ReferenceID:       payoutReferenceID(payoutID),
-		ChannelCode:       channelCode,
-		AccountNumber:     payout.BankAccount,
-		AccountHolderName: payout.BankAccountName,
-		Amount:            payout.Amount,
-		Description:       fmt.Sprintf("Pencairan TemenTrip #%d (%s)", payoutID, payout.Type),
-	})
+	payout.RoutingType = routing.Type
+	payout.RoutingValue = routing.Value
+	result, sendErr := s.xenditService.CreatePayout(xenditPayoutRequest(&payout))
 	if sendErr != nil {
-		// Instruksi ditolak gateway: pengajuan dikembalikan agar dapat diulang,
-		// dan saldo yang sempat dipotong dikembalikan ke buku besar.
+		if errors.Is(sendErr, ErrPayoutStatusUnknown) {
+			// Jangan kembalikan saldo pada timeout/5xx. Instruksi mungkin sudah
+			// diterima Xendit; idempotency key yang sama akan direkonsiliasi job.
+			_ = database.DB.Model(&models.Payout{}).
+				Where("id = ? AND status = ?", payoutID, models.PayoutStatusProcessing).
+				Updates(map[string]interface{}{
+					"failure_code": "DELIVERY_STATUS_UNKNOWN",
+					"updated_at":   time.Now(),
+				}).Error
+			log.Printf("[Payout] Status pengiriman payout %d belum pasti; tetap PROCESSING untuk rekonsiliasi: %v", payoutID, sendErr)
+			return s.payoutRepo.GetByID(payoutID)
+		}
+
+		// Hanya penolakan definitif 4xx/validasi yang mengembalikan dana.
 		if failErr := s.markPayoutFailed(payoutID, "", sendErr.Error()); failErr != nil {
 			log.Printf("[Payout] Payout %d gagal dikirim dan gagal dikembalikan: %v", payoutID, failErr)
 		}
 		return nil, fmt.Errorf("pencairan tidak dapat dikirim: %w", sendErr)
 	}
 
+	expectedReferenceID := payoutReferenceID(payoutID)
+	if result.ReferenceID != expectedReferenceID {
+		// Respons yang tidak menunjuk pengajuan ini tidak boleh dianggap gagal
+		// definitif karena Xendit mungkin tetap memproses instruksinya. Biarkan
+		// PROCESSING agar job rekonsiliasi memeriksa ulang dengan idempotency key.
+		_ = database.DB.Model(&models.Payout{}).
+			Where("id = ? AND status = ?", payoutID, models.PayoutStatusProcessing).
+			Updates(map[string]interface{}{
+				"failure_code": "REFERENCE_MISMATCH",
+				"updated_at":   time.Now(),
+			}).Error
+		log.Printf("[Payout] PENTING: reference payout %d tidak cocok (expected=%s actual=%s); tetap PROCESSING", payoutID, expectedReferenceID, result.ReferenceID)
+		return s.payoutRepo.GetByID(payoutID)
+	}
+
 	if err := database.DB.Model(&models.Payout{}).
 		Where("id = ? AND status = ?", payoutID, models.PayoutStatusProcessing).
 		Updates(map[string]interface{}{
 			"xendit_payout_id": result.ID,
+			"failure_code":     "",
 			"updated_at":       time.Now(),
 		}).Error; err != nil {
 		// Instruksi sudah terkirim; kehilangan id hanya menyulitkan penelusuran,
@@ -335,6 +366,14 @@ func (s *payoutService) HandlePayoutCallback(gatewayPayoutID string, referenceID
 		return err
 	}
 
+	var existing models.Payout
+	if err := database.DB.Select("id", "xendit_payout_id").First(&existing, payoutID).Error; err != nil {
+		return err
+	}
+	if existing.XenditPayoutID != "" && gatewayPayoutID != "" && existing.XenditPayoutID != gatewayPayoutID {
+		return fmt.Errorf("payout id gateway tidak cocok dengan reference id")
+	}
+
 	switch strings.ToUpper(status) {
 	case "SUCCEEDED", "COMPLETED":
 		result := database.DB.Model(&models.Payout{}).
@@ -352,12 +391,97 @@ func (s *payoutService) HandlePayoutCallback(gatewayPayoutID string, referenceID
 		}
 		return nil
 
-	case "FAILED", "REVERSED", "CANCELLED":
+	case "FAILED", "REVERSED", "CANCELLED", "REJECTED", "EXPIRED":
+		if strings.TrimSpace(failureCode) == "" {
+			failureCode = strings.ToUpper(status)
+		}
 		return s.markPayoutFailed(payoutID, gatewayPayoutID, failureCode)
 
 	default:
 		// Status antara (mis. ACCEPTED/PENDING) tidak mengubah apa pun.
 		return nil
+	}
+}
+
+// ReconcileProcessingPayouts memastikan payout yang kehilangan callback atau
+// respons Create Payout tidak menggantung selamanya. Create diulang hanya saat
+// payout_id belum diketahui dan selalu memakai idempotency key yang sama.
+func (s *payoutService) ReconcileProcessingPayouts(ctx context.Context) {
+	if s.cfg == nil || !s.cfg.EnableAutoPayout {
+		return
+	}
+
+	var payouts []models.Payout
+	if err := database.DB.WithContext(ctx).
+		Where("status = ? AND updated_at < ?", models.PayoutStatusProcessing, time.Now().Add(-5*time.Minute)).
+		Order("id asc").Limit(100).Find(&payouts).Error; err != nil {
+		log.Printf("[Payout Rekonsiliasi] Gagal memuat payout PROCESSING: %v", err)
+		return
+	}
+
+	for i := range payouts {
+		if ctx.Err() != nil {
+			return
+		}
+		payout := &payouts[i]
+		var result *XenditPayoutResult
+		var err error
+		creating := payout.XenditPayoutID == ""
+
+		if !creating {
+			result, err = s.xenditService.GetPayout(payout.XenditPayoutID)
+		} else {
+			if payout.RoutingType == "" || payout.RoutingValue == "" {
+				routing, routeErr := ResolveBankRouting(payout.BankName)
+				if routeErr != nil {
+					log.Printf("[Payout Rekonsiliasi] Payout %d tidak memiliki routing valid: %v", payout.ID, routeErr)
+					continue
+				}
+				payout.RoutingType, payout.RoutingValue = routing.Type, routing.Value
+			}
+			result, err = s.xenditService.CreatePayout(xenditPayoutRequest(payout))
+		}
+		if err != nil {
+			if creating && !errors.Is(err, ErrPayoutStatusUnknown) {
+				if failErr := s.markPayoutFailed(payout.ID, "", err.Error()); failErr != nil {
+					log.Printf("[Payout Rekonsiliasi] Payout %d ditolak gateway dan saldo gagal dikembalikan: %v", payout.ID, failErr)
+				}
+				continue
+			}
+			log.Printf("[Payout Rekonsiliasi] Payout %d belum dapat dipastikan: %v", payout.ID, err)
+			continue
+		}
+		if result.ReferenceID != payoutReferenceID(payout.ID) {
+			log.Printf("[Payout Rekonsiliasi] Payout %d menerima reference gateway yang tidak cocok", payout.ID)
+			continue
+		}
+		if err := database.DB.Model(&models.Payout{}).
+			Where("id = ? AND status = ?", payout.ID, models.PayoutStatusProcessing).
+			Updates(map[string]interface{}{
+				"xendit_payout_id": result.ID,
+				"routing_type":     payout.RoutingType,
+				"routing_value":    payout.RoutingValue,
+				"failure_code":     "",
+				"updated_at":       time.Now(),
+			}).Error; err != nil {
+			log.Printf("[Payout Rekonsiliasi] Payout %d gagal menyimpan status gateway: %v", payout.ID, err)
+			continue
+		}
+		if err := s.HandlePayoutCallback(result.ID, result.ReferenceID, result.Status, result.FailureCode); err != nil {
+			log.Printf("[Payout Rekonsiliasi] Payout %d gagal menerapkan status %s: %v", payout.ID, result.Status, err)
+		}
+	}
+}
+
+func xenditPayoutRequest(payout *models.Payout) XenditPayoutRequest {
+	return XenditPayoutRequest{
+		ReferenceID:       payoutReferenceID(payout.ID),
+		RoutingType:       payout.RoutingType,
+		RoutingValue:      payout.RoutingValue,
+		AccountNumber:     payout.BankAccount,
+		AccountHolderName: payout.BankAccountName,
+		Amount:            payout.Amount,
+		Description:       fmt.Sprintf("Pencairan TemenTrip #%d (%s)", payout.ID, payout.Type),
 	}
 }
 
@@ -369,7 +493,7 @@ func (s *payoutService) markPayoutFailed(payoutID uint, gatewayPayoutID string, 
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&payout, payoutID).Error; err != nil {
 			return err
 		}
-		if payout.Status != models.PayoutStatusProcessing {
+		if payout.Status != models.PayoutStatusProcessing && !(payout.Status == models.PayoutStatusApproved && payout.XenditPayoutID != "") {
 			// Sudah difinalkan sebelumnya; tidak ada yang perlu dikembalikan.
 			return nil
 		}

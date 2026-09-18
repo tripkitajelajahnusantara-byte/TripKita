@@ -125,6 +125,12 @@ func (c *Config) Validate() error {
 	if c.EnableAutoPayout && strings.TrimSpace(c.XenditPayoutToken) == "" {
 		return fmt.Errorf("XENDIT_PAYOUT_WEBHOOK_TOKEN wajib diisi saat ENABLE_AUTOMATIC_PAYOUT=true")
 	}
+	if c.EnableAutoPayout && strings.TrimSpace(c.XenditAPIKey) == "" {
+		return fmt.Errorf("XENDIT_SECRET_KEY dengan izin MONEY-OUT wajib diisi saat ENABLE_AUTOMATIC_PAYOUT=true")
+	}
+	if c.EnableAutoPayout && !c.EnableJobs {
+		return fmt.Errorf("ENABLE_BACKGROUND_JOBS wajib true saat ENABLE_AUTOMATIC_PAYOUT=true agar payout dapat direkonsiliasi")
+	}
 	if c.DBMaxOpenConns < 1 {
 		return fmt.Errorf("DB_MAX_OPEN_CONNS wajib minimal 1")
 	}

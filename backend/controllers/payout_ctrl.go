@@ -201,12 +201,13 @@ func (ctrl *PayoutController) XenditPayoutWebhook(c *gin.Context) {
 		return
 	}
 
-	// Payouts v2 membungkus payload di dalam "data"; sebagian event lama
+	// Payouts v3 membungkus payload di dalam "data"; sebagian event lama
 	// mengirim field di level teratas.
 	var req struct {
 		Event string `json:"event" binding:"max=100"`
 		Data  struct {
-			ID          string `json:"id" binding:"max=255"`
+			PayoutID    string `json:"payout_id" binding:"max=255"`
+			ID          string `json:"id" binding:"max=255"` // fallback webhook legacy
 			ReferenceID string `json:"reference_id" binding:"max=255"`
 			Status      string `json:"status" binding:"max=50"`
 			FailureCode string `json:"failure_code" binding:"max=100"`
@@ -221,15 +222,23 @@ func (ctrl *PayoutController) XenditPayoutWebhook(c *gin.Context) {
 		return
 	}
 
-	payoutID, referenceID, status, failureCode := req.Data.ID, req.Data.ReferenceID, req.Data.Status, req.Data.FailureCode
+	payoutID, referenceID, status, failureCode := req.Data.PayoutID, req.Data.ReferenceID, req.Data.Status, req.Data.FailureCode
+	if payoutID == "" {
+		payoutID = req.Data.ID
+	}
 	if referenceID == "" {
 		payoutID, referenceID, status, failureCode = req.ID, req.ReferenceID, req.Status, req.FailureCode
 	}
 	if status == "" && req.Event != "" {
-		// Bentuk event: "payout.succeeded" / "payout.failed".
-		if parts := strings.Split(req.Event, "."); len(parts) == 2 {
-			status = parts[1]
+		// Bentuk event v3: "v3_payout.succeeded". Ambil segmen terakhir agar
+		// callback legacy "payout.succeeded" tetap dapat diproses saat rollout.
+		if idx := strings.LastIndex(req.Event, "."); idx >= 0 && idx+1 < len(req.Event) {
+			status = req.Event[idx+1:]
 		}
+	}
+	if strings.TrimSpace(payoutID) == "" || strings.TrimSpace(referenceID) == "" || strings.TrimSpace(status) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Payload callback payout tidak lengkap"})
+		return
 	}
 
 	if err := ctrl.service.HandlePayoutCallback(payoutID, referenceID, status, failureCode); err != nil {

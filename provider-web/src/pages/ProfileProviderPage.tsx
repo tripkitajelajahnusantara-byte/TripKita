@@ -28,6 +28,26 @@ interface DashboardStats {
   activePackages: number;
 }
 
+const SUPPORTED_PAYOUT_BANKS = [
+  'BCA',
+  'Bank Mandiri',
+  'BNI',
+  'BRI',
+  'BTN',
+  'CIMB Niaga',
+  'Bank Permata',
+  'Bank Danamon',
+  'Bank Panin',
+  'Maybank',
+  'OCBC NISP',
+  'Bank Syariah Indonesia',
+  'Bank Mega',
+  'BJB',
+  'Bank Sinarmas',
+  'Bank Bukopin',
+  'Bank Muamalat',
+] as const;
+
 export const ProfileProviderPage: React.FC = () => {
   const { providerProfile, updateProfile } = useNavigation();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -776,11 +796,18 @@ export const ProfileProviderPage: React.FC = () => {
                   </div>
                   <div className="input-group">
                     <label>Nama Bank</label>
-                    <input 
-                      type="text" 
-                      value={editFields.bankName} 
+                    <select
+                      value={editFields.bankName}
                       onChange={(e) => setEditFields({ ...editFields, bankName: e.target.value })}
-                    />
+                    >
+                      <option value="">Pilih bank tujuan payout</option>
+                      {editFields.bankName && !SUPPORTED_PAYOUT_BANKS.includes(editFields.bankName as typeof SUPPORTED_PAYOUT_BANKS[number]) && (
+                        <option value={editFields.bankName} disabled>{editFields.bankName} (belum didukung payout otomatis)</option>
+                      )}
+                      {SUPPORTED_PAYOUT_BANKS.map((bank) => (
+                        <option key={bank} value={bank}>{bank}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div className="input-group">

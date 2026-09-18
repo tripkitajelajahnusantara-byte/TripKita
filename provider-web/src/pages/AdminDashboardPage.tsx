@@ -177,11 +177,15 @@ export const AdminDashboardPage: React.FC = () => {
     try {
       setError('');
       setSuccessMsg('');
-      await request(`/admin/payouts/${payoutId}/process`, {
+      const result = await request(`/admin/payouts/${payoutId}/process`, {
         method: 'PUT',
         body: JSON.stringify({ status, notes: notesPrompt })
       });
-      setSuccessMsg(`Berhasil memproses pencairan dana (${status}).`);
+      setSuccessMsg(
+        result?.status === 'PROCESSING'
+          ? 'Pencairan disetujui dan sedang diproses oleh Xendit.'
+          : `Berhasil memproses pencairan dana (${result?.status || status}).`
+      );
       fetchAdminPayouts();
     } catch (err: any) {
       setError(err.message || 'Gagal memproses pencairan.');
@@ -978,11 +982,11 @@ export const AdminDashboardPage: React.FC = () => {
                                       borderRadius: '30px',
                                       fontSize: '12px',
                                       fontWeight: '700',
-                                      backgroundColor: p.status === 'APPROVED' ? '#dcfce7' : p.status === 'REJECTED' ? '#fee2e2' : '#fef3c7',
-                                      color: p.status === 'APPROVED' ? '#16a34a' : p.status === 'REJECTED' ? '#dc2626' : '#d97706'
+                                      backgroundColor: p.status === 'APPROVED' ? '#dcfce7' : (p.status === 'REJECTED' || p.status === 'FAILED') ? '#fee2e2' : p.status === 'PROCESSING' ? '#e0f2fe' : '#fef3c7',
+                                      color: p.status === 'APPROVED' ? '#16a34a' : (p.status === 'REJECTED' || p.status === 'FAILED') ? '#dc2626' : p.status === 'PROCESSING' ? '#0284c7' : '#d97706'
                                     }}
                                   >
-                                    {p.status === 'APPROVED' ? '✓ Transfer Selesai' : p.status === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Admin'}
+                                    {p.status === 'APPROVED' ? '✓ Transfer Selesai' : p.status === 'PROCESSING' ? '↻ Diproses Xendit' : p.status === 'FAILED' ? '✕ Transfer Gagal' : p.status === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Admin'}
                                   </span>
                                 </td>
                                 <td>

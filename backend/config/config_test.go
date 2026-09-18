@@ -167,3 +167,37 @@ func TestAutomaticPayoutRequiresCallbackToken(t *testing.T) {
 		t.Errorf("token cadangan tidak terpakai: aktif=%v token=%q", cfg.EnableAutoPayout, cfg.XenditPayoutToken)
 	}
 }
+
+func TestAutomaticPayoutRequiresAPIKeyAndBackgroundJobs(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		mutate  func(map[string]string)
+		wantSub string
+	}{
+		{
+			name: "api key kosong",
+			mutate: func(env map[string]string) {
+				env["XENDIT_SECRET_KEY"] = ""
+			},
+			wantSub: "XENDIT_SECRET_KEY",
+		},
+		{
+			name: "background jobs mati",
+			mutate: func(env map[string]string) {
+				env["ENABLE_BACKGROUND_JOBS"] = "false"
+			},
+			wantSub: "ENABLE_BACKGROUND_JOBS",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env := validProductionEnv()
+			env["ENABLE_AUTOMATIC_PAYOUT"] = "true"
+			env["XENDIT_PAYOUT_WEBHOOK_TOKEN"] = "payout-callback-token"
+			tc.mutate(env)
+			_, err := loadWith(t, env)
+			if err == nil || !strings.Contains(err.Error(), tc.wantSub) {
+				t.Fatalf("diharapkan error %s, got %v", tc.wantSub, err)
+			}
+		})
+	}
+}

@@ -40,6 +40,8 @@ Konfigurasi production dipisahkan ke `docker-compose.prod.yml` dan tetap membutu
      pencairan tidak pernah memotong buku besar, sehingga `available_balance` menggelembung
      sebesar total pencairan yang sudah disetujui. Setelah migrasi, periksa log
      `[Rekonsiliasi Saldo]`; seluruh provider harus dilaporkan konsisten sebelum lanjut.
+   - `backend/database/migrations/004_xendit_payout_v3.sql` — menambahkan metadata routing
+     Xendit Payouts v3. Kolom `channel_code` lama tetap dipertahankan untuk audit.
 4. Atur callback Xendit ke `/api/v1/public/webhooks/xendit` dan samakan verification token dengan `XENDIT_WEBHOOK_TOKEN`.
 5. Gunakan persistent private volume/object storage untuk direktori `/app/uploads`. Jangan expose direktori ini langsung dari CDN atau web server.
 6. Pastikan frontend menggunakan `VITE_API_BASE_URL=https://<api-domain>/api/v1` bila tidak memakai reverse proxy `/api/v1`.
@@ -66,7 +68,7 @@ Gunakan `/readyz` sebagai health check load balancer (bukan `/healthz`) supaya t
 
 - **`false` (default)** — admin menyetujui pengajuan, lalu mentransfer sendiri lewat bank dan
   mencatat buktinya. Ini perilaku yang sudah berjalan selama ini.
-- **`true`** — persetujuan admin langsung mengirim instruksi ke Xendit Payouts API. Pengajuan
+- **`true`** — persetujuan admin langsung mengirim instruksi ke Xendit Payouts API v3. Pengajuan
   berhenti di status `PROCESSING` sampai callback menyatakan dana sampai (`APPROVED`) atau gagal
   (`FAILED`, saldo otomatis dikembalikan ke mitra).
 
@@ -91,13 +93,13 @@ memeriksa status pengajuan **serta saldo buku besar** setelah tiap skenario. Yan
 bukan sekadar API tidak error, melainkan bahwa dana yang gagal dikirim benar-benar kembali ke
 saldo mitra. Skrip keluar dengan kode 1 bila ada satu saja skenario gagal.
 
-Bila seluruh pencairan menggantung di `PROCESSING`, penyebab paling umum adalah callback Xendit
-tidak dapat menjangkau backend staging.
+Bila pencairan lama menggantung di `PROCESSING`, periksa delivery log callback Xendit dan log
+`[Payout Rekonsiliasi]`; job akan menanyakan ulang status gateway selama background jobs aktif.
 
 #### Sebelum menyalakan di production
 
 1. Skrip uji staging lulus seluruhnya (5 dari 5).
-2. Aktifkan produk Payouts di dashboard Xendit dan siapkan **saldo mengendap** yang cukup —
+2. Aktifkan produk Payouts dan izin API key **MONEY-OUT** di dashboard Xendit, lalu siapkan **saldo mengendap** yang cukup —
    pencairan ditarik dari saldo Xendit, bukan dari kas bank Anda. Tetapkan siapa yang memantau
    dan mengisi ulang saldo, serta ambang peringatannya.
 3. Arahkan callback payout Xendit production ke `/api/v1/public/webhooks/xendit/payout` dan isi
@@ -107,18 +109,21 @@ tidak dapat menjangkau backend staging.
 5. Periksa data rekening seluruh mitra aktif. **Test mode tidak memvalidasi nomor rekening ke
    bank sungguhan**, sehingga kesalahan ketik hanya akan terlihat di production. Selama Bank
    Account Validation API belum dipasang, verifikasi manual adalah satu-satunya pengaman.
-6. Pastikan nama bank seluruh mitra dikenali oleh `backend/services/bank_channel.go`. Nama yang
-   tidak terpetakan akan menolak pencairan otomatis, bukan menebak. Query pemeriksaan:
+6. Pastikan nama bank seluruh mitra dikenali oleh `backend/services/bank_channel.go` dan routing
+   SWIFT/BIC-nya cocok dengan Dynamic Schema Xendit untuk akun production. Nama yang tidak
+   terpetakan akan menolak pencairan otomatis, bukan menebak. Query pemeriksaan:
 
    ```sql
    SELECT DISTINCT bank_name FROM providers
    WHERE role = 'PROVIDER' AND status = 'APPROVED' AND bank_name <> '';
    ```
 
-7. Baru setelah semuanya terpenuhi, set `ENABLE_AUTOMATIC_PAYOUT="true"` pada environment
+7. Pastikan `ENABLE_BACKGROUND_JOBS="true"`; job ini merekonsiliasi payout `PROCESSING` ketika
+   respons API atau callback tidak sampai.
+8. Baru setelah semuanya terpenuhi, set `ENABLE_AUTOMATIC_PAYOUT="true"` pada environment
    production. Default di kode maupun di `.env.example` sengaja dibiarkan `false`, sehingga
    pencairan otomatis tidak pernah menyala hanya karena deploy.
-8. Lakukan satu pencairan nyata bernilai kecil ke rekening yang Anda kuasai, lalu cocokkan mutasi
+9. Lakukan satu pencairan nyata bernilai kecil ke rekening yang Anda kuasai, lalu cocokkan mutasi
    bank dengan status pengajuan di aplikasi sebelum melayani mitra sungguhan.
 
 #### Bila perlu dimatikan kembali
@@ -127,7 +132,7 @@ Set `ENABLE_AUTOMATIC_PAYOUT="false"` lalu deploy ulang. Pengajuan yang masih `P
 menunggu callback dan akan selesai sendiri; pengajuan baru kembali ke jalur transfer manual.
 Tidak ada data yang hilang, dan saldo tidak perlu disesuaikan.
 
-Nama bank mitra diterjemahkan ke channel code Xendit oleh `backend/services/bank_channel.go`.
+Nama bank mitra diterjemahkan ke routing SWIFT/BIC Xendit v3 oleh `backend/services/bank_channel.go`.
 Nama yang tidak dikenali **menolak** pencairan otomatis alih-alih menebak, jadi tambahkan
 pemetaannya atau proses pengajuan tersebut secara manual.
 

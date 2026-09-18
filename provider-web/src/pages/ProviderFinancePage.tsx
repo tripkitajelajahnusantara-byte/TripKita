@@ -147,7 +147,7 @@ export const ProviderFinancePage: React.FC = () => {
       setShowRequestModal(false);
       setModalNotice({
         title: 'Pengajuan Berhasil Dikirim!',
-		message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan Akhir 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim dan menunggu verifikasi transfer oleh admin.`
+		message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan Akhir 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim. Setelah disetujui admin, transfer diproses ke rekening Mitra yang terdaftar.`
       });
       fetchSummary();
     } catch (err: any) {
