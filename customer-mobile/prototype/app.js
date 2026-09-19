@@ -782,8 +782,15 @@ function initApp() {
     if (bookNowBtn) {
         bookNowBtn.addEventListener("click", () => {
             currentBookingGuests = currentGuestCount;
-            renderBookingFormData();
-            switchScreen("screen-booking");
+            if (!currentUser || !currentUser.isLoggedIn) {
+                openAuthModal("login", () => {
+                    renderBookingFormData();
+                    switchScreen("screen-booking");
+                });
+            } else {
+                renderBookingFormData();
+                switchScreen("screen-booking");
+            }
         });
     }
 

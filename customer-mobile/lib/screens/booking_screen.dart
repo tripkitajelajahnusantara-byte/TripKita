@@ -1,9 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:customer_mobile/models/package.dart';
-import 'package:customer_mobile/models/booking.dart';
 import 'package:customer_mobile/services/api_service.dart';
 import 'package:customer_mobile/widgets/bottom_navigation.dart';
 import 'package:intl/intl.dart';
+
+class ParticipantData {
+  String nama;
+  String hp;
+  String gender;
+  String tanggalLahir;
+  String riwayatPenyakit;
+
+  ParticipantData({
+    this.nama = '',
+    this.hp = '',
+    this.gender = 'Laki-laki',
+    this.tanggalLahir = '2000-01-01',
+    this.riwayatPenyakit = 'Tidak Ada',
+  });
+}
 
 class BookingScreen extends StatefulWidget {
   final Function(int, {Map<String, dynamic>? arguments}) onNavigate;
@@ -25,77 +40,114 @@ class _BookingScreenState extends State<BookingScreen> {
   late String selectedDateStr;
   late int basePrice;
 
-  List<Participant> participants = [];
-  List<bool> isFormExpanded = [];
+  // Pemesan Form Controllers
+  final TextEditingController _pemesanNameCtrl = TextEditingController(text: 'testing');
+  final TextEditingController _pemesanEmailCtrl = TextEditingController(text: 'testing@gmail.com');
+  final TextEditingController _pemesanPhoneCtrl = TextEditingController(text: '081221213149');
+  String _pemesanBirthDate = '1998-05-15';
+  String _pemesanGender = 'Laki-laki';
+
+  // Checkbox State: Peserta 1 sama dengan Pemesan
+  bool _isSameAsPemesan = false;
+
+  // Participants Data List
+  List<ParticipantData> participants = [];
+
+  // Form Validation Errors
+  Map<String, String> errors = {};
 
   @override
   void initState() {
     super.initState();
-    // Retrieve passed arguments
     if (widget.arguments != null) {
       package = widget.arguments!['package'] as TripPackage;
       participantCount = widget.arguments!['participants'] as int? ?? 1;
-      selectedDateStr = widget.arguments!['selectedDate'] as String? ?? '28 Mei 2024';
+      selectedDateStr = widget.arguments!['selectedDate'] as String? ?? '2026-09-26';
     } else {
-      // Fallback default
       package = TripPackage(
         id: 1,
         providerId: 101,
-        name: 'Open Trip Raja Ampat',
-        destination: 'Raja Ampat, Papua',
-        price: 2750000,
-        quotaUsed: 4,
-        quotaMax: 16,
-        schedule: '28 Mei 2024',
+        name: 'Trip Curug Cilember',
+        destination: 'Bogor, Jawa Barat',
+        price: 275000,
+        quotaUsed: 1,
+        quotaMax: 15,
+        schedule: '2026-09-26',
         status: 'Aktif',
         rating: 4.8,
-        reviewCount: 120,
-        duration: '4 Hari 3 Malam',
+        reviewCount: 45,
+        duration: '1 Hari',
         tripType: 'Open Trip',
-        minParticipants: 4,
-        availableSeats: 12,
+        category: 'CURUG',
+        minParticipants: 1,
+        availableSeats: 14,
         description: '',
-        images: ['https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=800'],
-        itinerary: [],
-        facilities: [],
-        includes: [],
-        excludes: [],
-        meetingPoint: 'Bandara Sorong',
+        images: ['https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?w=800'],
       );
-      participantCount = 4; // As shown in reference screenshot
-      selectedDateStr = '28 Mei 2024';
+      participantCount = 1;
+      selectedDateStr = '2026-09-26';
     }
 
     basePrice = package.price.toInt();
-    _syncParticipantForms();
+    _syncParticipants();
   }
 
-  // Adjust number of passenger forms to match participantCount
-  void _syncParticipantForms() {
+  void _syncParticipants() {
     if (participants.length < participantCount) {
-      // Add new forms
       int diff = participantCount - participants.length;
       for (int i = 0; i < diff; i++) {
-        participants.add(Participant());
-        isFormExpanded.add(participants.length == 1); // Expand the first form by default, collapse others
+        participants.add(ParticipantData(
+          nama: (participants.isEmpty && _isSameAsPemesan) ? _pemesanNameCtrl.text : '',
+          hp: (participants.isEmpty && _isSameAsPemesan) ? _pemesanPhoneCtrl.text : '',
+          gender: (participants.isEmpty && _isSameAsPemesan) ? _pemesanGender : 'Laki-laki',
+          tanggalLahir: (participants.isEmpty && _isSameAsPemesan) ? _pemesanBirthDate : '2000-01-01',
+          riwayatPenyakit: 'Tidak Ada',
+        ));
       }
     } else if (participants.length > participantCount) {
-      // Remove excess forms
       participants.removeRange(participantCount, participants.length);
-      isFormExpanded.removeRange(participantCount, isFormExpanded.length);
     }
   }
 
-  // Auto fill primary traveler data
-  void _autoFillPrimaryTraveler() {
+  void _onSameAsPemesanChanged(bool? val) {
     setState(() {
-      participants[0].fullName = 'Budi Santoso';
-      participants[0].email = 'budi@email.com';
-      participants[0].whatsappNumber = '081234567890';
-      participants[0].gender = 'Laki-laki';
-      participants[0].dateOfBirth = '1990-05-15';
-      participants[0].optionalNotes = 'Alergi seafood';
+      _isSameAsPemesan = val ?? false;
+      if (_isSameAsPemesan && participants.isNotEmpty) {
+        participants[0].nama = _pemesanNameCtrl.text;
+        participants[0].hp = _pemesanPhoneCtrl.text;
+        participants[0].gender = _pemesanGender;
+        participants[0].tanggalLahir = _pemesanBirthDate;
+      }
     });
+  }
+
+  bool _validateForm() {
+    final Map<String, String> newErrors = {};
+
+    if (_pemesanNameCtrl.text.trim().length < 3) {
+      newErrors['pemesanName'] = 'Nama pemesan minimal 3 karakter.';
+    }
+    if (!_pemesanEmailCtrl.text.contains('@') || !_pemesanEmailCtrl.text.contains('.')) {
+      newErrors['pemesanEmail'] = 'Format email tidak valid.';
+    }
+    if (_pemesanPhoneCtrl.text.trim().length < 10) {
+      newErrors['pemesanPhone'] = 'Nomor HP pemesan minimal 10 digit.';
+    }
+
+    for (int i = 0; i < participants.length; i++) {
+      if (participants[i].nama.trim().length < 3) {
+        newErrors['p_nama_$i'] = 'Nama Peserta ${i + 1} minimal 3 karakter.';
+      }
+      if (participants[i].hp.trim().length < 10) {
+        newErrors['p_hp_$i'] = 'Nomor HP Peserta ${i + 1} minimal 10 digit.';
+      }
+    }
+
+    setState(() {
+      errors = newErrors;
+    });
+
+    return newErrors.isEmpty;
   }
 
   @override
@@ -109,603 +161,542 @@ class _BookingScreenState extends State<BookingScreen> {
     int totalPrice = basePrice * participantCount;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF374151)),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF475569)),
           onPressed: () {
-            widget.onNavigate(5, arguments: {'package': package}); // Back to detail (Index 5)
+            widget.onNavigate(5, arguments: {'package': package});
           },
         ),
         title: const Text(
-          'Booking',
-          style: TextStyle(color: Color(0xFF1F2937), fontWeight: FontWeight.bold, fontSize: 18),
+          'Data Pemesan & Peserta Trip',
+          style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        centerTitle: true,
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Selected package mini preview card
+            // Rincian Pemesanan Summary Top Card
             Container(
-              color: Colors.white,
               padding: const EdgeInsets.all(16),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade200),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    // Package Image
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        package.images.isNotEmpty ? package.images[0] : '',
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                      ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    package.category.toUpperCase(),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF007BFF)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    package.name,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF64748B)),
+                      const SizedBox(width: 6),
+                      Text(selectedDateStr, style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                      const SizedBox(width: 16),
+                      const Icon(Icons.people_outline, size: 14, color: Color(0xFF64748B)),
+                      const SizedBox(width: 6),
+                      Text('$participantCount Peserta', style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                    ],
+                  ),
+                  const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Harga (${participantCount}x)', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      Text(currencyFormatter.format(totalPrice), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total Pembayaran', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      Text(currencyFormatter.format(totalPrice), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF007BFF))),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFEF3C7)),
                     ),
-                    const SizedBox(width: 16),
-                    // Metadata
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F8B8D).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              package.tripType.toUpperCase(),
-                              style: const TextStyle(color: Color(0xFF0F8B8D), fontSize: 9, fontWeight: FontWeight.bold),
-                            ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.shield_outlined, size: 16, color: Color(0xFFB45309)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Data peserta yang diisi akan digunakan oleh mitra travel untuk asuransi dan pendaftaran.',
+                            style: TextStyle(fontSize: 11, color: Color(0xFFB45309), height: 1.3),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            package.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F2937)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade400),
-                              const SizedBox(width: 2),
-                              Text(package.destination, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Icon(Icons.star, size: 14, color: Colors.amber.shade600),
-                              const SizedBox(width: 2),
-                              Text(package.rating.toString(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 8),
-                              Icon(Icons.access_time, size: 14, color: Colors.grey.shade400),
-                              const SizedBox(width: 2),
-                              Text(package.duration, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                            ],
-                          )
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
 
-            // Participant quantity selector
+            // BAGIAN 1: DATA PEMESAN (KONTAK UTAMA)
             Container(
-              color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Jumlah Peserta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937))),
-                          const SizedBox(height: 4),
-                          Text('Pilih jumlah peserta yang akan ikut trip', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                        ],
+                      const Text(
+                        '1. Data Pemesan (Kontak Utama)',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                       ),
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () {
-                              if (participantCount > 1) {
-                                setState(() {
-                                    participantCount--;
-                                    _syncParticipantForms();
-                                });
-                              }
-                            },
-                            icon: const Icon(Icons.remove_circle_outline, color: Color(0xFF0F8B8D)),
-                          ),
-                          Text('$participantCount Orang', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          IconButton(
-                            onPressed: () {
-                              if (participantCount < package.availableSeats) {
-                                setState(() {
-                                    participantCount++;
-                                    _syncParticipantForms();
-                                });
-                              }
-                            },
-                            icon: const Icon(Icons.add_circle_outline, color: Color(0xFF0F8B8D)),
-                          ),
-                        ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.check_circle, size: 12, color: Color(0xFF10B981)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Terisi Otomatis (Akun Anda)',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // Quota info badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0F2F1).withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline, size: 16, color: Color(0xFF0F8B8D)),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Minimal ${package.minParticipants} orang, maksimal ${package.quotaMax} orang',
-                          style: const TextStyle(color: Color(0xFF0F8B8D), fontSize: 11, fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 16),
+                  _buildInputLabel('Nama Lengkap Pemesan *'),
+                  _buildTextField(
+                    controller: _pemesanNameCtrl,
+                    icon: Icons.person_outline,
+                    hint: 'Nama pemesan...',
+                    errorText: errors['pemesanName'],
+                    onChanged: (val) {
+                      if (_isSameAsPemesan && participants.isNotEmpty) {
+                        setState(() {
+                          participants[0].nama = val;
+                        });
+                      }
+                    },
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Forms label and Autofill Action
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Data Peserta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1F2937))),
-                  TextButton.icon(
-                    onPressed: _autoFillPrimaryTraveler,
-                    icon: const Icon(Icons.flash_on, size: 16, color: Color(0xFF0F8B8D)),
-                    label: const Text('Auto Fill', style: TextStyle(fontSize: 12, color: Color(0xFF0F8B8D), fontWeight: FontWeight.bold)),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      backgroundColor: const Color(0xFFE0F2F1),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    ),
+                  const SizedBox(height: 14),
+                  _buildInputLabel('Alamat Email *'),
+                  _buildTextField(
+                    controller: _pemesanEmailCtrl,
+                    icon: Icons.mail_outline,
+                    hint: 'testing@gmail.com',
+                    keyboardType: TextInputType.emailAddress,
+                    errorText: errors['pemesanEmail'],
                   ),
-                ],
-              ),
-            ),
-
-            // Participant forms lists
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: participantCount,
-                itemBuilder: (context, index) {
-                  final participant = participants[index];
-                  final isExpanded = isFormExpanded[index];
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isExpanded ? const Color(0xFF0F8B8D) : Colors.grey.shade200,
-                        width: isExpanded ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        // Card Header clickable to expand/collapse
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              isFormExpanded[index] = !isFormExpanded[index];
-                            });
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
+                  const SizedBox(height: 14),
+                  _buildInputLabel('Nomor WhatsApp / HP *'),
+                  _buildTextField(
+                    controller: _pemesanPhoneCtrl,
+                    icon: Icons.phone_android,
+                    hint: '081221213149',
+                    keyboardType: TextInputType.phone,
+                    errorText: errors['pemesanPhone'],
+                    onChanged: (val) {
+                      if (_isSameAsPemesan && participants.isNotEmpty) {
+                        setState(() {
+                          participants[0].hp = val;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInputLabel('Tanggal Lahir *'),
+                            GestureDetector(
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: DateTime(1998, 5, 15),
+                                  firstDate: DateTime(1950),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (picked != null) {
+                                  setState(() {
+                                    _pemesanBirthDate = DateFormat('yyyy-MM-dd').format(picked);
+                                    if (_isSameAsPemesan && participants.isNotEmpty) {
+                                      participants[0].tanggalLahir = _pemesanBirthDate;
+                                    }
+                                  });
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Container(
-                                      width: 28,
-                                      height: 28,
-                                      decoration: BoxDecoration(
-                                        color: isExpanded ? const Color(0xFF0F8B8D) : Colors.grey.shade100,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        '${index + 1}',
-                                        style: TextStyle(
-                                          color: isExpanded ? Colors.white : Colors.grey.shade600,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      'Peserta ${index + 1}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937)),
-                                    ),
-                                    if (index == 0) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFE0F2F1),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: const Text(
-                                          'Data Utama',
-                                          style: TextStyle(color: Color(0xFF0F8B8D), fontSize: 9, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    ],
+                                    Text(_pemesanBirthDate, style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
+                                    const Icon(Icons.calendar_today, size: 16, color: Color(0xFF64748B)),
                                   ],
                                 ),
-                                Icon(
-                                  isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                  color: Colors.grey.shade500,
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                        // Expanded Form body
-                        if (isExpanded) ...[
-                          const Divider(height: 1, thickness: 1),
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              children: [
-                                // Full Name input
-                                _buildTextField(
-                                  icon: Icons.person_outline,
-                                  label: 'Nama Lengkap',
-                                  hint: 'Contoh: Budi Santoso',
-                                  value: participant.fullName,
-                                  onChanged: (val) => participant.fullName = val,
-                                ),
-                                const SizedBox(height: 12),
-                                // Email input
-                                _buildTextField(
-                                  icon: Icons.mail_outline,
-                                  label: 'Email',
-                                  hint: 'Contoh: budi@email.com',
-                                  value: participant.email,
-                                  onChanged: (val) => participant.email = val,
-                                  keyboardType: TextInputType.emailAddress,
-                                ),
-                                const SizedBox(height: 12),
-                                // WhatsApp input
-                                _buildTextField(
-                                  icon: Icons.phone_android,
-                                  label: 'No. WhatsApp',
-                                  hint: 'Contoh: 0812 3456 7890',
-                                  value: participant.whatsappNumber,
-                                  onChanged: (val) => participant.whatsappNumber = val,
-                                  keyboardType: TextInputType.phone,
-                                ),
-                                const SizedBox(height: 12),
-                                // Gender Dropdown
-                                _buildDropdownField(
-                                  icon: Icons.wc_outlined,
-                                  label: 'Jenis Kelamin',
-                                  value: participant.gender,
-                                  items: ['Laki-laki', 'Perempuan'],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInputLabel('Jenis Kelamin *'),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFCBD5E1)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _pemesanGender,
+                                  isExpanded: true,
+                                  items: ['Laki-laki', 'Perempuan'].map((g) => DropdownMenuItem(value: g, child: Text(g, style: const TextStyle(fontSize: 13)))).toList(),
                                   onChanged: (val) {
                                     if (val != null) {
                                       setState(() {
-                                        participant.gender = val;
+                                        _pemesanGender = val;
+                                        if (_isSameAsPemesan && participants.isNotEmpty) {
+                                          participants[0].gender = val;
+                                        }
                                       });
                                     }
                                   },
                                 ),
-                                const SizedBox(height: 12),
-                                // Date of Birth Picker mockup
-                                _buildTextField(
-                                  icon: Icons.cake_outlined,
-                                  label: 'Tanggal Lahir',
-                                  hint: 'Contoh: YYYY-MM-DD',
-                                  value: participant.dateOfBirth,
-                                  onChanged: (val) => participant.dateOfBirth = val,
-                                  suffixIcon: const Icon(Icons.calendar_today, size: 18, color: Colors.grey),
-                                ),
-                                const SizedBox(height: 12),
-                                // Additional Notes textarea
-                                _buildTextField(
-                                  icon: Icons.edit_note,
-                                  label: 'Catatan Tambahan (Opsional)',
-                                  hint: 'Contoh: Alergi makanan, dll',
-                                  value: participant.optionalNotes,
-                                  onChanged: (val) => participant.optionalNotes = val,
-                                  maxLines: 2,
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            // Booking summary and breakdown
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0F2F1).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE0F2F1).withOpacity(0.5)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.assignment_outlined, color: Color(0xFF0F8B8D), size: 20),
-                        const SizedBox(width: 8),
-                        Text('Ringkasan Booking', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F8B8D))),
-                      ],
-                    ),
-                    const Divider(height: 24, thickness: 1, color: Colors.white),
-                    _buildSummaryRow('Tanggal Trip', selectedDateStr),
-                    const SizedBox(height: 8),
-                    _buildSummaryRow('Jumlah Peserta', '$participantCount Orang'),
-                    const SizedBox(height: 8),
-                    _buildSummaryRow('Harga Per Orang', currencyFormatter.format(basePrice)),
-                    const Divider(height: 24, thickness: 1),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Total Harga', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF374151))),
-                        Text(
-                          currencyFormatter.format(totalPrice),
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F8B8D)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
-
-      // Booking sticky bottom bar
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
-              offset: const Offset(0, -4),
-            )
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Total Pembayaran', style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
-                      const SizedBox(height: 2),
-                      Text(
-                        currencyFormatter.format(totalPrice),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F8B8D),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      const Text('Termasuk pajak & biaya layanan', style: TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
                     ],
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      DateTime parsedTripDate;
-                      try {
-                        parsedTripDate = DateFormat('dd MMM yyyy').parse(selectedDateStr);
-                      } catch (e) {
-                        parsedTripDate = DateTime.now().add(const Duration(days: 14));
-                      }
-
-                      final String mainCustomerName = participants.isNotEmpty && participants[0].fullName.isNotEmpty
-                          ? participants[0].fullName
-                          : 'Pelanggan TripKita';
-
-                      // Call Railway backend to generate real Xendit Invoice
-                      final bookingResult = await ApiService.createBooking(
-                        packageId: package.id,
-                        packageDetails: package,
-                        customerName: mainCustomerName,
-                        guests: participantCount,
-                        totalPrice: totalPrice,
-                        tripDate: parsedTripDate,
-                        participants: participants,
-                      );
-
-                      // Navigate to Payment Screen (Index 7) with created booking
-                      widget.onNavigate(7, arguments: {'booking': bookingResult});
-                    },
-                    icon: const Text('Lanjut Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    label: const Icon(Icons.arrow_forward, size: 18),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F8B8D),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 0,
-                    ),
                   ),
                 ],
               ),
             ),
-            // Reuses the identical BottomNavigationBar (Booking is index 2 active)
-            TripKitaBottomNavigation(
-              currentIndex: 2, // Booking active
-              onTap: (index) {
-                widget.onNavigate(index);
-              },
+            const SizedBox(height: 20),
+
+            // BAGIAN 2: DATA PESERTA TRIP
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '2. Data Peserta Trip ($participantCount Orang)',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Lengkapi nama, nomor HP, dan jenis kelamin seluruh peserta yang akan berangkat.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 16),
+
+                  ...List.generate(participantCount, (index) {
+                    final p = participants[index];
+                    final bool isFirst = index == 0;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Peserta ${index + 1}',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF007BFF)),
+                              ),
+                              if (isFirst)
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _isSameAsPemesan,
+                                      onChanged: _onSameAsPemesanChanged,
+                                      activeColor: const Color(0xFF007BFF),
+                                    ),
+                                    const Text('Peserta 1 sama dengan Pemesan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                                  ],
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildInputLabel('Nama Lengkap Peserta *'),
+                                    TextFormField(
+                                      initialValue: p.nama,
+                                      readOnly: isFirst && _isSameAsPemesan,
+                                      onChanged: (val) => p.nama = val,
+                                      decoration: InputDecoration(
+                                        hintText: 'testing',
+                                        filled: isFirst && _isSameAsPemesan,
+                                        fillColor: isFirst && _isSameAsPemesan ? const Color(0xFFF1F5F9) : Colors.white,
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildInputLabel('Nomor HP Peserta *'),
+                                    TextFormField(
+                                      initialValue: p.hp,
+                                      readOnly: isFirst && _isSameAsPemesan,
+                                      onChanged: (val) => p.hp = val,
+                                      decoration: InputDecoration(
+                                        hintText: '081221213149',
+                                        filled: isFirst && _isSameAsPemesan,
+                                        fillColor: isFirst && _isSameAsPemesan ? const Color(0xFFF1F5F9) : Colors.white,
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildInputLabel('Jenis Kelamin *'),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      decoration: BoxDecoration(
+                                        color: isFirst && _isSameAsPemesan ? const Color(0xFFF1F5F9) : Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<String>(
+                                          value: p.gender,
+                                          isExpanded: true,
+                                          items: ['Laki-laki', 'Perempuan'].map((g) => DropdownMenuItem(value: g, child: Text(g, style: const TextStyle(fontSize: 12)))).toList(),
+                                          onChanged: (isFirst && _isSameAsPemesan) ? null : (val) {
+                                            if (val != null) setState(() => p.gender = val);
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildInputLabel('Tanggal Lahir Peserta *'),
+                                    TextFormField(
+                                      initialValue: p.tanggalLahir,
+                                      readOnly: isFirst && _isSameAsPemesan,
+                                      onChanged: (val) => p.tanggalLahir = val,
+                                      decoration: InputDecoration(
+                                        hintText: '01/01/2000',
+                                        filled: isFirst && _isSameAsPemesan,
+                                        fillColor: isFirst && _isSameAsPemesan ? const Color(0xFFF1F5F9) : Colors.white,
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                        suffixIcon: const Icon(Icons.calendar_today, size: 14),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildInputLabel('Riwayat Penyakit & Alergi (Maks. 255 Karakter, opsional)'),
+                          TextFormField(
+                            initialValue: p.riwayatPenyakit,
+                            onChanged: (val) => p.riwayatPenyakit = val,
+                            maxLength: 255,
+                            decoration: InputDecoration(
+                              hintText: 'Tidak Ada',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Submit Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  if (!_validateForm()) return;
+
+                  final DateTime parsedDate = DateTime.now().add(const Duration(days: 7));
+                  final bookingResult = await ApiService.createBooking(
+                    packageId: package.id,
+                    packageDetails: package,
+                    customerName: _pemesanNameCtrl.text,
+                    guests: participantCount,
+                    totalPrice: totalPrice,
+                    tripDate: parsedDate,
+                  );
+
+                  widget.onNavigate(7, arguments: {'booking': bookingResult});
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF007BFF),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Lanjut ke Konfirmasi Pemesanan',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: TripKitaBottomNavigation(
+        currentIndex: 2,
+        onTap: (index) => widget.onNavigate(index),
+      ),
+    );
+  }
+
+  Widget _buildInputLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
       ),
     );
   }
 
   Widget _buildTextField({
+    required TextEditingController controller,
     required IconData icon,
-    required String label,
     required String hint,
-    required String value,
-    required Function(String) onChanged,
     TextInputType keyboardType = TextInputType.text,
-    Widget? suffixIcon,
-    int maxLines = 1,
+    String? errorText,
+    Function(String)? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4B5563)),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: TextFormField(
-            initialValue: value,
-            key: Key(value), // Forces redrawing when state changes (e.g. Autofill)
-            onChanged: onChanged,
-            keyboardType: keyboardType,
-            maxLines: maxLines,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF1F2937)),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-              prefixIcon: Icon(icon, size: 18, color: Colors.grey.shade500),
-              suffixIcon: suffixIcon,
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDropdownField({
-    required IconData icon,
-    required String label,
-    required String value,
-    required List<String> items,
-    required Function(String?) onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4B5563)),
-        ),
-        const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: errorText != null ? Colors.red : const Color(0xFFCBD5E1)),
           ),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: Colors.grey.shade500),
+              Icon(icon, size: 16, color: const Color(0xFF94A3B8)),
               const SizedBox(width: 8),
               Expanded(
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: value,
-                    onChanged: onChanged,
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF1F2937)),
-                    items: items.map<DropdownMenuItem<String>>((String val) {
-                      return DropdownMenuItem<String>(
-                        value: val,
-                        child: Text(val),
-                      );
-                    }).toList(),
+                child: TextFormField(
+                  controller: controller,
+                  onChanged: onChanged,
+                  keyboardType: keyboardType,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildSummaryRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-        Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF374151))),
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(errorText, style: const TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
       ],
     );
   }

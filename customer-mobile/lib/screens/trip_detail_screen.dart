@@ -24,6 +24,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
   String? selectedDepartureDate;
   int participantCount = 2; // Default to 2 participants
   bool isWishlisted = false;
+  bool isLoggedIn = false;
 
   final PageController _carouselController = PageController();
 
@@ -541,12 +542,16 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
                     width: 180,
                     child: ElevatedButton(
                       onPressed: () {
-                        widget.onNavigate(6, arguments: {
-                          'package': package,
-                          'participants': participantCount,
-                          'selectedDate': selectedDepartureDate,
-                          'totalPrice': totalPrice,
-                        });
+                        if (!isLoggedIn) {
+                          _showLoginModal(context);
+                        } else {
+                          widget.onNavigate(6, arguments: {
+                            'package': package,
+                            'participants': participantCount,
+                            'selectedDate': selectedDepartureDate,
+                            'totalPrice': totalPrice,
+                          });
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F8B8D),
@@ -558,7 +563,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
                         elevation: 0,
                       ),
                       child: const Text(
-                        'Booking Sekarang',
+                        'Pesan Sekarang',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ),
@@ -971,6 +976,207 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
           ),
         ],
       ),
+    );
+  }
+
+  void _showLoginModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.public, color: Color(0xFF0F8B8D), size: 24),
+                        SizedBox(width: 8),
+                        Text('TemenTrip', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF0F8B8D))),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Masuk ke TemenTrip',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Silakan masuk untuk melanjutkan pemesanan paket wisata.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 16),
+                // Tabs Masuk / Daftar
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text('Masuk', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF007BFF))),
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          alignment: Alignment.center,
+                          child: const Text('Daftar Akun', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Email input
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Alamat Email', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F7FF),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: const TextField(
+                        controller: null,
+                        decoration: InputDecoration(
+                          hintText: 'testing@gmail.com',
+                          prefixIcon: Icon(Icons.mail_outline, size: 16, color: Color(0xFF64748B)),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Password input
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Kata Sandi', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F7FF),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: const TextField(
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          hintText: '••••••••',
+                          prefixIcon: Icon(Icons.lock_outline, size: 16, color: Color(0xFF64748B)),
+                          suffixIcon: Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                // Submit Login button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        isLoggedIn = true;
+                      });
+                      Navigator.of(ctx).pop();
+                      widget.onNavigate(6, arguments: {
+                        'package': package,
+                        'participants': participantCount,
+                        'selectedDate': selectedDepartureDate,
+                        'totalPrice': package.price * participantCount,
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF007BFF),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Masuk Sekarang', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        SizedBox(width: 4),
+                        Icon(Icons.arrow_forward, size: 16),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: const [
+                    Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text('atau', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                    ),
+                    Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // Google Login button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        isLoggedIn = true;
+                      });
+                      Navigator.of(ctx).pop();
+                      widget.onNavigate(6, arguments: {
+                        'package': package,
+                        'participants': participantCount,
+                        'selectedDate': selectedDepartureDate,
+                        'totalPrice': package.price * participantCount,
+                      });
+                    },
+                    icon: const Icon(Icons.g_mobiledata, size: 24, color: Colors.red),
+                    label: const Text('Masuk dengan Google', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
