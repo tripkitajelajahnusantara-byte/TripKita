@@ -45,6 +45,7 @@
                     <button class="btn-screen" data-target="screen-detail">3. Detail Trip</button>
                     <button class="btn-screen" data-target="screen-booking">4. Form Booking</button>
                     <button class="btn-screen" data-target="screen-payment">5. Pembayaran</button>
+                    <button class="btn-screen" data-target="screen-plan">6. Rencana Trip (Plan)</button>
                 </div>
             </div>
 
@@ -1293,6 +1294,16 @@
                         </div>
                     </div>
 
+                    <!-- Screen 11: Plan (Rencana Trip & Target Tabungan) -->
+                    <div class="screen" id="screen-plan">
+                        <div class="app-header">
+                            <h3 id="plan-screen-title" style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-bullseye text-teal" style="color: #0f8b8d;"></i> Rencana Trip & Tabungan</h3>
+                        </div>
+                        <div class="screen-content" id="plan-screen-container" style="overflow-y: auto; height: calc(100% - 50px); padding: 16px;">
+                            <!-- Dynamic Content Rendered by JavaScript -->
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- Bottom Navigation Bar Widget (Persistent & Identical across views) -->
@@ -1309,7 +1320,10 @@
                         <i class="fa-solid fa-briefcase"></i>
                         <span>Booking</span>
                     </div>
-
+                    <div class="nav-item" data-screen="screen-plan">
+                        <i class="fa-solid fa-bullseye"></i>
+                        <span>Plan</span>
+                    </div>
                     <div class="nav-item" data-screen="screen-profile">
                         <i class="fa-regular fa-user"></i>
                         <span>Profile</span>

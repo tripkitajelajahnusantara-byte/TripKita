@@ -944,6 +944,8 @@ function switchScreen(screenId) {
         renderChatInbox();
     } else if (screenId === "screen-booking-list") {
         renderBookingHistoryList();
+    } else if (screenId === "screen-plan") {
+        renderTripPlanScreen();
     }
 }
 
@@ -2199,6 +2201,439 @@ function generateQRISCode() {
     }
 }
 
+// -------------------------------------------------------------
+// 19. Rencana Trip & Target Tabungan (Plan Screen Prototype State & Renderer)
+// -------------------------------------------------------------
+let selectedPlanId = null;
+let tripPlansDB = [
+    {
+        id: "plan_palu_1",
+        destination: "Palu",
+        targetMonth: "2027-03",
+        targetMonthLabel: "17 Maret 2027",
+        participants: 2,
+        targetBudget: 10000000,
+        savedAmount: 1000000,
+        status: "Tersimpan",
+        checklist: [
+            { id: "1", label: "Tentukan Destinasi & Target Budget Liburan", completed: true, isAutomatic: true },
+            { id: "2", label: "Capai 25% Tabungan Perjalanan", completed: false, isAutomatic: true },
+            { id: "3", label: "Capai 50% Tabungan Perjalanan", completed: false, isAutomatic: true },
+            { id: "4", label: "Capai 75% Tabungan Perjalanan", completed: false, isAutomatic: true },
+            { id: "5", label: "Capai 100% Target Tabungan", completed: false, isAutomatic: true },
+            { id: "6", label: "Cari & Pesan Paket Open Trip di TemenTrip", completed: false, isAutomatic: false }
+        ],
+        savingsLogs: [
+            { id: "log_1", date: "17 Sep 2026", amount: 1000000, note: "Tabungan bulanan" }
+        ]
+    }
+];
+
+function updatePlanMilestones(plan) {
+    const pct = plan.targetBudget > 0 ? Math.min(100, Math.round((plan.savedAmount / plan.targetBudget) * 100)) : 0;
+    plan.checklist.forEach(item => {
+        if (item.id === "2") item.completed = pct >= 25;
+        if (item.id === "3") item.completed = pct >= 50;
+        if (item.id === "4") item.completed = pct >= 75;
+        if (item.id === "5") item.completed = pct >= 100;
+    });
+}
+
+function renderTripPlanScreen() {
+    const container = document.getElementById("plan-screen-container");
+    if (!container) return;
+
+    if (selectedPlanId) {
+        const plan = tripPlansDB.find(p => p.id === selectedPlanId);
+        if (plan) {
+            renderPlanDetailView(container, plan);
+            return;
+        } else {
+            selectedPlanId = null;
+        }
+    }
+
+    renderPlanListView(container);
+}
+
+function renderPlanListView(container) {
+    const planCount = tripPlansDB.length;
+    
+    let html = `
+        <!-- Hero Banner -->
+        <div style="background: linear-gradient(135deg, #0f8b8d 0%, #09686a 100%); border-radius: 18px; padding: 16px; color: white; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(15,139,141,0.25);">
+            <span style="background: #f59e0b; color: white; font-size: 9px; font-weight: 900; padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px; text-transform: uppercase;">LIBURAN IMPIAN TANPA BEBAN</span>
+            <h4 style="margin: 8px 0 4px 0; font-size: 14px; font-weight: bold; line-height: 1.3;">Rencanakan Liburan Seru Bersama Pasangan, Teman, atau Keluarga! 🏝️✨</h4>
+            <p style="margin: 0; font-size: 11px; opacity: 0.9; line-height: 1.4;">Susun target budget dan tabungan bulananmu mulai dari sekarang. Nikmati perjalanan impian tanpa perlu risau masalah keuangan!</p>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <strong style="font-size: 14px; color: #0f172a;">Daftar Rencana Trip Saya (${planCount}/10)</strong>
+        </div>
+    `;
+
+    if (planCount === 0) {
+        html += `
+            <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 32px 16px; text-align: center; color: #64748b;">
+                <i class="fa-solid fa-compass" style="font-size: 36px; color: #cbd5e1; margin-bottom: 8px;"></i>
+                <h5 style="margin: 0 0 4px 0; font-size: 14px; color: #0f172a;">Belum Ada Rencana Trip</h5>
+                <p style="margin: 0; font-size: 11px;">Yuk susun target tabungan liburan impianmu sekarang!</p>
+            </div>
+        `;
+    } else {
+        tripPlansDB.forEach(plan => {
+            const savedPercentage = plan.targetBudget > 0 ? Math.min(100, Math.round((plan.savedAmount / plan.targetBudget) * 100)) : 0;
+            const remainingBudget = Math.max(0, plan.targetBudget - plan.savedAmount);
+
+            html += `
+                <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 14px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="background: #dcfce7; color: #166534; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 8px;">${plan.status}</span>
+                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 8px;">${savedPercentage}% Terkumpul</span>
+                    </div>
+
+                    <h4 style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #0f172a;">🏝️ ${plan.destination}</h4>
+                    <div style="font-size: 11px; color: #64748b; margin-bottom: 12px; display: flex; gap: 12px;">
+                        <span><i class="fa-regular fa-calendar-days text-teal" style="color:#0f8b8d;"></i> ${plan.targetMonthLabel}</span>
+                        <span><i class="fa-solid fa-users text-teal" style="color:#0f8b8d;"></i> ${plan.participants} Peserta</span>
+                    </div>
+
+                    <div style="background: #f8fafc; border-radius: 12px; padding: 10px; border: 1px solid #f1f5f9; margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-bottom: 2px;">
+                            <span>TERKUMPUL</span>
+                            <span>TARGET BUDGET</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin-bottom: 6px;">
+                            <span style="color: #10b981;">${formatIDRCurrency(plan.savedAmount)}</span>
+                            <span style="color: #0f172a;">${formatIDRCurrency(plan.targetBudget)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 10px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 4px;">
+                            <span>Sisa Dibutuhkan:</span>
+                            <strong style="color: ${remainingBudget > 0 ? '#ef4444' : '#10b981'};">${formatIDRCurrency(remainingBudget)}</strong>
+                        </div>
+                    </div>
+
+                    <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
+                        <div style="height: 100%; width: ${savedPercentage}%; background: ${savedPercentage >= 100 ? '#10b981' : '#0f8b8d'}; border-radius: 4px;"></div>
+                    </div>
+
+                    <div style="display: flex; gap: 6px;">
+                        <button onclick="selectTripPlan('${plan.id}')" style="flex: 1; background: #0f8b8d; color: white; border: none; border-radius: 10px; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer;">Lihat Detail →</button>
+                        <button onclick="openCreatePlanModal('${plan.id}')" style="background: white; border: 1px solid #cbd5e1; color: #475569; border-radius: 10px; width: 34px; height: 34px; cursor: pointer;"><i class="fa-regular fa-pen-to-square"></i></button>
+                        <button onclick="deleteTripPlan('${plan.id}')" style="background: #fef2f2; border: 1px solid #fca5a5; color: #ef4444; border-radius: 10px; width: 34px; height: 34px; cursor: pointer;"><i class="fa-regular fa-trash-can"></i></button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    html += `
+        <button onclick="openCreatePlanModal()" style="width: 100%; background: #0f8b8d; color: white; border: none; border-radius: 12px; padding: 12px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 3px 8px rgba(15,139,141,0.2);">
+            <i class="fa-solid fa-plus"></i> Buat Rencana Baru (${planCount}/10)
+        </button>
+    `;
+
+    container.innerHTML = html;
+}
+
+function selectTripPlan(planId) {
+    selectedPlanId = planId;
+    renderTripPlanScreen();
+}
+
+function deleteTripPlan(planId) {
+    if (confirm("Apakah Anda yakin ingin menghapus Rencana Trip ini?")) {
+        tripPlansDB = tripPlansDB.filter(p => p.id !== planId);
+        if (selectedPlanId === planId) selectedPlanId = null;
+        renderTripPlanScreen();
+    }
+}
+
+function renderPlanDetailView(container, plan) {
+    updatePlanMilestones(plan);
+    const savedPercentage = plan.targetBudget > 0 ? Math.min(100, Math.round((plan.savedAmount / plan.targetBudget) * 100)) : 0;
+    const remainingBudget = Math.max(0, plan.targetBudget - plan.savedAmount);
+    const is100 = savedPercentage >= 100;
+
+    let html = `
+        <div onclick="selectTripPlan(null)" style="color: #0f8b8d; font-size: 12px; font-weight: bold; margin-bottom: 12px; cursor: pointer;">
+            <i class="fa-solid fa-arrow-left"></i> Kembali ke Daftar Rencana Trip Saya
+        </div>
+
+        <!-- Plan Header Box -->
+        <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 14px; margin-bottom: 14px;">
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                <span style="background: #e6f4f4; color: #0f8b8d; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 6px;">TARGET LIBURAN</span>
+                <span style="background: #dcfce7; color: #166534; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 6px;">Status: ${plan.status}</span>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                <div>
+                    <h3 style="margin: 0 0 2px 0; font-size: 20px; font-weight: bold; color: #0f172a;">${plan.destination}</h3>
+                    <div style="font-size: 11px; color: #64748b; display: flex; gap: 10px;">
+                        <span><i class="fa-regular fa-calendar-days text-teal" style="color:#0f8b8d;"></i> ${plan.targetMonthLabel}</span>
+                        <span><i class="fa-solid fa-users text-teal" style="color:#0f8b8d;"></i> ${plan.participants} Peserta</span>
+                    </div>
+                </div>
+                <button onclick="openSavingsModal('${plan.id}')" style="background: #0f8b8d; color: white; border: none; border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                    + Catat Tabungan
+                </button>
+            </div>
+
+            <!-- Progress Box -->
+            <div style="background: #f8fafc; border-radius: 12px; padding: 10px; border: 1px solid #f1f5f9;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 11px; font-weight: bold; color: #334155;">📈 Progres Tabungan</span>
+                    <strong style="font-size: 14px; color: #0f8b8d;">${savedPercentage}%</strong>
+                </div>
+                <div style="height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; margin-bottom: 10px;">
+                    <div style="height: 100%; width: ${savedPercentage}%; background: ${is100 ? '#10b981' : '#0f8b8d'}; border-radius: 5px;"></div>
+                </div>
+
+                <div style="display: flex; gap: 6px; text-align: center;">
+                    <div style="flex: 1; background: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 6px;">
+                        <span style="font-size: 8px; color: #64748b; display: block;">TERKUMPUL</span>
+                        <strong style="font-size: 11px; color: #10b981;">${formatIDRCurrency(plan.savedAmount)}</strong>
+                    </div>
+                    <div style="flex: 1; background: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 6px;">
+                        <span style="font-size: 8px; color: #64748b; display: block;">TARGET TOTAL</span>
+                        <strong style="font-size: 11px; color: #0f172a;">${formatIDRCurrency(plan.targetBudget)}</strong>
+                    </div>
+                    <div style="flex: 1; background: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 6px;">
+                        <span style="font-size: 8px; color: #64748b; display: block;">SISA DIBUTUHKAN</span>
+                        <strong style="font-size: 11px; color: ${remainingBudget > 0 ? '#ef4444' : '#10b981'};">${formatIDRCurrency(remainingBudget)}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Motivation Alert Box -->
+        <div style="background: ${is100 ? '#ecfdf5' : '#e6f4f4'}; border: 1px solid ${is100 ? '#a7f3d0' : '#b2e2e2'}; border-radius: 14px; padding: 12px; margin-bottom: 14px; display: flex; gap: 10px; align-items: flex-start;">
+            <div style="font-size: 24px;">${is100 ? '🥳' : '🚀'}</div>
+            <div style="flex: 1;">
+                <h5 style="margin: 0 0 2px 0; font-size: 12px; font-weight: bold; color: ${is100 ? '#065f46' : '#0d5c5e'};">
+                    ${is100 ? 'SELAMAT! Target Tabungan 100% Terkumpul!' : 'Langkah Awal Memulai Perjalanan Impian! 🚀'}
+                </h5>
+                <p style="margin: 0; font-size: 11px; color: ${is100 ? '#047857' : '#0f8b8d'}; line-height: 1.3;">
+                    ${is100
+                        ? `Tabungan liburan kamu ke ${plan.destination} sudah terkumpul penuh (${formatIDRCurrency(plan.savedAmount)}). Yuk langsung cari dan pesan paket trip di bawah!`
+                        : `Setiap perjalanan besar dimulai dari langkah kecil. Rencana trip impianmu ke ${plan.destination} baru saja dimulai. Yuk konsisten sisihkan tabungan bulan ini! ✨`}
+                </p>
+                ${is100 ? `
+                    <button onclick="switchScreen('screen-list')" style="margin-top: 8px; background: #10b981; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                        Pesan Trip Sekarang →
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+
+        <!-- Checklist Section -->
+        <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 14px; margin-bottom: 14px;">
+            <h5 style="margin: 0 0 10px 0; font-size: 13px; font-weight: bold; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-wand-magic-sparkles text-teal" style="color:#0f8b8d;"></i> Checklist Persiapan Trip
+            </h5>
+
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;">
+                ${plan.checklist.map((item, idx) => `
+                    <div style="display: flex; align-items: center; gap: 8px; background: ${item.completed ? '#f0fdf4' : '#f8fafc'}; border: 1px solid ${item.completed ? '#bbf7d0' : '#e2e8f0'}; padding: 8px 10px; border-radius: 10px;">
+                        <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleChecklistItem('${plan.id}', '${item.id}')" style="accent-color: #10b981; cursor: pointer;">
+                        <span style="flex: 1; font-size: 11px; font-weight: ${item.completed ? 'bold' : 'normal'}; color: ${item.completed ? '#166534' : '#334155'}; text-decoration: ${item.completed ? 'line-through' : 'none'};">
+                            ${item.label}
+                        </span>
+                        ${item.isAutomatic ? `
+                            <span style="font-size: 8px; background: #e0f2fe; color: #0369a1; padding: 2px 5px; border-radius: 4px; font-weight: bold;">Otomatis</span>
+                        ` : `
+                            <i class="fa-regular fa-trash-can" onclick="deleteChecklistItem('${plan.id}', ${idx})" style="color: #94a3b8; font-size: 12px; cursor: pointer;"></i>
+                        `}
+                    </div>
+                `).join('')}
+            </div>
+
+            <div style="display: flex; gap: 6px;">
+                <input type="text" id="input-custom-checklist" placeholder="Tambah item checklist baru..." style="flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 11px;">
+                <button onclick="addCustomChecklistItem('${plan.id}')" style="background: #0f8b8d; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: bold; cursor: pointer;">Tambah</button>
+            </div>
+        </div>
+
+        <!-- Savings Logs Section -->
+        <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 14px; margin-bottom: 14px;">
+            <h5 style="margin: 0 0 10px 0; font-size: 13px; font-weight: bold; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-wallet text-teal" style="color:#0f8b8d;"></i> Riwayat Catatan Tabungan
+            </h5>
+
+            ${plan.savingsLogs.length === 0 ? `
+                <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 12px 0;">Belum ada tabungan yang dicatat.<br>Klik tombol <strong>"+ Catat Tabungan"</strong> di atas.</p>
+            ` : `
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    ${plan.savingsLogs.map((log, lIdx) => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #f1f5f9; padding: 8px 10px; border-radius: 10px;">
+                            <div>
+                                <div style="font-size: 10px; color: #64748b;">${log.date}</div>
+                                <div style="font-size: 11px; font-weight: bold; color: #334155;">${log.note}</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <strong style="font-size: 11.5px; color: #10b981;">+ ${formatIDRCurrency(log.amount)}</strong>
+                                <i class="fa-regular fa-trash-can" onclick="deleteSavingsLog('${plan.id}', ${lIdx})" style="color: #94a3b8; font-size: 12px; cursor: pointer;"></i>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `}
+        </div>
+
+        <!-- Rekomendasi Open Trip -->
+        <div style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <strong style="font-size: 12px; color: #0f172a;">Rekomendasi Open Trip ke ${plan.destination}</strong>
+                <span onclick="switchScreen('screen-list')" style="font-size: 10px; color: #0f8b8d; font-weight: bold; cursor: pointer;">Lihat Semua ></span>
+            </div>
+            <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px;">
+                ${(typeof packagesDB !== 'undefined' ? packagesDB : []).slice(0, 3).map(pkg => `
+                    <div onclick="openPackageDetail(${pkg.id})" style="min-width: 150px; width: 150px; background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; cursor: pointer;">
+                        <img src="${pkg.image}" style="width: 100%; height: 75px; object-fit: cover;">
+                        <div style="padding: 8px;">
+                            <div style="font-size: 11px; font-weight: bold; color: #0f172a; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${pkg.name}</div>
+                            <div style="font-size: 9px; color: #64748b;">${pkg.destination}</div>
+                            <div style="font-size: 11px; font-weight: bold; color: #0f8b8d; margin-top: 4px;">${formatIDRCurrency(pkg.price)}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        <!-- Bottom Actions -->
+        <div style="display: flex; gap: 8px;">
+            <button onclick="deleteTripPlan('${plan.id}')" style="flex: 1; background: white; border: 1px solid #ef4444; color: #ef4444; border-radius: 10px; padding: 10px; font-size: 12px; font-weight: bold; cursor: pointer;">Batalkan Rencana</button>
+            <button onclick="selectTripPlan(null)" style="flex: 1; background: #0f8b8d; color: white; border: none; border-radius: 10px; padding: 10px; font-size: 12px; font-weight: bold; cursor: pointer;">Simpan Rencana</button>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+function toggleChecklistItem(planId, itemId) {
+    const plan = tripPlansDB.find(p => p.id === planId);
+    if (plan) {
+        const item = plan.checklist.find(i => i.id === itemId);
+        if (item) {
+            item.completed = !item.completed;
+            renderTripPlanScreen();
+        }
+    }
+}
+
+function addCustomChecklistItem(planId) {
+    const input = document.getElementById("input-custom-checklist");
+    if (!input || !input.value.trim()) return;
+    const plan = tripPlansDB.find(p => p.id === planId);
+    if (plan) {
+        plan.checklist.push({
+            id: `chk_${Date.now()}`,
+            label: input.value.trim(),
+            completed: false,
+            isAutomatic: false
+        });
+        renderTripPlanScreen();
+    }
+}
+
+function deleteChecklistItem(planId, idx) {
+    const plan = tripPlansDB.find(p => p.id === planId);
+    if (plan) {
+        plan.checklist.splice(idx, 1);
+        renderTripPlanScreen();
+    }
+}
+
+function deleteSavingsLog(planId, lIdx) {
+    const plan = tripPlansDB.find(p => p.id === planId);
+    if (plan && plan.savingsLogs[lIdx]) {
+        plan.savedAmount -= plan.savingsLogs[lIdx].amount;
+        if (plan.savedAmount < 0) plan.savedAmount = 0;
+        plan.savingsLogs.splice(lIdx, 1);
+        updatePlanMilestones(plan);
+        renderTripPlanScreen();
+    }
+}
+
+function openCreatePlanModal(planIdToEdit = null) {
+    let dest = "Palu";
+    let budget = "10000000";
+    let participants = 2;
+    let selectedMonth = "2027-03";
+
+    if (planIdToEdit) {
+        const plan = tripPlansDB.find(p => p.id === planIdToEdit);
+        if (plan) {
+            dest = plan.destination;
+            budget = plan.targetBudget;
+            participants = plan.participants;
+            selectedMonth = plan.targetMonth;
+        }
+    }
+
+    const inputDest = prompt("Masukkan Destinasi Impian:", dest);
+    if (inputDest === null) return;
+    const inputBudget = prompt("Masukkan Total Target Budget (Rp):", budget);
+    if (inputBudget === null) return;
+
+    const numBudget = parseInt(inputBudget.replace(/\D/g, ''), 10) || 10000000;
+
+    if (planIdToEdit) {
+        const plan = tripPlansDB.find(p => p.id === planIdToEdit);
+        if (plan) {
+            plan.destination = inputDest;
+            plan.targetBudget = numBudget;
+            updatePlanMilestones(plan);
+        }
+    } else {
+        const newPlan = {
+            id: `plan_${Date.now()}`,
+            destination: inputDest,
+            targetMonth: "2027-03",
+            targetMonthLabel: "17 Maret 2027",
+            participants: 2,
+            targetBudget: numBudget,
+            savedAmount: 0,
+            status: "Tersimpan",
+            checklist: [
+                { id: "1", label: "Tentukan Destinasi & Target Budget Liburan", completed: true, isAutomatic: true },
+                { id: "2", label: "Capai 25% Tabungan Perjalanan", completed: false, isAutomatic: true },
+                { id: "3", label: "Capai 50% Tabungan Perjalanan", completed: false, isAutomatic: true },
+                { id: "4", label: "Capai 75% Tabungan Perjalanan", completed: false, isAutomatic: true },
+                { id: "5", label: "Capai 100% Target Tabungan", completed: false, isAutomatic: true },
+                { id: "6", label: "Cari & Pesan Paket Open Trip di TemenTrip", completed: false, isAutomatic: false }
+            ],
+            savingsLogs: []
+        };
+        tripPlansDB.unshift(newPlan);
+        selectedPlanId = newPlan.id;
+    }
+    renderTripPlanScreen();
+}
+
+function openSavingsModal(planId) {
+    const inputAmount = prompt("Masukkan Nominal Tabungan Bulan Ini (Rp):", "500000");
+    if (inputAmount === null) return;
+    const amount = parseInt(inputAmount.replace(/\D/g, ''), 10);
+    if (isNaN(amount) || amount <= 0) return;
+
+    const inputNote = prompt("Catatan / Sumber (Opsional):", "Tabungan bulanan") || "Tabungan bulanan";
+
+    const plan = tripPlansDB.find(p => p.id === planId);
+    if (plan) {
+        plan.savedAmount += amount;
+        plan.savingsLogs.unshift({
+            id: `log_${Date.now()}`,
+            date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+            amount: amount,
+            note: inputNote
+        });
+        updatePlanMilestones(plan);
+        renderTripPlanScreen();
+    }
+}
+
 // Immediate Top-Level Execution (Script at bottom of <body>)
 try {
     renderHomeScreenData();
@@ -2208,8 +2643,8 @@ try {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    try { renderHomeScreenData(); renderTripListData(); } catch (e) {}
+    try { renderHomeScreenData(); renderTripListData(); renderTripPlanScreen(); } catch (e) {}
 });
 window.addEventListener("load", () => {
-    try { renderHomeScreenData(); renderTripListData(); } catch (e) {}
+    try { renderHomeScreenData(); renderTripListData(); renderTripPlanScreen(); } catch (e) {}
 });
