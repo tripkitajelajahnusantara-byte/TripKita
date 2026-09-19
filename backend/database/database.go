@@ -43,8 +43,9 @@ func ConnectDB(cfg *config.Config) {
 		DSN:                  dsn,
 		PreferSimpleProtocol: true,
 	}), &gorm.Config{
-		Logger:      logger.Default.LogMode(logLevel),
-		PrepareStmt: false,
+		Logger:         logger.Default.LogMode(logLevel),
+		PrepareStmt:    false,
+		TranslateError: true,
 	})
 
 	if err != nil {
@@ -65,6 +66,8 @@ func ConnectDB(cfg *config.Config) {
 		// Migration startup hanya untuk development atau deployment yang secara eksplisit mengaktifkannya.
 		err = DB.AutoMigrate(
 			&models.Provider{},
+			&models.User{},
+			&models.AuthSession{},
 			&models.Package{},
 			&models.Booking{},
 			&models.ProviderStatusHistory{},
@@ -92,6 +95,12 @@ func ConnectDB(cfg *config.Config) {
 		execMigration(`ALTER TABLE IF EXISTS provider_balances ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS provider_status_histories ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS refund_records ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS users ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS auth_sessions ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS oauth_login_codes ENABLE ROW LEVEL SECURITY;`)
+		if err := syncLegacyAuthUsers(); err != nil {
+			log.Fatalf("Migrasi identitas akun lama gagal: %v", err)
+		}
 
 		// Pastikan kolom meeting_point, customer_email, customer_phone, description, included_facilities, excluded_facilities, itinerary ada di database Supabase
 		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS meeting_point TEXT;`)
@@ -122,14 +131,32 @@ func ConnectDB(cfg *config.Config) {
 
 	// Data demo tidak pernah dibuat otomatis di production.
 	if cfg.SeedDatabase {
-		if len(os.Getenv("DEV_ADMIN_PASSWORD")) < 8 || len(os.Getenv("DEV_PROVIDER_PASSWORD")) < 8 {
-			log.Fatal("DEV_ADMIN_PASSWORD dan DEV_PROVIDER_PASSWORD minimal 8 karakter saat SEED_DB=true")
+		if len(os.Getenv("DEV_ADMIN_PASSWORD")) < 12 || len(os.Getenv("DEV_PROVIDER_PASSWORD")) < 12 {
+			log.Fatal("DEV_ADMIN_PASSWORD dan DEV_PROVIDER_PASSWORD minimal 12 karakter saat SEED_DB=true")
 		}
 		SeedDatabase()
 		EnsureAdminUserExists()
 		EnsureAllTestProvidersAndSeats()
+		if cfg.RunMigrations {
+			if err := syncLegacyAuthUsers(); err != nil {
+				log.Fatalf("Migrasi identitas akun seed gagal: %v", err)
+			}
+		}
 	}
 
+}
+
+// syncLegacyAuthUsers membuat identity record untuk akun yang sebelumnya
+// menyimpan kredensial langsung di tabel providers. Hash bcrypt lama tetap
+// dapat dipakai dan otomatis dinaikkan ke Argon2id saat login berhasil.
+func syncLegacyAuthUsers() error {
+	return DB.Exec(`
+		INSERT INTO users (provider_id, email, password_hash, created_at, updated_at)
+		SELECT p.id, LOWER(TRIM(p.email)), COALESCE(p.password_hash, ''), NOW(), NOW()
+		FROM providers p
+		WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.provider_id = p.id)
+		ON CONFLICT (provider_id) DO NOTHING;
+	`).Error
 }
 
 // execMigration menjalankan pernyataan penyesuaian skema dan mencatat

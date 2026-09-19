@@ -4,20 +4,8 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
     : 'http://localhost:8080/api/v1');
 
 export function getProviderToken(): string | null {
-  const sessionToken = sessionStorage.getItem('tementrip_partner_token');
-  if (sessionToken) return sessionToken;
-
-  const legacyToken = localStorage.getItem('tementrip_partner_token') ||
-    localStorage.getItem('tripkita_partner_token') ||
-    localStorage.getItem('tripkita_provider_token') ||
-    localStorage.getItem('tripkita_token') ||
-    localStorage.getItem('provider_token') ||
-    localStorage.getItem('token');
-  if (legacyToken) {
-    removeProviderToken();
-    sessionStorage.setItem('tementrip_partner_token', legacyToken);
-  }
-  return legacyToken;
+  clearLegacyProviderTokens();
+  return sessionStorage.getItem('tementrip_partner_token');
 }
 
 export function setProviderToken(token: string) {
@@ -26,7 +14,11 @@ export function setProviderToken(token: string) {
 }
 
 export function removeProviderToken() {
-	sessionStorage.removeItem('tementrip_partner_token');
+  sessionStorage.removeItem('tementrip_partner_token');
+  clearLegacyProviderTokens();
+}
+
+function clearLegacyProviderTokens() {
   localStorage.removeItem('tementrip_partner_token');
   localStorage.removeItem('tripkita_partner_token');
   localStorage.removeItem('tripkita_provider_token');
@@ -36,17 +28,8 @@ export function removeProviderToken() {
 }
 
 export function getCustomerToken(): string | null {
-  const sessionToken = sessionStorage.getItem('tementrip_customer_token');
-  if (sessionToken) return sessionToken;
-
-  const legacyToken = localStorage.getItem('tementrip_customer_token') ||
-	localStorage.getItem('tripkita_customer_token') ||
-	localStorage.getItem('customer_token');
-  if (legacyToken) {
-	removeCustomerToken();
-	sessionStorage.setItem('tementrip_customer_token', legacyToken);
-  }
-  return legacyToken;
+  clearLegacyCustomerTokens();
+  return sessionStorage.getItem('tementrip_customer_token');
 }
 
 export function setCustomerToken(token: string) {
@@ -55,10 +38,26 @@ export function setCustomerToken(token: string) {
 }
 
 export function removeCustomerToken() {
-	sessionStorage.removeItem('tementrip_customer_token');
+  sessionStorage.removeItem('tementrip_customer_token');
+  clearLegacyCustomerTokens();
+}
+
+function clearLegacyCustomerTokens() {
   localStorage.removeItem('tementrip_customer_token');
   localStorage.removeItem('tripkita_customer_token');
   localStorage.removeItem('customer_token');
+}
+
+/** Best effort: cabut sesi di server sebelum/ketika state lokal dibersihkan. */
+export async function revokeSessionToken(token: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/public/auth/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // Logout lokal tetap harus berhasil ketika jaringan sedang terputus.
+  }
 }
 
 export function getAuthToken(): string | null {

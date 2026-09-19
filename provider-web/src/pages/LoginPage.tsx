@@ -47,8 +47,8 @@ export const LoginPage: React.FC = () => {
       setForgotError('Semua kolom harus diisi');
       return;
     }
-    if (forgotNewPassword.length < 6) {
-      setForgotError('Password minimal 6 karakter');
+    if (forgotNewPassword.length < 12) {
+      setForgotError('Password minimal 12 karakter');
       return;
     }
     setForgotLoading(true);
@@ -298,7 +298,7 @@ export const LoginPage: React.FC = () => {
                     value={forgotNewPassword} 
                     onChange={e => setForgotNewPassword(e.target.value)}
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
-                    placeholder="Minimal 6 karakter"
+                    placeholder="Minimal 12 karakter"
                   />
                 </div>
                 <button 

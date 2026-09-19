@@ -30,8 +30,8 @@ export const CustomerRegisterPage: React.FC = () => {
       return;
     }
 
-    if (password.length < 8) {
-      setError('Kata sandi minimal harus 8 karakter.');
+    if (password.length < 12) {
+      setError('Kata sandi minimal harus 12 karakter.');
       return;
     }
 
@@ -177,7 +177,7 @@ export const CustomerRegisterPage: React.FC = () => {
               <Lock size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px' }} />
               <input 
                 type={showPassword ? 'text' : 'password'} 
-                placeholder="Minimal 8 karakter"
+                placeholder="Minimal 12 karakter"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

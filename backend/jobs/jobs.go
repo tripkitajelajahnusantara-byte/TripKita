@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"tripkita-provider/config"
+	"tripkita-provider/models"
 	"tripkita-provider/services"
 )
 
@@ -61,4 +62,21 @@ func (r *Runner) runOnce(ctx context.Context) {
 	r.AutoCompleteFinishedBookings(ctx)
 	r.container.PayoutService.ReconcileProcessingPayouts(ctx)
 	r.ReconcileProviderBalances(ctx)
+	r.cleanupExpiredAuthData(ctx)
+}
+
+func (r *Runner) cleanupExpiredAuthData(ctx context.Context) {
+	cutoff := time.Now().UTC().Add(-24 * time.Hour)
+	if err := r.db.WithContext(ctx).Where("expires_at < ? OR (revoked_at IS NOT NULL AND revoked_at < ?)", cutoff, cutoff).Delete(&models.AuthSession{}).Error; err != nil {
+		log.Printf("[Auth Cleanup] gagal membersihkan sesi lama: %v", err)
+	}
+	if err := r.db.WithContext(ctx).Where("expires_at < ? OR (used_at IS NOT NULL AND used_at < ?)", cutoff, cutoff).Delete(&models.OAuthLoginCode{}).Error; err != nil {
+		log.Printf("[Auth Cleanup] gagal membersihkan kode OAuth lama: %v", err)
+	}
+	now := time.Now().UTC()
+	if err := r.db.WithContext(ctx).Model(&models.User{}).
+		Where("reset_token_expires_at IS NOT NULL AND reset_token_expires_at < ?", now).
+		Updates(map[string]interface{}{"reset_token_hash": "", "reset_token_expires_at": nil, "reset_attempts": 0}).Error; err != nil {
+		log.Printf("[Auth Cleanup] gagal membersihkan token reset lama: %v", err)
+	}
 }

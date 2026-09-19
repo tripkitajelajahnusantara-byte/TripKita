@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Route } from '../types';
-import { request, setProviderToken, getProviderToken, removeProviderToken, setCustomerToken, getCustomerToken, removeCustomerToken } from '../utils/api';
+import { request, setProviderToken, getProviderToken, removeProviderToken, setCustomerToken, getCustomerToken, removeCustomerToken, revokeSessionToken } from '../utils/api';
 
 
 import { AuthModal } from '../components/AuthModal';
@@ -384,7 +384,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
           setProviderProfile(data);
           setCustomerProfile(null);
           setIsRegistered(true);
-          if (routeParam === 'profil-provider') navigateTo('profil-provider');
+          if (data.status !== 'APPROVED' || routeParam === 'profil-provider') navigateTo('profil-provider');
           else navigateTo('dashboard');
         }
 	  }).catch((err) => {
@@ -428,6 +428,8 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       setIsRegistered(true);
       if (res.provider?.role === 'ADMIN') {
         navigateTo('admin-dashboard');
+      } else if (res.provider?.status !== 'APPROVED') {
+        navigateTo('profil-provider');
       } else {
         navigateTo('dashboard');
       }
@@ -489,8 +491,10 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   const logout = () => {
+    const activeTokens = [getProviderToken(), getCustomerToken()].filter((token): token is string => Boolean(token));
     removeProviderToken();
     removeCustomerToken();
+    void Promise.allSettled([...new Set(activeTokens)].map(revokeSessionToken));
     setIsRegistered(false);
     setProviderProfile(null);
     setCustomerProfile(null);

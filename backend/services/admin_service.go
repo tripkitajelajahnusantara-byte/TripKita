@@ -1,8 +1,13 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"time"
+
+	"gorm.io/gorm"
+
+	"tripkita-provider/authn"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
 )
@@ -17,11 +22,12 @@ type AdminService interface {
 }
 
 type adminService struct {
+	db   *gorm.DB
 	repo repositories.ProviderRepository
 }
 
-func NewAdminService(repo repositories.ProviderRepository) AdminService {
-	return &adminService{repo: repo}
+func NewAdminService(db *gorm.DB, repo repositories.ProviderRepository) AdminService {
+	return &adminService{db: db, repo: repo}
 }
 
 func (s *adminService) ListProviders() ([]models.Provider, error) {
@@ -50,6 +56,11 @@ func (s *adminService) UpdateProviderStatus(id uint, status string, notes string
 	if err != nil {
 		return err
 	}
+	if status != "APPROVED" {
+		if err := authn.RevokeAllProviderSessions(context.Background(), s.db, id); err != nil {
+			return err
+		}
+	}
 
 	// Log status history transition
 	historyNotes := notes
@@ -76,6 +87,9 @@ func (s *adminService) UpdateProviderStatus(id uint, status string, notes string
 }
 
 func (s *adminService) DeleteProvider(id uint) error {
+	if err := authn.RevokeAllProviderSessions(context.Background(), s.db, id); err != nil {
+		return err
+	}
 	return s.repo.Delete(id)
 }
 

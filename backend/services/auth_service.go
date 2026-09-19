@@ -1,22 +1,26 @@
 package services
 
 import (
+	"context"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
+	"tripkita-provider/authn"
 	"tripkita-provider/config"
-	"tripkita-provider/database"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
 )
@@ -29,9 +33,11 @@ type AuthService interface {
 	UpdateProfile(providerID uint, req *models.UpdateProfileRequest) (*models.Provider, error)
 	ForgotPassword(email string) error
 	ResetPassword(email string, token string, newPassword string) error
+	Logout(ctx context.Context, token string) error
 }
 
 type authService struct {
+	db           *gorm.DB
 	repo         repositories.ProviderRepository
 	cfg          *config.Config
 	emailService *EmailService
@@ -41,8 +47,9 @@ type AuthInputError struct{ Message string }
 
 func (e *AuthInputError) Error() string { return e.Message }
 
-func NewAuthService(repo repositories.ProviderRepository, cfg *config.Config, emailService *EmailService) AuthService {
-	return &authService{repo: repo, cfg: cfg, emailService: emailService}
+func NewAuthService(db *gorm.DB, repo repositories.ProviderRepository, cfg *config.Config, emailService *EmailService) AuthService {
+	_ = dummyPasswordHash()
+	return &authService{db: db, repo: repo, cfg: cfg, emailService: emailService}
 }
 
 func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, error) {
@@ -53,15 +60,9 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 	if err := validateManagedDocumentPaths(req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
 		return nil, &AuthInputError{Message: err.Error()}
 	}
-	// Check if email already exists
-	existing, _ := s.repo.FindByEmail(req.Email)
-	if existing != nil {
-		return nil, &AuthInputError{Message: "email is already registered"}
-	}
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hashedPassword, err := authn.HashPassword(req.Password)
 	if err != nil {
-		return nil, err
+		return nil, &AuthInputError{Message: err.Error()}
 	}
 
 	provider := &models.Provider{
@@ -81,76 +82,78 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 		TikTok:              req.TikTok,
 		PicName:             req.PicName,
 		Email:               req.Email,
-		PasswordHash:        string(hashedPassword),
-		WhatsApp:            req.WhatsApp,
-		Role:                "PROVIDER",
-		Status:              "PENDING",
-		IsVerified:          false,
+		// Kredensial kanonik disimpan di users; kolom lama dibiarkan kosong
+		// supaya tidak ada dua salinan password hash untuk akun baru.
+		PasswordHash: "",
+		WhatsApp:     req.WhatsApp,
+		Role:         "PROVIDER",
+		Status:       "PENDING",
+		IsVerified:   false,
 	}
 
-	err = s.repo.Create(provider)
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := ensureEmailAvailable(tx, req.Email); err != nil {
+			return err
+		}
+		if err := tx.Create(provider).Error; err != nil {
+			return err
+		}
+		user := models.User{ProviderID: provider.ID, Email: req.Email, PasswordHash: hashedPassword}
+		if err := tx.Create(&user).Error; err != nil {
+			return err
+		}
+		return tx.Create(&models.ProviderStatusHistory{
+			ProviderID: provider.ID, Status: "PENDING",
+			Notes: "Pendaftaran akun baru via form registrasi.", CreatedAt: time.Now(),
+		}).Error
+	})
 	if err != nil {
+		if errors.Is(err, errEmailUnavailable) || errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, &AuthInputError{Message: "pendaftaran tidak dapat diproses dengan alamat email tersebut"}
+		}
 		return nil, err
 	}
-
-	// Create initial status history entry
-	history := &models.ProviderStatusHistory{
-		ProviderID: provider.ID,
-		Status:     "PENDING",
-		Notes:      "Pendaftaran akun baru via form registrasi.",
-		CreatedAt:  time.Now(),
-	}
-	_ = s.repo.CreateStatusHistory(history)
 
 	return provider, nil
 }
 
 func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*models.LoginResponse, error) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
-	// Check if email already exists
-	existing, _ := s.repo.FindByEmail(req.Email)
-	if existing != nil {
-		return nil, &AuthInputError{Message: "email is already registered"}
-	}
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hashedPassword, err := authn.HashPassword(req.Password)
 	if err != nil {
-		return nil, err
+		return nil, &AuthInputError{Message: err.Error()}
 	}
 
 	customer := &models.Provider{
 		PicName:      req.Name,
 		BusinessName: req.Name, // Default name as business name
 		Email:        req.Email,
-		PasswordHash: string(hashedPassword),
+		PasswordHash: "",
 		WhatsApp:     req.WhatsApp,
 		Role:         "CUSTOMER",
 		Status:       "APPROVED",
 		IsVerified:   true,
 	}
 
-	err = s.repo.Create(customer)
-	if err != nil {
-		return nil, err
-	}
-
-	// Generate a short-lived JWT. The browser keeps it only for the current session.
-	now := time.Now()
-	tokenID, err := generateTokenID()
-	if err != nil {
-		return nil, err
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"provider_id": customer.ID,
-		"role":        customer.Role,
-		"iss":         "tripkita-api",
-		"aud":         "tripkita-web",
-		"iat":         now.Unix(),
-		"jti":         tokenID,
-		"exp":         now.Add(8 * time.Hour).Unix(),
+	var user models.User
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := ensureEmailAvailable(tx, req.Email); err != nil {
+			return err
+		}
+		if err := tx.Create(customer).Error; err != nil {
+			return err
+		}
+		user = models.User{ProviderID: customer.ID, Email: req.Email, PasswordHash: hashedPassword}
+		return tx.Create(&user).Error
 	})
+	if err != nil {
+		if errors.Is(err, errEmailUnavailable) || errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, &AuthInputError{Message: "pendaftaran tidak dapat diproses dengan alamat email tersebut"}
+		}
+		return nil, err
+	}
 
-	tokenString, err := token.SignedString([]byte(s.cfg.JWTSecret))
+	tokenString, err := authn.IssueSession(context.Background(), s.db, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -163,51 +166,82 @@ func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*mo
 
 func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, error) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
-	provider, err := s.repo.FindByEmail(req.Email)
-	if err != nil {
-		return nil, &AuthInputError{Message: "invalid email or password"}
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(provider.PasswordHash), []byte(req.Password))
-	if err != nil {
-		return nil, &AuthInputError{Message: "invalid email or password"}
-	}
-
-	// Check status for providers
-	if provider.Role == "PROVIDER" && provider.Status != "APPROVED" {
-		if provider.Status == "PENDING" {
-			return nil, &AuthInputError{Message: "pendaftaran Anda sedang menunggu verifikasi admin"}
+	var user models.User
+	var provider models.Provider
+	invalidCredentials := false
+	now := time.Now().UTC()
+	loginErr := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("LOWER(email) = LOWER(?)", req.Email).First(&user).Error; err != nil {
+			// Argon2 dummy menjaga waktu respons akun tak dikenal mendekati akun
+			// yang memiliki password, sehingga enumerasi berbasis timing sulit.
+			_, _, _ = authn.VerifyPassword(dummyPasswordHash(), req.Password)
+			invalidCredentials = true
+			return nil
 		}
-		if provider.Status == "REJECTED" {
-			return nil, &AuthInputError{Message: "pendaftaran Anda ditolak oleh admin"}
+		hasPassword := user.PasswordHash != ""
+		hashForVerification := user.PasswordHash
+		if !hasPassword {
+			hashForVerification = dummyPasswordHash()
 		}
-		return nil, &AuthInputError{Message: "akun Anda belum aktif"}
-	}
+		if user.LockedUntil != nil && user.LockedUntil.After(now) {
+			_, _, _ = authn.VerifyPassword(hashForVerification, req.Password)
+			invalidCredentials = true
+			return nil
+		}
 
-	// Generate a short-lived JWT. The browser keeps it only for the current session.
-	now := time.Now()
-	tokenID, err := generateTokenID()
-	if err != nil {
-		return nil, err
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"provider_id": provider.ID,
-		"role":        provider.Role,
-		"iss":         "tripkita-api",
-		"aud":         "tripkita-web",
-		"iat":         now.Unix(),
-		"jti":         tokenID,
-		"exp":         now.Add(8 * time.Hour).Unix(),
+		matched, needsRehash, err := authn.VerifyPassword(hashForVerification, req.Password)
+		matched = matched && hasPassword
+		if err != nil || !matched {
+			user.FailedLoginAttempts++
+			updates := map[string]interface{}{"failed_login_attempts": user.FailedLoginAttempts, "updated_at": now}
+			if user.FailedLoginAttempts >= 5 {
+				lockedUntil := now.Add(15 * time.Minute)
+				updates["locked_until"] = &lockedUntil
+			}
+			if updateErr := tx.Model(&user).Updates(updates).Error; updateErr != nil {
+				return updateErr
+			}
+			invalidCredentials = true
+			return nil
+		}
+		if err := tx.First(&provider, user.ProviderID).Error; err != nil {
+			invalidCredentials = true
+			return nil
+		}
+		if !loginStatusAllowed(&provider) {
+			invalidCredentials = true
+			return nil
+		}
+
+		updates := map[string]interface{}{
+			"failed_login_attempts": 0, "locked_until": nil,
+			"last_login_at": &now, "updated_at": now,
+		}
+		if needsRehash {
+			newHash, err := authn.HashPasswordForMigration(req.Password)
+			if err != nil {
+				return err
+			}
+			updates["password_hash"] = newHash
+			user.PasswordHash = newHash
+		}
+		return tx.Model(&user).Updates(updates).Error
 	})
+	if loginErr != nil {
+		return nil, loginErr
+	}
+	if invalidCredentials {
+		return nil, &AuthInputError{Message: "login tidak berhasil; periksa email dan password atau coba lagi nanti"}
+	}
 
-	tokenString, err := token.SignedString([]byte(s.cfg.JWTSecret))
+	tokenString, err := authn.IssueSession(context.Background(), s.db, user.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &models.LoginResponse{
 		Token:    tokenString,
-		Provider: *provider,
+		Provider: provider,
 	}, nil
 }
 
@@ -219,22 +253,10 @@ func generateOTP() (string, error) {
 	return fmt.Sprintf("%06d", value.Int64()), nil
 }
 
-func generateTokenID() (string, error) {
-	raw := make([]byte, 16)
-	if _, err := rand.Read(raw); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(raw), nil
-}
-
-func hashResetToken(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(sum[:])
-}
-
 func (s *authService) ForgotPassword(email string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
-	provider, err := s.repo.FindByEmail(email)
+	var user models.User
+	err := s.db.Where("LOWER(email) = LOWER(?)", email).First(&user).Error
 	if err != nil {
 		// Do not leak whether email exists
 		return nil
@@ -245,41 +267,119 @@ func (s *authService) ForgotPassword(email string) error {
 		return err
 	}
 
-	// Save to provider
 	expiry := time.Now().Add(15 * time.Minute)
-	provider.ResetToken = hashResetToken(otp)
-	provider.ResetTokenExpiry = &expiry
-
-	if err := s.repo.Update(provider); err != nil {
+	if err := s.db.Model(&user).Updates(map[string]interface{}{
+		"reset_token_hash":       hashResetToken(s.cfg.JWTSecret, user.ID, otp),
+		"reset_token_expires_at": &expiry,
+		"reset_attempts":         0,
+		"updated_at":             time.Now(),
+	}).Error; err != nil {
 		return err
 	}
 
-	// Send email
-	return s.emailService.SendResetPasswordEmail(provider.Email, otp)
+	if err := s.emailService.SendResetPasswordEmail(user.Email, otp); err != nil {
+		// Respons tetap generik agar status pendaftaran email tidak dapat
+		// disimpulkan dari perbedaan status HTTP.
+		log.Printf("[Auth] gagal mengirim email reset password: %v", err)
+	}
+	return nil
 }
 
 func (s *authService) ResetPassword(email string, otp string, newPassword string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	hashedPassword, err := authn.HashPassword(newPassword)
 	if err != nil {
-		return err
+		return &AuthInputError{Message: err.Error()}
 	}
 
-	result := database.DB.Model(&models.Provider{}).
-		Where("LOWER(email) = LOWER(?) AND reset_token = ? AND reset_token_expiry IS NOT NULL AND reset_token_expiry > ?", email, hashResetToken(strings.TrimSpace(otp)), time.Now()).
-		Updates(map[string]interface{}{
-			"password_hash":      string(hashedPassword),
-			"reset_token":        "",
-			"reset_token_expiry": nil,
-			"updated_at":         time.Now(),
-		})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected != 1 {
+	invalidToken := false
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		var user models.User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("LOWER(email) = LOWER(?)", email).First(&user).Error; err != nil {
+			invalidToken = true
+			return nil
+		}
+		now := time.Now().UTC()
+		expected := hashResetToken(s.cfg.JWTSecret, user.ID, strings.TrimSpace(otp))
+		valid := user.ResetTokenHash != "" && user.ResetTokenExpiresAt != nil && user.ResetTokenExpiresAt.After(now) &&
+			hmac.Equal([]byte(user.ResetTokenHash), []byte(expected))
+		if !valid {
+			attempts := user.ResetAttempts + 1
+			updates := map[string]interface{}{"reset_attempts": attempts, "updated_at": now}
+			if attempts >= 5 {
+				updates["reset_token_hash"] = ""
+				updates["reset_token_expires_at"] = nil
+			}
+			if err := tx.Model(&user).Updates(updates).Error; err != nil {
+				return err
+			}
+			invalidToken = true
+			return nil
+		}
+		changedAt := now
+		if err := tx.Model(&user).Updates(map[string]interface{}{
+			"password_hash": hashedPassword, "password_changed_at": &changedAt,
+			"reset_token_hash": "", "reset_token_expires_at": nil, "reset_attempts": 0,
+			"failed_login_attempts": 0, "locked_until": nil, "updated_at": now,
+		}).Error; err != nil {
+			return err
+		}
+		// Hapus hash legacy agar rollback tidak menghidupkan kembali password lama.
+		if err := tx.Model(&models.Provider{}).Where("id = ?", user.ProviderID).
+			Updates(map[string]interface{}{"password_hash": "", "reset_token": "", "reset_token_expiry": nil}).Error; err != nil {
+			return err
+		}
+		return authn.RevokeAllUserSessions(context.Background(), tx, user.ID)
+	})
+	if invalidToken {
 		return &AuthInputError{Message: "invalid or expired reset token"}
 	}
+	return err
+}
+
+func (s *authService) Logout(ctx context.Context, token string) error {
+	return authn.RevokeSession(ctx, s.db, token)
+}
+
+var (
+	errEmailUnavailable = errors.New("email unavailable")
+)
+
+func ensureEmailAvailable(tx *gorm.DB, email string) error {
+	var count int64
+	if err := tx.Model(&models.User{}).Where("LOWER(email) = LOWER(?)", email).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return errEmailUnavailable
+	}
 	return nil
+}
+
+func loginStatusAllowed(provider *models.Provider) bool {
+	if provider.Role == "PROVIDER" {
+		return provider.Status == "PENDING" || provider.Status == "APPROVED"
+	}
+	return provider.Status == "APPROVED"
+}
+
+func hashResetToken(secret string, userID uint, token string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = fmt.Fprintf(mac, "password-reset:%d:%s", userID, token)
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+var (
+	dummyHash     string
+	dummyHashOnce sync.Once
+)
+
+func dummyPasswordHash() string {
+	dummyHashOnce.Do(func() {
+		// Nilai hanya dipakai untuk menyamakan biaya komputasi akun tak dikenal.
+		dummyHash, _ = authn.HashPassword("not-a-real-password-value")
+	})
+	return dummyHash
 }
 
 func (s *authService) GetProfile(providerID uint) (*models.Provider, error) {

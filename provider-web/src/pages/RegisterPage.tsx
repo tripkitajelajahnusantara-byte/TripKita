@@ -56,8 +56,8 @@ export const RegisterPage: React.FC = () => {
         errors.whatsapp = 'Nomor WhatsApp minimal 11 karakter (contoh: +6281234567890)';
       }
     }
-    if (!registerData.password || registerData.password.length < 8) {
-      errors.password = 'Password minimal harus 8 karakter';
+    if (!registerData.password || registerData.password.length < 12) {
+      errors.password = 'Password minimal harus 12 karakter';
     }
     if (!registerData.agreeToTerms) errors.agree = 'Anda harus menyetujui Syarat & Ketentuan';
     if (!registerData.instagram && !registerData.tiktok) {
@@ -509,7 +509,7 @@ export const RegisterPage: React.FC = () => {
                   <label>Password *</label>
                   <input 
                     type="password" 
-                    placeholder="Min. 8 karakter" 
+                    placeholder="Min. 12 karakter"
                     value={registerData.password || ''}
                     onChange={(e) => updateRegisterData({ password: e.target.value })}
                   />

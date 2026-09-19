@@ -95,6 +95,19 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+func (ctrl *AuthController) Logout(c *gin.Context) {
+	token, exists := c.Get("session_token")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	if err := ctrl.service.Logout(c.Request.Context(), token.(string)); err != nil {
+		respondInternalError(c, "logout", err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
+}
+
 func (ctrl *AuthController) GetProfile(c *gin.Context) {
 	providerID, exists := c.Get("provider_id")
 	if !exists {
@@ -155,7 +168,7 @@ func (ctrl *AuthController) ProviderResetPassword(c *gin.Context) {
 	var req struct {
 		Email       string `json:"email" binding:"required,email"`
 		OTP         string `json:"otp" binding:"required,len=6,numeric"`
-		NewPassword string `json:"newPassword" binding:"required,min=8,max=72"`
+		NewPassword string `json:"newPassword" binding:"required,min=12,max=128"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

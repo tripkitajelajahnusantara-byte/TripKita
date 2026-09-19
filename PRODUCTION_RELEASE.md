@@ -42,6 +42,11 @@ Konfigurasi production dipisahkan ke `docker-compose.prod.yml` dan tetap membutu
      `[Rekonsiliasi Saldo]`; seluruh provider harus dilaporkan konsisten sebelum lanjut.
    - `backend/database/migrations/004_xendit_payout_v3.sql` — menambahkan metadata routing
      Xendit Payouts v3. Kolom `channel_code` lama tetap dipertahankan untuk audit.
+   - `backend/database/migrations/005_auth_identity_sessions.sql` — memisahkan kredensial ke
+     tabel `users`, memindahkan akun lama, dan membuat sesi server-side yang dapat dicabut.
+     Deploy backend dan frontend baru segera setelah migrasi. JWT versi lama sengaja tidak lagi
+     diterima, sehingga seluruh pengguna harus login ulang satu kali setelah rilis ini. Kode reset
+     password lama juga sengaja tidak dimigrasikan dan pengguna dapat meminta kode baru.
 4. Atur callback Xendit ke `/api/v1/public/webhooks/xendit` dan samakan verification token dengan `XENDIT_WEBHOOK_TOKEN`.
 5. Gunakan persistent private volume/object storage untuk direktori `/app/uploads`. Jangan expose direktori ini langsung dari CDN atau web server.
 6. Pastikan frontend menggunakan `VITE_API_BASE_URL=https://<api-domain>/api/v1` bila tidak memakai reverse proxy `/api/v1`.
@@ -157,6 +162,10 @@ Sebelum mengedaluwarsakan booking yang belum dibayar, job memastikan dulu status
 
 - `/healthz` merespons 200 dan `/readyz` merespons 200.
 - Login admin/provider/customer bekerja dan akun provider yang belum approved ditolak dari endpoint operasional.
+- Logout membuat token lama langsung mendapat 401, reset password mencabut seluruh sesi akun,
+  dan lima percobaan password salah mengunci login akun selama 15 menit.
+- Login Google berhasil dengan akun customer/provider, sedangkan email admin tidak dapat tertaut
+  otomatis ke identitas Google baru.
 - Harga checkout tidak berubah saat nilai harga dimanipulasi dari browser.
 - Booking baru hanya menjadi paid setelah callback Xendit tervalidasi.
 - Dokumen legal tidak dapat dibuka tanpa token admin/provider pemilik.

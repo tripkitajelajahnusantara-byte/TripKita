@@ -77,8 +77,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     if (!password) {
       errors.password = 'Kata sandi wajib diisi.';
-    } else if (password.length < 8) {
-      errors.password = 'Kata sandi minimal 8 karakter.';
+    } else if (mode === 'register' && password.length < 12) {
+      errors.password = 'Kata sandi minimal 12 karakter.';
     }
 
     setFieldErrors(errors);
@@ -366,7 +366,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <Lock size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Minimal 8 karakter"
+                placeholder={mode === 'register' ? 'Minimal 12 karakter' : 'Kata sandi'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 style={{

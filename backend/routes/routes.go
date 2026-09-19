@@ -88,17 +88,18 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			auth := public.Group("/auth")
 			auth.Use(middleware.RateLimit(20, time.Minute))
 			{
-				auth.POST("/register", authCtrl.Register)
-				auth.POST("/register-customer", authCtrl.RegisterCustomer)
-				auth.POST("/login", authCtrl.Login)
+				auth.POST("/register", middleware.RateLimit(5, time.Hour), authCtrl.Register)
+				auth.POST("/register-customer", middleware.RateLimit(5, time.Hour), authCtrl.RegisterCustomer)
+				auth.POST("/login", middleware.RateLimit(10, time.Minute), authCtrl.Login)
+				auth.POST("/logout", middleware.AuthMiddleware(db, cfg), authCtrl.Logout)
 				auth.GET("/config", authCtrl.GetAuthConfig)
 				auth.POST("/upload", middleware.RateLimit(5, time.Hour), uploadCtrl.UploadDocument)
 				auth.GET("/google", oauthCtrl.RedirectToGoogle)
 				auth.GET("/google/callback", oauthCtrl.GoogleCallback)
 				auth.POST("/google/exchange", oauthCtrl.ExchangeLoginCode)
 
-				auth.POST("/provider/forgot-password", authCtrl.ProviderForgotPassword)
-				auth.POST("/provider/reset-password", authCtrl.ProviderResetPassword)
+				auth.POST("/provider/forgot-password", middleware.RateLimit(5, time.Hour), authCtrl.ProviderForgotPassword)
+				auth.POST("/provider/reset-password", middleware.RateLimit(10, time.Hour), authCtrl.ProviderResetPassword)
 			}
 		}
 

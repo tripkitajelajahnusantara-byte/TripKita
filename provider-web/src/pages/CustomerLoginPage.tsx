@@ -69,8 +69,8 @@ export const CustomerLoginPage: React.FC = () => {
     // Validate Password (Both modes)
     if (!password) {
       errors.password = 'Kata sandi wajib diisi.';
-    } else if (password.length < 8) {
-      errors.password = 'Kata sandi minimal 8 karakter.';
+    } else if (isRegisterMode && password.length < 12) {
+      errors.password = 'Kata sandi minimal 12 karakter.';
     }
 
     setFieldErrors(errors);
