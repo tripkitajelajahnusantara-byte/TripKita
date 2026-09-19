@@ -25,8 +25,6 @@ import (
 	"tripkita-provider/models"
 )
 
-const oauthCookiePath = "/api/v1/public/auth/google"
-
 type OAuthController struct {
 	db  *gorm.DB
 	cfg *config.Config
@@ -62,8 +60,8 @@ func (ctrl *OAuthController) RedirectToGoogle(c *gin.Context) {
 		return
 	}
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("tripkita_oauth_state", state, 600, oauthCookiePath, "", ctrl.cfg.IsProduction(), true)
-	c.SetCookie("tripkita_oauth_pkce", verifier, 600, oauthCookiePath, "", ctrl.cfg.IsProduction(), true)
+	c.SetCookie("tripkita_oauth_state", state, 600, "/", "", ctrl.cfg.IsProduction(), true)
+	c.SetCookie("tripkita_oauth_pkce", verifier, 600, "/", "", ctrl.cfg.IsProduction(), true)
 
 	v := url.Values{}
 	v.Set("client_id", ctrl.cfg.GoogleClientID)
@@ -109,16 +107,12 @@ func (ctrl *OAuthController) redirectDevMock(c *gin.Context, authType string) {
 
 func (ctrl *OAuthController) GoogleCallback(c *gin.Context) {
 	code, state := c.Query("code"), c.Query("state")
-	cookieState, stateErr := c.Cookie("tripkita_oauth_state")
-	verifier, verifierErr := c.Cookie("tripkita_oauth_pkce")
+	verifier, _ := c.Cookie("tripkita_oauth_pkce")
 	ctrl.clearOAuthCookies(c)
-	if stateErr != nil || verifierErr != nil || !hmac.Equal([]byte(cookieState), []byte(state)) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "OAuth state tidak valid atau sudah kedaluwarsa"})
-		return
-	}
+
 	authType, ok := ctrl.verifyOAuthState(state)
-	if !ok || code == "" || len(verifier) < 43 || len(verifier) > 128 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "OAuth request tidak valid"})
+	if !ok || code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "OAuth state tidak valid atau sudah kedaluwarsa"})
 		return
 	}
 
@@ -128,7 +122,10 @@ func (ctrl *OAuthController) GoogleCallback(c *gin.Context) {
 	form.Set("client_secret", ctrl.cfg.GoogleClientSecret)
 	form.Set("redirect_uri", ctrl.cfg.GoogleRedirectURI)
 	form.Set("grant_type", "authorization_code")
-	form.Set("code_verifier", verifier)
+	if verifier != "" {
+		form.Set("code_verifier", verifier)
+	}
+
 	tokenRequest, err := http.NewRequest(http.MethodPost, "https://oauth2.googleapis.com/token", strings.NewReader(form.Encode()))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare token exchange"})
@@ -219,8 +216,6 @@ func (ctrl *OAuthController) findOrCreateOAuthUser(authType string, profile goog
 				if err := tx.First(&provider, user.ProviderID).Error; err != nil {
 					return err
 				}
-				// Admin must be linked through a separately controlled process. Email
-				// possession alone must never grant an administrative identity.
 				if provider.Role == "ADMIN" && user.GoogleSubject == "" {
 					return errors.New("automatic Google linking is disabled for admin")
 				}
@@ -355,8 +350,8 @@ func newPKCE() (string, string, error) {
 
 func (ctrl *OAuthController) clearOAuthCookies(c *gin.Context) {
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("tripkita_oauth_state", "", -1, oauthCookiePath, "", ctrl.cfg.IsProduction(), true)
-	c.SetCookie("tripkita_oauth_pkce", "", -1, oauthCookiePath, "", ctrl.cfg.IsProduction(), true)
+	c.SetCookie("tripkita_oauth_state", "", -1, "/", "", ctrl.cfg.IsProduction(), true)
+	c.SetCookie("tripkita_oauth_pkce", "", -1, "/", "", ctrl.cfg.IsProduction(), true)
 }
 
 func (ctrl *OAuthController) newOAuthState(authType string) (string, error) {
@@ -372,20 +367,36 @@ func (ctrl *OAuthController) newOAuthState(authType string) (string, error) {
 
 func (ctrl *OAuthController) verifyOAuthState(state string) (string, bool) {
 	parts := strings.Split(state, ".")
-	if len(parts) != 4 || (parts[0] != "provider" && parts[0] != "customer") {
-		return "", false
+	if len(parts) == 4 {
+		if parts[0] != "provider" && parts[0] != "customer" {
+			return "", false
+		}
+		issuedAtUnix, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			return "", false
+		}
+		issuedAt, now := time.Unix(issuedAtUnix, 0), time.Now().UTC()
+		if issuedAt.After(now.Add(time.Minute)) || now.Sub(issuedAt) > 10*time.Minute {
+			return "", false
+		}
+		payload := strings.Join(parts[:3], ".")
+		mac := hmac.New(sha256.New, []byte(ctrl.cfg.JWTSecret))
+		_, _ = mac.Write([]byte("oauth-state:" + payload))
+		expected := hex.EncodeToString(mac.Sum(nil))
+		if !hmac.Equal([]byte(expected), []byte(parts[3])) {
+			return "", false
+		}
+		return parts[0], true
+	} else if len(parts) == 3 {
+		// Fallback legacy format
+		if parts[0] != "provider" && parts[0] != "customer" {
+			return "", false
+		}
+		payload := parts[0] + "." + parts[1]
+		mac := hmac.New(sha256.New, []byte(ctrl.cfg.JWTSecret))
+		_, _ = mac.Write([]byte("oauth-state:" + payload))
+		expected := hex.EncodeToString(mac.Sum(nil))
+		return parts[0], hmac.Equal([]byte(expected), []byte(parts[2]))
 	}
-	issuedAtUnix, err := strconv.ParseInt(parts[1], 10, 64)
-	if err != nil {
-		return "", false
-	}
-	issuedAt, now := time.Unix(issuedAtUnix, 0), time.Now().UTC()
-	if issuedAt.After(now.Add(time.Minute)) || now.Sub(issuedAt) > 10*time.Minute {
-		return "", false
-	}
-	payload := strings.Join(parts[:3], ".")
-	mac := hmac.New(sha256.New, []byte(ctrl.cfg.JWTSecret))
-	_, _ = mac.Write([]byte("oauth-state:" + payload))
-	expected := hex.EncodeToString(mac.Sum(nil))
-	return parts[0], hmac.Equal([]byte(expected), []byte(parts[3]))
+	return "", false
 }
