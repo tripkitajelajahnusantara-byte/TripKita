@@ -544,6 +544,24 @@ button {
 }
 
 /* Header standard rules */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px 10px 20px;
+    background: #ffffff;
+    border-bottom: 1px solid #f1f5f9;
+    z-index: 10;
+    position: relative;
+}
+
+.app-header h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
 .screen-header {
     display: flex;
     justify-content: space-between;
