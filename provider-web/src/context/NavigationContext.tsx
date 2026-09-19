@@ -21,7 +21,9 @@ export function getRouteFromHash(): Route {
   if (hash.includes('/provider/keuangan')) return 'keuangan-provider';
   if (hash.includes('/provider/profil')) return 'profil-provider';
   if (hash.includes('/provider/tambah-paket')) return 'tambah-paket';
-  if (hash.includes('/provider/login')) return 'provider-login';
+  // Tetap kenali URL lama agar bookmark/cache deployment sebelumnya tidak
+  // jatuh ke fallback halaman beranda.
+  if (hash.includes('/provider/login') || hash.includes('/provider-login')) return 'provider-login';
   if (hash.includes('/provider/register')) return 'provider-register';
   if (hash.includes('/admin/dashboard')) return 'admin-dashboard';
   if (hash.includes('/admin/login')) return 'admin-login';
@@ -445,23 +447,45 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       body: JSON.stringify({ email, password }),
     });
 
+    if (!res?.token || !res?.provider?.role) {
+      throw new Error('Respons login tidak valid. Silakan coba kembali.');
+    }
+
     if (res.provider?.role === 'CUSTOMER') {
       setCustomerToken(res.token);
-      setCustomerProfile(res.provider);
-      setProviderProfile(null);
-      setIsRegistered(true);
-      if (options.redirect !== false) redirectAfterAuth(res.provider, 'beranda');
+      try {
+        const verifiedProfile = await request('/provider/profile');
+        if (verifiedProfile?.role !== 'CUSTOMER') {
+          throw new Error('Sesi customer tidak sesuai dengan akun yang masuk.');
+        }
+        setCustomerProfile(verifiedProfile);
+        setProviderProfile(null);
+        setIsRegistered(true);
+        if (options.redirect !== false) redirectAfterAuth(verifiedProfile, 'beranda');
+      } catch (error) {
+        removeCustomerToken();
+        throw error;
+      }
     } else {
       setProviderToken(res.token);
-      setProviderProfile(res.provider);
-      setCustomerProfile(null);
-      setIsRegistered(true);
-      if (res.provider?.role === 'ADMIN') {
-        redirectAfterAuth(res.provider, 'admin-dashboard');
-      } else if (res.provider?.status !== 'APPROVED' || !res.provider?.isVerified) {
-        redirectAfterAuth(res.provider, 'profil-provider');
-      } else {
-        redirectAfterAuth(res.provider, 'dashboard');
+      try {
+        const verifiedProfile = await request('/provider/profile');
+        if (verifiedProfile?.role !== 'PROVIDER' && verifiedProfile?.role !== 'ADMIN') {
+          throw new Error('Sesi provider tidak sesuai dengan akun yang masuk.');
+        }
+        setProviderProfile(verifiedProfile);
+        setCustomerProfile(null);
+        setIsRegistered(true);
+        if (verifiedProfile.role === 'ADMIN') {
+          redirectAfterAuth(verifiedProfile, 'admin-dashboard');
+        } else if (verifiedProfile.status !== 'APPROVED' || !verifiedProfile.isVerified) {
+          redirectAfterAuth(verifiedProfile, 'profil-provider');
+        } else {
+          redirectAfterAuth(verifiedProfile, 'dashboard');
+        }
+      } catch (error) {
+        removeProviderToken();
+        throw error;
       }
     }
   };

@@ -130,16 +130,31 @@ export class ApiError extends Error {
  * Sesi yang sudah tidak berlaku dibersihkan lalu pengguna diarahkan ke halaman
  * masuk yang sesuai, agar tidak terjebak pada layar yang terus gagal memuat.
  */
-function handleExpiredSession(isProviderRoute: boolean) {
+function handleExpiredSession(isProviderRoute: boolean, isAdminRoute: boolean, rejectedToken: string) {
   if (typeof window === 'undefined') return;
+
+  // Request dari halaman sebelumnya bisa selesai setelah login baru berhasil.
+  // Jangan biarkan respons 401 milik token lama menghapus sesi yang lebih baru.
+  const currentToken = isProviderRoute ? getProviderToken() : getCustomerToken();
+  if (currentToken !== rejectedToken) return;
+
   const currentHash = window.location.hash;
-  if (currentHash.startsWith('#/') && !currentHash.startsWith('#//')) {
+  const isAuthPage = [
+    '#/provider/login',
+    '#/provider-login',
+    '#/provider/register',
+    '#/admin/login',
+    '#/masuk',
+    '#/customer-register',
+  ].some((authHash) => currentHash.startsWith(authHash));
+  if (!isAuthPage && currentHash.startsWith('#/') && !currentHash.startsWith('#//')) {
     sessionStorage.setItem('tementrip_auth_return_to', currentHash);
   }
   if (isProviderRoute) {
     removeProviderToken();
-    if (!window.location.hash.includes('/provider-login')) {
-      window.location.hash = '#/provider-login';
+    const loginHash = isAdminRoute ? '#/admin/login' : '#/provider/login';
+    if (window.location.hash !== loginHash) {
+      window.location.hash = loginHash;
     }
     return;
   }
@@ -152,6 +167,7 @@ function handleExpiredSession(isProviderRoute: boolean) {
 export async function request(endpoint: string, options: RequestInit = {}) {
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
   const isProviderRoute = hash.includes('/provider') || hash.includes('/admin');
+  const isAdminRoute = hash.includes('/admin');
 
   // Decide which token to attach based on endpoint or current route
   let token: string | null;
@@ -200,7 +216,7 @@ export async function request(endpoint: string, options: RequestInit = {}) {
 
     // Token kedaluwarsa atau dicabut: bersihkan sesi dan arahkan ke halaman masuk.
     if (response.status === 401 && token) {
-      handleExpiredSession(isProviderRoute);
+      handleExpiredSession(isProviderRoute, isAdminRoute, token);
       throw new ApiError(errorData.error || 'Sesi Anda telah berakhir. Silakan masuk kembali.', 401, requestId);
     }
 
