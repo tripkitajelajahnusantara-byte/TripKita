@@ -1557,11 +1557,79 @@ function renderTripDetailData() {
         }
     }
 
+    // Populate Provider Info Card
+    const pName = pkg.providerName || "Bandung Juara Tour";
+    const pCity = pkg.destination ? pkg.destination.split(',')[0] : "Bandung";
+    const pAvatarEl = document.getElementById("detail-provider-avatar");
+    if (pAvatarEl) pAvatarEl.innerText = pName.charAt(0).toUpperCase();
+
+    const pNameEl = document.getElementById("detail-provider-name");
+    if (pNameEl) pNameEl.innerText = pName;
+
+    const pCityEl = document.getElementById("detail-provider-city");
+    if (pCityEl) pCityEl.innerHTML = `<i class="fa-solid fa-location-dot" style="color:#007bff;"></i> ${pCity}`;
+
+    const pRatingEl = document.getElementById("detail-provider-rating");
+    if (pRatingEl) pRatingEl.innerHTML = `<i class="fa-solid fa-star"></i> ${pkg.rating > 0 ? pkg.rating : 'Belum ada rating'}`;
+
     const guestCountLbl = document.getElementById("detail-guest-count");
     if (guestCountLbl) guestCountLbl.innerText = `${currentGuestCount} Orang`;
 
     updateDetailPriceCalculation();
 }
+
+window.openProviderProfile = function(providerName, providerCity) {
+    const pName = providerName || (currentActivePackage ? currentActivePackage.providerName : 'Bandung Juara Tour');
+    const pCity = providerCity || (currentActivePackage ? currentActivePackage.destination : 'Bandung, Jawa Barat');
+    renderProviderProfileScreen(pName, pCity);
+    switchScreen('screen-provider-profile');
+};
+
+window.renderProviderProfileScreen = function(pName, pCity) {
+    const name = pName || 'Bandung Juara Tour';
+    const city = pCity || 'Bandung, Jawa Barat';
+
+    const avatarEl = document.getElementById('provider-profile-avatar');
+    if (avatarEl) avatarEl.innerText = name.charAt(0).toUpperCase();
+
+    const nameEl = document.getElementById('provider-profile-name');
+    if (nameEl) nameEl.innerText = name;
+
+    const metaEl = document.getElementById('provider-profile-meta');
+    if (metaEl) metaEl.innerText = `📍 ${city} • tour • Bergabung sejak 2026`;
+
+    const filtered = packagesDB.filter(p =>
+        (p.providerName && p.providerName.toLowerCase().includes(name.toLowerCase())) ||
+        (p.destination && p.destination.toLowerCase().includes(city.split(',')[0].toLowerCase()))
+    );
+    const displayList = filtered.length > 0 ? filtered : packagesDB.slice(0, 2);
+
+    const statPkg = document.getElementById('provider-profile-stat-pkg');
+    if (statPkg) statPkg.innerText = `${displayList.length} Paket`;
+
+    const tabCount = document.getElementById('provider-tab-count');
+    if (tabCount) tabCount.innerText = displayList.length;
+
+    const listContainer = document.getElementById('provider-packages-list');
+    if (listContainer) {
+        listContainer.innerHTML = displayList.map(pkg => `
+            <div onclick="viewTripDetail(${pkg.id})" style="background: white; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+                <div style="position: relative; height: 120px;">
+                    <img src="${pkg.images[0]}" style="width: 100%; height: 100%; object-fit: cover;" alt="${pkg.name}">
+                    <span style="position: absolute; top: 8px; left: 8px; background: #007bff; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px;">${pkg.tripType || 'Open Trip'}</span>
+                </div>
+                <div style="padding: 12px;">
+                    <h5 style="font-size: 13px; font-weight: 700; color: #0f172a; margin: 0 0 4px 0;">${pkg.name}</h5>
+                    <p style="font-size: 11px; color: #64748b; margin: 0 0 8px 0;">📍 ${pkg.destination}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 10px; color: #d97706;">⭐ ${pkg.rating > 0 ? pkg.rating : 'Belum ada rating'}</span>
+                        <strong style="font-size: 13px; color: #007bff;">${formatIDRCurrency(pkg.price)}</strong>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+};
 
 function updateDetailPriceCalculation() {
     const guestCountLbl = document.getElementById("detail-guest-count");

@@ -853,59 +853,121 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF0F8B8D).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F8B8D).withOpacity(0.04),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundImage: NetworkImage(package.providerAvatar),
+          const Text(
+            'DISELENGGARAKAN OLEH MITRA PROVIDER',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF64748B),
+              letterSpacing: 0.5,
+            ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              InkWell(
+                onTap: () {
+                  widget.onNavigate(10, arguments: {
+                    'providerName': package.providerName,
+                    'providerCity': package.destination,
+                  });
+                },
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF007BFF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    package.providerName.isNotEmpty ? package.providerName[0].toUpperCase() : 'B',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    widget.onNavigate(10, arguments: {
+                      'providerName': package.providerName,
+                      'providerCity': package.destination,
+                    });
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                         package.providerName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937)),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.verified, size: 16, color: Color(0xFF0F8B8D)),
-                  ],
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, size: 12, color: Colors.grey.shade500),
+                          const SizedBox(width: 2),
+                          Text(
+                            package.destination.split(',')[0],
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text('•', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          const SizedBox(width: 6),
+                          Icon(Icons.star, size: 12, color: Colors.amber.shade600),
+                          const SizedBox(width: 2),
+                          Text(
+                            package.rating > 0 ? '${package.rating}' : 'Belum ada rating',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 2),
-                const Text('Official Travel Partner TripKita', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
-                const SizedBox(height: 4),
-                Row(
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () {
+                  widget.onNavigate(10, arguments: {
+                    'providerName': package.providerName,
+                    'providerCity': package.destination,
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF0F7FF),
+                  foregroundColor: const Color(0xFF007BFF),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: const BorderSide(color: Color(0xFFBFDBFE)),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.star, size: 14, color: Colors.amber.shade600),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${package.rating} Rating',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(width: 10),
-                    const Icon(Icons.check_circle_outline, size: 14, color: Color(0xFF0F8B8D)),
-                    const SizedBox(width: 4),
-                    const Text('120+ Trip Selesai', style: TextStyle(fontSize: 11, color: Color(0xFF4B5563))),
+                    Text('Lihat Profil & Paket', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    SizedBox(width: 2),
+                    Icon(Icons.chevron_right, size: 14),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),

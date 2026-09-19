@@ -10,6 +10,7 @@ import 'package:customer_mobile/screens/booking_detail_screen.dart';
 import 'package:customer_mobile/screens/payment_verification_screen.dart';
 import 'package:customer_mobile/screens/plan_screen.dart';
 import 'package:customer_mobile/screens/profile_screen.dart';
+import 'package:customer_mobile/screens/provider_profile_screen.dart';
 
 
 void main() {
@@ -126,6 +127,11 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
         );
       case 9:
         return BookingDetailScreen(
+          onNavigate: _navigateToScreen,
+          arguments: _navigationArguments,
+        );
+      case 10:
+        return ProviderProfileScreen(
           onNavigate: _navigateToScreen,
           arguments: _navigationArguments,
         );
