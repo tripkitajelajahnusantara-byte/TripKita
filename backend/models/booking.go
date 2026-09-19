@@ -29,7 +29,7 @@ type Booking struct {
 	// TripDepartureID menautkan booking ke peninjauan kuota H-3 yang
 	// menghasilkan tawaran jadwal pengganti, supaya jawaban pelanggan dapat
 	// direkap per keberangkatan.
-	TripDepartureID  *uint      `gorm:"index" json:"openTripDepartureId,omitempty"`
+	TripDepartureID  *uint      `gorm:"index" json:"tripDepartureId,omitempty"`
 	OriginalTripDate *time.Time `json:"originalTripDate,omitempty"`
 	RescheduleDate   *time.Time `json:"rescheduleDate,omitempty"`
 	CreatedAt        time.Time  `json:"createdAt"`

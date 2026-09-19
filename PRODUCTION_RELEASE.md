@@ -47,6 +47,14 @@ Konfigurasi production dipisahkan ke `docker-compose.prod.yml` dan tetap membutu
      Deploy backend dan frontend baru segera setelah migrasi. JWT versi lama sengaja tidak lagi
      diterima, sehingga seluruh pengguna harus login ulang satu kali setelah rilis ini. Kode reset
      password lama juga sengaja tidak dimigrasikan dan pengguna dapat meminta kode baru.
+   - `backend/database/migrations/007_departures_and_package_dates.sql` — tabel `trip_departures`
+     (keputusan mitra atas keberangkatan yang batal karena kuota atau keadaan kahar) dan
+     `package_dates` (tanggal yang dibuka mitra untuk paket selain Open Trip, sekaligus
+     penguncian satu tanggal satu pesanan). **Wajib dijalankan sebelum backend versi ini
+     menerima trafik**: `package_dates` disentuh pada setiap perubahan status booking, sehingga
+     tanpa tabel tersebut pembuatan booking dan daftar paket publik akan gagal. Migrasi ini juga
+     memindahkan penamaan lama `open_trip_departures` bila ada, dan mengisi tanggal yang sudah
+     terpakai pesanan berjalan agar kalender pelanggan langsung akurat.
 4. Atur callback Xendit ke `/api/v1/public/webhooks/xendit` dan samakan verification token dengan `XENDIT_WEBHOOK_TOKEN`.
 5. Gunakan persistent private volume/object storage untuk direktori `/app/uploads`. Jangan expose direktori ini langsung dari CDN atau web server.
 6. Pastikan frontend menggunakan `VITE_API_BASE_URL=https://<api-domain>/api/v1` bila tidak memakai reverse proxy `/api/v1`.
