@@ -1125,6 +1125,9 @@ function updateUserHeaderUI() {
             btnLoginHeader.style.color = "#1f2937";
         }
     }
+    if (typeof renderTripPlanScreen === "function") {
+        try { renderTripPlanScreen(); } catch(e) {}
+    }
 }
 
 // 11. Modal 38 Provinsi Indonesia Selector
@@ -2232,29 +2235,46 @@ let selectedPlanId = null;
 let currentPlanIdForModal = null;
 let planToEditIdModal = null;
 
-let tripPlansDB = [
-    {
-        id: "plan_palu_1",
-        destination: "Palu",
-        targetMonth: "2027-03",
-        targetMonthLabel: "17 Maret 2027",
-        participants: 2,
-        targetBudget: 10000000,
-        savedAmount: 1000000,
-        status: "Tersimpan",
-        checklist: [
-            { id: "1", label: "Tentukan Destinasi & Target Budget Liburan", completed: true, isAutomatic: true },
-            { id: "2", label: "Capai 25% Tabungan Perjalanan", completed: false, isAutomatic: true },
-            { id: "3", label: "Capai 50% Tabungan Perjalanan", completed: false, isAutomatic: true },
-            { id: "4", label: "Capai 75% Tabungan Perjalanan", completed: false, isAutomatic: true },
-            { id: "5", label: "Capai 100% Target Tabungan", completed: false, isAutomatic: true },
-            { id: "6", label: "Cari & Pesan Paket Open Trip di TemenTrip", completed: false, isAutomatic: false }
-        ],
-        savingsLogs: [
-            { id: "log_1", date: "17 Sep 2026", amount: 1000000, note: "Tabungan bulanan" }
-        ]
+// User-specific Trip Plans Storage (Keyed by user email or "guest")
+let userPlansMap = {
+    "budi.santoso@gmail.com": [
+        {
+            id: "plan_palu_1",
+            destination: "Palu",
+            targetMonth: "2027-03",
+            targetMonthLabel: "Maret 2027",
+            participants: 2,
+            targetBudget: 10000000,
+            savedAmount: 1000000,
+            status: "Tersimpan",
+            checklist: [
+                { id: "1", label: "Tentukan Destinasi & Target Budget Liburan", completed: true, isAutomatic: true },
+                { id: "2", label: "Capai 25% Tabungan Perjalanan", completed: false, isAutomatic: true },
+                { id: "3", label: "Capai 50% Tabungan Perjalanan", completed: false, isAutomatic: true },
+                { id: "4", label: "Capai 75% Tabungan Perjalanan", completed: false, isAutomatic: true },
+                { id: "5", label: "Capai 100% Target Tabungan", completed: false, isAutomatic: true },
+                { id: "6", label: "Cari & Pesan Paket Open Trip di TemenTrip", completed: false, isAutomatic: false }
+            ],
+            savingsLogs: [
+                { id: "log_1", date: "17 Sep 2026", amount: 1000000, note: "Tabungan bulanan" }
+            ]
+        }
+    ],
+    "guest": []
+};
+
+function getPlansForCurrentUser() {
+    if (typeof currentUser !== 'undefined' && currentUser && currentUser.isLoggedIn && currentUser.email) {
+        if (!userPlansMap[currentUser.email]) {
+            userPlansMap[currentUser.email] = [];
+        }
+        return userPlansMap[currentUser.email];
     }
-];
+    if (!userPlansMap["guest"]) {
+        userPlansMap["guest"] = [];
+    }
+    return userPlansMap["guest"];
+}
 
 function generateAvailableFutureMonths() {
     const months = [];
@@ -2288,8 +2308,10 @@ function renderTripPlanScreen() {
     const container = document.getElementById("plan-screen-container");
     if (!container) return;
 
+    const userPlans = getPlansForCurrentUser();
+
     if (selectedPlanId) {
-        const plan = tripPlansDB.find(p => p.id === selectedPlanId);
+        const plan = userPlans.find(p => p.id === selectedPlanId);
         if (plan) {
             renderPlanDetailView(container, plan);
             return;
@@ -2302,16 +2324,36 @@ function renderTripPlanScreen() {
 }
 
 function renderPlanListView(container) {
-    const planCount = tripPlansDB.length;
+    const userPlans = getPlansForCurrentUser();
+    const planCount = userPlans.length;
+    const isGuest = (!currentUser || !currentUser.isLoggedIn);
     
     let html = `
         <!-- Hero Banner -->
-        <div style="background: linear-gradient(135deg, #0f8b8d 0%, #09686a 100%); border-radius: 18px; padding: 16px; color: white; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(15,139,141,0.25);">
+        <div style="background: linear-gradient(135deg, #0f8b8d 0%, #09686a 100%); border-radius: 18px; padding: 16px; color: white; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(15,139,141,0.25);">
             <span style="background: #f59e0b; color: white; font-size: 9px; font-weight: 900; padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px; text-transform: uppercase;">LIBURAN IMPIAN TANPA BEBAN</span>
             <h4 style="margin: 8px 0 4px 0; font-size: 14px; font-weight: bold; line-height: 1.3;">Rencanakan Liburan Seru Bersama Pasangan, Teman, atau Keluarga! 🏝️✨</h4>
             <p style="margin: 0; font-size: 11px; opacity: 0.9; line-height: 1.4;">Susun target budget dan tabungan bulananmu mulai dari sekarang. Nikmati perjalanan impian tanpa perlu risau masalah keuangan!</p>
         </div>
+    `;
 
+    if (isGuest) {
+        html += `
+        <!-- Guest Mode Warning Banner -->
+        <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 14px; padding: 12px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px;">
+            <i class="fa-solid fa-triangle-exclamation" style="color: #d97706; font-size: 18px; margin-top: 2px;"></i>
+            <div style="flex: 1;">
+                <strong style="font-size: 12px; color: #92400e; display: block; margin-bottom: 2px;">Mode Tamu (Belum Login)</strong>
+                <span style="font-size: 11px; color: #b45309; line-height: 1.35; display: block;">Rencana trip dan tabungan Anda saat ini bersifat sementara dan <strong>TIDAK tersimpan di akun server</strong>. Silakan login atau daftar akun TripKita agar rencana tersimpan di akun Anda!</span>
+                <button onclick="openAuthModal('login')" style="margin-top: 8px; background: #d97706; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-right-to-bracket"></i> Login / Register Sekarang
+                </button>
+            </div>
+        </div>
+        `;
+    }
+
+    html += `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <strong style="font-size: 14px; color: #0f172a;">Daftar Rencana Trip Saya (${planCount}/10)</strong>
         </div>
@@ -2319,14 +2361,14 @@ function renderPlanListView(container) {
 
     if (planCount === 0) {
         html += `
-            <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 32px 16px; text-align: center; color: #64748b;">
+            <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 32px 16px; text-align: center; color: #64748b; margin-bottom: 14px;">
                 <i class="fa-solid fa-compass" style="font-size: 36px; color: #cbd5e1; margin-bottom: 8px;"></i>
                 <h5 style="margin: 0 0 4px 0; font-size: 14px; color: #0f172a;">Belum Ada Rencana Trip</h5>
                 <p style="margin: 0; font-size: 11px;">Yuk susun target tabungan liburan impianmu sekarang!</p>
             </div>
         `;
     } else {
-        tripPlansDB.forEach(plan => {
+        userPlans.forEach(plan => {
             updatePlanMilestones(plan);
             const savedPercentage = plan.targetBudget > 0 ? Math.min(100, Math.round((plan.savedAmount / plan.targetBudget) * 100)) : 0;
             const remainingBudget = Math.max(0, plan.targetBudget - plan.savedAmount);
@@ -2389,7 +2431,11 @@ function selectTripPlan(planId) {
 
 function deleteTripPlan(planId) {
     if (confirm("Apakah Anda yakin ingin menghapus Rencana Trip ini?")) {
-        tripPlansDB = tripPlansDB.filter(p => p.id !== planId);
+        const userPlans = getPlansForCurrentUser();
+        const idx = userPlans.findIndex(p => p.id === planId);
+        if (idx !== -1) {
+            userPlans.splice(idx, 1);
+        }
         if (selectedPlanId === planId) selectedPlanId = null;
         renderTripPlanScreen();
     }
@@ -2400,6 +2446,7 @@ function renderPlanDetailView(container, plan) {
     const savedPercentage = plan.targetBudget > 0 ? Math.min(100, Math.round((plan.savedAmount / plan.targetBudget) * 100)) : 0;
     const remainingBudget = Math.max(0, plan.targetBudget - plan.savedAmount);
     const is100 = savedPercentage >= 100;
+    const isGuest = (!currentUser || !currentUser.isLoggedIn);
 
     // Package Matching with Image Fallbacks
     const destLower = plan.destination.toLowerCase();
@@ -2415,7 +2462,21 @@ function renderPlanDetailView(container, plan) {
         <div onclick="selectTripPlan(null)" style="color: #0f8b8d; font-size: 12px; font-weight: 800; margin-bottom: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-arrow-left"></i> Kembali ke Daftar Rencana Trip Saya
         </div>
+    `;
 
+    if (isGuest) {
+        html += `
+        <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 14px; padding: 12px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px;">
+            <i class="fa-solid fa-triangle-exclamation" style="color: #d97706; font-size: 18px; margin-top: 2px;"></i>
+            <div style="flex: 1;">
+                <strong style="font-size: 12px; color: #92400e; display: block; margin-bottom: 2px;">Mode Tamu (Belum Login)</strong>
+                <span style="font-size: 11px; color: #b45309; line-height: 1.35; display: block;">Rencana trip ini belum tersimpan di akun server. Silakan login agar tidak hilang!</span>
+            </div>
+        </div>
+        `;
+    }
+
+    html += `
         <!-- Plan Header Box -->
         <div style="background: white; border-radius: 18px; border: 1px solid #e2e8f0; padding: 16px; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.03);">
             <div style="display: flex; gap: 6px; margin-bottom: 10px;">
@@ -2577,7 +2638,8 @@ function renderPlanDetailView(container, plan) {
 }
 
 function toggleChecklistItem(planId, itemId) {
-    const plan = tripPlansDB.find(p => p.id === planId);
+    const userPlans = getPlansForCurrentUser();
+    const plan = userPlans.find(p => p.id === planId);
     if (plan) {
         const item = plan.checklist.find(i => i.id === itemId);
         if (item) {
@@ -2590,7 +2652,8 @@ function toggleChecklistItem(planId, itemId) {
 function addCustomChecklistItem(planId) {
     const input = document.getElementById("input-custom-checklist");
     if (!input || !input.value.trim()) return;
-    const plan = tripPlansDB.find(p => p.id === planId);
+    const userPlans = getPlansForCurrentUser();
+    const plan = userPlans.find(p => p.id === planId);
     if (plan) {
         plan.checklist.push({
             id: `chk_${Date.now()}`,
@@ -2603,7 +2666,8 @@ function addCustomChecklistItem(planId) {
 }
 
 function deleteChecklistItem(planId, idx) {
-    const plan = tripPlansDB.find(p => p.id === planId);
+    const userPlans = getPlansForCurrentUser();
+    const plan = userPlans.find(p => p.id === planId);
     if (plan) {
         plan.checklist.splice(idx, 1);
         renderTripPlanScreen();
@@ -2611,7 +2675,8 @@ function deleteChecklistItem(planId, idx) {
 }
 
 function deleteSavingsLog(planId, lIdx) {
-    const plan = tripPlansDB.find(p => p.id === planId);
+    const userPlans = getPlansForCurrentUser();
+    const plan = userPlans.find(p => p.id === planId);
     if (plan && plan.savingsLogs[lIdx]) {
         plan.savedAmount -= plan.savingsLogs[lIdx].amount;
         if (plan.savedAmount < 0) plan.savedAmount = 0;
@@ -2650,7 +2715,8 @@ function submitSavingsForm() {
     }
 
     const note = (noteInput && noteInput.value.trim()) ? noteInput.value.trim() : "Tabungan bulanan";
-    const plan = tripPlansDB.find(p => p.id === currentPlanIdForModal);
+    const userPlans = getPlansForCurrentUser();
+    const plan = userPlans.find(p => p.id === currentPlanIdForModal);
     if (plan) {
         plan.savedAmount += amount;
         plan.savingsLogs.unshift({
@@ -2685,8 +2751,9 @@ function openCreatePlanModal(planIdToEdit = null) {
         });
     }
 
+    const userPlans = getPlansForCurrentUser();
     if (planIdToEdit) {
-        const plan = tripPlansDB.find(p => p.id === planIdToEdit);
+        const plan = userPlans.find(p => p.id === planIdToEdit);
         if (plan) {
             if (titleEl) titleEl.innerHTML = `<i class="fa-solid fa-pen-to-square text-teal" style="color: #0f8b8d;"></i> Edit Rencana Trip`;
             if (destInput) destInput.value = plan.destination;
@@ -2728,8 +2795,10 @@ function submitPlanForm() {
         return;
     }
 
+    const userPlans = getPlansForCurrentUser();
+
     if (planToEditIdModal) {
-        const plan = tripPlansDB.find(p => p.id === planToEditIdModal);
+        const plan = userPlans.find(p => p.id === planToEditIdModal);
         if (plan) {
             plan.destination = dest;
             plan.targetMonth = targetMonth;
@@ -2758,8 +2827,12 @@ function submitPlanForm() {
             ],
             savingsLogs: []
         };
-        tripPlansDB.unshift(newPlan);
+        userPlans.unshift(newPlan);
         selectedPlanId = newPlan.id;
+
+        if (!currentUser || !currentUser.isLoggedIn) {
+            alert("⚠️ Perhatian: Anda sedang membuat Rencana Trip dalam Mode Tamu (Belum Login).\nRencana ini bersifat sementara dan TIDAK tersimpan di akun server. Silakan Login / Register untuk menyimpannya di akun Anda!");
+        }
     }
 
     renderTripPlanScreen();

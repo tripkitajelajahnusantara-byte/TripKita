@@ -548,7 +548,8 @@ class _PlanScreenState extends State<PlanScreen> {
             children: [
               // 1. Banner Header Component
               _buildHeroBanner(),
-              const SizedBox(height: 20),
+              _buildGuestWarningBanner(),
+              const SizedBox(height: 16),
 
               // 2. View Switcher: List View vs Detail View
               if (_selectedPlan == null)
@@ -624,6 +625,75 @@ class _PlanScreenState extends State<PlanScreen> {
               color: Colors.white.withOpacity(0.9),
               fontSize: 12,
               height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuestWarningBanner() {
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFCD34D)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Mode Tamu (Belum Login)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF92400E),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Rencana trip dan tabungan Anda saat ini bersifat sementara & TIDAK tersimpan di akun server. Silakan login agar tersimpan di akun Anda!',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFB45309),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Silakan Login melalui menu Profil untuk menyimpan Rencana Trip Anda!')),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD97706),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.login, color: Colors.white, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          'Login / Register Sekarang',
+                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
