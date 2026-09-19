@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Route } from '../types';
 import { request, setProviderToken, getProviderToken, removeProviderToken, setCustomerToken, getCustomerToken, removeCustomerToken, revokeSessionToken } from '../utils/api';
@@ -224,6 +224,9 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
   const [customerProfile, setCustomerProfile] = useState<ProviderProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
+  // Menandai permintaan profil aktif agar respons dari sesi lama tidak dapat
+  // menimpa state atau menghapus token sesi yang baru dibuat saat login.
+  const profileRequestSequence = useRef(0);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
   const [selectedPackageForDetail, setSelectedPackageForDetail] = useState<any>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<number | null>(null);
@@ -314,18 +317,29 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  const fetchSessionProfile = async (targetRoute: Route) => {
+  const fetchSessionProfile = useCallback(async (targetRoute: Route) => {
+    const requestSequence = ++profileRequestSequence.current;
     setLoadingProfile(true);
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
     const isProviderRoute = hash.includes('/provider') || hash.includes('/admin') ||
       ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard'].includes(targetRoute);
+    let tokenUsed: string | null = null;
+
+    const requestIsCurrent = () => {
+      if (requestSequence !== profileRequestSequence.current) return false;
+      if (!tokenUsed) return true;
+      const currentToken = isProviderRoute ? getProviderToken() : getCustomerToken();
+      return currentToken === tokenUsed;
+    };
 
     try {
       if (isProviderRoute) {
         setCustomerProfile(null);
         const token = getProviderToken();
+        tokenUsed = token;
         if (token) {
           const data = await request('/provider/profile');
+          if (!requestIsCurrent()) return null;
           if (data && (data.role === 'PROVIDER' || data.role === 'ADMIN')) {
             setProviderProfile(data);
             setIsRegistered(true);
@@ -337,8 +351,10 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       } else {
         setProviderProfile(null);
         const token = getCustomerToken();
+        tokenUsed = token;
         if (token) {
           const data = await request('/provider/profile');
+          if (!requestIsCurrent()) return null;
           if (data && data.role === 'CUSTOMER') {
             setCustomerProfile(data);
             setIsRegistered(true);
@@ -358,20 +374,25 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       }
       return null;
     } catch (err: any) {
+      // Permintaan ini mungkin dimulai sebelum proses login menghasilkan token
+      // baru. Respons lamanya tidak boleh membatalkan sesi yang lebih baru.
+      if (!requestIsCurrent()) return null;
       console.error('Failed to fetch profile:', err);
       if (isProviderRoute) {
         setProviderProfile(null);
-        removeProviderToken();
+        if (tokenUsed && getProviderToken() === tokenUsed) removeProviderToken();
       } else {
         setCustomerProfile(null);
-        removeCustomerToken();
+        if (tokenUsed && getCustomerToken() === tokenUsed) removeCustomerToken();
       }
       setIsRegistered(false);
       return null;
     } finally {
-      setLoadingProfile(false);
+      if (requestSequence === profileRequestSequence.current) {
+        setLoadingProfile(false);
+      }
     }
-  };
+  }, []);
 
   const redirectAfterAuth = useCallback((profile: Pick<ProviderProfile, 'role' | 'status' | 'isVerified'>, defaultRoute: Route) => {
     const returnHash = sessionStorage.getItem('tementrip_auth_return_to');
@@ -435,13 +456,18 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     } else {
       fetchSessionProfile(route);
     }
-  }, [route, navigateTo, redirectAfterAuth]);
+  }, [route, redirectAfterAuth, fetchSessionProfile]);
 
   const updateRegisterData = (fields: Partial<RegisterData>) => {
     setRegisterData((prev) => ({ ...prev, ...fields }));
   };
 
   const login = async (email: string, password: string, options: { redirect?: boolean } = {}) => {
+    // Batalkan efek state dari validasi profil yang mungkin masih berjalan
+    // menggunakan sesi sebelumnya di halaman login.
+    profileRequestSequence.current += 1;
+    setLoadingProfile(false);
+
     const res = await request('/public/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
@@ -547,6 +573,8 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   const performLogout = () => {
+    profileRequestSequence.current += 1;
+    setLoadingProfile(false);
     const destination: Route = providerProfile ? 'provider-login' : 'beranda';
     const activeTokens = [getProviderToken(), getCustomerToken()].filter((token): token is string => Boolean(token));
     removeProviderToken();
