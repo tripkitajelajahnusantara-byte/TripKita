@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { Booking } from '../types';
 import { request } from '../utils/api';
+import { ForceMajeureForm } from '../components/ForceMajeureForm';
 
 interface DashboardStats {
   totalPackages: number;
@@ -217,6 +218,9 @@ export const ManageBookingPage: React.FC = () => {
             </button>
           </div>
         </header>
+
+        {/* Pembatalan keberangkatan karena keadaan kahar; seluruh data dari backend. */}
+        <ForceMajeureForm onSubmitted={loadData} />
 
 
         {/* Counters Block */}

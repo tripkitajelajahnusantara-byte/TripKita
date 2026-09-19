@@ -3,6 +3,7 @@ package controllers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -154,4 +155,66 @@ func (ctrl *PackageController) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Package deleted successfully"})
+}
+
+// GetPackageDates mengembalikan tanggal keberangkatan yang diatur mitra beserta
+// statusnya, termasuk tanggal yang sudah terkunci pesanan.
+func (ctrl *PackageController) GetPackageDates(c *gin.Context) {
+	providerID, ok := principalIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	packageID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID paket tidak valid"})
+		return
+	}
+
+	dates, err := ctrl.service.ListPackageDates(uint(packageID), providerID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	earliest, latest := models.AvailabilityWindow(time.Now())
+	c.JSON(http.StatusOK, gin.H{
+		"dates":        dates,
+		"earliestDate": earliest,
+		"latestDate":   latest,
+	})
+}
+
+// SetPackageDates mengganti seluruh tanggal yang dibuka mitra untuk satu paket.
+func (ctrl *PackageController) SetPackageDates(c *gin.Context) {
+	providerID, ok := principalIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	packageID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID paket tidak valid"})
+		return
+	}
+
+	var req models.SetPackageDatesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Daftar tanggal tidak valid; gunakan format YYYY-MM-DD"})
+		return
+	}
+
+	dates, err := ctrl.service.SetPackageDates(uint(packageID), providerID, req.Dates)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	earliest, latest := models.AvailabilityWindow(time.Now())
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "Tanggal keberangkatan berhasil diperbarui",
+		"dates":        dates,
+		"earliestDate": earliest,
+		"latestDate":   latest,
+	})
 }

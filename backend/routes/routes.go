@@ -52,6 +52,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 	payoutCtrl := controllers.NewPayoutController(c.PayoutService, c.ExcelService, c.PDFService, c.ProviderRepo, c.BookingRepo, c.PayoutRepo, cfg)
 	reviewCtrl := controllers.NewReviewController(c.ReviewService)
 	notifCtrl := controllers.NewNotificationController(c.NotifService)
+	departureCtrl := controllers.NewDepartureController(c.DepartureService)
 
 	// Dokumen verifikasi tidak boleh menjadi file publik di production.
 	if !cfg.IsProduction() {
@@ -130,6 +131,11 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 				packages.GET("/:id", packageCtrl.GetByID)
 				packages.PUT("/:id", packageCtrl.Update)
 				packages.DELETE("/:id", packageCtrl.Delete)
+
+				// Tanggal keberangkatan yang dibuka mitra untuk paket selain
+				// Open Trip; pelanggan hanya dapat memilih dari daftar ini.
+				packages.GET("/:id/dates", packageCtrl.GetPackageDates)
+				packages.PUT("/:id/dates", packageCtrl.SetPackageDates)
 			}
 
 			// Bookings
@@ -151,6 +157,13 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 
 			// Ulasan yang diterima mitra
 			provider.GET("/reviews", reviewCtrl.GetProviderReviews)
+
+			// Keputusan atas keberangkatan bermasalah: kuota open trip kurang
+			// pada H-3, maupun pembatalan force majeure oleh mitra.
+			provider.GET("/departures", departureCtrl.GetProviderDepartures)
+			provider.GET("/departures/upcoming", departureCtrl.GetUpcomingDepartures)
+			provider.POST("/departures/force-majeure", departureCtrl.DeclareForceMajeure)
+			provider.POST("/departures/:id/decision", departureCtrl.SubmitDecision)
 		}
 
 		// ADMIN ROUTES (Auth + Admin Role Required)
@@ -180,6 +193,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 		{
 			customer.GET("/bookings", bookingCtrl.GetCustomerBookings)
 			customer.PUT("/bookings/:id/cancel", bookingCtrl.CustomerCancelBooking)
+			customer.POST("/bookings/:id/reschedule-response", departureCtrl.RespondToReschedule)
 			customer.POST("/reviews", reviewCtrl.CreateReview)
 			customer.GET("/notifications", notifCtrl.GetUserNotifications)
 			customer.PUT("/notifications/read-all", notifCtrl.MarkAllAsRead)

@@ -7,6 +7,7 @@ import (
 	"html"
 	"log"
 	"net/smtp"
+	"time"
 
 	"tripkita-provider/config"
 	"tripkita-provider/models"
@@ -379,4 +380,119 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 
 	log.Printf("[EmailService] Email dispatched successfully")
 	return nil
+}
+
+// SendOpenTripQuotaAlertEmail memberi tahu mitra bahwa kuota minimal satu
+// keberangkatan open trip tidak terpenuhi pada batas H-3, beserta tiga pilihan
+// keputusan yang tersedia di Partner Hub.
+func (s *EmailService) SendOpenTripQuotaAlertEmail(provider *models.Provider, departure *models.TripDeparture, pkg *models.Package) error {
+	if provider == nil || departure == nil || provider.Email == "" {
+		return nil
+	}
+
+	packageName := "Paket Wisata"
+	if pkg != nil && pkg.Name != "" {
+		packageName = pkg.Name
+	}
+
+	dashboardURL := s.cfg.FrontendURL + "/#/provider/dashboard"
+	subject := fmt.Sprintf("⚠️ Kuota Open Trip %s Belum Terpenuhi - Keputusan H-3 Dibutuhkan", packageName)
+
+	htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #1e293b;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #0284c7; text-align: center;">Temen<span style="color: #00c9a7;">Trip</span>✨</h2>
+    <div style="background-color: #fffbeb; border: 1px solid #fde68a; padding: 16px; border-radius: 12px; margin: 20px 0;">
+      <h3 style="color: #b45309; margin: 0 0 6px 0;">Kuota Minimal Belum Terpenuhi</h3>
+      <p style="color: #92400e; margin: 0; font-size: 14px;">
+        Halo <strong>%s</strong>, Open Trip <strong>%s</strong> yang dijadwalkan berangkat pada
+        <strong>%s</strong> baru terisi <strong>%d dari minimal %d kursi</strong> (%d pesanan).
+      </p>
+    </div>
+    <p style="font-size: 14px; color: #475569;">Sesuai ketentuan H-3, Anda perlu menentukan salah satu dari tiga pilihan berikut:</p>
+    <ul style="font-size: 14px; color: #475569; line-height: 1.8;">
+      <li><strong>Tetap berangkat</strong> — perjalanan berjalan sesuai jadwal meski peserta di bawah kuota minimal.</li>
+      <li><strong>Batalkan</strong> — seluruh pesanan diteruskan ke admin untuk pengembalian dana penuh kepada pelanggan.</li>
+      <li><strong>Jadwalkan ulang</strong> — Anda menawarkan tanggal pengganti, dan setiap pelanggan berhak menerima atau menolaknya. Pelanggan yang menolak otomatis masuk proses pengembalian dana.</li>
+    </ul>
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="%s" style="background-color: #0284c7; color: #ffffff; padding: 12px 28px; border-radius: 10px; text-decoration: none; font-weight: bold; display: inline-block;">Buka Partner Hub</a>
+    </div>
+    <p style="font-size: 12px; color: #94a3b8; text-align: center;">Keputusan harus dikirim sebelum tanggal keberangkatan. Tanpa keputusan, pesanan tetap berjalan pada jadwal semula.</p>
+  </div>
+</body>
+</html>
+`,
+		html.EscapeString(provider.PicName),
+		html.EscapeString(packageName),
+		html.EscapeString(departure.DepartureAt.Format("02 January 2006")),
+		departure.SeatsBooked,
+		departure.SeatsRequired,
+		departure.BookingCount,
+		html.EscapeString(dashboardURL),
+	)
+
+	return s.sendMailWithAttachment(provider.Email, subject, htmlBody, nil, "")
+}
+
+// SendRescheduleOfferEmail meminta persetujuan pelanggan atas tanggal pengganti.
+// Berbeda dengan SendRescheduleEmail yang mengabarkan jadwal yang sudah berubah,
+// email ini menuntut jawaban: diterima atau ditolak.
+func (s *EmailService) SendRescheduleOfferEmail(b *models.Booking, proposed time.Time, originalDate time.Time, cause string) error {
+	if b == nil || b.CustomerEmail == "" {
+		return nil
+	}
+
+	packageName := "Paket Wisata"
+	if b.Package.Name != "" {
+		packageName = b.Package.Name
+	}
+
+	historyURL := s.cfg.FrontendURL + "/#/riwayat-booking"
+	subject := fmt.Sprintf("🗓️ Tawaran Jadwal Pengganti untuk Pesanan #%s - TemenTrip", b.BookingCode)
+
+	htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #1e293b;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #0284c7; text-align: center;">Temen<span style="color: #00c9a7;">Trip</span>✨</h2>
+    <div style="background-color: #fffbeb; border: 1px solid #fde68a; padding: 16px; border-radius: 12px; margin: 20px 0;">
+      <h3 style="color: #b45309; margin: 0 0 6px 0;">Jadwal Trip Perlu Diubah</h3>
+      <p style="color: #92400e; margin: 0; font-size: 14px;">
+        Halo <strong>%s</strong>, keberangkatan <strong>%s</strong> tanggal <strong>%s</strong> tidak dapat dijalankan.
+        <br /><br />Sebab: <strong>%s</strong>.
+        <br /><br />Penyelenggara menawarkan tanggal pengganti berikut.
+      </p>
+    </div>
+    <table style="width: 100%%; font-size: 14px; color: #475569; border-collapse: collapse; margin: 16px 0;">
+      <tr><td style="padding: 8px 0;">Kode Pesanan</td><td style="padding: 8px 0; text-align: right;"><strong>#%s</strong></td></tr>
+      <tr><td style="padding: 8px 0;">Jadwal Semula</td><td style="padding: 8px 0; text-align: right;">%s</td></tr>
+      <tr><td style="padding: 8px 0;">Jadwal Pengganti</td><td style="padding: 8px 0; text-align: right;"><strong style="color: #0284c7;">%s</strong></td></tr>
+    </table>
+    <p style="font-size: 14px; color: #475569;">
+      Silakan buka riwayat pesanan Anda untuk <strong>menerima</strong> atau <strong>menolak</strong> tanggal pengganti ini.
+      Jika Anda menolak, pesanan akan diteruskan ke proses pengembalian dana penuh.
+    </p>
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="%s" style="background-color: #0284c7; color: #ffffff; padding: 12px 28px; border-radius: 10px; text-decoration: none; font-weight: bold; display: inline-block;">Tanggapi Tawaran Jadwal</a>
+    </div>
+    <p style="font-size: 12px; color: #94a3b8; text-align: center;">Tanpa jawaban sampai tanggal keberangkatan semula, pesanan otomatis diteruskan ke proses pengembalian dana.</p>
+  </div>
+</body>
+</html>
+`,
+		html.EscapeString(b.CustomerName),
+		html.EscapeString(packageName),
+		html.EscapeString(originalDate.Format("02 January 2006")),
+		html.EscapeString(cause),
+		html.EscapeString(b.BookingCode),
+		html.EscapeString(originalDate.Format("02 January 2006")),
+		html.EscapeString(proposed.Format("02 January 2006")),
+		html.EscapeString(historyURL),
+	)
+
+	return s.sendMailWithAttachment(b.CustomerEmail, subject, htmlBody, nil, "")
 }

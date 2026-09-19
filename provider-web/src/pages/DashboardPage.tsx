@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { Booking } from '../types';
 import { request } from '../utils/api';
+import { TripDepartureAlert } from '../components/TripDepartureAlert';
 
 interface DashboardStats {
   totalPackages: number;
@@ -32,7 +33,6 @@ export const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [popularPackages, setPopularPackages] = useState<any[]>([]);
-  const [urgentOpenTrip, setUrgentOpenTrip] = useState<any | null>(null);
 
   const providerName = providerProfile?.businessName || 'Mitra TemenTrip';
 
@@ -86,30 +86,6 @@ export const DashboardPage: React.FC = () => {
             }));
           setPopularPackages(sortedPackages);
 
-          // Find urgent open trip (H-3)
-          const allPackages = packagesRes.value;
-          const openTrips = allPackages.filter(p => p.tripType === 'Open Trip' && p.status === 'Aktif');
-          const now = new Date();
-          now.setHours(0, 0, 0, 0);
-
-          let foundUrgent = null;
-          for (const pkg of openTrips) {
-            if (pkg.startDate) {
-              const tripDate = new Date(pkg.startDate);
-              tripDate.setHours(0, 0, 0, 0);
-              const diffTime = tripDate.getTime() - now.getTime();
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              
-              if (diffDays <= 3 && diffDays >= 0 && pkg.quotaUsed < pkg.quotaMin) {
-                foundUrgent = {
-                  ...pkg,
-                  daysLeft: diffDays
-                };
-                break;
-              }
-            }
-          }
-          setUrgentOpenTrip(foundUrgent);
         }
         
       } catch (err) {
@@ -159,90 +135,8 @@ export const DashboardPage: React.FC = () => {
           </div>
         </header>
 
-        {/* H-3 Open Trip Quota Verification Alert Banner */}
-        {urgentOpenTrip && (
-          <section style={{ margin: '20px 0 10px 0' }}>
-            <div style={{
-              backgroundColor: '#fffbebfb',
-              border: '1.5px solid #fde68a',
-              borderRadius: '20px',
-              padding: '20px 24px',
-              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '20px' }}>⚠️</span>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#92400e' }}>
-                      Verifikasi H-3 Keberangkatan Open Trip (Penting)
-                    </h3>
-                    <p style={{ margin: 0, fontSize: '12.5px', color: '#b45309' }}>
-                      Jadwal Open Trip <strong>{urgentOpenTrip.name} ({new Date(urgentOpenTrip.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })})</strong> saat ini terisi <strong>{urgentOpenTrip.quotaUsed || 0} dari minimal {urgentOpenTrip.quotaMin || 1} orang</strong>. Harap tentukan keputusan H-3 sebelum pendaftaran ditutup:
-                    </p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#b45309', backgroundColor: '#fef3c7', padding: '4px 10px', borderRadius: '20px', border: '1px solid #fde68a' }}>
-                    Batas Keputusan: H-3 06:00 WIB
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => navigateTo('booking')}
-                    style={{
-                      backgroundColor: '#ffffff',
-                      color: '#92400e',
-                      border: '1.5px solid #f59e0b',
-                      padding: '5px 12px',
-                      borderRadius: '20px',
-                      fontSize: '11.5px',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
-                    }}
-                  >
-                    📋 Lihat Detail Pesanan &gt;
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px', paddingTop: '14px', borderTop: '1px dashed #fde68a' }}>
-                <button
-                  onClick={() => alert(`Berhasil mengonfirmasi keberangkatan untuk ${urgentOpenTrip.name}! Status trip berubah menjadi Pasti Berangkat.`)}
-                  style={{
-                    backgroundColor: '#16a34a',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  ✅ Konfirmasi Berangkat (Tetap Jalan)
-                </button>
-                <button
-                  onClick={() => alert(`Trip ${urgentOpenTrip.name} telah dibatalkan. Dana akan dikembalikan ke pelanggan.`)}
-                  style={{
-                    backgroundColor: '#ef4444',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  ❌ Batalkan Trip (Refund)
-                </button>
-              </div>
-            </div>
-          </section>
-        )}
+        {/* Keputusan H-3 keberangkatan open trip; isinya dari backend. */}
+        <TripDepartureAlert />
 
         {/* Stats Grid */}
         <section className="stats-cards-grid">

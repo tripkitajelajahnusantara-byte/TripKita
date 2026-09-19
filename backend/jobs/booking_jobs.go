@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"tripkita-provider/models"
+	"tripkita-provider/services"
 )
 
 // ExpirePendingBookings menutup booking yang tidak dibayar dalam 24 jam.
@@ -125,7 +126,7 @@ func (r *Runner) expireOne(ctx context.Context, bookingID uint, cutoff time.Time
 		if err := tx.Model(&booking).Update("status", "EXPIRED").Error; err != nil {
 			return err
 		}
-		return recalculateQuotaTx(tx, booking.PackageID)
+		return services.RecalculatePackageAvailability(tx, booking.PackageID)
 	})
 }
 
@@ -192,16 +193,4 @@ func (r *Runner) AutoCompleteFinishedBookings(ctx context.Context) {
 	if completed > 0 {
 		log.Printf("[Auto Complete] %d booking diselesaikan dan settlement dilepas.", completed)
 	}
-}
-
-func recalculateQuotaTx(tx *gorm.DB, packageID uint) error {
-	return tx.Exec(`
-		UPDATE packages p
-		SET quota_used = COALESCE((
-			SELECT SUM(b.guests) FROM bookings b
-			WHERE b.package_id = p.id
-			AND b.status IN ('PENDING_PAYMENT', 'PAID', 'CONFIRMED', 'COMPLETED')
-		), 0)
-		WHERE p.id = ?
-	`, packageID).Error
 }

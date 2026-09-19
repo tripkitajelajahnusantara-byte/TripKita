@@ -48,6 +48,7 @@ const (
 	NotifTypeReschedule   = "RESCHEDULE"
 	NotifTypePayout       = "PAYOUT"
 	NotifTypeRegistration = "REGISTRATION"
+	NotifTypeDeparture    = "DEPARTURE"
 	NotifTypeAccount      = "ACCOUNT"
 	NotifTypeGeneral      = "GENERAL"
 )

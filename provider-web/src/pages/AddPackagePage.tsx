@@ -16,6 +16,12 @@ import {
 } from 'lucide-react';
 
 import { request, API_BASE_URL } from '../utils/api';
+import { PackageDateManager } from '../components/PackageDateManager';
+
+/** Open Trip berangkat bersama pada jadwal tetap; tipe lain eksklusif per tanggal. */
+function isOpenTripType(tripType: string): boolean {
+  return tripType.toLowerCase().replace(/\s+/g, '') === 'opentrip';
+}
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -820,6 +826,22 @@ export const AddPackagePage: React.FC = () => {
                     </span>
                   )}
                 </div>
+
+                {/* Paket selain Open Trip berangkat eksklusif per pesanan, jadi
+                    mitra menentukan sendiri tanggal mana yang dibuka. */}
+                {tripType && !isOpenTripType(tripType) && (
+                  <div className="input-group">
+                    {editingPackageId ? (
+                      <PackageDateManager packageId={Number(editingPackageId)} tripType={tripType} />
+                    ) : (
+                      <div style={{ border: '1px dashed #cbd5e1', borderRadius: '12px', padding: '16px', backgroundColor: '#f8fafc', fontSize: '12.5px', color: '#475569', lineHeight: 1.6 }}>
+                        <strong style={{ color: '#0f172a' }}>Tanggal keberangkatan</strong><br />
+                        Simpan paket ini terlebih dahulu, lalu buka kembali untuk memilih tanggal mana saja yang
+                        dibuka bagi pelanggan (maksimal enam bulan ke depan). Satu tanggal hanya untuk satu pesanan.
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="input-group">
                   <label>Keterangan Jadwal Tambahan</label>

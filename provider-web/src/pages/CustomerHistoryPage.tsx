@@ -24,6 +24,13 @@ interface BookingItem {
   createdAt: string;
   providerWhatsApp?: string;
   providerName?: string;
+  // Terisi saat penyelenggara menawarkan tanggal pengganti karena kuota minimal
+  // open trip tidak terpenuhi pada H-3.
+  rescheduleDate?: string | null;
+  tripDepartureId?: number | null;
+  // Sebab keberangkatan tidak dapat dijalankan: kuota minimal tidak terpenuhi,
+  // atau keadaan kahar beserta penjelasan penyelenggara.
+  cancellationReason?: string;
 }
 
 const getWhatsAppURL = (phone?: string): string | null => {
@@ -274,6 +281,39 @@ export const CustomerHistoryPage: React.FC = () => {
     }
   };
 
+  // Jawaban pelanggan atas tanggal pengganti yang ditawarkan penyelenggara saat
+  // kuota minimal open trip tidak terpenuhi pada H-3.
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState<number | null>(null);
+
+  const handleRescheduleResponse = async (bookingId: number, accept: boolean) => {
+    const confirmText = accept
+      ? 'Terima tanggal pengganti ini? Jadwal trip Anda akan diperbarui.'
+      : 'Tolak tanggal pengganti ini? Pesanan Anda akan diteruskan ke proses pengembalian dana penuh.';
+    if (!window.confirm(confirmText)) return;
+
+    setRescheduleSubmitting(bookingId);
+    try {
+      const result = await request(`/customer/bookings/${bookingId}/reschedule-response`, {
+        method: 'POST',
+        body: JSON.stringify({ accept }),
+      });
+      setModalNotice({
+        title: accept ? 'Jadwal Pengganti Diterima' : 'Jadwal Pengganti Ditolak',
+        message: result?.message || 'Jawaban Anda telah tersimpan.',
+        isError: !accept,
+      });
+      await fetchHistory();
+    } catch (err: any) {
+      setModalNotice({
+        title: 'Jawaban Gagal Dikirim',
+        message: err?.message || 'Jawaban Anda tidak dapat disimpan. Silakan coba lagi.',
+        isError: true,
+      });
+    } finally {
+      setRescheduleSubmitting(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'COMPLETED':
@@ -315,6 +355,13 @@ export const CustomerHistoryPage: React.FC = () => {
           color: '#f59e0b',
           bgColor: '#fffbeb',
           icon: <Clock size={14} color="#f59e0b" />
+        };
+      case 'RESCHEDULE_OFFERED':
+        return {
+          label: 'Menunggu Jawaban Anda (Jadwal Pengganti)',
+          color: '#d97706',
+          bgColor: '#fffbeb',
+          icon: <AlertCircle size={14} color="#d97706" />
         };
       case 'REFUND_REQUIRED':
         return {
@@ -592,6 +639,47 @@ export const CustomerHistoryPage: React.FC = () => {
                       <span>Peserta: {booking.guests} orang</span>
                     </div>
                   </div>
+
+                  {booking.status === 'RESCHEDULE_OFFERED' && booking.rescheduleDate && (
+                    <div style={{ backgroundColor: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <strong style={{ fontSize: '13.5px', color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <AlertCircle size={16} color="#d97706" /> Penyelenggara Menawarkan Tanggal Pengganti
+                      </strong>
+                      <p style={{ fontSize: '13px', color: '#7c2d12', margin: 0, lineHeight: '1.6' }}>
+                        Keberangkatan <strong>{formattedTripDate}</strong> tidak dapat dijalankan. Penyelenggara menawarkan
+                        tanggal pengganti{' '}
+                        <strong style={{ color: '#b45309' }}>
+                          {new Date(booking.rescheduleDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </strong>.
+                      </p>
+                      {booking.cancellationReason && (
+                        <p style={{ fontSize: '12.5px', color: '#7c2d12', margin: 0, lineHeight: '1.5', backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 12px' }}>
+                          <strong>Sebab:</strong> {booking.cancellationReason}
+                        </p>
+                      )}
+                      <p style={{ fontSize: '12.5px', color: '#92400e', margin: 0, lineHeight: '1.5' }}>
+                        Jika Anda menolak, pesanan akan diteruskan ke proses pengembalian dana penuh.
+                      </p>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          disabled={rescheduleSubmitting === booking.id}
+                          onClick={() => handleRescheduleResponse(booking.id, true)}
+                          style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: rescheduleSubmitting === booking.id ? 'wait' : 'pointer' }}
+                        >
+                          Terima Jadwal Pengganti
+                        </button>
+                        <button
+                          type="button"
+                          disabled={rescheduleSubmitting === booking.id}
+                          onClick={() => handleRescheduleResponse(booking.id, false)}
+                          style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1.5px solid #fca5a5', padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: rescheduleSubmitting === booking.id ? 'wait' : 'pointer' }}
+                        >
+                          Tolak & Minta Refund
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {booking.status === 'PENDING_PAYMENT' && (
                     isExpired ? (

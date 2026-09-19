@@ -59,6 +59,7 @@ func (r *Runner) Start(ctx context.Context) <-chan struct{} {
 func (r *Runner) runOnce(ctx context.Context) {
 	// Transaksi lama tidak pernah dihapus otomatis karena dibutuhkan untuk audit.
 	r.ExpirePendingBookings(ctx)
+	r.ReviewTripDepartures(ctx)
 	r.AutoCompleteFinishedBookings(ctx)
 	r.container.PayoutService.ReconcileProcessingPayouts(ctx)
 	r.ReconcileProviderBalances(ctx)

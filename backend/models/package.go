@@ -37,6 +37,13 @@ type Package struct {
 	CreatedAt          time.Time      `json:"createdAt"`
 	UpdatedAt          time.Time      `json:"updatedAt"`
 	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// Tanggal keberangkatan untuk paket selain Open Trip. Diisi saat paket
+	// dibaca dari tabel package_dates, tidak disimpan pada tabel packages.
+	// AvailableDates adalah tanggal yang dibuka mitra dan masih bebas dipilih;
+	// BookedDates sudah terkunci satu pesanan dan ditampilkan sebagai penuh.
+	AvailableDates []string `gorm:"-" json:"availableDates"`
+	BookedDates    []string `gorm:"-" json:"bookedDates"`
 }
 
 type CreatePackageRequest struct {

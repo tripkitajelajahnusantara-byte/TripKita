@@ -8,6 +8,12 @@ interface TravelokaCalendarModalProps {
   endDateIso: string;
   onSelectRange: (startIso: string, endIso: string) => void;
   bookedDates: string[];
+  /**
+   * Tanggal yang dibuka penyelenggara untuk paket selain Open Trip. Bila diisi,
+   * hanya tanggal di dalam daftar ini yang dapat dipilih. Dibiarkan kosong
+   * berarti paket belum mengatur tanggal dan kalender memakai aturan lama.
+   */
+  availableDates?: string[];
   minDateIso: string;
   tripType?: string;
   durationDays?: number;
@@ -20,6 +26,7 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
   endDateIso,
   onSelectRange,
   bookedDates,
+  availableDates,
   minDateIso,
   tripType = 'Private Trip',
   durationDays
@@ -105,6 +112,14 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
     return dateIso < minDateIso;
   };
 
+  const restrictsDates = Array.isArray(availableDates) && availableDates.length > 0;
+
+  // Tanggal di luar daftar yang dibuka penyelenggara tidak dapat dipilih.
+  const isClosed = (dateIso: string) => {
+    if (!restrictsDates) return false;
+    return !availableDates!.includes(dateIso);
+  };
+
   const monthsIndoFull = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
   const renderMonthCalendar = (year: number, monthIdx: number, monthTitle: string) => {
@@ -133,7 +148,8 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
 
             const dateIso = cell.dateIso;
             const inBooked = isBooked(dateIso);
-            const disabled = isBeforeMinDate(dateIso) || inBooked;
+            const closed = isClosed(dateIso);
+            const disabled = isBeforeMinDate(dateIso) || inBooked || closed;
             const isStart = dateIso === startDateIso;
             const isEnd = dateIso === endDateIso;
             const inRange = isDateInRange(dateIso);

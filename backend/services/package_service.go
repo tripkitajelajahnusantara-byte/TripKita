@@ -2,7 +2,10 @@ package services
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"time"
+
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
 )
@@ -15,15 +18,18 @@ type PackageService interface {
 	GetPackageByID(id uint, providerID uint) (*models.Package, error)
 	UpdatePackage(id uint, providerID uint, req *models.UpdatePackageRequest) (*models.Package, error)
 	DeletePackage(id uint, providerID uint) error
+	ListPackageDates(packageID uint, providerID uint) ([]models.PackageDate, error)
+	SetPackageDates(packageID uint, providerID uint, dates []string) ([]models.PackageDate, error)
 }
 
 type packageService struct {
 	repo         repositories.PackageRepository
 	providerRepo repositories.ProviderRepository
+	dateRepo     repositories.PackageDateRepository
 }
 
-func NewPackageService(repo repositories.PackageRepository, providerRepo repositories.ProviderRepository) PackageService {
-	return &packageService{repo: repo, providerRepo: providerRepo}
+func NewPackageService(repo repositories.PackageRepository, providerRepo repositories.ProviderRepository, dateRepo repositories.PackageDateRepository) PackageService {
+	return &packageService{repo: repo, providerRepo: providerRepo, dateRepo: dateRepo}
 }
 
 func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackageRequest) (*models.Package, error) {
@@ -89,11 +95,102 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 }
 
 func (s *packageService) GetAllPackages(providerID uint) ([]models.Package, error) {
-	return s.repo.FindAllByProvider(providerID)
+	packages, err := s.repo.FindAllByProvider(providerID)
+	if err != nil {
+		return nil, err
+	}
+	return s.attachDates(packages)
 }
 
 func (s *packageService) GetAllPublic() ([]models.Package, error) {
-	return s.repo.FindAllPublic()
+	packages, err := s.repo.FindAllPublic()
+	if err != nil {
+		return nil, err
+	}
+	return s.attachDates(packages)
+}
+
+// attachDates melengkapi daftar paket dengan tanggal keberangkatannya dalam satu
+// query, bukan satu query per paket.
+func (s *packageService) attachDates(packages []models.Package) ([]models.Package, error) {
+	if s.dateRepo == nil || len(packages) == 0 {
+		return packages, nil
+	}
+
+	ids := make([]uint, 0, len(packages))
+	for _, pkg := range packages {
+		if !models.IsOpenTrip(pkg.TripType) {
+			ids = append(ids, pkg.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return packages, nil
+	}
+
+	today, _ := models.AvailabilityWindow(time.Now())
+	open, booked, err := s.dateRepo.DatesFor(ids, today)
+	if err != nil {
+		return nil, err
+	}
+	for i := range packages {
+		packages[i].AvailableDates = open[packages[i].ID]
+		packages[i].BookedDates = booked[packages[i].ID]
+	}
+	return packages, nil
+}
+
+// ListPackageDates mengembalikan seluruh tanggal paket beserta statusnya untuk
+// mitra pemiliknya.
+func (s *packageService) ListPackageDates(packageID uint, providerID uint) ([]models.PackageDate, error) {
+	pkg, err := s.repo.FindByIDAndProvider(packageID, providerID)
+	if err != nil || pkg == nil {
+		return nil, fmt.Errorf("paket tidak ditemukan")
+	}
+	return s.dateRepo.ListByPackage(packageID)
+}
+
+// SetPackageDates mengganti daftar tanggal yang dibuka mitra.
+//
+// Aturan yang ditegakkan di sini: hanya untuk paket selain Open Trip, tanggal
+// tidak boleh di masa lalu, dan tidak boleh lebih jauh dari enam bulan ke depan.
+func (s *packageService) SetPackageDates(packageID uint, providerID uint, dates []string) ([]models.PackageDate, error) {
+	pkg, err := s.repo.FindByIDAndProvider(packageID, providerID)
+	if err != nil || pkg == nil {
+		return nil, fmt.Errorf("paket tidak ditemukan")
+	}
+	if models.IsOpenTrip(pkg.TripType) {
+		return nil, fmt.Errorf("Open Trip berangkat bersama pada jadwal yang sudah ditetapkan, sehingga tanggalnya tidak dipilih per pelanggan")
+	}
+	if len(dates) > models.MaxAvailabilityDates {
+		return nil, fmt.Errorf("jumlah tanggal melebihi batas %d", models.MaxAvailabilityDates)
+	}
+
+	earliest, latest := models.AvailabilityWindow(time.Now())
+	unique := make(map[string]struct{}, len(dates))
+	cleaned := make([]string, 0, len(dates))
+	for _, raw := range dates {
+		date := strings.TrimSpace(raw)
+		if _, err := time.Parse("2006-01-02", date); err != nil {
+			return nil, fmt.Errorf("tanggal %q tidak valid; gunakan format YYYY-MM-DD", raw)
+		}
+		if date < earliest {
+			return nil, fmt.Errorf("tanggal %s sudah lewat dan tidak dapat dibuka", date)
+		}
+		if date > latest {
+			return nil, fmt.Errorf("tanggal %s melebihi batas %d bulan ke depan (maksimal %s)", date, models.AvailabilityHorizonMonths, latest)
+		}
+		if _, seen := unique[date]; seen {
+			continue
+		}
+		unique[date] = struct{}{}
+		cleaned = append(cleaned, date)
+	}
+	sort.Strings(cleaned)
+
+	if err := s.dateRepo.ReplaceProviderDates(packageID, cleaned); err != nil {
+		return nil, err
+	}
+	return s.dateRepo.ListByPackage(packageID)
 }
 
 func (s *packageService) GetPublicProviderProfile(id uint) (*models.PublicProviderProfile, error) {

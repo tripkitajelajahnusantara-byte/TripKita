@@ -78,6 +78,7 @@ func ConnectDB(cfg *config.Config) {
 			&models.HeldSettlement{},
 			&models.OAuthLoginCode{},
 			&models.RefundRecord{},
+			&models.TripDeparture{},
 		)
 		if err != nil {
 			log.Fatalf("Migrasi database gagal: %v", err)

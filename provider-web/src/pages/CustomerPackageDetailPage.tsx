@@ -147,6 +147,15 @@ export const CustomerPackageDetailPage: React.FC = () => {
     ? pkg.bookedDates
     : [];
 
+  // Tanggal yang dibuka penyelenggara untuk paket selain Open Trip. Open Trip
+  // berangkat bersama pada jadwal tetap sehingga daftarnya kosong.
+  const currentPkgAvailableDates: string[] = Array.isArray(pkg.availableDates)
+    ? pkg.availableDates
+    : [];
+  const restrictsDates = currentPkgAvailableDates.length > 0;
+  const isSelectedDateClosed =
+    restrictsDates && !!customStartDate && !currentPkgAvailableDates.includes(customStartDate);
+
   const getBookedDatesInSelectedRange = (startIso: string, endIso: string, bookedList: string[]) => {
     if (!startIso || !endIso) return [];
     const start = new Date(startIso).getTime();
@@ -475,6 +484,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
     }
     if (!isOpenTrip && isRangeBooked) {
       showAlert({ type: 'error', title: 'Jadwal Terbooking', message: `Rentang tanggal ${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)} sudah TERBOOKING oleh pemesan lain. Silakan pilih rentang tanggal lain.` });
+      return;
+    }
+    if (isSelectedDateClosed) {
+      showAlert({ type: 'error', title: 'Tanggal Tidak Dibuka', message: `Penyelenggara tidak membuka tanggal ${formatDateIndoFull(customStartDate)} untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.` });
       return;
     }
     if (!isOpenTrip && customStartDate < h7MinDateStr) {
@@ -1273,6 +1286,12 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   </div>
                 </button>
 
+                {isSelectedDateClosed && !isRangeBooked && (
+                  <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '10px 12px', borderRadius: '8px', color: '#92400e', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
+                    ⚠️ Tanggal {formatDateIndoFull(customStartDate)} tidak dibuka penyelenggara untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.
+                  </div>
+                )}
+
                 {isRangeBooked && (
                   <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '10px 12px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
                     ❌ Dalam rentang tanggal yang Anda pilih ({customStartDate === customEndDate ? formatDateIndoFull(customStartDate) : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`}), terdapat tanggal yang sudah terbooking ({bookedDatesInRange.map(d => formatDateIndoFull(d)).join(', ')} FULL). Silakan pilih rentang tanggal lain pada kalender.
@@ -1360,7 +1379,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Pesan Sekarang Button (Directly Visible!) */}
             <button
               onClick={handleBookNow}
-              disabled={availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)}
+              disabled={availableSeats <= 0 || guestsCount > availableSeats || isSelectedDateClosed || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)}
               style={{
                 width: '100%',
                 padding: '14px',
@@ -1413,7 +1432,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
         <button
           onClick={handleBookNow}
-          disabled={availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)}
+          disabled={availableSeats <= 0 || guestsCount > availableSeats || isSelectedDateClosed || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)}
           style={{
             padding: '12px 24px',
             backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? '#94a3b8' : '#007bff',
@@ -1568,6 +1587,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
           setCustomEndDate(endIso);
         }}
         bookedDates={currentPkgBookedDates}
+        availableDates={currentPkgAvailableDates}
         minDateIso={h7MinDateStr}
         tripType={pkg.tripType}
         durationDays={pkg.duration}

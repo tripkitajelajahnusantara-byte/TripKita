@@ -266,7 +266,10 @@ func validateProviderStatusTransition(current, next string, tripEndDate time.Tim
 			return fmt.Errorf("booking hanya dapat dikonfirmasi setelah pembayaran terverifikasi")
 		}
 	case "CANCELLED_BY_PROVIDER":
-		if current != "PENDING_PAYMENT" && current != "PAID" && current != "CONFIRMED" {
+		// RESCHEDULE_OFFERED ikut diizinkan: tawaran jadwal pengganti yang
+		// ditolak pelanggan atau tidak dijawab sampai tanggal berangkat harus
+		// dapat dialihkan ke proses pengembalian dana.
+		if current != "PENDING_PAYMENT" && current != "PAID" && current != "CONFIRMED" && current != models.StatusRescheduleOffered {
 			return fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", current)
 		}
 	case "CANCELLED_BY_CUSTOMER":
@@ -320,6 +323,12 @@ func (s *bookingService) ProviderReschedule(id uint, providerID uint, newDate st
 		}
 		if booking.Status != "RESCHEDULE_OFFERED" || booking.RescheduleCount >= 1 {
 			return fmt.Errorf("booking tidak berada pada proses penjadwalan ulang")
+		}
+		// Tawaran yang berasal dari peninjauan kuota H-3 wajib melewati
+		// persetujuan pelanggan. Tanpa penjagaan ini, jalur lama dapat memaksa
+		// tanggal baru menjadi CONFIRMED tanpa pelanggan pernah menyetujuinya.
+		if booking.TripDepartureID != nil {
+			return fmt.Errorf("penjadwalan ulang keberangkatan open trip menunggu jawaban pelanggan dan tidak dapat diubah dari sini")
 		}
 		newTripDay := parsedDate.Format("2006-01-02")
 		if booking.Package.StartDate != "" && newTripDay < booking.Package.StartDate {
@@ -402,6 +411,9 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		if pkg.QuotaMax > 0 && pkg.QuotaUsed+booking.Guests > pkg.QuotaMax {
 			return &BookingInputError{Message: fmt.Sprintf("kuota paket tidak mencukupi (tersisa %d seat)", pkg.QuotaMax-pkg.QuotaUsed)}
 		}
+		if err := ensureExclusiveDateTx(tx, &pkg, booking.TripDate, calculateTripEnd(booking.TripDate, pkg.Duration), 0); err != nil {
+			return err
+		}
 		addOnTotal, err := calculateAddOnTotal(pkg.Name, booking.SelectedAddOnIDs)
 		if err != nil {
 			return &BookingInputError{Message: err.Error()}
@@ -435,7 +447,7 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		if err := tx.Create(booking).Error; err != nil {
 			return err
 		}
-		return tx.Model(&models.Package{}).Where("id = ?", pkg.ID).UpdateColumn("quota_used", gorm.Expr("quota_used + ?", booking.Guests)).Error
+		return recalculatePackageQuotaTx(tx, pkg.ID)
 	})
 	if err != nil {
 		return err
@@ -701,8 +713,15 @@ func recordFinanceOnPaymentTx(tx *gorm.DB, booking *models.Booking) error {
 	return tx.Save(&balance).Error
 }
 
+// RecalculatePackageAvailability menghitung ulang kuota terpakai sekaligus
+// menyelaraskan status tanggal paket dari tabel bookings. Diekspor agar job
+// latar belakang memakai rumus yang sama, bukan salinannya sendiri.
+func RecalculatePackageAvailability(tx *gorm.DB, packageID uint) error {
+	return recalculatePackageQuotaTx(tx, packageID)
+}
+
 func recalculatePackageQuotaTx(tx *gorm.DB, packageID uint) error {
-	return tx.Exec(`
+	if err := tx.Exec(`
 		UPDATE packages p
 		SET quota_used = COALESCE((
 			SELECT SUM(b.guests) FROM bookings b
@@ -710,7 +729,10 @@ func recalculatePackageQuotaTx(tx *gorm.DB, packageID uint) error {
 			AND b.status IN ('PENDING_PAYMENT', 'PAID', 'CONFIRMED', 'COMPLETED')
 		), 0)
 		WHERE p.id = ?
-	`, packageID).Error
+	`, packageID).Error; err != nil {
+		return err
+	}
+	return syncPackageDatesTx(tx, packageID)
 }
 
 func (s *bookingService) adjustQuota(booking *models.Booking, oldStatus, newStatus string, providerID uint) {
@@ -820,4 +842,196 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 			)
 		}
 	}(*booking, oldStatus, newStatus)
+}
+
+// activeBookingStatuses adalah status yang benar-benar menahan kursi maupun
+// tanggal. Sama persis dengan status yang dihitung recalculatePackageQuotaTx.
+var activeBookingStatuses = []string{
+	models.StatusPendingPayment,
+	models.StatusPaid,
+	models.StatusConfirmed,
+	models.StatusCompleted,
+}
+
+// ensureExclusiveDateTx menegakkan aturan "satu tanggal satu pesanan" untuk
+// paket selain Open Trip.
+//
+// Open Trip berangkat bersama-sama sehingga satu tanggal memang dibagi banyak
+// pemesan dan dikendalikan kuota. Tipe lain bersifat eksklusif: begitu seorang
+// pelanggan memilih tanggal, tanggal itu tidak boleh lagi dipilih orang lain.
+//
+// Pemeriksaan ini aman dari balapan karena pemanggilnya sudah memegang lock
+// baris paket (SELECT ... FOR UPDATE), sehingga pemesanan pada satu paket
+// diproses berurutan.
+func ensureExclusiveDateTx(tx *gorm.DB, pkg *models.Package, tripStart time.Time, tripEnd time.Time, excludeBookingID uint) error {
+	if models.IsOpenTrip(pkg.TripType) {
+		return nil
+	}
+
+	startDay := tripStart.Format("2006-01-02")
+	endDay := tripEnd.Format("2006-01-02")
+	if endDay < startDay {
+		endDay = startDay
+	}
+
+	// Dua pesanan bentrok bila rentang menginapnya beririsan, bukan hanya bila
+	// tanggal berangkatnya sama. Paket 4D3N menahan pemandu dan armada selama
+	// empat hari, sehingga hari kedua pun tidak boleh dijual ke pemesan lain.
+	var conflicting int64
+	query := tx.Model(&models.Booking{}).
+		Where(`package_id = ? AND status IN ?
+		       AND to_char(trip_date, 'YYYY-MM-DD') <= ?
+		       AND to_char(GREATEST(trip_end_date, trip_date), 'YYYY-MM-DD') >= ?`,
+			pkg.ID, activeBookingStatuses, endDay, startDay)
+	if excludeBookingID > 0 {
+		query = query.Where("id <> ?", excludeBookingID)
+	}
+	if err := query.Count(&conflicting).Error; err != nil {
+		return err
+	}
+	if conflicting > 0 {
+		return &BookingInputError{Message: "tanggal tersebut sudah dipesan pelanggan lain; silakan pilih tanggal lain yang masih tersedia"}
+	}
+
+	// Bila mitra sudah mengatur tanggal yang dibuka, tanggal berangkat wajib
+	// berada di dalamnya. Hari-hari berikutnya mengikuti durasi paket dan tidak
+	// perlu ikut dibuka satu per satu. Paket lama yang belum pernah diatur tetap
+	// memakai rentang periode paket supaya tidak mendadak berhenti menerima
+	// pesanan.
+	var declared int64
+	if err := tx.Model(&models.PackageDate{}).
+		Where("package_id = ? AND origin = ?", pkg.ID, models.PackageDateOriginProvider).
+		Count(&declared).Error; err != nil {
+		return err
+	}
+	if declared == 0 {
+		return nil
+	}
+
+	var offered int64
+	if err := tx.Model(&models.PackageDate{}).
+		Where("package_id = ? AND date = ? AND origin = ?", pkg.ID, startDay, models.PackageDateOriginProvider).
+		Count(&offered).Error; err != nil {
+		return err
+	}
+	if offered == 0 {
+		return &BookingInputError{Message: "tanggal tersebut tidak dibuka oleh penyelenggara; silakan pilih salah satu tanggal yang tersedia"}
+	}
+	return nil
+}
+
+// occupiedDays menjabarkan seluruh hari yang ditahan satu pesanan, dari tanggal
+// berangkat sampai tanggal selesai.
+func occupiedDays(tripStart time.Time, tripEnd time.Time) []string {
+	day := time.Date(tripStart.Year(), tripStart.Month(), tripStart.Day(), 0, 0, 0, 0, tripStart.Location())
+	last := day
+	if tripEnd.After(tripStart) {
+		last = time.Date(tripEnd.Year(), tripEnd.Month(), tripEnd.Day(), 0, 0, 0, 0, tripEnd.Location())
+	}
+
+	days := make([]string, 0, 8)
+	for !day.After(last) && len(days) < 366 {
+		days = append(days, day.Format("2006-01-02"))
+		day = day.AddDate(0, 0, 1)
+	}
+	return days
+}
+
+// syncPackageDatesTx menyelaraskan status tanggal dengan pesanan yang aktif.
+//
+// Statusnya adalah turunan dari tabel bookings, sama seperti quota_used, supaya
+// tidak ada dua sumber kebenaran yang bisa menyimpang. Fungsi ini dipanggil dari
+// recalculatePackageQuotaTx sehingga setiap perubahan status pesanan ikut
+// memperbarui kalender pelanggan tanpa perlu diingat satu per satu.
+func syncPackageDatesTx(tx *gorm.DB, packageID uint) error {
+	var pkg models.Package
+	if err := tx.Select("id", "trip_type").First(&pkg, packageID).Error; err != nil {
+		return err
+	}
+	// Open Trip tidak mengunci tanggal; kursinya dikendalikan kuota.
+	if models.IsOpenTrip(pkg.TripType) {
+		return nil
+	}
+
+	var active []models.Booking
+	if err := tx.Select("id", "trip_date", "trip_end_date").
+		Where("package_id = ? AND status IN ?", packageID, activeBookingStatuses).
+		Order("id asc").
+		Find(&active).Error; err != nil {
+		return err
+	}
+
+	taken := make(map[string]uint, len(active)*2)
+	for _, booking := range active {
+		for _, day := range occupiedDays(booking.TripDate, booking.TripEndDate) {
+			if _, exists := taken[day]; !exists {
+				taken[day] = booking.ID
+			}
+		}
+	}
+
+	var rows []models.PackageDate
+	if err := tx.Where("package_id = ?", packageID).Find(&rows).Error; err != nil {
+		return err
+	}
+
+	now := time.Now()
+	seen := make(map[string]struct{}, len(rows))
+	for _, row := range rows {
+		seen[row.Date] = struct{}{}
+		bookingID, isTaken := taken[row.Date]
+
+		if isTaken {
+			if row.Status == models.PackageDateBooked && row.BookingID != nil && *row.BookingID == bookingID {
+				continue
+			}
+			if err := tx.Model(&models.PackageDate{}).Where("id = ?", row.ID).
+				Updates(map[string]interface{}{
+					"status":     models.PackageDateBooked,
+					"booking_id": bookingID,
+					"updated_at": now,
+				}).Error; err != nil {
+				return err
+			}
+			continue
+		}
+
+		// Tanggal sudah bebas kembali.
+		if row.Origin == models.PackageDateOriginAuto {
+			if err := tx.Delete(&models.PackageDate{}, row.ID).Error; err != nil {
+				return err
+			}
+			continue
+		}
+		if row.Status != models.PackageDateOpen || row.BookingID != nil {
+			if err := tx.Model(&models.PackageDate{}).Where("id = ?", row.ID).
+				Updates(map[string]interface{}{
+					"status":     models.PackageDateOpen,
+					"booking_id": nil,
+					"updated_at": now,
+				}).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	// Tanggal terpakai yang belum punya baris: dicatat sebagai baris bayangan
+	// supaya kalender pelanggan tetap menandainya penuh, termasuk pada paket
+	// lama yang mitranya belum pernah mengatur tanggal.
+	for day, bookingID := range taken {
+		if _, exists := seen[day]; exists {
+			continue
+		}
+		id := bookingID
+		if err := tx.Create(&models.PackageDate{
+			PackageID: packageID,
+			Date:      day,
+			Status:    models.PackageDateBooked,
+			Origin:    models.PackageDateOriginAuto,
+			BookingID: &id,
+		}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

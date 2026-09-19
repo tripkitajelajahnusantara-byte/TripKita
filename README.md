@@ -79,6 +79,76 @@ Pelanggan membayar **penuh di muka** melalui satu invoice Xendit; tidak ada uang
 Dari nominal yang dibayar, platform mengambil biaya layanan tetap dan komisi, lalu sisa bagian
 mitra dibagi dua: separuh tersedia untuk dicairkan segera, separuhnya ditahan sampai trip selesai.
 
+## Tanggal keberangkatan per tipe paket
+
+**Open Trip** berangkat bersama-sama pada jadwal yang ditetapkan mitra, sehingga
+satu tanggal dibagi banyak pemesan dan dikendalikan `quotaMin`/`quotaMax`.
+
+**Tipe lain** (Private Trip, Honeymoon, Family, Corporate) bersifat **eksklusif**:
+
+- Mitra memilih sendiri tanggal mana saja yang dibuka, paling jauh **enam bulan**
+  ke depan, lewat Partner Hub → Kelola Paket → edit paket.
+- Pelanggan hanya dapat memilih dari tanggal tersebut; tanggal lain tidak dapat
+  diklik di kalender dan ditolak backend.
+- Begitu seorang pelanggan memesan, **seluruh rentang menginap terkunci** — paket
+  4D3N menahan empat hari sekaligus, bukan hanya tanggal berangkat — dan tidak
+  dapat dipilih pelanggan lain. Kunci ini juga berlaku selama pesanan masih
+  menunggu pembayaran, dan terlepas kembali bila pesanan kedaluwarsa atau batal.
+- Mitra tidak dapat menutup tanggal yang sudah terkunci pesanan.
+
+Status tanggal adalah turunan dari tabel `bookings`, dihitung oleh fungsi yang
+sama dengan `quota_used`, sehingga tidak ada dua sumber kebenaran yang bisa
+menyimpang. Paket lama yang mitranya belum pernah mengatur tanggal tetap memakai
+rentang `startDate`–`endDate` seperti sebelumnya, tetapi penguncian tanggal sudah
+langsung berlaku.
+
+## Keberangkatan yang tidak dapat dijalankan
+
+Hanya paket bertipe **Open Trip** yang tunduk pada kuota minimal keberangkatan;
+private trip, honeymoon, family, dan corporate berangkat atas permintaan pemesan.
+
+Pada **H-3 pukul 00:01** terhadap tanggal jalan, bila kursi terisi masih di bawah
+`quotaMin` paket, sistem mengirim notifikasi dan email ke mitra berisi tiga pilihan:
+
+| Pilihan | Akibat |
+| --- | --- |
+| **Tetap berangkat** | Trip berjalan sesuai jadwal; pelanggan menerima notifikasi kepastian berangkat. |
+| **Batalkan** | Seluruh pesanan menjadi `REFUND_REQUIRED` dengan hak refund penuh, saldo mitra dibalik, dan admin menerima notifikasi untuk memproses pengembalian dana. |
+| **Jadwalkan ulang** | Mitra menetapkan tanggal pengganti. Setiap pelanggan menerima notifikasi dan email untuk **menerima** atau **menolak**. Menerima berarti jadwal diperbarui; menolak mengalirkan pesanan ke alur refund. |
+
+Kuota dihitung per **keberangkatan** (kombinasi paket dan tanggal jalan), bukan
+per paket, karena satu open trip dapat memiliki banyak tanggal jalan. Tawaran
+jadwal pengganti yang tidak dijawab sampai tanggal keberangkatan semula otomatis
+diperlakukan sebagai penolakan agar dana pelanggan tidak menggantung.
+
+Pemeriksaan dijalankan oleh job latar belakang, sehingga `ENABLE_BACKGROUND_JOBS`
+wajib bernilai `true` agar aturan ini berjalan.
+
+### Pembatalan karena keadaan kahar (force majeure)
+
+Berbeda dengan aturan kuota yang hanya berlaku untuk Open Trip dan terikat batas
+H-3, mitra dapat menyatakan **keadaan kahar** untuk **seluruh tipe paket**, kapan
+saja sampai hari keberangkatan berakhir — termasuk pada hari-H, yang justru
+paling sering terjadi. Menu tersedia di Partner Hub → **Booking**.
+
+Mitra wajib mengisi alasan (minimal 10 karakter) dan satu tanggal pengganti.
+Alasan tersimpan sebagai jejak audit dan ikut dikirim ke pelanggan. Setiap
+pelanggan pada keberangkatan itu lalu menerima notifikasi dan email berisi dua
+pilihan yang sama seperti alur kuota:
+
+- **Terima tanggal pengganti** — jadwal booking diperbarui dan jadwal pelepasan
+  dana ikut bergeser mengikuti tanggal baru.
+- **Tolak** — booking menjadi `REFUND_REQUIRED` dengan hak refund penuh dan admin
+  menerima notifikasi untuk memprosesnya.
+
+Pelanggan memiliki waktu menjawab minimal 48 jam sejak tawaran dikirim; tanpa
+jawaban sampai batas itu, pesanan otomatis diteruskan ke pengembalian dana.
+Tanggal pengganti untuk keadaan kahar tidak dibatasi periode operasional paket,
+karena paket berjadwal satu hari akan menolak semua tanggal pengganti bila aturan
+itu dipaksakan.
+
+## Pencairan dana mitra
+
 Pencairan ke mitra berjalan manual secara default (admin mentransfer lalu mencatat bukti) dan
 dapat dialihkan ke Xendit Payouts API lewat `ENABLE_AUTOMATIC_PAYOUT`. Refund selalu manual,
 tetapi wajib dicatat beserta nominal, metode, referensi transfer, dan admin pemrosesnya.
