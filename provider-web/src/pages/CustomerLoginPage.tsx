@@ -90,11 +90,9 @@ export const CustomerLoginPage: React.FC = () => {
       if (isRegisterMode) {
         await registerCustomer(name.trim(), email.trim(), password, whatsapp.trim());
         alert('Pendaftaran berhasil! Akun Anda telah aktif.');
-        navigateTo('beranda');
       } else {
         await login(email.trim(), password);
         alert('Berhasil masuk! Selamat datang kembali.');
-        navigateTo('beranda');
       }
     } catch (err: any) {
       console.error(err);

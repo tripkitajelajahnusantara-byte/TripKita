@@ -24,6 +24,7 @@ export function getRouteFromHash(): Route {
   if (hash.includes('/provider/login')) return 'provider-login';
   if (hash.includes('/provider/register')) return 'provider-register';
   if (hash.includes('/admin/dashboard')) return 'admin-dashboard';
+  if (hash.includes('/admin/login')) return 'admin-login';
   
   if (hash.includes('/riwayat-booking')) return 'riwayat-booking';
   if (hash.includes('/cari-trip')) return 'cari-trip';
@@ -54,6 +55,7 @@ export function getHashFromRoute(r: Route): string {
     case 'provider-login': return '#/provider/login';
     case 'provider-register': return '#/provider/register';
     case 'admin-dashboard': return '#/admin/dashboard';
+    case 'admin-login': return '#/admin/login';
     
     case 'riwayat-booking': return '#/riwayat-booking';
     case 'cari-trip': return '#/cari-trip';
@@ -66,6 +68,7 @@ export function getHashFromRoute(r: Route): string {
     case 'bantuan': return '#/bantuan';
     case 'provider-public-profile': return '#/provider-profile';
     case 'customer-register': return '#/customer-register';
+    case 'daftar': return '#/customer-register';
     case 'masuk': return '#/masuk';
     case 'pengaturan': return '#/pengaturan';
     case 'rencana-trip': return '#/rencana-trip';
@@ -173,9 +176,9 @@ interface NavigationContextType {
   setCustomerProfile: (profile: ProviderProfile | null) => void;
   providerProfile: ProviderProfile | null;
   setProviderProfile: (profile: ProviderProfile | null) => void;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, options?: { redirect?: boolean }) => Promise<void>;
   registerProvider: () => Promise<void>;
-  registerCustomer: (name: string, email: string, password: string, whatsapp: string) => Promise<void>;
+  registerCustomer: (name: string, email: string, password: string, whatsapp: string, options?: { redirect?: boolean }) => Promise<void>;
   updateProfile: (fields: Partial<ProviderProfile>) => Promise<void>;
   logout: () => void;
   loadingProfile: boolean;
@@ -368,6 +371,32 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  const redirectAfterAuth = useCallback((profile: Pick<ProviderProfile, 'role' | 'status' | 'isVerified'>, defaultRoute: Route) => {
+    const returnHash = sessionStorage.getItem('tementrip_auth_return_to');
+    sessionStorage.removeItem('tementrip_auth_return_to');
+
+    // Tujuan harus route internal dan harus sesuai area role pengguna.
+    if (returnHash?.startsWith('#/') && !returnHash.startsWith('#//')) {
+      const isProviderDestination = returnHash.startsWith('#/provider/');
+      const isAdminDestination = returnHash.startsWith('#/admin/');
+      const providerIsOperational = profile.status === 'APPROVED' && profile.isVerified;
+      const roleMayOpenDestination = profile.role === 'CUSTOMER'
+        ? !isProviderDestination && !isAdminDestination
+        : profile.role === 'ADMIN'
+          ? isProviderDestination || isAdminDestination
+          : isProviderDestination && !isAdminDestination
+            && (providerIsOperational || returnHash.startsWith('#/provider/profil'));
+
+      if (roleMayOpenDestination) {
+        window.location.hash = returnHash;
+        setRoute(getRouteFromHash());
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+    navigateTo(defaultRoute);
+  }, [navigateTo]);
+
   useEffect(() => {
 	const params = new URLSearchParams(window.location.search);
 	const oauthCode = params.get('oauth_code');
@@ -387,15 +416,15 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
           setCustomerProfile(data);
           setProviderProfile(null);
           setIsRegistered(true);
-          navigateTo('beranda');
+          redirectAfterAuth(data, 'beranda');
 		} else {
           setProviderToken(token);
           setProviderProfile(data);
           setCustomerProfile(null);
           setIsRegistered(true);
-          if (data.role === 'ADMIN') navigateTo('admin-dashboard');
-          else if (data.status !== 'APPROVED' || routeParam === 'profil-provider') navigateTo('profil-provider');
-          else navigateTo('dashboard');
+          if (data.role === 'ADMIN') redirectAfterAuth(data, 'admin-dashboard');
+          else if (data.status !== 'APPROVED' || !data.isVerified || routeParam === 'profil-provider') redirectAfterAuth(data, 'profil-provider');
+          else redirectAfterAuth(data, 'dashboard');
         }
 	  }).catch((err) => {
 		console.error('Token verification failed:', err);
@@ -404,13 +433,13 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     } else {
       fetchSessionProfile(route);
     }
-  }, [route, navigateTo]);
+  }, [route, navigateTo, redirectAfterAuth]);
 
   const updateRegisterData = (fields: Partial<RegisterData>) => {
     setRegisterData((prev) => ({ ...prev, ...fields }));
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, options: { redirect?: boolean } = {}) => {
     const res = await request('/public/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
@@ -421,23 +450,23 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       setCustomerProfile(res.provider);
       setProviderProfile(null);
       setIsRegistered(true);
-      navigateTo('beranda');
+      if (options.redirect !== false) redirectAfterAuth(res.provider, 'beranda');
     } else {
       setProviderToken(res.token);
       setProviderProfile(res.provider);
       setCustomerProfile(null);
       setIsRegistered(true);
       if (res.provider?.role === 'ADMIN') {
-        navigateTo('admin-dashboard');
-      } else if (res.provider?.status !== 'APPROVED') {
-        navigateTo('profil-provider');
+        redirectAfterAuth(res.provider, 'admin-dashboard');
+      } else if (res.provider?.status !== 'APPROVED' || !res.provider?.isVerified) {
+        redirectAfterAuth(res.provider, 'profil-provider');
       } else {
-        navigateTo('dashboard');
+        redirectAfterAuth(res.provider, 'dashboard');
       }
     }
   };
 
-  const registerCustomer = async (name: string, email: string, password: string, whatsapp: string) => {
+  const registerCustomer = async (name: string, email: string, password: string, whatsapp: string, options: { redirect?: boolean } = {}) => {
     const res = await request('/public/auth/register-customer', {
       method: 'POST',
       body: JSON.stringify({ name, email, password, whatsapp }),
@@ -449,7 +478,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       setCustomerProfile(profile);
       setProviderProfile(null);
       setIsRegistered(true);
-      navigateTo('beranda');
+      if (options.redirect !== false) redirectAfterAuth(profile, 'beranda');
     }
   };
 
@@ -491,7 +520,10 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+
+  const performLogout = () => {
+    const destination: Route = providerProfile ? 'provider-login' : 'beranda';
     const activeTokens = [getProviderToken(), getCustomerToken()].filter((token): token is string => Boolean(token));
     removeProviderToken();
     removeCustomerToken();
@@ -499,7 +531,6 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     setIsRegistered(false);
     setProviderProfile(null);
     setCustomerProfile(null);
-    setRoute('beranda');
     setRegisterStep(1);
     setRegisterData({
       businessName: '',
@@ -522,7 +553,12 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       agreeToTerms: false,
       password: '',
     });
+    sessionStorage.removeItem('tementrip_auth_return_to');
+    setIsLogoutConfirmOpen(false);
+    navigateTo(destination);
   };
+
+  const logout = () => setIsLogoutConfirmOpen(true);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
@@ -589,6 +625,70 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
         initialMode={authModalMode}
         onSuccess={authSuccessCallback}
       />
+      {isLogoutConfirmOpen && (
+        <div
+          role="presentation"
+          onClick={() => setIsLogoutConfirmOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px', background: 'rgba(15, 23, 42, 0.62)',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="logout-confirm-title"
+            aria-describedby="logout-confirm-description"
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '420px', padding: '28px',
+              borderRadius: '18px', background: '#ffffff',
+              boxShadow: '0 24px 60px rgba(15, 23, 42, 0.24)', textAlign: 'center'
+            }}
+          >
+            <div style={{
+              width: '52px', height: '52px', margin: '0 auto 16px',
+              borderRadius: '50%', display: 'grid', placeItems: 'center',
+              background: '#fee2e2', color: '#dc2626', fontSize: '24px', fontWeight: 800
+            }}>
+              !
+            </div>
+            <h2 id="logout-confirm-title" style={{ margin: '0 0 8px', color: '#0f172a', fontSize: '21px' }}>
+              Keluar dari akun?
+            </h2>
+            <p id="logout-confirm-description" style={{ margin: '0 0 24px', color: '#64748b', lineHeight: 1.6, fontSize: '14px' }}>
+              Sesi Anda akan diakhiri. Anda perlu masuk kembali untuk mengakses akun.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setIsLogoutConfirmOpen(false)}
+                style={{
+                  flex: 1, padding: '11px 16px', borderRadius: '10px',
+                  border: '1px solid #cbd5e1', background: '#ffffff',
+                  color: '#334155', fontWeight: 700, cursor: 'pointer'
+                }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={performLogout}
+                style={{
+                  flex: 1, padding: '11px 16px', borderRadius: '10px',
+                  border: 'none', background: '#dc2626',
+                  color: '#ffffff', fontWeight: 700, cursor: 'pointer'
+                }}
+              >
+                Ya, Keluar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </NavigationContext.Provider>
   );
 };

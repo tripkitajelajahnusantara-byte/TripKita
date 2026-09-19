@@ -187,7 +187,7 @@ export const RegisterPage: React.FC = () => {
                     <li>Setelah disetujui, Anda dapat masuk ke dashboard menggunakan email dan password yang telah Anda daftarkan.</li>
                   </ul>
                 </div>
-                <button className="submit-form-btn" onClick={() => navigateTo('masuk')} style={{ width: '100%', cursor: 'pointer' }}>
+                <button className="submit-form-btn" onClick={() => navigateTo('provider-login')} style={{ width: '100%', cursor: 'pointer' }}>
                   Ke Halaman Masuk
                 </button>
               </div>
@@ -425,7 +425,7 @@ export const RegisterPage: React.FC = () => {
                 </button>
 
                 <p className="login-prompt">
-                  Sudah punya akun? <span onClick={() => navigateTo('masuk')}>Masuk di sini</span>
+                  Sudah punya akun? <span onClick={() => navigateTo('provider-login')}>Masuk di sini</span>
                 </p>
               </form>
             ) : (
@@ -539,7 +539,7 @@ export const RegisterPage: React.FC = () => {
                 </div>
 
                 <p className="login-prompt">
-                  Sudah punya akun? <span onClick={() => navigateTo('masuk')}>Masuk di sini</span>
+                  Sudah punya akun? <span onClick={() => navigateTo('provider-login')}>Masuk di sini</span>
                 </p>
               </form>
             )}

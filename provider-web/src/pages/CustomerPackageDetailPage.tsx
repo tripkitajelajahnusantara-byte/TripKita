@@ -460,14 +460,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
     setLightboxPhotoIdx(prev => (prev === 0 ? photos.length - 1 : prev - 1));
   };
 
-  const handleBookNow = () => {
-    if (!customerProfile) {
-      openAuthModal('login', () => {
-        // Automatically proceed after successful login in AuthModal
-        handleBookNow();
-      });
-      return;
-    }
+  const continueBooking = () => {
     if (availableSeats <= 0) {
       showAlert({ type: 'warning', title: 'Kuota Habis', message: 'Maaf, kuota untuk paket ini telah habis. Silakan pilih paket wisata lain.' });
       return;
@@ -506,6 +499,14 @@ export const CustomerPackageDetailPage: React.FC = () => {
     };
     setSelectedPackageForDetail(updatedPkg);
     navigateTo('customer-checkout');
+  };
+
+  const handleBookNow = () => {
+    if (!customerProfile) {
+      openAuthModal('login', continueBooking);
+      return;
+    }
+    continueBooking();
   };
 
   return (

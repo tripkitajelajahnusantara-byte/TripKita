@@ -94,9 +94,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
     try {
       if (mode === 'register') {
-        await registerCustomer(name.trim(), email.trim(), password, whatsapp.trim());
+        await registerCustomer(name.trim(), email.trim(), password, whatsapp.trim(), { redirect: !onSuccess });
       } else {
-        await login(email.trim(), password);
+        await login(email.trim(), password, { redirect: !onSuccess });
       }
       onClose();
       if (onSuccess) onSuccess();
@@ -113,6 +113,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setGeneralError('Anda wajib menyetujui Syarat & Ketentuan sebelum mendaftar.');
       setFieldErrors(prev => ({ ...prev, agreeTerms: 'Centang untuk menyetujui Syarat & Ketentuan.' }));
       return;
+    }
+    const currentHash = window.location.hash;
+    if (currentHash.startsWith('#/') && !currentHash.startsWith('#//')) {
+      sessionStorage.setItem('tementrip_auth_return_to', currentHash);
     }
     window.location.href = `${API_BASE_URL}/public/auth/google?type=customer`;
   };

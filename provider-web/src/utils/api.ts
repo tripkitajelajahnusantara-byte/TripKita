@@ -132,6 +132,10 @@ export class ApiError extends Error {
  */
 function handleExpiredSession(isProviderRoute: boolean) {
   if (typeof window === 'undefined') return;
+  const currentHash = window.location.hash;
+  if (currentHash.startsWith('#/') && !currentHash.startsWith('#//')) {
+    sessionStorage.setItem('tementrip_auth_return_to', currentHash);
+  }
   if (isProviderRoute) {
     removeProviderToken();
     if (!window.location.hash.includes('/provider-login')) {
