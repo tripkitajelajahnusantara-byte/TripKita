@@ -19,13 +19,34 @@ class BookingListScreen extends StatefulWidget {
 
 class _BookingListScreenState extends State<BookingListScreen> {
   String selectedFilter = 'Semua'; // Semua, Berhasil, Menunggu, Gagal
+  final TextEditingController _trackCodeController = TextEditingController();
+  Booking? _trackedBooking;
+  String? _trackError;
+
+  void _handleTrackTicket() {
+    final code = _trackCodeController.text.trim();
+    if (code.isEmpty) return;
+
+    final List<Booking> allBookings = Booking.mockBookings;
+    final foundIndex = allBookings.indexWhere(
+      (b) => b.bookingCode.toLowerCase() == code.toLowerCase() || b.id.toLowerCase() == code.toLowerCase(),
+    );
+
+    setState(() {
+      if (foundIndex != -1) {
+        _trackedBooking = allBookings[foundIndex];
+        _trackError = null;
+      } else {
+        _trackedBooking = null;
+        _trackError = 'Kode booking tidak ditemukan. Mohon periksa kembali kode Anda.';
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Read bookings from memory
     final List<Booking> allBookings = Booking.mockBookings;
 
-    // Filter bookings based on active filter
     final List<Booking> filteredBookings = allBookings.where((booking) {
       if (selectedFilter == 'Semua') return true;
       if (selectedFilter == 'Berhasil') {
@@ -40,7 +61,6 @@ class _BookingListScreenState extends State<BookingListScreen> {
       return true;
     }).toList();
 
-    // Sort bookings: newest created first
     filteredBookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return Scaffold(
@@ -50,68 +70,38 @@ class _BookingListScreenState extends State<BookingListScreen> {
         elevation: 0.5,
         automaticallyImplyLeading: false,
         title: const Text(
-          'Booking Saya',
+          'Cek Booking',
           style: TextStyle(color: Color(0xFF1F2937), fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          // Filter Chips Section
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-            child: Row(
-              children: ['Semua', 'Berhasil', 'Menunggu', 'Gagal'].map((filter) {
-                final isSelected = selectedFilter == filter;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: ChoiceChip(
-                    label: Text(
-                      filter == 'Gagal' ? 'Gagal / Batal' : filter,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : const Color(0xFF4B5563),
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 12,
-                      ),
-                    ),
-                    selected: isSelected,
-                    selectedColor: const Color(0xFF0F8B8D),
-                    backgroundColor: Colors.grey.shade100,
-                    elevation: 0,
-                    pressElevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() {
-                          selectedFilter = filter;
-                        });
-                      }
-                    },
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 8),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Track Ticket Widget (Aligned with Customer Web)
+            _buildTrackTicketCard(),
+            const SizedBox(height: 20),
 
-          // Bookings List Section
-          Expanded(
-            child: filteredBookings.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-                    itemCount: filteredBookings.length,
-                    itemBuilder: (context, index) {
-                      final booking = filteredBookings[index];
-                      return _buildBookingCard(booking);
-                    },
-                  ),
-          ),
-        ],
+            // History Header Title
+            const Text(
+              'Detail Status Pemesanan Tiket',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.extrabold,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Guest Mode Empty State OR Filtered Bookings List
+            _buildGuestOrBookingsContent(filteredBookings),
+          ],
+        ),
       ),
       bottomNavigationBar: TripKitaBottomNavigation(
-        currentIndex: 2, // Booking tab is index 2
+        currentIndex: 2,
         onTap: (index) {
           widget.onNavigate(index);
         },
@@ -119,49 +109,279 @@ class _BookingListScreenState extends State<BookingListScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade400),
+  Widget _buildTrackTicketCard() {
+    final currencyFormatter = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Lacak Tiket Pesanan Anda',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.extrabold,
+              color: Color(0xFF0F172A),
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Belum Ada Booking',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1F2937)),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Ingin mencari pesanan Anda yang hilang? Masukkan Kode Booking (Contoh: TK-2824-xxxx) di bawah ini.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF64748B),
+              height: 1.4,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Anda belum memiliki transaksi booking dengan status filter "$selectedFilter". Yuk, cari open trip menarik di TemenTrip!',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+
+          TextField(
+            controller: _trackCodeController,
+            decoration: InputDecoration(
+              hintText: 'Masukkan Kode Booking Anda...',
+              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                widget.onNavigate(1); // Go to Trip List screen (Index 1)
-              },
+          ),
+          const SizedBox(height: 10),
+
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              onPressed: _handleTrackTicket,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F8B8D),
+                backgroundColor: const Color(0xFF007BFF),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 elevation: 0,
               ),
-              child: const Text('Jelajahi Open Trip', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              child: const Text('Cari Tiket', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+          ),
+
+          if (_trackError != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _trackError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ],
+
+          if (_trackedBooking != null) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text(
+              'Hasil Pencarian Tiket',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _trackedBooking!.bookingCode,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                      ),
+                      _buildStatusBadge(_trackedBooking!.status),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _trackedBooking!.packageDetails?.name ?? 'Open Trip Special',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tanggal: ${DateFormat("dd MMM yyyy").format(_trackedBooking!.tripDate)} • ${_trackedBooking!.guests} Pax',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        currencyFormatter.format(_trackedBooking!.totalPrice),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.extrabold, color: Color(0xFF00A896)),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          widget.onNavigate(9, arguments: {'booking': _trackedBooking});
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F8B8D),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        ),
+                        child: const Text('Lihat Detail', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuestOrBookingsContent(List<Booking> filteredBookings) {
+    // Guest Mode State (matching screenshot when no bookings in list)
+    if (filteredBookings.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEFF6FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.calendar_month_rounded, color: Color(0xFF007BFF), size: 28),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Melacak Tiket Pesanan (Mode Tamu)',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Anda saat ini mengakses tanpa akun. Masukkan Kode Booking yang telah Anda salin pada kolom pencarian di atas untuk melacak pesanan Anda.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF64748B),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    widget.onNavigate(4); // Profile screen (Login)
+                  },
+                  icon: const Icon(Icons.key, size: 14, color: Colors.white),
+                  label: const Text('Masuk ke Akun Saya', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF007BFF),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton(
+                  onPressed: () {
+                    widget.onNavigate(0); // Home screen
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF475569),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Cari Paket Wisata', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ],
             ),
           ],
         ),
-      ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Filter Chips Row
+        Container(
+          color: Colors.transparent,
+          child: Row(
+            children: ['Semua', 'Berhasil', 'Menunggu', 'Gagal'].map((filter) {
+              final isSelected = selectedFilter == filter;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: ChoiceChip(
+                  label: Text(
+                    filter == 'Gagal' ? 'Gagal / Batal' : filter,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : const Color(0xFF4B5563),
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 12,
+                    ),
+                  ),
+                  selected: isSelected,
+                  selectedColor: const Color(0xFF0F8B8D),
+                  backgroundColor: Colors.grey.shade100,
+                  elevation: 0,
+                  pressElevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() {
+                        selectedFilter = filter;
+                      });
+                    }
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: filteredBookings.length,
+          itemBuilder: (context, index) {
+            final booking = filteredBookings[index];
+            return _buildBookingCard(booking);
+          },
+        ),
+      ],
     );
   }
 

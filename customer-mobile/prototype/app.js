@@ -1709,69 +1709,206 @@ function unlockGroupChatForBooking(booking) {
     }
 }
 
-// 18. Render Booking History List Screen
+// 18. Render Booking History List Screen (Aligned with Customer Web Cek Booking)
+let currentTrackedBookingCode = "";
+
+function handleTrackTicketForm(e) {
+    e.preventDefault();
+    const input = document.getElementById("track-booking-input");
+    if (input) {
+        currentTrackedBookingCode = input.value;
+        renderBookingHistoryList();
+    }
+}
+
 function renderBookingHistoryList(filterStatus = "Semua") {
-    const container = document.getElementById("booking-history-container");
+    const container = document.getElementById("booking-list-container");
     if (!container) return;
 
-    let filtered = bookingsDB;
+    const isLoggedIn = (typeof currentUser !== 'undefined' && currentUser && currentUser.isLoggedIn);
+    
+    let trackedBooking = null;
+    let searchError = "";
+    if (currentTrackedBookingCode.trim()) {
+        const query = currentTrackedBookingCode.trim().toLowerCase();
+        const found = bookingsDB.find(b => (b.bookingCode && b.bookingCode.toLowerCase() === query) || (b.id && b.id.toLowerCase() === query));
+        if (found) {
+            trackedBooking = found;
+        } else {
+            searchError = "Kode booking tidak ditemukan. Mohon periksa kembali kode Anda.";
+        }
+    }
+
+    let userBookings = bookingsDB;
+
+    let filtered = userBookings;
     if (filterStatus !== "Semua") {
-        filtered = bookingsDB.filter(b => b.status === filterStatus);
+        filtered = userBookings.filter(b => {
+            if (filterStatus === "Berhasil") return b.status === "Lunas" || b.status === "PAID" || b.status === "CONFIRMED";
+            if (filterStatus === "Menunggu") return b.status === "Menunggu Pembayaran" || b.status === "PENDING_PAYMENT";
+            if (filterStatus === "Gagal") return b.status === "Dibatalkan" || b.status === "EXPIRED" || b.status === "FAILED";
+            return true;
+        });
     }
 
-    container.innerHTML = "";
-    if (filtered.length === 0) {
-        container.innerHTML = `
-            <div class="no-result" style="text-align: center; padding: 40px 0; color: #9ca3af;">
-                <i class="fa-solid fa-receipt" style="font-size: 44px; margin-bottom: 12px; color: #cbd5e1;"></i>
-                <h4 style="color: #334155;">Belum ada pesanan</h4>
-                <p style="font-size: 11px;">Silakan buat pesanan trip impian Anda terlebih dahulu.</p>
+    let html = `
+        <!-- Track Ticket Widget -->
+        <div style="background: white; border-radius: 16px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); margin-bottom: 20px; border: 1px solid #e2e8f0;">
+            <h3 style="font-size: 15px; font-weight: 800; color: #0f172a; margin: 0 0 6px 0;">Lacak Tiket Pesanan Anda</h3>
+            <p style="font-size: 11.5px; color: #64748b; margin: 0 0 14px 0; line-height: 1.4;">
+                Ingin mencari pesanan Anda yang hilang? Masukkan Kode Booking (Contoh: TK-2824-xxxx) di bawah ini.
+            </p>
+
+            <form onsubmit="handleTrackTicketForm(event)" style="display: flex; gap: 8px; flex-direction: column;">
+                <input
+                    type="text"
+                    id="track-booking-input"
+                    placeholder="Masukkan Kode Booking Anda..."
+                    value="${currentTrackedBookingCode}"
+                    style="width: 100%; box-sizing: border-box; padding: 10px 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 12.5px; outline: none; color: #0f172a;"
+                />
+                <button
+                    type="submit"
+                    style="width: 100%; background-color: #007bff; color: #ffffff; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 800; font-size: 12.5px; cursor: pointer; box-shadow: 0 3px 10px rgba(0,123,255,0.25);"
+                >
+                    Cari Tiket
+                </button>
+            </form>
+
+            ${searchError ? `
+                <p style="color: #ef4444; font-size: 11.5px; font-weight: 600; margin: 10px 0 0 0;">${searchError}</p>
+            ` : ''}
+
+            <!-- Tracked Ticket Result Box -->
+            ${trackedBooking ? `
+                <div style="margin-top: 16px; border-top: 1px solid #f1f5f9; padding-top: 14px;">
+                    <h4 style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin: 0 0 10px 0;">Hasil Pencarian Tiket</h4>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-size: 13px; font-weight: 800; color: #0f172a;">${trackedBooking.bookingCode}</span>
+                            <span style="background: #e6f4f4; color: #0f8b8d; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 8px;">${trackedBooking.status}</span>
+                        </div>
+                        <strong style="font-size: 13px; color: #0f172a; display: block; margin-bottom: 4px;">${trackedBooking.packageName}</strong>
+                        <div style="font-size: 11px; color: #64748b; margin-bottom: 10px;">
+                            <span>Tanggal: ${trackedBooking.schedule}</span> • <span>${trackedBooking.guestsCount || 2} Pax</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dotted #cbd5e1; padding-top: 8px;">
+                            <span style="font-size: 12px; font-weight: 800; color: #00a896;">${formatIDRCurrency(trackedBooking.totalPrice)}</span>
+                            <button onclick="viewBookingDetail('${trackedBooking.id}')" style="background: #0f8b8d; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: bold; cursor: pointer;">Lihat Detail</button>
+                        </div>
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+
+        <!-- History List Header -->
+        <h3 style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0 0 14px 0;">
+            ${isLoggedIn ? 'Riwayat Pemesanan Akun Anda' : 'Detail Status Pemesanan Tiket'}
+        </h3>
+    `;
+
+    if (!isLoggedIn) {
+        // Guest mode empty state matching Web Customer
+        html += `
+            <div style="text-align: center; padding: 36px 20px; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; color: #64748b; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+                <div style="width: 56px; height: 56px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto;">
+                    <i class="fa-regular fa-calendar-days" style="font-size: 26px; color: #007bff;"></i>
+                </div>
+                <h4 style="color: #0f172a; font-size: 15px; font-weight: 800; margin: 0 0 6px 0;">Melacak Tiket Pesanan (Mode Tamu)</h4>
+                <p style="font-size: 11.5px; color: #64748b; max-width: 320px; margin: 0 auto 20px auto; line-height: 1.5;">
+                    Anda saat ini mengakses tanpa akun. Masukkan Kode Booking yang telah Anda salin pada kolom pencarian di atas untuk melacak pesanan Anda.
+                </p>
+                
+                <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                    <button 
+                        onclick="openAuthModal('login')"
+                        style="padding: 10px 18px; background-color: #007bff; color: #ffffff; border: none; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; box-shadow: 0 3px 8px rgba(0,123,255,0.25); display: flex; align-items: center; gap: 6px;"
+                    >
+                        <i class="fa-solid fa-key"></i> Masuk ke Akun Saya
+                    </button>
+                    <button 
+                        onclick="switchScreen('screen-home')"
+                        style="padding: 10px 18px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer;"
+                    >
+                        Cari Paket Wisata
+                    </button>
+                </div>
             </div>
         `;
-        return;
+    } else if (filtered.length === 0) {
+        html += `
+            <div style="text-align: center; padding: 36px 20px; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; color: #64748b;">
+                <div style="width: 56px; height: 56px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto;">
+                    <i class="fa-regular fa-calendar-days" style="font-size: 26px; color: #007bff;"></i>
+                </div>
+                <h4 style="color: #0f172a; font-size: 15px; font-weight: 800; margin: 0 0 6px 0;">Belum Ada Pemesanan Terdaftar</h4>
+                <p style="font-size: 11.5px; color: #64748b; margin: 0 auto 18px auto;">
+                    Anda belum memiliki riwayat transaksi di akun ini.
+                </p>
+                <button 
+                    onclick="switchScreen('screen-home')"
+                    style="padding: 10px 18px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer;"
+                >
+                    Cari Paket Wisata
+                </button>
+            </div>
+        `;
+    } else {
+        // Filter Chips
+        html += `
+            <div style="display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; padding-bottom: 4px;">
+                ${["Semua", "Berhasil", "Menunggu", "Gagal"].map(f => `
+                    <span 
+                        onclick="renderBookingHistoryList('${f}')"
+                        style="padding: 6px 14px; border-radius: 20px; font-size: 11.5px; cursor: pointer; white-space: nowrap; ${filterStatus === f ? 'background: #0f8b8d; color: white; font-weight: bold;' : 'background: #f1f5f9; color: #475569;'}"
+                    >
+                        ${f === 'Gagal' ? 'Gagal / Batal' : f}
+                    </span>
+                `).join('')}
+            </div>
+        `;
+
+        filtered.forEach(b => {
+            let statusBadgeClass = "badge-pending";
+            if (b.status === "Lunas" || b.status === "PAID" || b.status === "CONFIRMED") statusBadgeClass = "badge-success";
+            if (b.status === "Dibatalkan" || b.status === "EXPIRED" || b.status === "FAILED") statusBadgeClass = "badge-danger";
+
+            html += `
+                <div class="booking-history-card" style="background: white; border-radius: 14px; border: 1px solid #e2e8f0; padding: 14px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 12px; font-weight: 800; color: #0f172a;">${b.bookingCode}</span>
+                        <span class="status-badge ${statusBadgeClass}">${b.status}</span>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <h4 style="margin: 0 0 4px 0; font-size: 13.5px; font-weight: bold; color: #0f172a;">${b.packageName}</h4>
+                        <p style="margin: 0; font-size: 11px; color: #64748b;"><i class="fa-solid fa-location-dot" style="color: #0f8b8d;"></i> ${b.destination || 'Destinasi Wisata'}</p>
+                        <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b;"><i class="fa-regular fa-calendar-days"></i> Tanggal: <strong>${b.schedule || '20 Okt 2026'}</strong> | ${b.guestsCount || 2} Pax</p>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 8px;">
+                        <div>
+                            <span style="font-size: 10px; color: #94a3b8; display: block;">TOTAL HARGA</span>
+                            <strong style="font-size: 13px; color: #0f8b8d;">${formatIDRCurrency(b.totalPrice)}</strong>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                            ${(b.status === 'Lunas' || b.status === 'PAID' || b.status === 'CONFIRMED') ? `
+                                <a href="https://wa.me/6281234567890" target="_blank" style="background: #25d366; color: white; border: none; border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fa-brands fa-whatsapp"></i> Group WA
+                                </a>
+                            ` : (b.status === 'Menunggu Pembayaran' || b.status === 'PENDING_PAYMENT') ? `
+                                <button onclick="simulatePaymentSuccess()" style="background: #0284c7; color: white; border: none; border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                                    Bayar Sekarang
+                                </button>
+                            ` : `
+                                <span style="font-size: 11px; color: #94a3b8;">Dibatalkan</span>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
     }
 
-    filtered.forEach(b => {
-        let statusBadgeClass = "badge-pending";
-        if (b.status === "Lunas") statusBadgeClass = "badge-success";
-        if (b.status === "Dibatalkan") statusBadgeClass = "badge-danger";
-
-        const itemHtml = `
-            <div class="booking-history-card">
-                <div class="history-head">
-                    <span class="code">${b.bookingCode}</span>
-                    <span class="status-badge ${statusBadgeClass}">${b.status}</span>
-                </div>
-                <div class="history-body">
-                    <h4>${b.packageName}</h4>
-                    <p class="meta"><i class="fa-solid fa-location-dot"></i> ${b.destination}</p>
-                    <p class="meta"><i class="fa-regular fa-calendar-days"></i> Tanggal Trip: <strong>${b.schedule}</strong></p>
-                    <p class="meta"><i class="fa-solid fa-users"></i> ${b.guestsCount} Peserta</p>
-                </div>
-                <div class="history-footer">
-                    <div class="total">
-                        <span>Total:</span>
-                        <strong>${formatIDRCurrency(b.totalPrice)}</strong>
-                    </div>
-                    <div class="action-btns">
-                        ${b.status === 'Lunas' ? `
-                            <button class="btn-sm bg-teal text-white" disabled>Lunas</button>
-                        ` : b.status === 'Menunggu Pembayaran' ? `
-                            <button class="btn-sm bg-green text-white" onclick="simulatePaymentSuccess()">
-                                <i class="fa-solid fa-check"></i> Uji Lunas
-                            </button>
-                            <button class="btn-sm bg-red text-white" onclick="simulatePaymentCancel()">
-                                <i class="fa-solid fa-xmark"></i> Cancel
-                            </button>
-                        ` : `
-                            <button class="btn-sm bg-gray" disabled>Dibatalkan</button>
-                        `}
-                    </div>
-                </div>
-            </div>
-        `;
-        container.insertAdjacentHTML("beforeend", itemHtml);
-    });
+    container.innerHTML = html;
 }
 
 function openTripGroupChatByPackage(packageId) {
