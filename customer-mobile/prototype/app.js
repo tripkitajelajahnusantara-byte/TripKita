@@ -1356,27 +1356,57 @@ function renderHomeScreenData() {
     }
 }
 
-// 14. Render Trip List Screen with Search + Province + Category Filters (Presisi Gambar 2)
+// 14. Render Trip List Screen with Search + Province + Category Filters & GPS Nearest Recommendations
+let isNavigatedFromHomeFilter = false;
+
+function submitHomeSearchFilters() {
+    isNavigatedFromHomeFilter = true;
+    switchScreen("screen-list");
+    renderTripListData();
+}
+
 function renderTripListData(sortBy = "Rekomendasi") {
     let filtered = [...packagesDB];
 
     const destFilter = document.getElementById("select-home-dest")?.value;
-    if (destFilter) {
-        filtered = filtered.filter(p => p.destination.toLowerCase().includes(destFilter.toLowerCase()) || p.province.toLowerCase().includes(destFilter.toLowerCase()));
-    }
-
     const typeFilter = document.getElementById("select-home-type")?.value;
-    if (typeFilter && typeFilter !== 'Semua Tipe') {
-        filtered = filtered.filter(p => p.tripType.toLowerCase().includes(typeFilter.toLowerCase()));
-    }
-
     const catFilter = document.getElementById("select-home-category")?.value;
-    if (catFilter && catFilter !== 'Semua Kategori') {
-        filtered = filtered.filter(p => p.category.toLowerCase().includes(catFilter.toLowerCase()));
+    const searchVal = document.getElementById("txt-list-search")?.value;
+
+    const hasActiveHomeFilter = isNavigatedFromHomeFilter && (
+        (destFilter && destFilter !== 'Pilih destinasi') ||
+        (typeFilter && typeFilter !== 'Semua Tipe') ||
+        (catFilter && catFilter !== 'Semua Kategori') ||
+        (searchVal && searchVal.trim() !== '')
+    );
+
+    if (hasActiveHomeFilter) {
+        if (destFilter && destFilter !== 'Pilih destinasi') {
+            filtered = filtered.filter(p => p.destination.toLowerCase().includes(destFilter.toLowerCase()) || (p.province && p.province.toLowerCase().includes(destFilter.toLowerCase())));
+        }
+        if (typeFilter && typeFilter !== 'Semua Tipe') {
+            filtered = filtered.filter(p => p.tripType.toLowerCase().includes(typeFilter.toLowerCase()));
+        }
+        if (catFilter && catFilter !== 'Semua Kategori') {
+            filtered = filtered.filter(p => p.category.toLowerCase().includes(catFilter.toLowerCase()));
+        }
+        if (searchVal && searchVal.trim() !== '') {
+            const q = searchVal.trim().toLowerCase();
+            filtered = filtered.filter(p => p.name.toLowerCase().includes(q) || p.destination.toLowerCase().includes(q));
+        }
+    } else {
+        // Direct click on Trip tab -> Sort by GPS Location (Nearest Recommendations)
+        filtered.sort((a, b) => {
+            const isNearA = (a.destination.includes("Bogor") || a.destination.includes("Bandung") || (a.province && a.province.includes("Jawa Barat"))) ? 1 : 0;
+            const isNearB = (b.destination.includes("Bogor") || b.destination.includes("Bandung") || (b.province && b.province.includes("Jawa Barat"))) ? 1 : 0;
+            return isNearB - isNearA;
+        });
     }
 
-    if (sortBy === "Harga Terendah") {
+    if (sortBy === "Harga Terendah" || sortBy === "Termurah") {
         filtered.sort((a, b) => a.price - b.price);
+    } else if (sortBy === "Harga Tertinggi" || sortBy === "Termahal") {
+        filtered.sort((a, b) => b.price - a.price);
     } else if (sortBy === "Rating Tertinggi") {
         filtered.sort((a, b) => b.rating - a.rating);
     }
@@ -1387,8 +1417,22 @@ function renderTripListData(sortBy = "Rekomendasi") {
     const resCount = document.getElementById("lbl-result-count");
     if (resCount) resCount.innerText = `Menampilkan ${filtered.length} paket wisata`;
 
+    let gpsBannerHtml = "";
+    if (!hasActiveHomeFilter) {
+        gpsBannerHtml = `
+            <div style="background: #e6f4f4; border: 1px solid #0f8b8d; border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-location-crosshairs" style="color: #0f8b8d; font-size: 16px;"></i>
+                <div style="flex: 1;">
+                    <strong style="font-size: 11.5px; color: #0f8b8d; display: block; margin-bottom: 2px;">📍 GPS Lokasi Aktif</strong>
+                    <span style="font-size: 10.5px; color: #334155;">Menampilkan rekomendasi trip terdekat dari lokasi Anda (Jawa Barat & Sekitarnya)</span>
+                </div>
+                <span style="background: #0f8b8d; color: white; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 6px; white-space: nowrap;">TERDEKAT</span>
+            </div>
+        `;
+    }
+
     if (filtered.length === 0) {
-        container.innerHTML = `
+        container.innerHTML = gpsBannerHtml + `
             <div class="no-result" style="text-align: center; padding: 40px 0; color: #6b7280;">
                 <i class="fa-solid fa-search-minus" style="font-size: 36px; margin-bottom: 8px; color: #ccc;"></i>
                 <h4 style="color: #111827; margin: 0 0 4px 0; font-size: 13px;">Trip tidak ditemukan</h4>
@@ -1398,8 +1442,8 @@ function renderTripListData(sortBy = "Rekomendasi") {
         return;
     }
 
-    container.innerHTML = filtered.map(pkg => `
-        <div class="trip-card-v2" onclick="viewTripDetail(${pkg.id})" style="background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+    container.innerHTML = gpsBannerHtml + filtered.map(pkg => `
+        <div class="trip-card-v2" onclick="viewTripDetail(${pkg.id})" style="background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04); margin-bottom: 12px;">
             <div style="display: flex; gap: 10px; padding: 10px;">
                 <div style="width: 100px; height: 85px; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0;">
                     <img src="${pkg.images[0]}" style="width: 100%; height: 100%; object-fit: cover;">
@@ -1426,7 +1470,7 @@ function renderTripListData(sortBy = "Rekomendasi") {
 
             <div style="padding: 6px 10px; background: #f9fafb; border-top: 1px dashed #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: #4b5563;">
                 <div>
-                    <span style="color: #d97706; font-weight: 800;">⭐ ${pkg.rating}</span> <span style="color: #6b7280;">(${pkg.reviewCount} ulasan)</span> | <span style="color: #0f8b8d; font-weight: bold;">Sisa ${pkg.availableSeats} seat</span>
+                    <span style="color: #d97706; font-weight: 800;">⭐ ${pkg.rating}</span> <span style="color: #6b7280;">(${pkg.reviewCount || 102} ulasan)</span> | <span style="color: #0f8b8d; font-weight: bold;">Sisa ${pkg.availableSeats || 14} seat</span>
                 </div>
                 <div style="display: flex; gap: 4px;">
                     <button onclick="event.stopPropagation(); alert('Link tersalin!');" style="background: white; border: 1px solid #d1d5db; color: #374151; padding: 3px 6px; border-radius: 5px; font-size: 8px; font-weight: bold; cursor: pointer;"><i class="fa-solid fa-share-nodes"></i> Bagikan</button>

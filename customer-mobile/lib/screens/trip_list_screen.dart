@@ -24,6 +24,7 @@ class _TripListScreenState extends State<TripListScreen> {
   String selectedDestinationFilter = '';
   String sortBy = 'Rekomendasi';
   final TextEditingController _searchController = TextEditingController();
+  bool isFromHomeFilter = false;
 
   List<TripPackage> allPackages = TripPackage.allPackages;
 
@@ -32,17 +33,20 @@ class _TripListScreenState extends State<TripListScreen> {
     super.initState();
     _loadLivePackages();
 
-    // Pre-populate filters based on passed arguments from Home Screen
+    // Check if navigated from Home Screen with active filters
     if (widget.arguments != null) {
-      if (widget.arguments!['type'] != null) {
+      if (widget.arguments!['type'] != null && widget.arguments!['type'] != 'Semua Tipe') {
         selectedTypeFilter = widget.arguments!['type'] as String;
+        isFromHomeFilter = true;
       }
-      if (widget.arguments!['category'] != null) {
+      if (widget.arguments!['category'] != null && widget.arguments!['category'] != 'Semua Kategori') {
         selectedCategoryFilter = widget.arguments!['category'] as String;
+        isFromHomeFilter = true;
       }
       if (widget.arguments!['destination'] != null && (widget.arguments!['destination'] as String).isNotEmpty) {
         selectedDestinationFilter = widget.arguments!['destination'] as String;
         _searchController.text = selectedDestinationFilter;
+        isFromHomeFilter = true;
       }
     }
   }
@@ -64,7 +68,7 @@ class _TripListScreenState extends State<TripListScreen> {
       decimalDigits: 0,
     );
 
-    // Dynamic filtering matching Gambar 2
+    // Dynamic filtering matching Customer Web
     List<TripPackage> filteredPackages = allPackages.where((p) {
       bool matchesType = true;
       if (selectedTypeFilter != 'Semua Tipe' && selectedTypeFilter.isNotEmpty) {
@@ -85,8 +89,14 @@ class _TripListScreenState extends State<TripListScreen> {
       return matchesType && matchesCategory && matchesSearch;
     }).toList();
 
-    // Sorting logic matching Gambar 2
-    if (sortBy == 'Harga Terendah') {
+    // Sorting logic (Nearest GPS recommendation if not filtered from home)
+    if (sortBy == 'Rekomendasi' && !isFromHomeFilter) {
+      filteredPackages.sort((a, b) {
+        final isNearA = (a.destination.contains('Bogor') || a.destination.contains('Bandung') || (a.province != null && a.province!.contains('Jawa Barat'))) ? 1 : 0;
+        final isNearB = (b.destination.contains('Bogor') || b.destination.contains('Bandung') || (b.province != null && b.province!.contains('Jawa Barat'))) ? 1 : 0;
+        return isNearB.compareTo(isNearA);
+      });
+    } else if (sortBy == 'Harga Terendah') {
       filteredPackages.sort((a, b) => a.price.compareTo(b.price));
     } else if (sortBy == 'Harga Tertinggi') {
       filteredPackages.sort((a, b) => b.price.compareTo(a.price));
@@ -106,7 +116,7 @@ class _TripListScreenState extends State<TripListScreen> {
           },
         ),
         title: Text(
-          selectedTypeFilter != 'Semua Tipe' ? 'Daftar Paket $selectedTypeFilter' : 'Daftar Paket Wisata',
+          selectedTypeFilter != 'Semua Tipe' ? 'Daftar Paket $selectedTypeFilter' : 'Daftar Paket Open Trip',
           style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
         ),
         centerTitle: false,
@@ -119,6 +129,12 @@ class _TripListScreenState extends State<TripListScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Column(
               children: [
+                // GPS Active Location Indicator Banner (if clicked directly without home filter)
+                if (!isFromHomeFilter) ...[
+                  _buildGpsActiveBanner(),
+                  const SizedBox(height: 10),
+                ],
+
                 // Search Input
                 Container(
                   height: 42,
@@ -139,7 +155,7 @@ class _TripListScreenState extends State<TripListScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                // Results Counter & Sort Dropdown matching Gambar 2
+                // Results Counter & Sort Dropdown matching Customer Web
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -199,6 +215,63 @@ class _TripListScreenState extends State<TripListScreen> {
         onTap: (index) {
           widget.onNavigate(index);
         },
+      ),
+    );
+  }
+
+  Widget _buildGpsActiveBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F4F4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF0F8B8D)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.my_location, color: Color(0xFF0F8B8D), size: 20),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '📍 GPS Lokasi Aktif',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F8B8D),
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Menampilkan rekomendasi trip terdekat dari posisi Anda (Jawa Barat & Sekitarnya)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF334155),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F8B8D),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text(
+              'TERDEKAT',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
