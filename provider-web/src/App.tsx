@@ -72,8 +72,22 @@ const AppContent: React.FC = () => {
       if (providerProfile) {
         if (providerProfile.role === 'ADMIN' && route !== 'admin-dashboard') {
           navigateTo('admin-dashboard');
-        } else if (providerProfile.role === 'PROVIDER' && route === 'admin-dashboard') {
-          navigateTo('dashboard');
+          return;
+        }
+        if (providerProfile.role === 'PROVIDER') {
+          if (route === 'admin-dashboard') {
+            navigateTo('dashboard');
+            return;
+          }
+          // Akun mitra baru berstatus PENDING sampai admin menyetujuinya, dan
+          // backend menolak seluruh endpoint operasional selama itu. Tanpa
+          // penjagaan ini halaman dashboard tetap terbuka tetapi setiap
+          // permintaannya gagal tanpa penjelasan, sehingga alur persetujuan
+          // admin terlihat seolah tidak berjalan.
+          const isOperational = providerProfile.status === 'APPROVED' && providerProfile.isVerified;
+          if (!isOperational && route !== 'profil-provider') {
+            navigateTo('profil-provider');
+          }
         }
       }
     }

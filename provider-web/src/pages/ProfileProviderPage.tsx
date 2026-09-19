@@ -25,7 +25,17 @@ interface DashboardStats {
   completedBookings: number;
   totalRevenue: number;
   rating: number;
+  totalReviews: number;
   activePackages: number;
+}
+
+interface ProviderReview {
+  id: number;
+  packageId: number;
+  packageName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
 }
 
 const SUPPORTED_PAYOUT_BANKS = [
@@ -51,6 +61,7 @@ const SUPPORTED_PAYOUT_BANKS = [
 export const ProfileProviderPage: React.FC = () => {
   const { providerProfile, updateProfile } = useNavigation();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [reviews, setReviews] = useState<ProviderReview[]>([]);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeModalTab, setActiveModalTab] = useState<'bisnis' | 'kontak' | 'legal'>('bisnis');
@@ -117,7 +128,7 @@ export const ProfileProviderPage: React.FC = () => {
     }
   };
 
-  const providerName = providerProfile?.businessName || 'Wisata Nusantara';
+  const providerName = providerProfile?.businessName || 'Mitra TemenTrip';
   const categoryLabel = providerProfile?.businessCategory || 'Penyedia Jasa';
 
   useEffect(() => {
@@ -129,8 +140,21 @@ export const ProfileProviderPage: React.FC = () => {
         console.error('Failed to load stats:', err);
       }
     }
+    async function loadReviews() {
+      try {
+        const data = await request('/provider/reviews?limit=5');
+        setReviews(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Failed to load reviews:', err);
+      }
+    }
     loadStats();
-  }, []);
+    // Endpoint operasional tertutup sampai akun disetujui; jangan memanggilnya
+    // hanya untuk menerima 403.
+    if (providerProfile?.status === 'APPROVED' && providerProfile?.isVerified) {
+      loadReviews();
+    }
+  }, [providerProfile?.status, providerProfile?.isVerified]);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [activeUploadField, setActiveUploadField] = useState<string | null>(null);
@@ -264,7 +288,8 @@ export const ProfileProviderPage: React.FC = () => {
     return null;
   };
 
-  const reviews: Array<{ name: string; date: string; rating: number; comment: string; trip: string }> = [];
+  const accountStatus = providerProfile?.status ?? 'PENDING';
+  const isOperational = accountStatus === 'APPROVED' && providerProfile?.isVerified === true;
 
   return (
     <div className="dashboard-layout animate-fade-in">
@@ -284,6 +309,49 @@ export const ProfileProviderPage: React.FC = () => {
           </div>
         </header>
 
+        {!isOperational && (
+          <div
+            style={{
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'flex-start',
+              padding: '16px 18px',
+              marginBottom: '20px',
+              borderRadius: '12px',
+              border: `1px solid ${accountStatus === 'REJECTED' ? '#fecaca' : '#fde68a'}`,
+              backgroundColor: accountStatus === 'REJECTED' ? '#fef2f2' : '#fffbeb',
+            }}
+          >
+            {accountStatus === 'REJECTED'
+              ? <AlertTriangle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+              : <Clock size={20} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />}
+            <div style={{ fontSize: '13px', lineHeight: 1.6, color: '#475569' }}>
+              <strong style={{ display: 'block', fontSize: '14px', color: accountStatus === 'REJECTED' ? '#b91c1c' : '#b45309', marginBottom: '4px' }}>
+                {accountStatus === 'REJECTED'
+                  ? 'Verifikasi akun ditolak'
+                  : 'Akun menunggu persetujuan admin'}
+              </strong>
+              {accountStatus === 'REJECTED' ? (
+                <>
+                  Admin menolak verifikasi akun Anda. Perbaiki dokumen yang diminta lalu hubungi tim TemenTrip
+                  untuk peninjauan ulang.
+                </>
+              ) : (
+                <>
+                  Dokumen legalitas Anda sedang diperiksa tim admin. Selama proses ini menu Dashboard, Kelola Paket,
+                  Booking, dan Keuangan belum dapat dibuka. Anda tetap dapat melengkapi profil dan mengunggah dokumen
+                  di halaman ini.
+                </>
+              )}
+              {providerProfile?.verificationNotes?.trim() && (
+                <div style={{ marginTop: '8px', padding: '8px 10px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+                  <strong style={{ color: '#0f172a' }}>Catatan admin:</strong> {providerProfile.verificationNotes}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Profile Grid Layout */}
         <div className="profile-grid">
           
@@ -294,19 +362,34 @@ export const ProfileProviderPage: React.FC = () => {
             <div className="summary-profile-card">
               <div className="card-banner" />
               <div className="profile-badge-area">
-                <div className="profile-avatar-large">WN</div>
-                <span className="status-badge-verified">✓ Terverifikasi</span>
+                <div className="profile-avatar-large">{providerName.substring(0, 2).toUpperCase()}</div>
+                <span
+                  className="status-badge-verified"
+                  style={
+                    isOperational
+                      ? { background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }
+                      : accountStatus === 'REJECTED'
+                        ? { background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }
+                        : { background: 'rgba(245, 158, 11, 0.15)', color: '#d97706' }
+                  }
+                >
+                  {isOperational ? '✓ Terverifikasi' : accountStatus === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Verifikasi'}
+                </span>
               </div>
               <div className="profile-details-info">
                 <h3>{providerName}</h3>
-                <p className="tagline">Jelajahi keindahan Indonesia bersama kami</p>
+                <p className="tagline">{providerProfile?.description?.trim() || 'Deskripsi bisnis belum diisi.'}</p>
                 <div className="loc-rating">
                   <span className="loc">
                     <MapPin size={12} /> {providerProfile?.operationalCity && providerProfile?.operationalProvince 
                       ? `${providerProfile.operationalCity}, ${providerProfile.operationalProvince}`
                       : providerProfile?.operationalCity || providerProfile?.operationalProvince || 'Indonesia'}
                   </span>
-                  <span className="rating"><Star size={12} fill="#eab308" color="#eab308" /> 4.92 <span>(284 ulasan)</span></span>
+                  <span className="rating">
+                    <Star size={12} fill="#eab308" color="#eab308" />{' '}
+                    {stats && stats.totalReviews > 0 ? stats.rating.toFixed(2) : '-'}{' '}
+                    <span>({stats ? stats.totalReviews : 0} ulasan)</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -315,18 +398,29 @@ export const ProfileProviderPage: React.FC = () => {
             <div className="profile-sub-card">
               <h4>Pencapaian</h4>
               <div className="badges-grid-pencapaian">
-                <div className="achievement-badge green-badge">
-                  <ShieldCheck size={14} /> Verified Partner
-                </div>
-                <div className="achievement-badge yellow-badge">
-                  <Award size={14} /> Top Provider 2024
-                </div>
-                <div className="achievement-badge blue-badge">
-                  <CalendarDays size={14} /> 100+ Bookings
-                </div>
-                <div className="achievement-badge purple-badge">
-                  <Star size={14} /> 4.9+ Rating
-                </div>
+                {isOperational && (
+                  <div className="achievement-badge green-badge">
+                    <ShieldCheck size={14} /> Mitra Terverifikasi
+                  </div>
+                )}
+                {stats && stats.completedBookings > 0 && (
+                  <div className="achievement-badge blue-badge">
+                    <CalendarDays size={14} /> {stats.completedBookings} Trip Selesai
+                  </div>
+                )}
+                {stats && stats.activePackages > 0 && (
+                  <div className="achievement-badge yellow-badge">
+                    <Award size={14} /> {stats.activePackages} Paket Aktif
+                  </div>
+                )}
+                {stats && stats.totalReviews > 0 && (
+                  <div className="achievement-badge purple-badge">
+                    <Star size={14} /> Rating {stats.rating.toFixed(2)} ({stats.totalReviews} ulasan)
+                  </div>
+                )}
+                {(!isOperational && (!stats || (stats.completedBookings === 0 && stats.activePackages === 0 && stats.totalReviews === 0))) && (
+                  <p className="rev-comment">Belum ada pencapaian. Lencana muncul setelah akun disetujui dan trip pertama selesai.</p>
+                )}
               </div>
             </div>            {/* Mini Stats Card */}
             <div className="profile-sub-card">
@@ -370,11 +464,11 @@ export const ProfileProviderPage: React.FC = () => {
               <h4>Ulasan Terbaru</h4>
               <div className="reviews-list">
                 {reviews.length === 0 && <p className="rev-comment">Belum ada ulasan terverifikasi.</p>}
-                {reviews.map((rev, i) => (
-                  <div key={i} className="review-log-item">
+                {reviews.map((rev) => (
+                  <div key={rev.id} className="review-log-item">
                     <div className="rev-log-header">
-                      <strong>{rev.name}</strong>
-                      <span className="rev-date">{rev.date}</span>
+                      <strong>{rev.packageName}</strong>
+                      <span className="rev-date">{formatDate(new Date(rev.createdAt))}</span>
                     </div>
                     <div className="rev-log-stars">
                       {[...Array(5)].map((_, idx) => (
@@ -387,7 +481,7 @@ export const ProfileProviderPage: React.FC = () => {
                       ))}
                     </div>
                     <p className="rev-comment">"{rev.comment}"</p>
-                    <span className="rev-trip-tag">{rev.trip}</span>
+                    <span className="rev-trip-tag">Paket #{rev.packageId}</span>
                   </div>
                 ))}
               </div>
@@ -407,7 +501,7 @@ export const ProfileProviderPage: React.FC = () => {
                 </div>
                 <div className="field-group">
                   <label>TAGLINE</label>
-                  <span>Jelajahi keindahan Indonesia bersama kami</span>
+                  <span>{providerProfile?.description?.trim() || '—'}</span>
                 </div>
                 <div className="field-group">
                   <label>KATEGORI</label>

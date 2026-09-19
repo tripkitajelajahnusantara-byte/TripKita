@@ -20,6 +20,7 @@ import {
   Wallet
 } from 'lucide-react';
 import { getProtectedDocumentURL, request } from '../utils/api';
+import { NotificationCenter, type NotificationItem } from '../components/NotificationCenter';
 import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
 
 
@@ -110,6 +111,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewObjectUrl, setPreviewObjectUrl] = useState<string | null>(null);
   const [previewDocName, setPreviewDocName] = useState<string>('');
+  const [previewError, setPreviewError] = useState('');
   const [zoomLevel, setZoomLevel] = useState(100);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -119,6 +121,7 @@ export const AdminDashboardPage: React.FC = () => {
     let active = true;
     let objectURL: string | null = null;
     setPreviewObjectUrl(null);
+    setPreviewError('');
     if (previewDocUrl) {
       getProtectedDocumentURL('admin', previewDocUrl)
         .then((url) => {
@@ -127,7 +130,10 @@ export const AdminDashboardPage: React.FC = () => {
           else URL.revokeObjectURL(url);
         })
         .catch((err) => {
-          if (active) setError(err.message || 'Dokumen tidak dapat dibuka.');
+          // Kegagalan membuka satu berkas hanya menyangkut panel pratinjau.
+          // Sebelumnya pesan ini mengisi banner global sehingga tetap terlihat
+          // di seluruh menu admin walau tidak ada dokumen yang sedang dibuka.
+          if (active) setPreviewError(err.message || 'Dokumen tidak dapat dibuka.');
         });
     }
     return () => {
@@ -189,6 +195,30 @@ export const AdminDashboardPage: React.FC = () => {
       fetchAdminPayouts();
     } catch (err: any) {
       setError(err.message || 'Gagal memproses pencairan.');
+    }
+  };
+
+  // Notifikasi admin memakai navigasi internal dashboard, bukan route global.
+  const handleNotificationSelect = (item: NotificationItem) => {
+    setSelectedProvider(null);
+    switch (item.type) {
+      case 'PAYOUT':
+        setActiveView('pencairan-provider');
+        fetchAdminPayouts();
+        break;
+      case 'REFUND':
+        setActiveView('administrasi-refund');
+        break;
+      case 'PAYMENT':
+        setActiveView('kelola-pembayaran');
+        break;
+      case 'REGISTRATION':
+        setStatusTab('PENDING');
+        setActiveView('kelola-provider');
+        fetchProviders();
+        break;
+      default:
+        setActiveView('dashboard');
     }
   };
 
@@ -347,6 +377,15 @@ export const AdminDashboardPage: React.FC = () => {
 
   const handleUpdateStatus = async (id: number, status: 'APPROVED' | 'REJECTED' | 'PENDING', customNotes?: string) => {
     const notesToSubmit = customNotes !== undefined ? customNotes : adminNotes;
+
+    // Alasan penolakan dikirim ke mitra sebagai notifikasi dan tersimpan di
+    // riwayat status, jadi penolakan tanpa penjelasan tidak diterima.
+    if (status === 'REJECTED' && notesToSubmit.trim().length < 10) {
+      setSuccessMsg('');
+      setError('Isi "Catatan Admin" minimal 10 karakter sebagai alasan penolakan sebelum menolak provider.');
+      return;
+    }
+
     try {
       setError('');
       setSuccessMsg('');
@@ -659,13 +698,7 @@ export const AdminDashboardPage: React.FC = () => {
             </button>
           </div>
           <div className="header-right">
-            <button className="notification-bell-btn">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-              </svg>
-              <span className="bell-badge">3</span>
-            </button>
+            <NotificationCenter onSelect={handleNotificationSelect} />
             <div className="user-profile-widget">
               <div className="avatar-circle">AD</div>
               <div className="profile-details">
@@ -1038,7 +1071,7 @@ export const AdminDashboardPage: React.FC = () => {
                       <span className="card-label">Total Provider</span>
                     </div>
                     <div className="card-bottom">
-                      <h3>2,504</h3>
+                      <h3>{stats.total.toLocaleString('id-ID')}</h3>
                       <p>Semua provider terdaftar</p>
                     </div>
                   </div>
@@ -1051,7 +1084,7 @@ export const AdminDashboardPage: React.FC = () => {
                       <span className="card-label">Pending Approval</span>
                     </div>
                     <div className="card-bottom">
-                      <h3>{stats.pending}</h3>
+                      <h3>{stats.pending.toLocaleString('id-ID')}</h3>
                       <p>Menunggu persetujuan</p>
                     </div>
                   </div>
@@ -1064,7 +1097,7 @@ export const AdminDashboardPage: React.FC = () => {
                       <span className="card-label">Provider Aktif</span>
                     </div>
                     <div className="card-bottom">
-                      <h3>2,481</h3>
+                      <h3>{stats.approved.toLocaleString('id-ID')}</h3>
                       <p>Provider aktif</p>
                     </div>
                   </div>
@@ -1077,7 +1110,7 @@ export const AdminDashboardPage: React.FC = () => {
                       <span className="card-label">Provider Ditolak</span>
                     </div>
                     <div className="card-bottom">
-                      <h3>5</h3>
+                      <h3>{stats.rejected.toLocaleString('id-ID')}</h3>
                       <p>Provider ditolak</p>
                     </div>
                   </div>
@@ -1172,7 +1205,7 @@ export const AdminDashboardPage: React.FC = () => {
                                     <span className="pic-phone">{p.whatsapp}</span>
                                   </div>
                                 </td>
-                                <td style={{ textTransform: 'capitalize' }}>{p.businessCategory} & Travel</td>
+                                <td style={{ textTransform: 'capitalize' }}>{p.businessCategory}</td>
                                 <td>{p.operationalCity}{p.operationalProvince ? `, ${p.operationalProvince}` : ''}</td>
                                 <td>
                                   {new Date(p.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}<br/>
@@ -1240,7 +1273,7 @@ export const AdminDashboardPage: React.FC = () => {
                   </div>
                   <div>
                     <h3>{selectedProvider.businessName}</h3>
-                    <p>{selectedProvider.businessCategory} & Travel</p>
+                    <p>{selectedProvider.businessCategory}</p>
                     <span className={`drawer-status-badge ${selectedProvider.status.toLowerCase()}`}>
                       {selectedProvider.status === 'APPROVED' ? 'Approved' : selectedProvider.status === 'PENDING' ? 'Pending Approval' : 'Rejected'}
                     </span>
@@ -1258,7 +1291,7 @@ export const AdminDashboardPage: React.FC = () => {
                       </tr>
                       <tr>
                         <td className="field-label">Kategori</td>
-                        <td className="field-value" style={{ textTransform: 'capitalize' }}>: {selectedProvider.businessCategory} & Travel</td>
+                        <td className="field-value" style={{ textTransform: 'capitalize' }}>: {selectedProvider.businessCategory}</td>
                       </tr>
                       <tr>
                         <td className="field-label">Provinsi</td>
@@ -1426,7 +1459,14 @@ export const AdminDashboardPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="doc-preview-container">
-                      {!previewObjectUrl ? (
+                      {previewError ? (
+                        <div style={{ padding: '24px', color: '#b91c1c', fontSize: '13px', textAlign: 'center' }}>
+                          {previewError}
+                          <div style={{ marginTop: '6px', color: '#64748b', fontSize: '12px' }}>
+                            Berkas tidak tersedia di server. Minta mitra mengunggah ulang dokumen ini.
+                          </div>
+                        </div>
+                      ) : !previewObjectUrl ? (
                         <div style={{ padding: '24px', color: '#64748b' }}>Memuat dokumen...</div>
                       ) : previewDocName.toLowerCase().includes('.pdf') ? (
                         <iframe 

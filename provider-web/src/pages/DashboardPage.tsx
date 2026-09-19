@@ -5,16 +5,11 @@ import {
   Package, 
   CalendarDays, 
   Search, 
-  Bell,
   CheckCircle,
   TrendingUp,
   Star,
   ChevronRight,
-  ArrowUpRight,
-  ShoppingBag,
-  CheckCircle2,
-  XCircle,
-  X
+  ArrowUpRight
 } from 'lucide-react';
 import type { Booking } from '../types';
 import { request } from '../utils/api';
@@ -29,15 +24,6 @@ interface DashboardStats {
   activePackages: number;
 }
 
-interface NotificationItem {
-  id: string | number;
-  type: string;
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-}
-
 export const DashboardPage: React.FC = () => {
   const { providerProfile, navigateTo } = useNavigation();
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,23 +34,17 @@ export const DashboardPage: React.FC = () => {
   const [popularPackages, setPopularPackages] = useState<any[]>([]);
   const [urgentOpenTrip, setUrgentOpenTrip] = useState<any | null>(null);
 
-  // Notification state
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-
-  const providerName = providerProfile?.businessName || 'Wisata Nusantara';
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const providerName = providerProfile?.businessName || 'Mitra TemenTrip';
 
   useEffect(() => {
     let isMounted = true;
     async function loadDashboardData() {
       setIsLoading(true);
       try {
-        const [statsRes, bookingsRes, packagesRes, notifsRes] = await Promise.allSettled([
+        const [statsRes, bookingsRes, packagesRes] = await Promise.allSettled([
           request('/provider/dashboard/stats'),
           request('/provider/bookings'),
-          request('/provider/packages'),
-          request('/provider/notifications')
+          request('/provider/packages')
         ]);
 
         if (!isMounted) return;
@@ -132,17 +112,6 @@ export const DashboardPage: React.FC = () => {
           setUrgentOpenTrip(foundUrgent);
         }
         
-        if (notifsRes.status === 'fulfilled' && Array.isArray(notifsRes.value)) {
-          const formattedNotifs = notifsRes.value.map((n: any) => ({
-            id: n.id,
-            type: n.type,
-            title: n.title,
-            message: n.message,
-            time: new Date(n.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
-            read: n.isRead
-          }));
-          setNotifications(formattedNotifs);
-        }
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
       } finally {
@@ -152,13 +121,6 @@ export const DashboardPage: React.FC = () => {
     loadDashboardData();
     return () => { isMounted = false; };
   }, [providerProfile]);
-
-  const handleMarkAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    notifications.filter(n => !n.read).forEach(n => {
-      request(`/provider/notifications/${n.id}/read`, { method: 'PUT' }).catch(console.error);
-    });
-  };
 
   const filteredBookings = bookings.filter((b) => {
     const matchesSearch = b.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -193,122 +155,6 @@ export const DashboardPage: React.FC = () => {
               />
             </div>
             
-            {/* Notification Bell with Dropdown */}
-            <div style={{ position: 'relative' }}>
-              <button 
-                className="notification-btn" 
-                onClick={() => setShowNotifications(!showNotifications)}
-                title="Notifikasi"
-              >
-                <Bell size={18} />
-                {unreadCount > 0 && <span className="bell-badge">{unreadCount}</span>}
-              </button>
-
-              {showNotifications && (
-                <div 
-                  style={{
-                    position: 'absolute',
-                    top: '48px',
-                    right: '0',
-                    width: '360px',
-                    backgroundColor: '#ffffff',
-                    borderRadius: '16px',
-                    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.15)',
-                    border: '1px solid #e2e8f0',
-                    zIndex: 100,
-                    overflow: 'hidden',
-                    animation: 'fadeIn 0.2s ease-out'
-                  }}
-                >
-                  <div style={{
-                    padding: '14px 18px',
-                    borderBottom: '1px solid #f1f5f9',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    backgroundColor: '#f8fafc'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Bell size={16} color="#0284c7" />
-                      <span style={{ fontWeight: '700', fontSize: '14px', color: '#0f172a' }}>Notifikasi Mitra</span>
-                      {unreadCount > 0 && (
-                        <span style={{ backgroundColor: '#0284c7', color: '#ffffff', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
-                          {unreadCount} baru
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {unreadCount > 0 && (
-                        <button 
-                          onClick={handleMarkAllRead} 
-                          style={{ border: 'none', background: 'none', color: '#0284c7', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
-                        >
-                          Tandai Dibaca
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => setShowNotifications(false)} 
-                        style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex' }}
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
-                    {notifications.map((n) => (
-                      <div 
-                        key={n.id}
-                        onClick={() => {
-                          setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
-                          request(`/provider/notifications/${n.id}/read`, { method: 'PUT' }).catch(console.error);
-                        }}
-                        style={{
-                          padding: '14px 18px',
-                          borderBottom: '1px solid #f1f5f9',
-                          backgroundColor: n.read ? '#ffffff' : '#f0f9ff',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          gap: '12px',
-                          alignItems: 'flex-start',
-                          transition: 'background-color 0.2s'
-                        }}
-                      >
-                        <div style={{
-                          padding: '8px',
-                          borderRadius: '10px',
-                          backgroundColor: n.type === 'ORDER_IN' ? '#e0f2fe' : n.type === 'PAYOUT_SUCCESS' ? '#dcfce7' : '#fee2e2',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          {n.type === 'ORDER_IN' && <ShoppingBag size={16} color="#0284c7" />}
-                          {n.type === 'PAYOUT_SUCCESS' && <CheckCircle2 size={16} color="#16a34a" />}
-                          {n.type === 'PAYOUT_REJECTED' && <XCircle size={16} color="#dc2626" />}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: '700', color: n.type === 'ORDER_IN' ? '#0369a1' : n.type === 'PAYOUT_SUCCESS' ? '#15803d' : '#b91c1c' }}>
-                              {n.title}
-                            </span>
-                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>{n.time}</span>
-                          </div>
-                          <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: '1.4' }}>
-                            {n.message}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div style={{ padding: '10px', textAlign: 'center', backgroundColor: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
-                    <span style={{ fontSize: '11.5px', color: '#64748b' }}>Hanya menampilkan notifikasi terbaru Mitra</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
             <div className="user-profile-circle">{providerName.substring(0, 2).toUpperCase()}</div>
           </div>
         </header>
@@ -619,7 +465,9 @@ export const DashboardPage: React.FC = () => {
                       {stats ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(stats.totalRevenue) : 'Rp 0'}
                     </span>
                   </div>
-                  <span className="rev-trend positive">+100%</span>
+                  <span className="rev-trend positive">
+                    {stats ? `${stats.completedBookings} trip selesai` : '—'}
+                  </span>
                 </div>
               </div>
             </div>

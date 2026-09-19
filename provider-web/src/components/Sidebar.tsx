@@ -1,20 +1,42 @@
 import React from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { ProviderHintTour } from './ProviderHintTour';
-import { 
-  LayoutDashboard, 
-  Package, 
-  CalendarDays, 
-  User, 
-  Plus, 
+import { NotificationCenter } from './NotificationCenter';
+import {
+  LayoutDashboard,
+  Package,
+  CalendarDays,
+  User,
+  Plus,
   LogOut,
   Wallet
 } from 'lucide-react';
 
 
+/**
+ * Lencana status akun mitra. Backend menutup seluruh endpoint operasional sampai
+ * status APPROVED dan isVerified bernilai true, jadi sidebar harus menampilkan
+ * keadaan sebenarnya; sebelumnya lencana ini selalu tertulis "Terverifikasi"
+ * sehingga mitra yang masih menunggu persetujuan mengira akunnya sudah aktif.
+ */
+function verificationBadge(status?: string, isVerified?: boolean) {
+  if (status === 'APPROVED' && isVerified) {
+    return { label: '✓ Terverifikasi', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' };
+  }
+  if (status === 'REJECTED') {
+    return { label: '✕ Ditolak', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' };
+  }
+  return { label: '⏳ Menunggu Verifikasi', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' };
+}
+
 export const Sidebar: React.FC = () => {
   const { route, navigateTo, logout, providerProfile, setEditingPackageId } = useNavigation();
-  const providerName = providerProfile?.businessName || 'Wisata Nusantara';
+  const providerName = providerProfile?.businessName || 'Mitra TemenTrip';
+
+  // Selama akun belum disetujui admin, hanya halaman profil yang berguna; menu
+  // lain hanya akan menghasilkan 403 dari backend.
+  const isOperational = providerProfile?.status === 'APPROVED' && providerProfile?.isVerified === true;
+  const badge = verificationBadge(providerProfile?.status, providerProfile?.isVerified);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -23,6 +45,8 @@ export const Sidebar: React.FC = () => {
     { id: 'keuangan-provider', label: 'Keuangan & Saldo', icon: <Wallet size={18} /> },
     { id: 'profil-provider', label: 'Profil Provider', icon: <User size={18} /> },
   ] as const;
+
+  const lockedHint = 'Menu ini terbuka setelah akun Anda disetujui admin.';
 
   return (
     <aside className="dashboard-sidebar">
@@ -34,10 +58,18 @@ export const Sidebar: React.FC = () => {
 
         <div className="provider-profile-card">
           <div className="profile-avatar">{providerName.substring(0, 2).toUpperCase()}</div>
-          <div className="profile-info">
-            <h4>{providerName}</h4>
-            <span className="status-badge-verified">✓ Terverifikasi</span>
+          <div className="profile-info" style={{ minWidth: 0, flex: 1 }}>
+            <h4 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={providerName}>
+              {providerName}
+            </h4>
+            <span
+              className="status-badge-verified"
+              style={{ background: badge.background, color: badge.color, whiteSpace: 'nowrap', display: 'inline-block' }}
+            >
+              {badge.label}
+            </span>
           </div>
+          <NotificationCenter variant="dark" align="left" />
         </div>
 
         {/* Top Right Floating Hint / Guided Tour Trigger */}
@@ -47,21 +79,34 @@ export const Sidebar: React.FC = () => {
 
 
         <nav className="sidebar-menu">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              id={`tour-step-${item.id}`}
-              className={`menu-btn ${route === item.id ? 'active' : ''}`}
-              onClick={() => navigateTo(item.id)}
-            >
-              {item.icon} {item.label}
-            </button>
-          ))}
+          {menuItems.map((item) => {
+            const locked = !isOperational && item.id !== 'profil-provider';
+            return (
+              <button
+                key={item.id}
+                id={`tour-step-${item.id}`}
+                className={`menu-btn ${route === item.id ? 'active' : ''}`}
+                onClick={() => !locked && navigateTo(item.id)}
+                disabled={locked}
+                title={locked ? lockedHint : undefined}
+                style={locked ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+              >
+                {item.icon} {item.label}
+              </button>
+            );
+          })}
         </nav>
       </div>
 
       <div className="sidebar-bottom">
-        <button id="tour-step-tambah-paket" className="add-package-btn" onClick={() => { setEditingPackageId(null); navigateTo('tambah-paket'); }}>
+        <button
+          id="tour-step-tambah-paket"
+          className="add-package-btn"
+          onClick={() => { setEditingPackageId(null); navigateTo('tambah-paket'); }}
+          disabled={!isOperational}
+          title={!isOperational ? lockedHint : undefined}
+          style={!isOperational ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+        >
           <Plus size={16} /> Tambah Paket
         </button>
         <button className="sidebar-logout-btn" onClick={logout}>

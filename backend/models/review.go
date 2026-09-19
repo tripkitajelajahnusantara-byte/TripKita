@@ -19,3 +19,14 @@ type CreateReviewRequest struct {
 	Rating    int    `json:"rating" binding:"required,min=1,max=5"`
 	Comment   string `json:"comment" binding:"max=2000"`
 }
+
+// ProviderReview adalah bentuk ulasan yang dibaca dashboard mitra. Identitas
+// pelanggan sengaja tidak dibawa; mitra hanya perlu isi dan nilai ulasannya.
+type ProviderReview struct {
+	ID          uint      `json:"id"`
+	PackageID   uint      `json:"packageId"`
+	PackageName string    `json:"packageName"`
+	Rating      int       `json:"rating"`
+	Comment     string    `json:"comment"`
+	CreatedAt   time.Time `json:"createdAt"`
+}

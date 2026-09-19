@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"errors"
+	"log"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -22,12 +24,13 @@ type AdminService interface {
 }
 
 type adminService struct {
-	db   *gorm.DB
-	repo repositories.ProviderRepository
+	db           *gorm.DB
+	repo         repositories.ProviderRepository
+	notifService *NotificationService
 }
 
-func NewAdminService(db *gorm.DB, repo repositories.ProviderRepository) AdminService {
-	return &adminService{db: db, repo: repo}
+func NewAdminService(db *gorm.DB, repo repositories.ProviderRepository, notifService *NotificationService) AdminService {
+	return &adminService{db: db, repo: repo, notifService: notifService}
 }
 
 func (s *adminService) ListProviders() ([]models.Provider, error) {
@@ -83,7 +86,40 @@ func (s *adminService) UpdateProviderStatus(id uint, status string, notes string
 	}
 	_ = s.repo.CreateStatusHistory(history)
 
+	// Keputusan admin harus sampai ke mitra. Tanpa ini, mitra yang ditolak atau
+	// disetujui hanya bisa mengetahuinya dengan mencoba login berulang kali.
+	if s.notifService != nil {
+		title, message := providerStatusNotification(status, historyNotes)
+		if title != "" {
+			if err := s.notifService.CreateNotification(provider.ID, "PROVIDER", title, message, NotifTypeAccount, "/provider/profil"); err != nil {
+				log.Printf("[Notifikasi] Gagal memberi tahu provider %d tentang status %s: %v", provider.ID, status, err)
+			}
+		}
+	}
+
 	return nil
+}
+
+// providerStatusNotification menyusun pesan yang dibaca mitra di lonceng
+// notifikasi. Alasan penolakan ikut dibawa supaya mitra tahu apa yang harus
+// diperbaiki tanpa menghubungi admin lebih dulu.
+func providerStatusNotification(status, notes string) (string, string) {
+	switch status {
+	case "APPROVED":
+		return "Akun Mitra Disetujui",
+			"Verifikasi akun Anda telah disetujui. Seluruh menu Partner Hub kini dapat digunakan, termasuk membuat paket dan menerima booking."
+	case "REJECTED":
+		message := "Verifikasi akun Anda ditolak."
+		if strings.TrimSpace(notes) != "" {
+			message += " Catatan admin: " + notes
+		}
+		return "Akun Mitra Ditolak", message
+	case "PENDING":
+		return "Akun Mitra Kembali Ditinjau",
+			"Status akun Anda dikembalikan ke peninjauan admin. Akses menu operasional ditutup sementara sampai verifikasi selesai."
+	default:
+		return "", ""
+	}
 }
 
 func (s *adminService) DeleteProvider(id uint) error {

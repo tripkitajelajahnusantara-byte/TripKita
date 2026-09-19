@@ -620,6 +620,7 @@ func SeedDatabase() {
 			CustomerName:    "Anisa Rahmawati",
 			CustomerInitial: "AR",
 			TripDate:        time.Now().AddDate(0, 0, 10),
+			TripEndDate:     time.Now().AddDate(0, 0, 10+1),
 			Guests:          2,
 			TotalPrice:      700000,
 			PaymentMethod:   "Xendit Invoice",
@@ -632,6 +633,7 @@ func SeedDatabase() {
 			CustomerName:    "Dimas Prasetyo",
 			CustomerInitial: "DP",
 			TripDate:        time.Now().AddDate(0, 0, 13),
+			TripEndDate:     time.Now().AddDate(0, 0, 13+1),
 			Guests:          4,
 			TotalPrice:      1800000,
 			PaymentMethod:   "Xendit Invoice",
@@ -644,6 +646,7 @@ func SeedDatabase() {
 			CustomerName:    "Rika Susanti",
 			CustomerInitial: "RS",
 			TripDate:        time.Now().AddDate(0, 0, 15),
+			TripEndDate:     time.Now().AddDate(0, 0, 15+1),
 			Guests:          3,
 			TotalPrice:      825000,
 			PaymentMethod:   "Manual Transfer",
@@ -656,6 +659,7 @@ func SeedDatabase() {
 			CustomerName:    "Budi Hermawan",
 			CustomerInitial: "BH",
 			TripDate:        time.Now().AddDate(0, 0, 8),
+			TripEndDate:     time.Now().AddDate(0, 0, 8+1),
 			Guests:          2,
 			TotalPrice:      400000,
 			PaymentMethod:   "Manual Transfer",
@@ -667,18 +671,19 @@ func SeedDatabase() {
 		if err := DB.Create(&bookingsList[i]).Error; err == nil {
 			b := bookingsList[i]
 			if b.Status == "CONFIRMED" || b.Status == "PAID" || b.Status == "COMPLETED" {
-				halfAmount := b.TotalPrice / 2
-				if halfAmount <= 0 {
-					halfAmount = b.TotalPrice
-				}
+				// Pembagian uang memakai rumus yang sama dengan ringkasan
+				// pencairan. Sebelumnya seeder membelah harga kotor menjadi dua
+				// tanpa memotong biaya layanan dan komisi, sehingga buku besar
+				// data contoh selalu dilaporkan selisih oleh job rekonsiliasi.
+				split := models.SplitBookingEarning(b.TotalPrice)
 
 				// Create held_settlements record
 				settlement := models.HeldSettlement{
 					BookingID:   b.ID,
 					ProviderID:  b.ProviderID,
-					Amount:      halfAmount,
+					Amount:      split.SettlementHeld,
 					Status:      "HELD",
-					ReleaseDate: b.TripDate.AddDate(0, 0, 1),
+					ReleaseDate: b.TripEndDate.AddDate(0, 0, 1),
 					CreatedAt:   time.Now(),
 				}
 				DB.Create(&settlement)
@@ -688,16 +693,16 @@ func SeedDatabase() {
 				if errBal := DB.Where("provider_id = ?", b.ProviderID).First(&balance).Error; errBal != nil {
 					balance = models.ProviderBalance{
 						ProviderID:       b.ProviderID,
-						AvailableBalance: halfAmount,
-						HeldBalance:      halfAmount,
-						TotalEarned:      b.TotalPrice,
+						AvailableBalance: split.DPAmount,
+						HeldBalance:      split.SettlementHeld,
+						TotalEarned:      split.NetEarning,
 						UpdatedAt:        time.Now(),
 					}
 					DB.Create(&balance)
 				} else {
-					balance.AvailableBalance += halfAmount
-					balance.HeldBalance += halfAmount
-					balance.TotalEarned += b.TotalPrice
+					balance.AvailableBalance += split.DPAmount
+					balance.HeldBalance += split.SettlementHeld
+					balance.TotalEarned += split.NetEarning
 					balance.UpdatedAt = time.Now()
 					DB.Save(&balance)
 				}

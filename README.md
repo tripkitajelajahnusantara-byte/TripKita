@@ -83,6 +83,9 @@ Pencairan ke mitra berjalan manual secara default (admin mentransfer lalu mencat
 dapat dialihkan ke Xendit Payouts API lewat `ENABLE_AUTOMATIC_PAYOUT`. Refund selalu manual,
 tetapi wajib dicatat beserta nominal, metode, referensi transfer, dan admin pemrosesnya.
 
+Langkah menguji pencairan DP dan pelunasan secara lokal, beserta daftar periksanya,
+ada di [`PANDUAN_UJI_PENCAIRAN.md`](PANDUAN_UJI_PENCAIRAN.md).
+
 Untuk menguji pencairan otomatis, pakai [`backend/.env.staging.example`](backend/.env.staging.example)
 dan jalankan [`backend/scripts/test_staging_payout.sh`](backend/scripts/test_staging_payout.sh)
 terhadap Xendit test mode. Rinciannya ada di [`PRODUCTION_RELEASE.md`](PRODUCTION_RELEASE.md).

@@ -747,9 +747,11 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 		}
 
 		var title, msgCustomer, msgProvider string
+		notifType := NotifTypeGeneral
 
 		switch newS {
 		case "PAID", "CONFIRMED":
+			notifType = NotifTypePayment
 			title = "Pembayaran Berhasil"
 			msgCustomer = fmt.Sprintf("Pembayaran pesanan #%s (%s) telah berhasil dikonfirmasi. E-Voucher PDF telah dikirim ke email Anda.", b.BookingCode, packageName)
 			msgProvider = fmt.Sprintf("Pesanan baru #%s (%s) telah lunas sebesar Rp %s.", b.BookingCode, packageName, formatIDRNumber(b.TotalPrice))
@@ -777,6 +779,7 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 			}
 
 		case "REFUND_REQUIRED", "REFUNDED":
+			notifType = NotifTypeRefund
 			title = "Pengembalian Dana (Refund)"
 			msgCustomer = fmt.Sprintf("Pengembalian dana untuk pesanan #%s (%s) telah diproses.", b.BookingCode, packageName)
 			msgProvider = fmt.Sprintf("Status refund untuk pesanan #%s (%s) telah diperbarui.", b.BookingCode, packageName)
@@ -786,6 +789,7 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 			}
 
 		case "RESCHEDULE_OFFERED", "RESCHEDULED":
+			notifType = NotifTypeReschedule
 			title = "Perubahan Jadwal Trip (Reschedule)"
 			msgCustomer = fmt.Sprintf("Jadwal trip untuk pesanan #%s (%s) telah berhasil diperbarui.", b.BookingCode, packageName)
 			msgProvider = fmt.Sprintf("Pesanan #%s (%s) telah dilakukan penjadwalan ulang.", b.BookingCode, packageName)
@@ -797,12 +801,23 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 
 		// Save in-app notification for Customer if CustomerID is set
 		if b.CustomerID != nil && *b.CustomerID > 0 && s.notifService != nil && title != "" {
-			_ = s.notifService.CreateNotification(*b.CustomerID, "CUSTOMER", title, msgCustomer, newS, "/riwayat-booking")
+			_ = s.notifService.CreateNotification(*b.CustomerID, "CUSTOMER", title, msgCustomer, notifType, "/riwayat-booking")
 		}
 
 		// Save in-app notification for Provider
 		if b.ProviderID > 0 && s.notifService != nil && title != "" {
-			_ = s.notifService.CreateNotification(b.ProviderID, "PROVIDER", title, msgProvider, newS, "/booking")
+			_ = s.notifService.CreateNotification(b.ProviderID, "PROVIDER", title, msgProvider, notifType, "/booking")
+		}
+
+		// Refund menunggu tindakan manual admin, jadi harus muncul di lonceng
+		// notifikasi admin, bukan hanya di daftar "Administrasi Refund".
+		if newS == models.StatusRefundRequired && s.notifService != nil {
+			_ = s.notifService.NotifyAdmins(
+				"Refund Menunggu Diproses",
+				fmt.Sprintf("Pesanan #%s (%s) membutuhkan pengembalian dana ke pelanggan.", b.BookingCode, packageName),
+				NotifTypeRefund,
+				"/admin/refunds",
+			)
 		}
 	}(*booking, oldStatus, newStatus)
 }

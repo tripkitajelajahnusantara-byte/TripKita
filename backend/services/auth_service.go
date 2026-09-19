@@ -41,15 +41,16 @@ type authService struct {
 	repo         repositories.ProviderRepository
 	cfg          *config.Config
 	emailService *EmailService
+	notifService *NotificationService
 }
 
 type AuthInputError struct{ Message string }
 
 func (e *AuthInputError) Error() string { return e.Message }
 
-func NewAuthService(db *gorm.DB, repo repositories.ProviderRepository, cfg *config.Config, emailService *EmailService) AuthService {
+func NewAuthService(db *gorm.DB, repo repositories.ProviderRepository, cfg *config.Config, emailService *EmailService, notifService *NotificationService) AuthService {
 	_ = dummyPasswordHash()
-	return &authService{db: db, repo: repo, cfg: cfg, emailService: emailService}
+	return &authService{db: db, repo: repo, cfg: cfg, emailService: emailService, notifService: notifService}
 }
 
 func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, error) {
@@ -112,6 +113,20 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 			return nil, &AuthInputError{Message: "pendaftaran tidak dapat diproses dengan alamat email tersebut"}
 		}
 		return nil, err
+	}
+
+	// Pendaftaran mitra baru harus terlihat oleh admin tanpa perlu memuat ulang
+	// daftar provider. Kegagalan mencatat notifikasi tidak boleh membatalkan
+	// pendaftaran yang sudah tersimpan.
+	if s.notifService != nil {
+		if err := s.notifService.NotifyAdmins(
+			"Pendaftaran Provider Baru",
+			fmt.Sprintf("%s (%s) mendaftar dari %s dan menunggu verifikasi dokumen.", provider.BusinessName, provider.Email, provider.OperationalCity),
+			NotifTypeRegistration,
+			"/admin/providers",
+		); err != nil {
+			log.Printf("[Notifikasi] Gagal memberi tahu admin tentang pendaftaran provider %d: %v", provider.ID, err)
+		}
 	}
 
 	return provider, nil

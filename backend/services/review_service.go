@@ -11,6 +11,7 @@ type ReviewService interface {
 	CreateReview(customerID uint, req *models.CreateReviewRequest) (*models.Review, error)
 	GetReviewByBookingID(bookingID uint) (*models.Review, error)
 	GetReviewsByPackageID(packageID uint) ([]models.Review, error)
+	GetRecentProviderReviews(providerID uint, limit int) ([]models.ProviderReview, error)
 }
 
 type reviewService struct {
@@ -76,4 +77,34 @@ func (s *reviewService) GetReviewByBookingID(bookingID uint) (*models.Review, er
 
 func (s *reviewService) GetReviewsByPackageID(packageID uint) ([]models.Review, error) {
 	return s.reviewRepo.FindByPackageID(packageID)
+}
+
+// GetRecentProviderReviews mengumpulkan ulasan terbaru lintas paket milik mitra
+// beserta nama paketnya, supaya kartu "Ulasan Terbaru" di profil mitra membaca
+// data nyata alih-alih daftar contoh.
+func (s *reviewService) GetRecentProviderReviews(providerID uint, limit int) ([]models.ProviderReview, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+	reviews, err := s.reviewRepo.FindRecentByProvider(providerID, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]models.ProviderReview, 0, len(reviews))
+	for _, review := range reviews {
+		packageName := "Paket Wisata"
+		if pkg, err := s.packageRepo.FindByID(review.PackageID); err == nil && pkg.Name != "" {
+			packageName = pkg.Name
+		}
+		result = append(result, models.ProviderReview{
+			ID:          review.ID,
+			PackageID:   review.PackageID,
+			PackageName: packageName,
+			Rating:      review.Rating,
+			Comment:     review.Comment,
+			CreatedAt:   review.CreatedAt,
+		})
+	}
+	return result, nil
 }

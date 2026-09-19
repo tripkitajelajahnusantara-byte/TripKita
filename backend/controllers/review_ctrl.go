@@ -92,3 +92,31 @@ func (ctrl *ReviewController) GetReviewsByPackage(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, result)
 }
+
+// GetProviderReviews mengembalikan ulasan terbaru untuk mitra yang sedang masuk.
+func (ctrl *ReviewController) GetProviderReviews(c *gin.Context) {
+	providerIDVal, exists := c.Get("provider_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	providerID, ok := providerIDVal.(uint)
+	if !ok || providerID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	limit := 10
+	if raw := c.Query("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+
+	reviews, err := ctrl.service.GetRecentProviderReviews(providerID, limit)
+	if err != nil {
+		respondInternalError(c, "memuat ulasan mitra", err)
+		return
+	}
+	c.JSON(http.StatusOK, reviews)
+}

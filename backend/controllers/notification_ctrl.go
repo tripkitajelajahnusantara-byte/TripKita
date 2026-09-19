@@ -44,9 +44,48 @@ func (ctrl *NotificationController) GetUserNotifications(c *gin.Context) {
 		return
 	}
 
+	// Daftar dipotong 50 baris terakhir, jadi jumlah belum dibaca dihitung
+	// terpisah supaya badge tetap benar untuk akun yang menumpuk notifikasi.
+	unread, err := ctrl.notifService.UnreadCount(providerID, role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil notifikasi"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"data":   list,
+		"status":      "success",
+		"data":        list,
+		"unreadCount": unread,
+	})
+}
+
+// MarkAllAsRead mengosongkan badge notifikasi dalam satu permintaan.
+func (ctrl *NotificationController) MarkAllAsRead(c *gin.Context) {
+	providerIDVal, exists := c.Get("provider_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	providerID, ok := providerIDVal.(uint)
+	if !ok || providerID == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Identitas pengguna tidak valid"})
+		return
+	}
+
+	roleVal, _ := c.Get("role")
+	role := "CUSTOMER"
+	if roleVal != nil {
+		role = roleVal.(string)
+	}
+
+	if err := ctrl.notifService.MarkAllAsRead(providerID, role); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memperbarui notifikasi"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Seluruh notifikasi ditandai dibaca",
 	})
 }
 

@@ -114,6 +114,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 
 			// Notification Center endpoints
 			authProfile.GET("/notifications", notifCtrl.GetUserNotifications)
+			authProfile.PUT("/notifications/read-all", notifCtrl.MarkAllAsRead)
 			authProfile.PUT("/notifications/:id/read", notifCtrl.MarkAsRead)
 		}
 
@@ -147,6 +148,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 
 			// Dashboard Stats
 			provider.GET("/dashboard/stats", dashboardCtrl.GetStats)
+
+			// Ulasan yang diterima mitra
+			provider.GET("/reviews", reviewCtrl.GetProviderReviews)
 		}
 
 		// ADMIN ROUTES (Auth + Admin Role Required)
@@ -178,6 +182,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			customer.PUT("/bookings/:id/cancel", bookingCtrl.CustomerCancelBooking)
 			customer.POST("/reviews", reviewCtrl.CreateReview)
 			customer.GET("/notifications", notifCtrl.GetUserNotifications)
+			customer.PUT("/notifications/read-all", notifCtrl.MarkAllAsRead)
 			customer.PUT("/notifications/:id/read", notifCtrl.MarkAsRead)
 		}
 	}

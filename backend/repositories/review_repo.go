@@ -10,6 +10,8 @@ type ReviewRepository interface {
 	FindByBookingID(bookingID uint) (*models.Review, error)
 	FindByPackageID(packageID uint) ([]models.Review, error)
 	GetAverageRating(packageID uint) (float64, error)
+	CountByProvider(providerID uint) (int64, error)
+	FindRecentByProvider(providerID uint, limit int) ([]models.Review, error)
 }
 
 type reviewRepository struct {
@@ -43,4 +45,26 @@ func (r *reviewRepository) GetAverageRating(packageID uint) (float64, error) {
 	var avgRating float64
 	err := r.db.Model(&models.Review{}).Where("package_id = ?", packageID).Select("COALESCE(AVG(rating), 0)").Scan(&avgRating).Error
 	return avgRating, err
+}
+
+// CountByProvider menghitung ulasan seluruh paket milik satu mitra.
+func (r *reviewRepository) CountByProvider(providerID uint) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Review{}).
+		Joins("JOIN packages ON packages.id = reviews.package_id").
+		Where("packages.provider_id = ?", providerID).
+		Count(&count).Error
+	return count, err
+}
+
+// FindRecentByProvider mengambil ulasan terbaru lintas paket milik satu mitra.
+func (r *reviewRepository) FindRecentByProvider(providerID uint, limit int) ([]models.Review, error) {
+	var reviews []models.Review
+	err := r.db.Model(&models.Review{}).
+		Joins("JOIN packages ON packages.id = reviews.package_id").
+		Where("packages.provider_id = ?", providerID).
+		Order("reviews.created_at desc").
+		Limit(limit).
+		Find(&reviews).Error
+	return reviews, err
 }

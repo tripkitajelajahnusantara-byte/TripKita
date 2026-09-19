@@ -3,16 +3,24 @@ const isLocalBrowser = typeof window === 'undefined'
   || window.location.hostname === 'localhost'
   || window.location.hostname === '127.0.0.1';
 
+// Path relatif satu origin (mis. "/api/v1" di belakang reverse proxy seperti
+// nginx pada docker compose) sah dan tidak perlu diperiksa protokolnya: skema
+// dan host-nya mengikuti halaman yang memuat aplikasi. "//host" dikecualikan
+// karena itu URL protocol-relative yang dapat menunjuk origin lain.
+const isSameOriginApiPath = !!configuredApiBaseURL
+  && configuredApiBaseURL.startsWith('/')
+  && !configuredApiBaseURL.startsWith('//');
+
 if (!configuredApiBaseURL && !isLocalBrowser) {
   throw new Error('VITE_API_BASE_URL wajib diisi dengan URL absolut backend pada deployment');
 }
 
-if (configuredApiBaseURL) {
+if (configuredApiBaseURL && !isSameOriginApiPath) {
   let parsedApiURL: URL;
   try {
     parsedApiURL = new URL(configuredApiBaseURL);
   } catch {
-    throw new Error('VITE_API_BASE_URL wajib berupa URL absolut backend');
+    throw new Error('VITE_API_BASE_URL wajib berupa URL absolut backend atau path satu origin seperti /api/v1');
   }
   if (!['http:', 'https:'].includes(parsedApiURL.protocol) || (!isLocalBrowser && parsedApiURL.protocol !== 'https:')) {
     throw new Error('VITE_API_BASE_URL deployment wajib menggunakan HTTPS');

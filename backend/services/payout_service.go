@@ -115,7 +115,67 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 		return nil, err
 	}
 
+	// Pengajuan yang tidak terlihat admin akan menggantung di status PENDING.
+	if s.notifService != nil {
+		if err := s.notifService.NotifyAdmins(
+			"Pengajuan Pencairan Dana Baru",
+			fmt.Sprintf("%s mengajukan pencairan %s sebesar Rp %s ke %s %s a.n. %s.",
+				provider.BusinessName, payoutTypeLabel(payout.Type), formatIDRNumber(payout.Amount),
+				payout.BankName, payout.BankAccount, payout.BankAccountName),
+			NotifTypePayout,
+			"/admin/payouts",
+		); err != nil {
+			log.Printf("[Notifikasi] Gagal memberi tahu admin tentang pengajuan pencairan %d: %v", payout.ID, err)
+		}
+	}
+
 	return payout, nil
+}
+
+// payoutTypeLabel menerjemahkan kode jenis pencairan menjadi istilah yang dipakai
+// di antarmuka, supaya notifikasi tidak menampilkan konstanta mentah.
+func payoutTypeLabel(payoutType string) string {
+	switch payoutType {
+	case "DP_50":
+		return "DP 50%"
+	case "PELUNASAN_50":
+		return "Pelunasan 50%"
+	default:
+		return payoutType
+	}
+}
+
+// notifyProviderPayout memberi tahu mitra hasil akhir pengajuan pencairannya.
+func (s *payoutService) notifyProviderPayout(payout *models.Payout) {
+	if s.notifService == nil || payout == nil {
+		return
+	}
+
+	var title, message string
+	switch payout.Status {
+	case models.PayoutStatusApproved:
+		title = "Pencairan Dana Berhasil"
+		message = fmt.Sprintf("Pencairan %s sebesar Rp %s telah ditransfer ke %s %s.",
+			payoutTypeLabel(payout.Type), formatIDRNumber(payout.Amount), payout.BankName, payout.BankAccount)
+	case models.PayoutStatusProcessing:
+		title = "Pencairan Dana Sedang Diproses"
+		message = fmt.Sprintf("Pencairan %s sebesar Rp %s telah disetujui admin dan sedang dikirim ke rekening Anda.",
+			payoutTypeLabel(payout.Type), formatIDRNumber(payout.Amount))
+	case models.PayoutStatusRejected:
+		title = "Pengajuan Pencairan Ditolak"
+		message = fmt.Sprintf("Pengajuan pencairan %s sebesar Rp %s ditolak. Catatan admin: %s",
+			payoutTypeLabel(payout.Type), formatIDRNumber(payout.Amount), payout.Notes)
+	case models.PayoutStatusFailed:
+		title = "Pencairan Dana Gagal"
+		message = fmt.Sprintf("Pencairan %s sebesar Rp %s gagal dikirim dan saldo telah dikembalikan. Periksa kembali data rekening Anda.",
+			payoutTypeLabel(payout.Type), formatIDRNumber(payout.Amount))
+	default:
+		return
+	}
+
+	if err := s.notifService.CreateNotification(payout.ProviderID, "PROVIDER", title, message, NotifTypePayout, "/provider/keuangan"); err != nil {
+		log.Printf("[Notifikasi] Gagal memberi tahu provider %d tentang pencairan %d: %v", payout.ProviderID, payout.ID, err)
+	}
 }
 
 func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.PayoutSummary, error) {
@@ -139,23 +199,14 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 
 	for _, b := range bookings {
 		if b.Status == "CONFIRMED" || b.Status == "PAID" || b.Status == "COMPLETED" {
-			totalCustomerPaid := b.TotalPrice
-			adminFee := int64(5000)
-			if totalCustomerPaid < adminFee {
-				adminFee = 0
-			}
+			split := models.SplitBookingEarning(b.TotalPrice)
 
-			packageGross := totalCustomerPaid - adminFee
-			platformFee := packageGross*15/100 + adminFee
-			netProviderEarning := packageGross * 85 / 100
+			grossOmset += b.TotalPrice
+			totalPlatformFee += split.PlatformFee
+			totalNetEarnings += split.NetEarning
 
-			grossOmset += totalCustomerPaid
-			totalPlatformFee += platformFee
-			totalNetEarnings += netProviderEarning
-
-			dpAmount := netProviderEarning / 2
-			settlementAmount := netProviderEarning - dpAmount
-			dpEligible += dpAmount
+			settlementAmount := split.SettlementHeld
+			dpEligible += split.DPAmount
 
 			// Pelunasan hanya tersedia setelah waktu akhir perjalanan, bukan
 			// setelah 24 jam dari waktu mulai.
@@ -299,8 +350,19 @@ func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string
 	}
 
 	if !automatic {
-		return s.payoutRepo.GetByID(payoutID)
+		updated, err := s.payoutRepo.GetByID(payoutID)
+		if err != nil {
+			return nil, err
+		}
+		s.notifyProviderPayout(updated)
+		return updated, nil
 	}
+
+	// Instruksi otomatis sudah masuk antrean gateway; mitra diberi tahu sekarang
+	// agar status PROCESSING tidak terlihat seperti pengajuan yang diabaikan.
+	processing := payout
+	processing.Status = models.PayoutStatusProcessing
+	s.notifyProviderPayout(&processing)
 
 	// Tahap 2: kirim instruksi ke gateway di luar transaksi database, supaya
 	// panggilan jaringan yang lambat tidak menahan lock baris pencairan.
@@ -389,6 +451,9 @@ func (s *payoutService) HandlePayoutCallback(gatewayPayoutID string, referenceID
 		}
 		if result.RowsAffected == 1 {
 			log.Printf("[Payout] Payout %d dikonfirmasi berhasil oleh gateway.", payoutID)
+			if settled, err := s.payoutRepo.GetByID(payoutID); err == nil {
+				s.notifyProviderPayout(settled)
+			}
 		}
 		return nil
 
@@ -489,7 +554,8 @@ func xenditPayoutRequest(payout *models.Payout) XenditPayoutRequest {
 // markPayoutFailed mengembalikan dana yang sudah dipotong ke buku besar dan
 // menandai pengajuan sebagai gagal, sekali saja.
 func (s *payoutService) markPayoutFailed(payoutID uint, gatewayPayoutID string, failureCode string) error {
-	return database.DB.Transaction(func(tx *gorm.DB) error {
+	var notified *models.Payout
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		var payout models.Payout
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&payout, payoutID).Error; err != nil {
 			return err
@@ -517,8 +583,17 @@ func (s *payoutService) markPayoutFailed(payoutID uint, gatewayPayoutID string, 
 			return err
 		}
 		log.Printf("[Payout] Payout %d gagal (%s); saldo dikembalikan ke provider %d.", payoutID, failureCode, payout.ProviderID)
+		notified = &payout
+		notified.Status = models.PayoutStatusFailed
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	// Notifikasi dikirim setelah transaksi commit agar mitra tidak pernah membaca
+	// kabar pengembalian saldo yang ternyata di-rollback.
+	s.notifyProviderPayout(notified)
+	return nil
 }
 
 // ErrUnknownPayoutReference menandai callback yang tidak merujuk pencairan milik

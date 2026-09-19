@@ -11,6 +11,7 @@ type DashboardStats struct {
 	CompletedBookings int64   `json:"completedBookings"`
 	TotalRevenue      int64   `json:"totalRevenue"`
 	Rating            float64 `json:"rating"`
+	TotalReviews      int64   `json:"totalReviews"`
 	ActivePackages    int64   `json:"activePackages"`
 }
 
@@ -22,17 +23,20 @@ type dashboardService struct {
 	packageRepo  repositories.PackageRepository
 	bookingRepo  repositories.BookingRepository
 	providerRepo repositories.ProviderRepository
+	reviewRepo   repositories.ReviewRepository
 }
 
 func NewDashboardService(
 	packageRepo repositories.PackageRepository,
 	bookingRepo repositories.BookingRepository,
 	providerRepo repositories.ProviderRepository,
+	reviewRepo repositories.ReviewRepository,
 ) DashboardService {
 	return &dashboardService{
 		packageRepo:  packageRepo,
 		bookingRepo:  bookingRepo,
 		providerRepo: providerRepo,
+		reviewRepo:   reviewRepo,
 	}
 }
 
@@ -86,6 +90,12 @@ func (s *dashboardService) GetStats(providerID uint) (*DashboardStats, error) {
 		}
 	}
 
+	// Jumlah ulasan dipakai kartu profil supaya tidak lagi menampilkan angka contoh.
+	totalReviews, err := s.reviewRepo.CountByProvider(providerID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &DashboardStats{
 		TotalPackages:     totalPackages,
 		TotalBookings:     totalBookings,
@@ -93,6 +103,7 @@ func (s *dashboardService) GetStats(providerID uint) (*DashboardStats, error) {
 		CompletedBookings: completedBookings,
 		TotalRevenue:      totalRevenue,
 		Rating:            rating,
+		TotalReviews:      totalReviews,
 		ActivePackages:    activePackages,
 	}, nil
 }
