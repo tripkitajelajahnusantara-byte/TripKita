@@ -58,6 +58,14 @@ class TripKitaBottomNavigation extends StatelessWidget {
               ),
               _buildNavItem(
                 index: 3,
+                icon: Icons.track_changes,
+                activeIcon: Icons.track_changes,
+                label: 'Plan',
+                activeColor: activeColor,
+                inactiveColor: inactiveColor,
+              ),
+              _buildNavItem(
+                index: 4,
                 icon: Icons.person_outline,
                 activeIcon: Icons.person,
                 label: 'Profile',
