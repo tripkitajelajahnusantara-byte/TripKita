@@ -18,12 +18,19 @@ func NewNotificationController(notifService *services.NotificationService) *Noti
 
 // GetUserNotifications returns the notification list for logged-in user
 func (ctrl *NotificationController) GetUserNotifications(c *gin.Context) {
-	userIDVal, exists := c.Get("userID")
+	// Notification.user_id masih merujuk ke ID profil Provider/Customer
+	// (providers.id), bukan ID identitas login baru (users.id). AuthMiddleware
+	// menyediakan nilai tersebut dengan key provider_id.
+	providerIDVal, exists := c.Get("provider_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	userID := userIDVal.(uint)
+	providerID, ok := providerIDVal.(uint)
+	if !ok || providerID == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Identitas pengguna tidak valid"})
+		return
+	}
 
 	roleVal, _ := c.Get("role")
 	role := "CUSTOMER"
@@ -31,7 +38,7 @@ func (ctrl *NotificationController) GetUserNotifications(c *gin.Context) {
 		role = roleVal.(string)
 	}
 
-	list, err := ctrl.notifService.GetUserNotifications(userID, role)
+	list, err := ctrl.notifService.GetUserNotifications(providerID, role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil notifikasi"})
 		return
@@ -45,12 +52,16 @@ func (ctrl *NotificationController) GetUserNotifications(c *gin.Context) {
 
 // MarkAsRead marks a notification as read
 func (ctrl *NotificationController) MarkAsRead(c *gin.Context) {
-	userIDVal, exists := c.Get("userID")
+	providerIDVal, exists := c.Get("provider_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	userID := userIDVal.(uint)
+	providerID, ok := providerIDVal.(uint)
+	if !ok || providerID == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Identitas pengguna tidak valid"})
+		return
+	}
 
 	idStr := c.Param("id")
 	notifID, err := strconv.ParseUint(idStr, 10, 32)
@@ -59,7 +70,7 @@ func (ctrl *NotificationController) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.notifService.MarkAsRead(uint(notifID), userID)
+	err = ctrl.notifService.MarkAsRead(uint(notifID), providerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memperbarui notifikasi"})
 		return
