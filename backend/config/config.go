@@ -198,6 +198,14 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("URL production wajib berupa HTTPS yang valid: %s", rawURL)
 		}
 	}
+	backendURL, _ := url.Parse(c.BackendURL)
+	googleRedirectURL, _ := url.Parse(c.GoogleRedirectURI)
+	if backendURL.Scheme != googleRedirectURL.Scheme || backendURL.Host != googleRedirectURL.Host {
+		return fmt.Errorf("GOOGLE_REDIRECT_URI wajib menggunakan origin BACKEND_URL yang sama")
+	}
+	if googleRedirectURL.Path != "/api/v1/public/auth/google/callback" || googleRedirectURL.RawQuery != "" || googleRedirectURL.Fragment != "" {
+		return fmt.Errorf("GOOGLE_REDIRECT_URI wajib berakhir dengan /api/v1/public/auth/google/callback tanpa query atau fragment")
+	}
 	if len(c.AllowedOrigins) == 0 {
 		return fmt.Errorf("ALLOWED_ORIGINS wajib diisi pada production")
 	}

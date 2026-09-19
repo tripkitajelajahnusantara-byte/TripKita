@@ -1,7 +1,27 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-    ? '/api/v1'
-    : 'http://localhost:8080/api/v1');
+const configuredApiBaseURL = import.meta.env.VITE_API_BASE_URL?.trim();
+const isLocalBrowser = typeof window === 'undefined'
+  || window.location.hostname === 'localhost'
+  || window.location.hostname === '127.0.0.1';
+
+if (!configuredApiBaseURL && !isLocalBrowser) {
+  throw new Error('VITE_API_BASE_URL wajib diisi dengan URL absolut backend pada deployment');
+}
+
+if (configuredApiBaseURL) {
+  let parsedApiURL: URL;
+  try {
+    parsedApiURL = new URL(configuredApiBaseURL);
+  } catch {
+    throw new Error('VITE_API_BASE_URL wajib berupa URL absolut backend');
+  }
+  if (!['http:', 'https:'].includes(parsedApiURL.protocol) || (!isLocalBrowser && parsedApiURL.protocol !== 'https:')) {
+    throw new Error('VITE_API_BASE_URL deployment wajib menggunakan HTTPS');
+  }
+}
+
+export const API_BASE_URL = (
+  configuredApiBaseURL || 'http://localhost:8080/api/v1'
+).replace(/\/+$/, '');
 
 export function getProviderToken(): string | null {
   clearLegacyProviderTokens();

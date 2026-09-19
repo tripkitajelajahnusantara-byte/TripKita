@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Route } from '../types';
 import { request, setProviderToken, getProviderToken, removeProviderToken, setCustomerToken, getCustomerToken, removeCustomerToken, revokeSessionToken } from '../utils/api';
@@ -291,6 +291,15 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   });
 
   // Sync hash changes with internal route state
+  const navigateTo = useCallback((newRoute: Route) => {
+    setRoute(newRoute);
+    const targetHash = getHashFromRoute(newRoute);
+    if (window.location.hash !== targetHash) {
+      window.location.hash = targetHash;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   useEffect(() => {
     const handleHashChange = () => {
       const targetRoute = getRouteFromHash();
@@ -379,12 +388,13 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
           setProviderProfile(null);
           setIsRegistered(true);
           navigateTo('beranda');
-        } else {
+		} else {
           setProviderToken(token);
           setProviderProfile(data);
           setCustomerProfile(null);
           setIsRegistered(true);
-          if (data.status !== 'APPROVED' || routeParam === 'profil-provider') navigateTo('profil-provider');
+          if (data.role === 'ADMIN') navigateTo('admin-dashboard');
+          else if (data.status !== 'APPROVED' || routeParam === 'profil-provider') navigateTo('profil-provider');
           else navigateTo('dashboard');
         }
 	  }).catch((err) => {
@@ -394,16 +404,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     } else {
       fetchSessionProfile(route);
     }
-  }, [route]);
-
-  const navigateTo = (newRoute: Route) => {
-    setRoute(newRoute);
-    const targetHash = getHashFromRoute(newRoute);
-    if (window.location.hash !== targetHash) {
-      window.location.hash = targetHash;
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [route, navigateTo]);
 
   const updateRegisterData = (fields: Partial<RegisterData>) => {
     setRegisterData((prev) => ({ ...prev, ...fields }));

@@ -76,6 +76,12 @@ func TestProductionRejectsUnsafeValues(t *testing.T) {
 			e["DATABASE_URL"] = "postgres://u:p@db.example.com:5432/tripkita?sslmode=disable"
 		}, "TLS"},
 		{"frontend bukan https", func(e map[string]string) { e["FRONTEND_URL"] = "http://app.example.com" }, "HTTPS"},
+		{"redirect google beda origin", func(e map[string]string) {
+			e["GOOGLE_REDIRECT_URI"] = "https://other-api.example.com/api/v1/public/auth/google/callback"
+		}, "BACKEND_URL"},
+		{"redirect google salah path", func(e map[string]string) {
+			e["GOOGLE_REDIRECT_URI"] = "https://api.example.com/oauth/callback"
+		}, "GOOGLE_REDIRECT_URI"},
 		{"origin memakai path", func(e map[string]string) { e["ALLOWED_ORIGINS"] = "https://app.example.com/app" }, "ALLOWED_ORIGINS"},
 		{"smtp from bukan email", func(e map[string]string) { e["SMTP_FROM"] = "Tim TemenTrip" }, "SMTP_FROM"},
 		{"webhook token kosong", func(e map[string]string) { e["XENDIT_WEBHOOK_TOKEN"] = "" }, "XENDIT_WEBHOOK_TOKEN"},
