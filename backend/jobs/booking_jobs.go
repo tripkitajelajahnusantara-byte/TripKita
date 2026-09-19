@@ -132,10 +132,10 @@ func (r *Runner) expireOne(ctx context.Context, bookingID uint, cutoff time.Time
 // AutoCompleteFinishedBookings menandai trip yang sudah lewat sebagai selesai dan
 // melepas settlement yang ditahan ke saldo tersedia provider.
 func (r *Runner) AutoCompleteFinishedBookings(ctx context.Context) {
-	cutoff := time.Now().Add(-24 * time.Hour)
+	now := time.Now()
 	var candidates []models.Booking
 	if err := r.db.WithContext(ctx).Select("id").
-		Where("status IN ? AND trip_date < ?", []string{models.StatusPaid, models.StatusConfirmed}, cutoff).
+		Where("status IN ? AND trip_end_date <= ?", []string{models.StatusPaid, models.StatusConfirmed}, now).
 		Find(&candidates).Error; err != nil {
 		log.Printf("[Auto Complete] Gagal mencari booking selesai: %v", err)
 		return
@@ -149,7 +149,7 @@ func (r *Runner) AutoCompleteFinishedBookings(ctx context.Context) {
 		err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			var booking models.Booking
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-				Where("id = ? AND status IN ? AND trip_date < ?", candidate.ID, []string{models.StatusPaid, models.StatusConfirmed}, cutoff).
+				Where("id = ? AND status IN ? AND trip_end_date <= ?", candidate.ID, []string{models.StatusPaid, models.StatusConfirmed}, now).
 				First(&booking).Error; err != nil {
 				return err
 			}

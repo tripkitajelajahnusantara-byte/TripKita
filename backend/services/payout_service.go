@@ -157,8 +157,9 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 			settlementAmount := netProviderEarning - dpAmount
 			dpEligible += dpAmount
 
-			// Check if trip is finished (either status is COMPLETED or tripDate has passed by 24 hours)
-			isFinished := b.Status == "COMPLETED" || (!b.TripDate.IsZero() && now.After(b.TripDate.Add(24*time.Hour)))
+			// Pelunasan hanya tersedia setelah waktu akhir perjalanan, bukan
+			// setelah 24 jam dari waktu mulai.
+			isFinished := tripHasEnded(b, now)
 			if isFinished {
 				pelunasanEligible += settlementAmount
 			} else {
@@ -567,7 +568,7 @@ func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error)
 		dpAmount := providerNet / 2
 		if current.Type == "DP_50" {
 			eligible += dpAmount
-		} else if booking.Status == "COMPLETED" || (!booking.TripDate.IsZero() && now.After(booking.TripDate.Add(24*time.Hour))) {
+		} else if tripHasEnded(booking, now) {
 			eligible += providerNet - dpAmount
 		}
 	}

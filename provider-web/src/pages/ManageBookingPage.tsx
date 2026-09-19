@@ -77,7 +77,7 @@ export const ManageBookingPage: React.FC = () => {
           createdAt: b.createdAt || '',
           paidAt: b.updatedAt || '',
           paymentUrl: b.paymentUrl,
-          rawEndDate: b.endDate || b.tripDate,
+          rawEndDate: b.tripEndDate,
           status: b.status,
         }));
         setBookings(mapped);

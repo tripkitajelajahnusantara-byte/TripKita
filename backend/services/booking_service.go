@@ -138,7 +138,7 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 			return err
 		}
 		oldStatus = booking.Status
-		if err := validateProviderStatusTransition(oldStatus, status); err != nil {
+		if err := validateProviderStatusTransition(oldStatus, status, booking.TripEndDate, time.Now()); err != nil {
 			return err
 		}
 
@@ -180,6 +180,11 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 				return fmt.Errorf("penjadwalan ulang hanya diperbolehkan maksimal 1 kali")
 			}
 			booking.Status = "RESCHEDULE_OFFERED"
+		case models.StatusCompleted:
+			if err := releaseHeldSettlementTx(tx, &booking); err != nil {
+				return err
+			}
+			booking.Status = models.StatusCompleted
 		default:
 			booking.Status = status
 		}
@@ -254,7 +259,7 @@ func reverseProviderFinanceTx(tx *gorm.DB, booking *models.Booking) error {
 	}).Error
 }
 
-func validateProviderStatusTransition(current, next string) error {
+func validateProviderStatusTransition(current, next string, tripEndDate time.Time, now time.Time) error {
 	switch next {
 	case "CONFIRMED":
 		if current != "PAID" {
@@ -271,6 +276,16 @@ func validateProviderStatusTransition(current, next string) error {
 	case "RESCHEDULE_OFFERED":
 		if current != "PAID" && current != "CONFIRMED" {
 			return fmt.Errorf("hanya booking terbayar yang dapat dijadwalkan ulang")
+		}
+	case models.StatusCompleted:
+		if current != models.StatusPaid && current != models.StatusConfirmed {
+			return fmt.Errorf("booking dengan status %s tidak dapat diselesaikan", current)
+		}
+		if tripEndDate.IsZero() {
+			return fmt.Errorf("tanggal selesai perjalanan belum tersedia")
+		}
+		if now.Before(tripEndDate) {
+			return fmt.Errorf("booking baru dapat diselesaikan setelah perjalanan berakhir pada %s", tripEndDate.Format(time.RFC3339))
 		}
 	default:
 		return fmt.Errorf("perubahan status tidak diizinkan")
@@ -314,12 +329,23 @@ func (s *bookingService) ProviderReschedule(id uint, providerID uint, newDate st
 			return fmt.Errorf("tanggal pengganti berada setelah periode paket")
 		}
 		original := booking.TripDate
+		tripDuration := booking.TripEndDate.Sub(booking.TripDate)
+		if tripDuration <= 0 {
+			tripDuration = time.Duration(normalizedTripDuration(booking.Package.Duration)) * 24 * time.Hour
+		}
+		parsedDate = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), original.Hour(), original.Minute(), original.Second(), original.Nanosecond(), original.Location())
 		booking.OriginalTripDate = &original
 		booking.RescheduleDate = &parsedDate
 		booking.TripDate = parsedDate
+		booking.TripEndDate = parsedDate.Add(tripDuration)
 		booking.RescheduleCount++
 		booking.Status = "CONFIRMED"
-		return tx.Save(&booking).Error
+		if err := tx.Save(&booking).Error; err != nil {
+			return err
+		}
+		return tx.Model(&models.HeldSettlement{}).
+			Where("booking_id = ? AND status = ?", booking.ID, "HELD").
+			Update("release_date", booking.TripEndDate).Error
 	})
 	if err != nil {
 		return nil, err
@@ -382,6 +408,7 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		}
 
 		booking.ProviderID = pkg.ProviderID
+		booking.TripEndDate = calculateTripEnd(booking.TripDate, pkg.Duration)
 		const serviceFee int64 = 5000
 		booking.TotalPrice = int64(booking.Guests)*pkg.Price + addOnTotal + serviceFee
 		booking.Status = "PENDING_PAYMENT"
@@ -436,6 +463,24 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		return fmt.Errorf("status booking berubah sebelum invoice tersimpan")
 	}
 	return nil
+}
+
+func normalizedTripDuration(duration int) int {
+	if duration < 1 {
+		return 1
+	}
+	return duration
+}
+
+// calculateTripEnd menganggap duration sebagai jumlah hari kalender perjalanan.
+// Booking satu hari berakhir pada jam yang sama di hari berikutnya; booking
+// lima hari berakhir pada jam yang sama lima hari kalender kemudian.
+func calculateTripEnd(start time.Time, duration int) time.Time {
+	return start.AddDate(0, 0, normalizedTripDuration(duration))
+}
+
+func tripHasEnded(booking models.Booking, now time.Time) bool {
+	return booking.Status == models.StatusCompleted || (!booking.TripEndDate.IsZero() && !now.Before(booking.TripEndDate))
 }
 
 func generateBookingCode() (string, error) {
@@ -636,7 +681,7 @@ func recordFinanceOnPaymentTx(tx *gorm.DB, booking *models.Booking) error {
 
 	settlement := models.HeldSettlement{
 		BookingID: booking.ID, ProviderID: booking.ProviderID, Amount: heldAmount,
-		Status: "HELD", ReleaseDate: booking.TripDate.AddDate(0, 0, 1), CreatedAt: time.Now(),
+		Status: "HELD", ReleaseDate: booking.TripEndDate, CreatedAt: time.Now(),
 	}
 	if err := tx.Create(&settlement).Error; err != nil {
 		return err

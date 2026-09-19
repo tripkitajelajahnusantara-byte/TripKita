@@ -16,6 +16,7 @@ type Booking struct {
 	CustomerEmail      string     `gorm:"size:255" json:"customerEmail"`
 	CustomerInitial    string     `gorm:"size:10" json:"customerInitial"`
 	TripDate           time.Time  `gorm:"not null" json:"tripDate"`
+	TripEndDate        time.Time  `gorm:"not null" json:"tripEndDate"`
 	Guests             int        `gorm:"not null" json:"guests"`
 	TotalPrice         int64      `gorm:"not null" json:"totalPrice"`
 	PaymentMethod      string     `gorm:"size:100" json:"paymentMethod"`
@@ -47,7 +48,7 @@ const (
 )
 
 type UpdateBookingStatusRequest struct {
-	Status             string `json:"status" binding:"required,oneof=CONFIRMED CANCELLED_BY_PROVIDER RESCHEDULE_OFFERED"`
+	Status             string `json:"status" binding:"required,oneof=CONFIRMED COMPLETED CANCELLED_BY_PROVIDER RESCHEDULE_OFFERED"`
 	CancellationReason string `json:"cancellationReason,omitempty"`
 	RescheduleDate     string `json:"rescheduleDate,omitempty"` // YYYY-MM-DD format if offering reschedule
 }
