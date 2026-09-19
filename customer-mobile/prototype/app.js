@@ -30,6 +30,30 @@ const TRIP_TYPES = ["Semua Tipe", "Open Trip", "Private Trip", "Custom Trip"];
 // 3. Mock Database Packages (Synced 1-to-1 with Provider "Wisata Nusantara" & Database)
 const packagesDB = [
     {
+        id: 99,
+        name: "Open Trip Palu & Teluk Tomini 3D2N",
+        destination: "Palu, Sulawesi Tengah",
+        province: "Sulawesi Tengah",
+        price: 1450000,
+        quotaMin: 4,
+        quotaUsed: 3,
+        quotaMax: 15,
+        schedule: ["17 Mar - 19 Mar 2027 (3 Hari)"],
+        status: "Aktif",
+        rating: 4.9,
+        reviewCount: 42,
+        duration: "3 Hari 2 Malam",
+        tripType: "Open Trip",
+        category: "Wisata Bahari & Alam",
+        minParticipants: 4,
+        availableSeats: 12,
+        highlights: [" Tour Guide Local", " Snorkeling Gear", " Dokumentasi Under Water"],
+        providerName: "TemenTrip Partner",
+        providerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+        description: "Jelajahi pesona alam pesisir Palu dan keindahan bawah laut Teluk Tomini.",
+        images: ["https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600"]
+    },
+    {
         id: 1,
         name: "Rumah Ayu Ting-Ting",
         destination: "Jawa Barat",
@@ -2205,6 +2229,9 @@ function generateQRISCode() {
 // 19. Rencana Trip & Target Tabungan (Plan Screen Prototype State & Renderer)
 // -------------------------------------------------------------
 let selectedPlanId = null;
+let currentPlanIdForModal = null;
+let planToEditIdModal = null;
+
 let tripPlansDB = [
     {
         id: "plan_palu_1",
@@ -2228,6 +2255,24 @@ let tripPlansDB = [
         ]
     }
 ];
+
+function generateAvailableFutureMonths() {
+    const months = [];
+    const now = new Date();
+    const monthNames = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    for (let i = 0; i < 24; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const val = `${yyyy}-${mm}`;
+        const label = `${monthNames[d.getMonth()]} ${yyyy}`;
+        months.push({ val, label });
+    }
+    return months;
+}
 
 function updatePlanMilestones(plan) {
     const pct = plan.targetBudget > 0 ? Math.min(100, Math.round((plan.savedAmount / plan.targetBudget) * 100)) : 0;
@@ -2261,7 +2306,7 @@ function renderPlanListView(container) {
     
     let html = `
         <!-- Hero Banner -->
-        <div style="background: linear-gradient(135deg, #0f8b8d 0%, #09686a 100%); border-radius: 18px; padding: 16px; color: white; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(15,139,141,0.25);">
+        <div style="background: linear-gradient(135deg, #0f8b8d 0%, #09686a 100%); border-radius: 18px; padding: 16px; color: white; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(15,139,141,0.25);">
             <span style="background: #f59e0b; color: white; font-size: 9px; font-weight: 900; padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px; text-transform: uppercase;">LIBURAN IMPIAN TANPA BEBAN</span>
             <h4 style="margin: 8px 0 4px 0; font-size: 14px; font-weight: bold; line-height: 1.3;">Rencanakan Liburan Seru Bersama Pasangan, Teman, atau Keluarga! 🏝️✨</h4>
             <p style="margin: 0; font-size: 11px; opacity: 0.9; line-height: 1.4;">Susun target budget dan tabungan bulananmu mulai dari sekarang. Nikmati perjalanan impian tanpa perlu risau masalah keuangan!</p>
@@ -2282,28 +2327,29 @@ function renderPlanListView(container) {
         `;
     } else {
         tripPlansDB.forEach(plan => {
+            updatePlanMilestones(plan);
             const savedPercentage = plan.targetBudget > 0 ? Math.min(100, Math.round((plan.savedAmount / plan.targetBudget) * 100)) : 0;
             const remainingBudget = Math.max(0, plan.targetBudget - plan.savedAmount);
 
             html += `
-                <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 14px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+                <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 14px; margin-bottom: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="background: #dcfce7; color: #166534; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 8px;">${plan.status}</span>
-                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 8px;">${savedPercentage}% Terkumpul</span>
+                        <span style="background: #dcfce7; color: #166534; font-size: 10px; font-weight: bold; padding: 3px 8px; border-radius: 8px;">${plan.status}</span>
+                        <span style="background: #e6f4f4; color: #0f8b8d; font-size: 10px; font-weight: bold; padding: 3px 8px; border-radius: 8px;">${savedPercentage}% Terkumpul</span>
                     </div>
 
                     <h4 style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #0f172a;">🏝️ ${plan.destination}</h4>
                     <div style="font-size: 11px; color: #64748b; margin-bottom: 12px; display: flex; gap: 12px;">
-                        <span><i class="fa-regular fa-calendar-days text-teal" style="color:#0f8b8d;"></i> ${plan.targetMonthLabel}</span>
-                        <span><i class="fa-solid fa-users text-teal" style="color:#0f8b8d;"></i> ${plan.participants} Peserta</span>
+                        <span><i class="fa-regular fa-calendar-days" style="color:#0f8b8d;"></i> ${plan.targetMonthLabel}</span>
+                        <span><i class="fa-solid fa-users" style="color:#0f8b8d;"></i> ${plan.participants} Peserta</span>
                     </div>
 
                     <div style="background: #f8fafc; border-radius: 12px; padding: 10px; border: 1px solid #f1f5f9; margin-bottom: 10px;">
-                        <div style="display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-bottom: 2px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 9.5px; font-weight: 700; color: #64748b; margin-bottom: 2px;">
                             <span>TERKUMPUL</span>
                             <span>TARGET BUDGET</span>
                         </div>
-                        <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin-bottom: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 800; margin-bottom: 6px;">
                             <span style="color: #10b981;">${formatIDRCurrency(plan.savedAmount)}</span>
                             <span style="color: #0f172a;">${formatIDRCurrency(plan.targetBudget)}</span>
                         </div>
@@ -2314,11 +2360,11 @@ function renderPlanListView(container) {
                     </div>
 
                     <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
-                        <div style="height: 100%; width: ${savedPercentage}%; background: ${savedPercentage >= 100 ? '#10b981' : '#0f8b8d'}; border-radius: 4px;"></div>
+                        <div style="height: 100%; width: ${savedPercentage}%; background: ${savedPercentage >= 100 ? '#10b981' : '#0f8b8d'}; border-radius: 4px; transition: width 0.3s ease;"></div>
                     </div>
 
                     <div style="display: flex; gap: 6px;">
-                        <button onclick="selectTripPlan('${plan.id}')" style="flex: 1; background: #0f8b8d; color: white; border: none; border-radius: 10px; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer;">Lihat Detail →</button>
+                        <button onclick="selectTripPlan('${plan.id}')" style="flex: 1; background: #0f8b8d; color: white; border: none; border-radius: 10px; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer; boxShadow: 0 2px 6px rgba(15,139,141,0.2);">Lihat Detail →</button>
                         <button onclick="openCreatePlanModal('${plan.id}')" style="background: white; border: 1px solid #cbd5e1; color: #475569; border-radius: 10px; width: 34px; height: 34px; cursor: pointer;"><i class="fa-regular fa-pen-to-square"></i></button>
                         <button onclick="deleteTripPlan('${plan.id}')" style="background: #fef2f2; border: 1px solid #fca5a5; color: #ef4444; border-radius: 10px; width: 34px; height: 34px; cursor: pointer;"><i class="fa-regular fa-trash-can"></i></button>
                     </div>
@@ -2328,7 +2374,7 @@ function renderPlanListView(container) {
     }
 
     html += `
-        <button onclick="openCreatePlanModal()" style="width: 100%; background: #0f8b8d; color: white; border: none; border-radius: 12px; padding: 12px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 3px 8px rgba(15,139,141,0.2);">
+        <button onclick="openCreatePlanModal()" style="width: 100%; background: #0f8b8d; color: white; border: none; border-radius: 12px; padding: 12px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(15,139,141,0.25);">
             <i class="fa-solid fa-plus"></i> Buat Rencana Baru (${planCount}/10)
         </button>
     `;
@@ -2355,72 +2401,82 @@ function renderPlanDetailView(container, plan) {
     const remainingBudget = Math.max(0, plan.targetBudget - plan.savedAmount);
     const is100 = savedPercentage >= 100;
 
+    // Package Matching with Image Fallbacks
+    const destLower = plan.destination.toLowerCase();
+    let matchingPkgs = packagesDB.filter(pkg =>
+        pkg.destination.toLowerCase().includes(destLower) ||
+        pkg.name.toLowerCase().includes(destLower)
+    );
+    if (matchingPkgs.length === 0) {
+        matchingPkgs = packagesDB.slice(0, 3);
+    }
+
     let html = `
-        <div onclick="selectTripPlan(null)" style="color: #0f8b8d; font-size: 12px; font-weight: bold; margin-bottom: 12px; cursor: pointer;">
+        <div onclick="selectTripPlan(null)" style="color: #0f8b8d; font-size: 12px; font-weight: 800; margin-bottom: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-arrow-left"></i> Kembali ke Daftar Rencana Trip Saya
         </div>
 
         <!-- Plan Header Box -->
-        <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 14px; margin-bottom: 14px;">
-            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-                <span style="background: #e6f4f4; color: #0f8b8d; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 6px;">TARGET LIBURAN</span>
-                <span style="background: #dcfce7; color: #166534; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 6px;">Status: ${plan.status}</span>
+        <div style="background: white; border-radius: 18px; border: 1px solid #e2e8f0; padding: 16px; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.03);">
+            <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+                <span style="background: #e6f4f4; color: #0f8b8d; font-size: 9.5px; font-weight: 800; padding: 3px 8px; border-radius: 6px;">TARGET LIBURAN</span>
+                <span style="background: #dcfce7; color: #166534; font-size: 9.5px; font-weight: 800; padding: 3px 8px; border-radius: 6px;">Status: ${plan.status}</span>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
                 <div>
-                    <h3 style="margin: 0 0 2px 0; font-size: 20px; font-weight: bold; color: #0f172a;">${plan.destination}</h3>
-                    <div style="font-size: 11px; color: #64748b; display: flex; gap: 10px;">
-                        <span><i class="fa-regular fa-calendar-days text-teal" style="color:#0f8b8d;"></i> ${plan.targetMonthLabel}</span>
-                        <span><i class="fa-solid fa-users text-teal" style="color:#0f8b8d;"></i> ${plan.participants} Peserta</span>
+                    <h3 style="margin: 0 0 4px 0; font-size: 22px; font-weight: 900; color: #0f172a;">${plan.destination}</h3>
+                    <div style="font-size: 11.5px; color: #64748b; display: flex; gap: 12px; font-weight: 600;">
+                        <span><i class="fa-regular fa-calendar-days" style="color:#0f8b8d;"></i> ${plan.targetMonthLabel}</span>
+                        <span><i class="fa-solid fa-users" style="color:#0f8b8d;"></i> ${plan.participants} Peserta</span>
                     </div>
                 </div>
-                <button onclick="openSavingsModal('${plan.id}')" style="background: #0f8b8d; color: white; border: none; border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                <button onclick="openSavingsModal('${plan.id}')" style="background: #0f8b8d; color: white; border: none; border-radius: 12px; padding: 8px 12px; font-size: 11.5px; font-weight: 800; cursor: pointer; box-shadow: 0 3px 8px rgba(15,139,141,0.25);">
                     + Catat Tabungan
                 </button>
             </div>
 
             <!-- Progress Box -->
-            <div style="background: #f8fafc; border-radius: 12px; padding: 10px; border: 1px solid #f1f5f9;">
+            <div style="background: #f8fafc; border-radius: 14px; padding: 12px; border: 1px solid #f1f5f9;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <span style="font-size: 11px; font-weight: bold; color: #334155;">📈 Progres Tabungan</span>
-                    <strong style="font-size: 14px; color: #0f8b8d;">${savedPercentage}%</strong>
+                    <span style="font-size: 12px; font-weight: 800; color: #334155;">📈 Progres Tabungan</span>
+                    <strong style="font-size: 15px; font-weight: 900; color: #0f8b8d;">${savedPercentage}%</strong>
                 </div>
                 <div style="height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; margin-bottom: 10px;">
-                    <div style="height: 100%; width: ${savedPercentage}%; background: ${is100 ? '#10b981' : '#0f8b8d'}; border-radius: 5px;"></div>
+                    <div style="height: 100%; width: ${savedPercentage}%; background: ${is100 ? '#10b981' : '#0f8b8d'}; border-radius: 5px; transition: width 0.3s ease;"></div>
                 </div>
 
                 <div style="display: flex; gap: 6px; text-align: center;">
-                    <div style="flex: 1; background: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 6px;">
-                        <span style="font-size: 8px; color: #64748b; display: block;">TERKUMPUL</span>
-                        <strong style="font-size: 11px; color: #10b981;">${formatIDRCurrency(plan.savedAmount)}</strong>
+                    <div style="flex: 1; background: white; border-radius: 10px; border: 1px solid #e2e8f0; padding: 8px 4px;">
+                        <span style="font-size: 8px; font-weight: 700; color: #64748b; display: block; text-transform: uppercase;">TERKUMPUL</span>
+                        <strong style="font-size: 11.5px; font-weight: 800; color: #10b981;">${formatIDRCurrency(plan.savedAmount)}</strong>
                     </div>
-                    <div style="flex: 1; background: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 6px;">
-                        <span style="font-size: 8px; color: #64748b; display: block;">TARGET TOTAL</span>
-                        <strong style="font-size: 11px; color: #0f172a;">${formatIDRCurrency(plan.targetBudget)}</strong>
+                    <div style="flex: 1; background: white; border-radius: 10px; border: 1px solid #e2e8f0; padding: 8px 4px;">
+                        <span style="font-size: 8px; font-weight: 700; color: #64748b; display: block; text-transform: uppercase;">TARGET TOTAL</span>
+                        <strong style="font-size: 11.5px; font-weight: 800; color: #0f172a;">${formatIDRCurrency(plan.targetBudget)}</strong>
                     </div>
-                    <div style="flex: 1; background: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 6px;">
-                        <span style="font-size: 8px; color: #64748b; display: block;">SISA DIBUTUHKAN</span>
-                        <strong style="font-size: 11px; color: ${remainingBudget > 0 ? '#ef4444' : '#10b981'};">${formatIDRCurrency(remainingBudget)}</strong>
+                    <div style="flex: 1; background: white; border-radius: 10px; border: 1px solid #e2e8f0; padding: 8px 4px;">
+                        <span style="font-size: 8px; font-weight: 700; color: #64748b; display: block; text-transform: uppercase;">SISA DIBUTUHKAN</span>
+                        <strong style="font-size: 11.5px; font-weight: 800; color: ${remainingBudget > 0 ? '#ef4444' : '#10b981'};">${formatIDRCurrency(remainingBudget)}</strong>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Motivation Alert Box -->
-        <div style="background: ${is100 ? '#ecfdf5' : '#e6f4f4'}; border: 1px solid ${is100 ? '#a7f3d0' : '#b2e2e2'}; border-radius: 14px; padding: 12px; margin-bottom: 14px; display: flex; gap: 10px; align-items: flex-start;">
-            <div style="font-size: 24px;">${is100 ? '🥳' : '🚀'}</div>
+        <div style="background: ${is100 ? '#ecfdf5' : '#e6f4f4'}; border: 1.5px solid ${is100 ? '#a7f3d0' : '#b2e2e2'}; border-radius: 16px; padding: 14px; margin-bottom: 14px; display: flex; gap: 12px; align-items: flex-start;">
+            <div style="font-size: 26px;">${is100 ? '🥳' : '🚀'}</div>
             <div style="flex: 1;">
-                <h5 style="margin: 0 0 2px 0; font-size: 12px; font-weight: bold; color: ${is100 ? '#065f46' : '#0d5c5e'};">
+                <h5 style="margin: 0 0 4px 0; font-size: 13px; font-weight: 800; color: ${is100 ? '#065f46' : '#0d5c5e'};">
                     ${is100 ? 'SELAMAT! Target Tabungan 100% Terkumpul!' : 'Langkah Awal Memulai Perjalanan Impian! 🚀'}
                 </h5>
-                <p style="margin: 0; font-size: 11px; color: ${is100 ? '#047857' : '#0f8b8d'}; line-height: 1.3;">
+                <p style="margin: 0; font-size: 11.5px; color: ${is100 ? '#047857' : '#0f8b8d'}; line-height: 1.4;">
                     ${is100
                         ? `Tabungan liburan kamu ke ${plan.destination} sudah terkumpul penuh (${formatIDRCurrency(plan.savedAmount)}). Yuk langsung cari dan pesan paket trip di bawah!`
                         : `Setiap perjalanan besar dimulai dari langkah kecil. Rencana trip impianmu ke ${plan.destination} baru saja dimulai. Yuk konsisten sisihkan tabungan bulan ini! ✨`}
                 </p>
                 ${is100 ? `
-                    <button onclick="switchScreen('screen-list')" style="margin-top: 8px; background: #10b981; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                    <button onclick="switchScreen('screen-list')" style="margin-top: 8px; background: #10b981; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 800; cursor: pointer;">
                         Pesan Trip Sekarang →
                     </button>
                 ` : ''}
@@ -2428,52 +2484,52 @@ function renderPlanDetailView(container, plan) {
         </div>
 
         <!-- Checklist Section -->
-        <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 14px; margin-bottom: 14px;">
-            <h5 style="margin: 0 0 10px 0; font-size: 13px; font-weight: bold; color: #0f172a; display: flex; align-items: center; gap: 6px;">
-                <i class="fa-solid fa-wand-magic-sparkles text-teal" style="color:#0f8b8d;"></i> Checklist Persiapan Trip
+        <div style="background: white; border-radius: 18px; border: 1px solid #e2e8f0; padding: 16px; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.03);">
+            <h5 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color:#0f8b8d;"></i> Checklist Persiapan Trip
             </h5>
 
-            <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
                 ${plan.checklist.map((item, idx) => `
-                    <div style="display: flex; align-items: center; gap: 8px; background: ${item.completed ? '#f0fdf4' : '#f8fafc'}; border: 1px solid ${item.completed ? '#bbf7d0' : '#e2e8f0'}; padding: 8px 10px; border-radius: 10px;">
-                        <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleChecklistItem('${plan.id}', '${item.id}')" style="accent-color: #10b981; cursor: pointer;">
-                        <span style="flex: 1; font-size: 11px; font-weight: ${item.completed ? 'bold' : 'normal'}; color: ${item.completed ? '#166534' : '#334155'}; text-decoration: ${item.completed ? 'line-through' : 'none'};">
+                    <div style="display: flex; align-items: center; gap: 10px; background: ${item.completed ? '#f0fdf4' : '#f8fafc'}; border: 1px solid ${item.completed ? '#bbf7d0' : '#e2e8f0'}; padding: 10px 12px; border-radius: 12px; transition: all 0.2s ease;">
+                        <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleChecklistItem('${plan.id}', '${item.id}')" style="width: 16px; height: 16px; accent-color: #10b981; cursor: pointer;">
+                        <span style="flex: 1; font-size: 12px; font-weight: ${item.completed ? '800' : '600'}; color: ${item.completed ? '#166534' : '#334155'}; text-decoration: ${item.completed ? 'line-through' : 'none'};">
                             ${item.label}
                         </span>
                         ${item.isAutomatic ? `
-                            <span style="font-size: 8px; background: #e0f2fe; color: #0369a1; padding: 2px 5px; border-radius: 4px; font-weight: bold;">Otomatis</span>
+                            <span style="font-size: 8.5px; background: #e0f2fe; color: #0369a1; padding: 3px 6px; border-radius: 6px; font-weight: 800;">Otomatis</span>
                         ` : `
-                            <i class="fa-regular fa-trash-can" onclick="deleteChecklistItem('${plan.id}', ${idx})" style="color: #94a3b8; font-size: 12px; cursor: pointer;"></i>
+                            <i class="fa-regular fa-trash-can" onclick="deleteChecklistItem('${plan.id}', ${idx})" style="color: #94a3b8; font-size: 14px; cursor: pointer;"></i>
                         `}
                     </div>
                 `).join('')}
             </div>
 
-            <div style="display: flex; gap: 6px;">
-                <input type="text" id="input-custom-checklist" placeholder="Tambah item checklist baru..." style="flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 11px;">
-                <button onclick="addCustomChecklistItem('${plan.id}')" style="background: #0f8b8d; color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: bold; cursor: pointer;">Tambah</button>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="input-custom-checklist" placeholder="Tambah item checklist baru..." style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #cbd5e1; font-size: 12px; outline: none;">
+                <button onclick="addCustomChecklistItem('${plan.id}')" style="background: #0f8b8d; color: white; border: none; border-radius: 10px; padding: 10px 16px; font-size: 12px; font-weight: 800; cursor: pointer;">Tambah</button>
             </div>
         </div>
 
         <!-- Savings Logs Section -->
-        <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 14px; margin-bottom: 14px;">
-            <h5 style="margin: 0 0 10px 0; font-size: 13px; font-weight: bold; color: #0f172a; display: flex; align-items: center; gap: 6px;">
-                <i class="fa-solid fa-wallet text-teal" style="color:#0f8b8d;"></i> Riwayat Catatan Tabungan
+        <div style="background: white; border-radius: 18px; border: 1px solid #e2e8f0; padding: 16px; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.03);">
+            <h5 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-wallet" style="color:#0f8b8d;"></i> Riwayat Catatan Tabungan
             </h5>
 
             ${plan.savingsLogs.length === 0 ? `
-                <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 12px 0;">Belum ada tabungan yang dicatat.<br>Klik tombol <strong>"+ Catat Tabungan"</strong> di atas.</p>
+                <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 16px 0; line-height: 1.4;">Belum ada tabungan yang dicatat.<br>Klik tombol <strong>"+ Catat Tabungan"</strong> di atas.</p>
             ` : `
-                <div style="display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
                     ${plan.savingsLogs.map((log, lIdx) => `
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #f1f5f9; padding: 8px 10px; border-radius: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 12px; border-radius: 12px;">
                             <div>
-                                <div style="font-size: 10px; color: #64748b;">${log.date}</div>
-                                <div style="font-size: 11px; font-weight: bold; color: #334155;">${log.note}</div>
+                                <div style="font-size: 10.5px; color: #64748b; font-weight: 600;">${log.date}</div>
+                                <div style="font-size: 12px; font-weight: 700; color: #334155;">${log.note}</div>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <strong style="font-size: 11.5px; color: #10b981;">+ ${formatIDRCurrency(log.amount)}</strong>
-                                <i class="fa-regular fa-trash-can" onclick="deleteSavingsLog('${plan.id}', ${lIdx})" style="color: #94a3b8; font-size: 12px; cursor: pointer;"></i>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <strong style="font-size: 13px; font-weight: 800; color: #10b981;">+ ${formatIDRCurrency(log.amount)}</strong>
+                                <i class="fa-regular fa-trash-can" onclick="deleteSavingsLog('${plan.id}', ${lIdx})" style="color: #94a3b8; font-size: 13px; cursor: pointer;"></i>
                             </div>
                         </div>
                     `).join('')}
@@ -2481,30 +2537,39 @@ function renderPlanDetailView(container, plan) {
             `}
         </div>
 
-        <!-- Rekomendasi Open Trip -->
-        <div style="margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <strong style="font-size: 12px; color: #0f172a;">Rekomendasi Open Trip ke ${plan.destination}</strong>
-                <span onclick="switchScreen('screen-list')" style="font-size: 10px; color: #0f8b8d; font-weight: bold; cursor: pointer;">Lihat Semua ></span>
+        <!-- Rekomendasi Open Trip Cards -->
+        <div style="margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <strong style="font-size: 13px; font-weight: 800; color: #0f172a;">Rekomendasi Open Trip ke ${plan.destination}</strong>
+                <span onclick="switchScreen('screen-list')" style="font-size: 11px; color: #0f8b8d; font-weight: 800; cursor: pointer;">Lihat Semua ></span>
             </div>
-            <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px;">
-                ${(typeof packagesDB !== 'undefined' ? packagesDB : []).slice(0, 3).map(pkg => `
-                    <div onclick="openPackageDetail(${pkg.id})" style="min-width: 150px; width: 150px; background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; cursor: pointer;">
-                        <img src="${pkg.image}" style="width: 100%; height: 75px; object-fit: cover;">
-                        <div style="padding: 8px;">
-                            <div style="font-size: 11px; font-weight: bold; color: #0f172a; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${pkg.name}</div>
-                            <div style="font-size: 9px; color: #64748b;">${pkg.destination}</div>
-                            <div style="font-size: 11px; font-weight: bold; color: #0f8b8d; margin-top: 4px;">${formatIDRCurrency(pkg.price)}</div>
+            <div style="display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px;">
+                ${matchingPkgs.slice(0, 3).map(pkg => {
+                    const pkgImg = (pkg.images && pkg.images.length > 0) ? pkg.images[0] : (pkg.image || 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600');
+                    return `
+                        <div onclick="openPackageDetail(${pkg.id})" style="min-width: 170px; width: 170px; background: white; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
+                            <div style="height: 90px; width: 100%; position: relative;">
+                                <img src="${pkgImg}" style="width: 100%; height: 100%; object-fit: cover;" onError="this.src='https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600'">
+                                <span style="position: absolute; top: 6px; left: 6px; background: #0f8b8d; color: white; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">${pkg.tripType || 'Open Trip'}</span>
+                            </div>
+                            <div style="padding: 10px;">
+                                <div style="font-size: 12px; font-weight: 800; color: #0f172a; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; margin-bottom: 2px;">${pkg.name}</div>
+                                <div style="font-size: 10px; color: #64748b; margin-bottom: 6px;">${pkg.destination}</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 6px;">
+                                    <span style="font-size: 10px; color: #d97706; font-weight: 800;">⭐ ${pkg.rating || 4.9}</span>
+                                    <strong style="font-size: 11.5px; color: #0f8b8d; font-weight: 800;">${formatIDRCurrency(pkg.price)}</strong>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
         </div>
 
         <!-- Bottom Actions -->
-        <div style="display: flex; gap: 8px;">
-            <button onclick="deleteTripPlan('${plan.id}')" style="flex: 1; background: white; border: 1px solid #ef4444; color: #ef4444; border-radius: 10px; padding: 10px; font-size: 12px; font-weight: bold; cursor: pointer;">Batalkan Rencana</button>
-            <button onclick="selectTripPlan(null)" style="flex: 1; background: #0f8b8d; color: white; border: none; border-radius: 10px; padding: 10px; font-size: 12px; font-weight: bold; cursor: pointer;">Simpan Rencana</button>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <button onclick="deleteTripPlan('${plan.id}')" style="flex: 1; background: white; border: 1.5px solid #ef4444; color: #ef4444; border-radius: 12px; padding: 12px; font-size: 12.5px; font-weight: 800; cursor: pointer;">Batalkan Rencana</button>
+            <button onclick="selectTripPlan(null)" style="flex: 1; background: #0f8b8d; color: white; border: none; border-radius: 12px; padding: 12px; font-size: 12.5px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 12px rgba(15,139,141,0.25);">Simpan Rencana</button>
         </div>
     `;
 
@@ -2556,44 +2621,131 @@ function deleteSavingsLog(planId, lIdx) {
     }
 }
 
-function openCreatePlanModal(planIdToEdit = null) {
-    let dest = "Palu";
-    let budget = "10000000";
-    let participants = 2;
-    let selectedMonth = "2027-03";
+function openSavingsModal(planId) {
+    currentPlanIdForModal = planId;
+    const amountInput = document.getElementById("savings-amount-input");
+    const noteInput = document.getElementById("savings-note-input");
+    if (amountInput) amountInput.value = "";
+    if (noteInput) noteInput.value = "Tabungan bulanan";
+    
+    const modal = document.getElementById("modal-add-savings");
+    if (modal) modal.style.display = "flex";
+}
 
-    if (planIdToEdit) {
-        const plan = tripPlansDB.find(p => p.id === planIdToEdit);
-        if (plan) {
-            dest = plan.destination;
-            budget = plan.targetBudget;
-            participants = plan.participants;
-            selectedMonth = plan.targetMonth;
-        }
+function closeSavingsModal() {
+    const modal = document.getElementById("modal-add-savings");
+    if (modal) modal.style.display = "none";
+}
+
+function submitSavingsForm() {
+    const amountInput = document.getElementById("savings-amount-input");
+    const noteInput = document.getElementById("savings-note-input");
+    if (!amountInput) return;
+
+    const raw = amountInput.value.replace(/\D/g, '');
+    const amount = parseInt(raw, 10);
+    if (isNaN(amount) || amount <= 0) {
+        alert("Masukkan nominal tabungan yang valid.");
+        return;
     }
 
-    const inputDest = prompt("Masukkan Destinasi Impian:", dest);
-    if (inputDest === null) return;
-    const inputBudget = prompt("Masukkan Total Target Budget (Rp):", budget);
-    if (inputBudget === null) return;
+    const note = (noteInput && noteInput.value.trim()) ? noteInput.value.trim() : "Tabungan bulanan";
+    const plan = tripPlansDB.find(p => p.id === currentPlanIdForModal);
+    if (plan) {
+        plan.savedAmount += amount;
+        plan.savingsLogs.unshift({
+            id: `log_${Date.now()}`,
+            date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+            amount: amount,
+            note: note
+        });
+        updatePlanMilestones(plan);
+        renderTripPlanScreen();
+    }
+    closeSavingsModal();
+}
 
-    const numBudget = parseInt(inputBudget.replace(/\D/g, ''), 10) || 10000000;
+function openCreatePlanModal(planIdToEdit = null) {
+    planToEditIdModal = planIdToEdit;
+    const titleEl = document.getElementById("plan-modal-title");
+    const destInput = document.getElementById("plan-dest-input");
+    const monthSelect = document.getElementById("plan-month-select");
+    const partInput = document.getElementById("plan-participants-input");
+    const budgetInput = document.getElementById("plan-budget-input");
+
+    // Populate month select
+    if (monthSelect) {
+        monthSelect.innerHTML = "";
+        const months = generateAvailableFutureMonths();
+        months.forEach(m => {
+            const opt = document.createElement("option");
+            opt.value = m.val;
+            opt.textContent = m.label;
+            monthSelect.appendChild(opt);
+        });
+    }
 
     if (planIdToEdit) {
         const plan = tripPlansDB.find(p => p.id === planIdToEdit);
         if (plan) {
-            plan.destination = inputDest;
-            plan.targetBudget = numBudget;
+            if (titleEl) titleEl.innerHTML = `<i class="fa-solid fa-pen-to-square text-teal" style="color: #0f8b8d;"></i> Edit Rencana Trip`;
+            if (destInput) destInput.value = plan.destination;
+            if (monthSelect) monthSelect.value = plan.targetMonth;
+            if (partInput) partInput.value = plan.participants;
+            if (budgetInput) budgetInput.value = formatIDRCurrency(plan.targetBudget).replace("Rp ", "");
+        }
+    } else {
+        if (titleEl) titleEl.innerHTML = `<i class="fa-solid fa-compass text-teal" style="color: #0f8b8d;"></i> Buat Rencana Trip Baru`;
+        if (destInput) destInput.value = "";
+        if (partInput) partInput.value = "2";
+        if (budgetInput) budgetInput.value = "";
+    }
+
+    const modal = document.getElementById("modal-create-plan");
+    if (modal) modal.style.display = "flex";
+}
+
+function closePlanFormModal() {
+    const modal = document.getElementById("modal-create-plan");
+    if (modal) modal.style.display = "none";
+}
+
+function submitPlanForm() {
+    const destInput = document.getElementById("plan-dest-input");
+    const monthSelect = document.getElementById("plan-month-select");
+    const partInput = document.getElementById("plan-participants-input");
+    const budgetInput = document.getElementById("plan-budget-input");
+
+    const dest = destInput ? destInput.value.trim() : "";
+    const rawBudget = budgetInput ? budgetInput.value.replace(/\D/g, '') : "";
+    const budget = parseInt(rawBudget, 10);
+    const participants = parseInt(partInput ? partInput.value : "2", 10) || 1;
+    const targetMonth = monthSelect ? monthSelect.value : "";
+    const monthLabel = monthSelect && monthSelect.options[monthSelect.selectedIndex] ? monthSelect.options[monthSelect.selectedIndex].text : targetMonth;
+
+    if (!dest || isNaN(budget) || budget <= 0) {
+        alert("Silakan lengkapi destinasi impian dan target budget yang valid.");
+        return;
+    }
+
+    if (planToEditIdModal) {
+        const plan = tripPlansDB.find(p => p.id === planToEditIdModal);
+        if (plan) {
+            plan.destination = dest;
+            plan.targetMonth = targetMonth;
+            plan.targetMonthLabel = monthLabel;
+            plan.participants = participants;
+            plan.targetBudget = budget;
             updatePlanMilestones(plan);
         }
     } else {
         const newPlan = {
             id: `plan_${Date.now()}`,
-            destination: inputDest,
-            targetMonth: "2027-03",
-            targetMonthLabel: "17 Maret 2027",
-            participants: 2,
-            targetBudget: numBudget,
+            destination: dest,
+            targetMonth: targetMonth,
+            targetMonthLabel: monthLabel,
+            participants: participants,
+            targetBudget: budget,
             savedAmount: 0,
             status: "Tersimpan",
             checklist: [
@@ -2609,29 +2761,9 @@ function openCreatePlanModal(planIdToEdit = null) {
         tripPlansDB.unshift(newPlan);
         selectedPlanId = newPlan.id;
     }
+
     renderTripPlanScreen();
-}
-
-function openSavingsModal(planId) {
-    const inputAmount = prompt("Masukkan Nominal Tabungan Bulan Ini (Rp):", "500000");
-    if (inputAmount === null) return;
-    const amount = parseInt(inputAmount.replace(/\D/g, ''), 10);
-    if (isNaN(amount) || amount <= 0) return;
-
-    const inputNote = prompt("Catatan / Sumber (Opsional):", "Tabungan bulanan") || "Tabungan bulanan";
-
-    const plan = tripPlansDB.find(p => p.id === planId);
-    if (plan) {
-        plan.savedAmount += amount;
-        plan.savingsLogs.unshift({
-            id: `log_${Date.now()}`,
-            date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-            amount: amount,
-            note: inputNote
-        });
-        updatePlanMilestones(plan);
-        renderTripPlanScreen();
-    }
+    closePlanFormModal();
 }
 
 // Immediate Top-Level Execution (Script at bottom of <body>)
