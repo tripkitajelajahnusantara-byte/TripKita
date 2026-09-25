@@ -402,10 +402,11 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 			return &BookingInputError{Message: "jumlah peserta tidak valid"}
 		}
 		tripDay := booking.TripDate.Format("2006-01-02")
-		if pkg.StartDate != "" && tripDay < pkg.StartDate {
+		todayStr := time.Now().Format("2006-01-02")
+		if pkg.StartDate != "" && pkg.StartDate >= todayStr && tripDay < pkg.StartDate {
 			return &BookingInputError{Message: "tanggal perjalanan berada sebelum periode paket"}
 		}
-		if pkg.EndDate != "" && tripDay > pkg.EndDate {
+		if pkg.EndDate != "" && pkg.EndDate >= todayStr && tripDay > pkg.EndDate {
 			return &BookingInputError{Message: "tanggal perjalanan berada setelah periode paket"}
 		}
 		if pkg.QuotaMax > 0 && pkg.QuotaUsed+booking.Guests > pkg.QuotaMax {

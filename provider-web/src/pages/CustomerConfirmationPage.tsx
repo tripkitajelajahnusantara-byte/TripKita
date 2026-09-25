@@ -171,7 +171,7 @@ export const CustomerConfirmationPage: React.FC = () => {
 
     } catch (err: any) {
       console.error('[Booking Error]', err);
-      alert(`Gagal membuat Invoice Xendit: ${err?.message || 'Terjadi kesalahan sistem'}`);
+      alert(`Gagal membuat tagihan pembayaran: ${err?.message || 'Terjadi kesalahan sistem'}`);
       setSubmitting(false);
     }
   };
