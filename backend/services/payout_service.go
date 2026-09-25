@@ -358,57 +358,6 @@ func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string
 		return updated, nil
 	}
 
-<<<<<<< HEAD
-	// Instruksi otomatis sudah masuk antrean gateway; mitra diberi tahu sekarang
-	// agar status PROCESSING tidak terlihat seperti pengajuan yang diabaikan.
-	processing := payout
-	processing.Status = models.PayoutStatusProcessing
-	s.notifyProviderPayout(&processing)
-
-	// Tahap 2: kirim instruksi ke gateway di luar transaksi database, supaya
-	// panggilan jaringan yang lambat tidak menahan lock baris pencairan.
-	payout.RoutingType = routing.Type
-	payout.RoutingValue = routing.Value
-	result, sendErr := s.xenditService.CreatePayout(xenditPayoutRequest(&payout))
-	if sendErr != nil {
-		if errors.Is(sendErr, ErrPayoutStatusUnknown) {
-			// Jangan kembalikan saldo pada timeout/5xx. Instruksi mungkin sudah
-			// diterima Xendit; idempotency key yang sama akan direkonsiliasi job.
-			_ = database.DB.Model(&models.Payout{}).
-				Where("id = ? AND status = ?", payoutID, models.PayoutStatusProcessing).
-				Updates(map[string]interface{}{
-					"failure_code": "DELIVERY_STATUS_UNKNOWN",
-					"updated_at":   time.Now(),
-				}).Error
-			log.Printf("[Payout] Status pengiriman payout %d belum pasti; tetap PROCESSING untuk rekonsiliasi: %v", payoutID, sendErr)
-			return s.payoutRepo.GetByID(payoutID)
-		}
-
-		// Hanya penolakan definitif 4xx/validasi yang mengembalikan dana.
-		if failErr := s.markPayoutFailed(payoutID, "", sendErr.Error()); failErr != nil {
-			log.Printf("[Payout] Payout %d gagal dikirim dan gagal dikembalikan: %v", payoutID, failErr)
-		}
-		return nil, fmt.Errorf("pencairan tidak dapat dikirim: %w", sendErr)
-	}
-
-	expectedReferenceID := payoutReferenceID(payoutID)
-	if result.ReferenceID != expectedReferenceID {
-		// Respons yang tidak menunjuk pengajuan ini tidak boleh dianggap gagal
-		// definitif karena Xendit mungkin tetap memproses instruksinya. Biarkan
-		// PROCESSING agar job rekonsiliasi memeriksa ulang dengan idempotency key.
-		_ = database.DB.Model(&models.Payout{}).
-			Where("id = ? AND status = ?", payoutID, models.PayoutStatusProcessing).
-			Updates(map[string]interface{}{
-				"failure_code": "REFERENCE_MISMATCH",
-				"updated_at":   time.Now(),
-			}).Error
-		log.Printf("[Payout] PENTING: reference payout %d tidak cocok (expected=%s actual=%s); tetap PROCESSING", payoutID, expectedReferenceID, result.ReferenceID)
-=======
-	if !automatic {
->>>>>>> 02150b4 (feat(backend): migrate payment gateway from Xendit to iPaymu)
-		return s.payoutRepo.GetByID(payoutID)
-	}
-
 	// Auto payout via iPaymu manual/batch payout
 	payout.RoutingType = routing.Type
 	payout.RoutingValue = routing.Value
