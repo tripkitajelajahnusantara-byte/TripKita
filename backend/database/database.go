@@ -126,6 +126,11 @@ func ConnectDB(cfg *config.Config) {
 		execMigration(`UPDATE packages SET meeting_point = 'Bandara Marinda Waisai, Kabupaten Raja Ampat, Papua Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Raja Ampat%'`)
 		execMigration(`UPDATE packages SET meeting_point = 'Bandara Internasional I Gusti Ngurah Rai (Door Kedatangan Domestik), Badung, Bali' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bali%'`)
 
+		// Hapus data paket dummy percobaan seperti "Rumah Ayu Ting-Ting" atau "Margo City" dari Supabase DB
+		execMigration(`DELETE FROM bookings WHERE package_id IN (SELECT id FROM packages WHERE LOWER(name) LIKE '%ayu ting%' OR LOWER(name) LIKE '%margo city%');`)
+		execMigration(`DELETE FROM package_dates WHERE package_id IN (SELECT id FROM packages WHERE LOWER(name) LIKE '%ayu ting%' OR LOWER(name) LIKE '%margo city%');`)
+		execMigration(`DELETE FROM packages WHERE LOWER(name) LIKE '%ayu ting%' OR LOWER(name) LIKE '%margo city%';`)
+
 		// Reset hardcoded 5.0 ratings for packages without reviews
 		execMigration(`UPDATE packages SET rating = 0 WHERE NOT EXISTS (SELECT 1 FROM reviews WHERE reviews.package_id = packages.id)`)
 	}
