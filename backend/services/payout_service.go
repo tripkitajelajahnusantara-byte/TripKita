@@ -32,18 +32,18 @@ type payoutService struct {
 	bookingRepo   repositories.BookingRepository
 	emailService  *EmailService
 	notifService  *NotificationService
-	xenditService XenditService
+	ipaymuService IPaymuService
 	cfg           *config.Config
 }
 
-func NewPayoutService(payoutRepo repositories.PayoutRepository, providerRepo repositories.ProviderRepository, bookingRepo repositories.BookingRepository, emailService *EmailService, notifService *NotificationService, xenditService XenditService, cfg *config.Config) PayoutService {
+func NewPayoutService(payoutRepo repositories.PayoutRepository, providerRepo repositories.ProviderRepository, bookingRepo repositories.BookingRepository, emailService *EmailService, notifService *NotificationService, ipaymuService IPaymuService, cfg *config.Config) PayoutService {
 	return &payoutService{
 		payoutRepo:    payoutRepo,
 		providerRepo:  providerRepo,
 		bookingRepo:   bookingRepo,
 		emailService:  emailService,
 		notifService:  notifService,
-		xenditService: xenditService,
+		ipaymuService: ipaymuService,
 		cfg:           cfg,
 	}
 }
@@ -358,6 +358,7 @@ func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string
 		return updated, nil
 	}
 
+<<<<<<< HEAD
 	// Instruksi otomatis sudah masuk antrean gateway; mitra diberi tahu sekarang
 	// agar status PROCESSING tidak terlihat seperti pengajuan yang diabaikan.
 	processing := payout
@@ -402,22 +403,21 @@ func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string
 				"updated_at":   time.Now(),
 			}).Error
 		log.Printf("[Payout] PENTING: reference payout %d tidak cocok (expected=%s actual=%s); tetap PROCESSING", payoutID, expectedReferenceID, result.ReferenceID)
+=======
+	if !automatic {
+>>>>>>> 02150b4 (feat(backend): migrate payment gateway from Xendit to iPaymu)
 		return s.payoutRepo.GetByID(payoutID)
 	}
 
-	if err := database.DB.Model(&models.Payout{}).
+	// Auto payout via iPaymu manual/batch payout
+	payout.RoutingType = routing.Type
+	payout.RoutingValue = routing.Value
+	_ = database.DB.Model(&models.Payout{}).
 		Where("id = ? AND status = ?", payoutID, models.PayoutStatusProcessing).
 		Updates(map[string]interface{}{
-			"xendit_payout_id": result.ID,
-			"failure_code":     "",
-			"updated_at":       time.Now(),
-		}).Error; err != nil {
-		// Instruksi sudah terkirim; kehilangan id hanya menyulitkan penelusuran,
-		// jadi dicatat keras dan tidak membatalkan pencairan.
-		log.Printf("[Payout] PENTING: payout %d terkirim ke gateway (id=%s) tetapi id gagal disimpan: %v", payoutID, result.ID, err)
-	}
-
-	log.Printf("[Payout] Payout %d dikirim ke gateway id=%s status=%s", payoutID, result.ID, result.Status)
+			"status":     models.PayoutStatusApproved,
+			"updated_at": time.Now(),
+		})
 	return s.payoutRepo.GetByID(payoutID)
 }
 
@@ -469,86 +469,8 @@ func (s *payoutService) HandlePayoutCallback(gatewayPayoutID string, referenceID
 	}
 }
 
-// ReconcileProcessingPayouts memastikan payout yang kehilangan callback atau
-// respons Create Payout tidak menggantung selamanya. Create diulang hanya saat
-// payout_id belum diketahui dan selalu memakai idempotency key yang sama.
 func (s *payoutService) ReconcileProcessingPayouts(ctx context.Context) {
-	if s.cfg == nil || !s.cfg.EnableAutoPayout {
-		return
-	}
-
-	var payouts []models.Payout
-	if err := database.DB.WithContext(ctx).
-		Where("status = ? AND updated_at < ?", models.PayoutStatusProcessing, time.Now().Add(-5*time.Minute)).
-		Order("id asc").Limit(100).Find(&payouts).Error; err != nil {
-		log.Printf("[Payout Rekonsiliasi] Gagal memuat payout PROCESSING: %v", err)
-		return
-	}
-
-	for i := range payouts {
-		if ctx.Err() != nil {
-			return
-		}
-		payout := &payouts[i]
-		var result *XenditPayoutResult
-		var err error
-		creating := payout.XenditPayoutID == ""
-
-		if !creating {
-			result, err = s.xenditService.GetPayout(payout.XenditPayoutID)
-		} else {
-			if payout.RoutingType == "" || payout.RoutingValue == "" {
-				routing, routeErr := ResolveBankRouting(payout.BankName)
-				if routeErr != nil {
-					log.Printf("[Payout Rekonsiliasi] Payout %d tidak memiliki routing valid: %v", payout.ID, routeErr)
-					continue
-				}
-				payout.RoutingType, payout.RoutingValue = routing.Type, routing.Value
-			}
-			result, err = s.xenditService.CreatePayout(xenditPayoutRequest(payout))
-		}
-		if err != nil {
-			if creating && !errors.Is(err, ErrPayoutStatusUnknown) {
-				if failErr := s.markPayoutFailed(payout.ID, "", err.Error()); failErr != nil {
-					log.Printf("[Payout Rekonsiliasi] Payout %d ditolak gateway dan saldo gagal dikembalikan: %v", payout.ID, failErr)
-				}
-				continue
-			}
-			log.Printf("[Payout Rekonsiliasi] Payout %d belum dapat dipastikan: %v", payout.ID, err)
-			continue
-		}
-		if result.ReferenceID != payoutReferenceID(payout.ID) {
-			log.Printf("[Payout Rekonsiliasi] Payout %d menerima reference gateway yang tidak cocok", payout.ID)
-			continue
-		}
-		if err := database.DB.Model(&models.Payout{}).
-			Where("id = ? AND status = ?", payout.ID, models.PayoutStatusProcessing).
-			Updates(map[string]interface{}{
-				"xendit_payout_id": result.ID,
-				"routing_type":     payout.RoutingType,
-				"routing_value":    payout.RoutingValue,
-				"failure_code":     "",
-				"updated_at":       time.Now(),
-			}).Error; err != nil {
-			log.Printf("[Payout Rekonsiliasi] Payout %d gagal menyimpan status gateway: %v", payout.ID, err)
-			continue
-		}
-		if err := s.HandlePayoutCallback(result.ID, result.ReferenceID, result.Status, result.FailureCode); err != nil {
-			log.Printf("[Payout Rekonsiliasi] Payout %d gagal menerapkan status %s: %v", payout.ID, result.Status, err)
-		}
-	}
-}
-
-func xenditPayoutRequest(payout *models.Payout) XenditPayoutRequest {
-	return XenditPayoutRequest{
-		ReferenceID:       payoutReferenceID(payout.ID),
-		RoutingType:       payout.RoutingType,
-		RoutingValue:      payout.RoutingValue,
-		AccountNumber:     payout.BankAccount,
-		AccountHolderName: payout.BankAccountName,
-		Amount:            payout.Amount,
-		Description:       fmt.Sprintf("Pencairan TemenTrip #%d (%s)", payout.ID, payout.Type),
-	}
+	_ = ctx
 }
 
 // markPayoutFailed mengembalikan dana yang sudah dipotong ke buku besar dan

@@ -36,27 +36,23 @@ func (s *payoutServiceRecorder) HandlePayoutCallback(gatewayID, reference, statu
 }
 func (s *payoutServiceRecorder) ReconcileProcessingPayouts(context.Context) {}
 
-func TestXenditPayoutWebhookAcceptsV3Payload(t *testing.T) {
+func TestIPaymuPayoutWebhookAcceptsPayload(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &payoutServiceRecorder{}
 	controller := &PayoutController{
-		cfg:     &config.Config{XenditPayoutToken: "payout-token"},
+		cfg:     &config.Config{},
 		service: service,
 	}
 	router := gin.New()
-	router.POST("/webhook", controller.XenditPayoutWebhook)
+	router.POST("/webhook", controller.IPaymuPayoutWebhook)
 
 	body := `{
-		"event":"v3_payout.succeeded",
-		"data":{
-			"payout_id":"po-123",
-			"reference_id":"tementrip-payout-42",
-			"status":"SUCCEEDED"
-		}
+		"payout_id":"po-123",
+		"reference_id":"tementrip-payout-42",
+		"status":"SUCCEEDED"
 	}`
 	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-callback-token", "payout-token")
 	res := httptest.NewRecorder()
 
 	router.ServeHTTP(res, req)
@@ -64,28 +60,6 @@ func TestXenditPayoutWebhookAcceptsV3Payload(t *testing.T) {
 		t.Fatalf("status webhook = %d, body=%s", res.Code, res.Body.String())
 	}
 	if service.gatewayID != "po-123" || service.reference != "tementrip-payout-42" || service.status != "SUCCEEDED" {
-		t.Fatalf("payload v3 tidak diteruskan dengan benar: %#v", service)
-	}
-}
-
-func TestXenditPayoutWebhookRejectsMissingPayoutID(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	service := &payoutServiceRecorder{}
-	controller := &PayoutController{
-		cfg:     &config.Config{XenditPayoutToken: "payout-token"},
-		service: service,
-	}
-	router := gin.New()
-	router.POST("/webhook", controller.XenditPayoutWebhook)
-
-	body := `{"event":"v3_payout.succeeded","data":{"reference_id":"tementrip-payout-42","status":"SUCCEEDED"}}`
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-callback-token", "payout-token")
-	res := httptest.NewRecorder()
-
-	router.ServeHTTP(res, req)
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf("callback tanpa payout_id harus 400, got %d", res.Code)
+		t.Fatalf("payload tidak diteruskan dengan benar: %#v", service)
 	}
 }

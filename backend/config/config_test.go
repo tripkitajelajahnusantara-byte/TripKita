@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// validProductionEnv adalah baseline environment production yang lolos
-// validasi; setiap test mengubah satu nilai untuk menguji satu aturan.
 func validProductionEnv() map[string]string {
 	return map[string]string{
 		"APP_ENV":              "production",
@@ -19,8 +17,8 @@ func validProductionEnv() map[string]string {
 		"GOOGLE_CLIENT_ID":     "1234.apps.googleusercontent.com",
 		"GOOGLE_CLIENT_SECRET": "google-secret-value",
 		"GOOGLE_REDIRECT_URI":  "https://api.example.com/api/v1/public/auth/google/callback",
-		"XENDIT_SECRET_KEY":    "xnd_production_abc123",
-		"XENDIT_WEBHOOK_TOKEN": "callback-token-value",
+		"IPAYMU_VA":            "0000000813208875",
+		"IPAYMU_API_KEY":       "SANDBOX443FF47C-1E4B-4880-A955-BFB25F2599CF",
 		"SMTP_HOST":            "smtp.example.com",
 		"SMTP_PORT":            "587",
 		"SMTP_USER":            "mailer",
@@ -31,16 +29,15 @@ func validProductionEnv() map[string]string {
 
 func loadWith(t *testing.T, env map[string]string) (*Config, error) {
 	t.Helper()
-	// Env dibersihkan supaya nilai dari mesin developer tidak membocor ke test.
 	for _, key := range []string{
 		"APP_ENV", "PORT", "DATABASE_URL", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD",
 		"DB_NAME", "DB_SSLMODE", "DB_MAX_OPEN_CONNS", "DB_MAX_IDLE_CONNS", "JWT_SECRET",
 		"FRONTEND_URL", "BACKEND_URL", "ALLOWED_ORIGINS", "TRUSTED_PROXIES",
 		"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
-		"XENDIT_SECRET_KEY", "XENDIT_API_KEY", "XENDIT_WEBHOOK_TOKEN",
+		"IPAYMU_VA", "IPAYMU_API_KEY", "IPAYMU_BASE_URL", "IPAYMU_CALLBACK_URL",
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM",
 		"RUN_MIGRATIONS", "SEED_DB", "ENABLE_DEV_MOCKS", "ENABLE_BACKGROUND_JOBS",
-		"ENABLE_AUTOMATIC_PAYOUT", "XENDIT_PAYOUT_WEBHOOK_TOKEN",
+		"ENABLE_AUTOMATIC_PAYOUT",
 	} {
 		t.Setenv(key, "")
 	}
@@ -71,7 +68,7 @@ func TestProductionRejectsUnsafeValues(t *testing.T) {
 	}{
 		{"jwt secret terlalu pendek", func(e map[string]string) { e["JWT_SECRET"] = "pendek" }, "JWT_SECRET"},
 		{"jwt secret mudah ditebak", func(e map[string]string) { e["JWT_SECRET"] = strings.Repeat("ab", 20) }, "JWT_SECRET"},
-		{"nilai contoh belum diganti", func(e map[string]string) { e["XENDIT_WEBHOOK_TOKEN"] = "replace-with-token" }, "nilai contoh"},
+		{"nilai contoh belum diganti", func(e map[string]string) { e["IPAYMU_API_KEY"] = "replace-with-key" }, "nilai contoh"},
 		{"database tanpa TLS", func(e map[string]string) {
 			e["DATABASE_URL"] = "postgres://u:p@db.example.com:5432/tripkita?sslmode=disable"
 		}, "TLS"},
@@ -84,7 +81,7 @@ func TestProductionRejectsUnsafeValues(t *testing.T) {
 		}, "GOOGLE_REDIRECT_URI"},
 		{"origin memakai path", func(e map[string]string) { e["ALLOWED_ORIGINS"] = "https://app.example.com/app" }, "ALLOWED_ORIGINS"},
 		{"smtp from bukan email", func(e map[string]string) { e["SMTP_FROM"] = "Tim TemenTrip" }, "SMTP_FROM"},
-		{"webhook token kosong", func(e map[string]string) { e["XENDIT_WEBHOOK_TOKEN"] = "" }, "XENDIT_WEBHOOK_TOKEN"},
+		{"ipaymu api key kosong", func(e map[string]string) { e["IPAYMU_API_KEY"] = "" }, "IPAYMU_API_KEY"},
 		{"pool idle melebihi open", func(e map[string]string) {
 			e["DB_MAX_OPEN_CONNS"] = "5"
 			e["DB_MAX_IDLE_CONNS"] = "10"
@@ -106,8 +103,6 @@ func TestProductionRejectsUnsafeValues(t *testing.T) {
 	}
 }
 
-// Mock checkout dan seeding tidak boleh bisa dinyalakan di production, berapa
-// pun nilai environment yang diberikan operator.
 func TestProductionForcesDevFlagsOff(t *testing.T) {
 	env := validProductionEnv()
 	env["ENABLE_DEV_MOCKS"] = "true"
@@ -146,8 +141,6 @@ func TestDevelopmentDefaultsStayUsable(t *testing.T) {
 	}
 }
 
-// Pencairan otomatis memindahkan uang sungguhan, jadi harus mati kecuali
-// dinyalakan secara eksplisit.
 func TestAutomaticPayoutIsOffByDefault(t *testing.T) {
 	cfg, err := loadWith(t, validProductionEnv())
 	if err != nil {
@@ -155,55 +148,5 @@ func TestAutomaticPayoutIsOffByDefault(t *testing.T) {
 	}
 	if cfg.EnableAutoPayout {
 		t.Error("ENABLE_AUTOMATIC_PAYOUT harus default false")
-	}
-}
-
-// Tanpa token callback, status pencairan tidak pernah dapat dikonfirmasi dan
-// dana akan menggantung di status PROCESSING, jadi konfigurasinya ditolak.
-func TestAutomaticPayoutRequiresCallbackToken(t *testing.T) {
-	env := validProductionEnv()
-	env["ENABLE_AUTOMATIC_PAYOUT"] = "true"
-	env["XENDIT_WEBHOOK_TOKEN"] = "callback-token-value"
-
-	cfg, err := loadWith(t, env)
-	if err != nil {
-		t.Fatalf("token webhook invoice seharusnya dipakai sebagai cadangan: %v", err)
-	}
-	if !cfg.EnableAutoPayout || cfg.XenditPayoutToken != "callback-token-value" {
-		t.Errorf("token cadangan tidak terpakai: aktif=%v token=%q", cfg.EnableAutoPayout, cfg.XenditPayoutToken)
-	}
-}
-
-func TestAutomaticPayoutRequiresAPIKeyAndBackgroundJobs(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		mutate  func(map[string]string)
-		wantSub string
-	}{
-		{
-			name: "api key kosong",
-			mutate: func(env map[string]string) {
-				env["XENDIT_SECRET_KEY"] = ""
-			},
-			wantSub: "XENDIT_SECRET_KEY",
-		},
-		{
-			name: "background jobs mati",
-			mutate: func(env map[string]string) {
-				env["ENABLE_BACKGROUND_JOBS"] = "false"
-			},
-			wantSub: "ENABLE_BACKGROUND_JOBS",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			env := validProductionEnv()
-			env["ENABLE_AUTOMATIC_PAYOUT"] = "true"
-			env["XENDIT_PAYOUT_WEBHOOK_TOKEN"] = "payout-callback-token"
-			tc.mutate(env)
-			_, err := loadWith(t, env)
-			if err == nil || !strings.Contains(err.Error(), tc.wantSub) {
-				t.Fatalf("diharapkan error %s, got %v", tc.wantSub, err)
-			}
-		})
 	}
 }

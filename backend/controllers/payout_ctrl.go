@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log"
@@ -189,62 +188,33 @@ func (ctrl *PayoutController) AdminProcessPayout(c *gin.Context) {
 // Token callback dibandingkan constant-time seperti webhook pembayaran, dan
 // respons non-2xx sengaja dikembalikan saat pemrosesan gagal agar gateway
 // mengirim ulang eventnya.
-func (ctrl *PayoutController) XenditPayoutWebhook(c *gin.Context) {
-	expectedToken := ctrl.cfg.XenditPayoutToken
-	if expectedToken == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Webhook pencairan belum dikonfigurasi"})
-		return
-	}
-	callbackToken := c.GetHeader("x-callback-token")
-	if len(callbackToken) != len(expectedToken) || subtle.ConstantTimeCompare([]byte(callbackToken), []byte(expectedToken)) != 1 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Invalid Xendit callback token"})
-		return
-	}
+func (ctrl *PayoutController) IPaymuPayoutWebhook(c *gin.Context) {
+	payoutID := c.PostForm("payout_id")
+	referenceID := c.PostForm("reference_id")
+	status := c.PostForm("status")
+	failureCode := c.PostForm("failure_code")
 
-	// Payouts v3 membungkus payload di dalam "data"; sebagian event lama
-	// mengirim field di level teratas.
-	var req struct {
-		Event string `json:"event" binding:"max=100"`
-		Data  struct {
-			PayoutID    string `json:"payout_id" binding:"max=255"`
-			ID          string `json:"id" binding:"max=255"` // fallback webhook legacy
-			ReferenceID string `json:"reference_id" binding:"max=255"`
-			Status      string `json:"status" binding:"max=50"`
-			FailureCode string `json:"failure_code" binding:"max=100"`
-		} `json:"data"`
-		ID          string `json:"id" binding:"max=255"`
-		ReferenceID string `json:"reference_id" binding:"max=255"`
-		Status      string `json:"status" binding:"max=50"`
-		FailureCode string `json:"failure_code" binding:"max=100"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	payoutID, referenceID, status, failureCode := req.Data.PayoutID, req.Data.ReferenceID, req.Data.Status, req.Data.FailureCode
 	if payoutID == "" {
-		payoutID = req.Data.ID
-	}
-	if referenceID == "" {
-		payoutID, referenceID, status, failureCode = req.ID, req.ReferenceID, req.Status, req.FailureCode
-	}
-	if status == "" && req.Event != "" {
-		// Bentuk event v3: "v3_payout.succeeded". Ambil segmen terakhir agar
-		// callback legacy "payout.succeeded" tetap dapat diproses saat rollout.
-		if idx := strings.LastIndex(req.Event, "."); idx >= 0 && idx+1 < len(req.Event) {
-			status = req.Event[idx+1:]
+		var req struct {
+			PayoutID    string `json:"payout_id"`
+			ReferenceID string `json:"reference_id"`
+			Status      string `json:"status"`
+			FailureCode string `json:"failure_code"`
+		}
+		if err := c.ShouldBindJSON(&req); err == nil {
+			payoutID = req.PayoutID
+			referenceID = req.ReferenceID
+			status = req.Status
+			failureCode = req.FailureCode
 		}
 	}
-	if strings.TrimSpace(payoutID) == "" || strings.TrimSpace(referenceID) == "" || strings.TrimSpace(status) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Payload callback payout tidak lengkap"})
+
+	if strings.TrimSpace(payoutID) == "" || strings.TrimSpace(referenceID) == "" {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		return
 	}
 
 	if err := ctrl.service.HandlePayoutCallback(payoutID, referenceID, status, failureCode); err != nil {
-		// Reference asing tidak akan pernah berhasil diproses, jadi dijawab 4xx
-		// supaya gateway berhenti mengirim ulang. Kegagalan lain dijawab 5xx agar
-		// event dikirim ulang.
 		if errors.Is(err, services.ErrUnknownPayoutReference) {
 			log.Printf("[Payout Webhook] Callback dengan reference tidak dikenali diabaikan")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Reference pencairan tidak dikenali"})

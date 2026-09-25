@@ -28,8 +28,12 @@ type Config struct {
 	GoogleRedirectURI  string
 	FrontendURL        string
 	BackendURL         string
-	XenditAPIKey       string
-	XenditWebhookToken string
+	IPaymuVA           string
+	IPaymuAPIKey       string
+	IPaymuBaseURL      string
+	IPaymuCallbackURL  string
+	IPaymuReturnURL    string
+	IPaymuCancelURL    string
 	SMTPHost           string
 	SMTPPort           string
 	SMTPUser           string
@@ -44,7 +48,6 @@ type Config struct {
 	DBMaxOpenConns     int
 	DBMaxIdleConns     int
 	EnableAutoPayout   bool
-	XenditPayoutToken  string
 }
 
 func LoadConfig() (*Config, error) {
@@ -56,7 +59,6 @@ func LoadConfig() (*Config, error) {
 
 	appEnv := strings.ToLower(getEnv("APP_ENV", "development"))
 	isProduction := appEnv == "production"
-	xenditKey := strings.TrimSpace(getEnv("XENDIT_SECRET_KEY", getEnv("XENDIT_API_KEY", "")))
 
 	cfg := &Config{
 		AppEnv:             appEnv,
@@ -74,8 +76,12 @@ func LoadConfig() (*Config, error) {
 		GoogleRedirectURI:  getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/v1/public/auth/google/callback"),
 		FrontendURL:        strings.TrimRight(getEnv("FRONTEND_URL", "http://localhost:5173"), "/"),
 		BackendURL:         strings.TrimRight(getEnv("BACKEND_URL", "http://localhost:8080"), "/"),
-		XenditAPIKey:       xenditKey,
-		XenditWebhookToken: getEnv("XENDIT_WEBHOOK_TOKEN", ""),
+		IPaymuVA:           getEnv("IPAYMU_VA", "0000000813208875"),
+		IPaymuAPIKey:       getEnv("IPAYMU_API_KEY", ""),
+		IPaymuBaseURL:      getEnv("IPAYMU_BASE_URL", "https://sandbox.ipaymu.com/api/v2"),
+		IPaymuCallbackURL:  getEnv("IPAYMU_CALLBACK_URL", ""),
+		IPaymuReturnURL:    getEnv("IPAYMU_RETURN_URL", ""),
+		IPaymuCancelURL:    getEnv("IPAYMU_CANCEL_URL", ""),
 		SMTPHost:           getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:           getEnv("SMTP_PORT", "587"),
 		SMTPUser:           getEnv("SMTP_USER", ""),
@@ -87,14 +93,9 @@ func LoadConfig() (*Config, error) {
 		RunMigrations:      getBoolEnv("RUN_MIGRATIONS", !isProduction),
 		SeedDatabase:       getBoolEnv("SEED_DB", false) && !isProduction,
 		EnableJobs:         getBoolEnv("ENABLE_BACKGROUND_JOBS", true),
-		// Pool dibuat dapat diatur karena batas koneksi database berbeda antar
-		// penyedia (mis. Supabase pooler) dan antar jumlah replica aplikasi.
-		DBMaxOpenConns: getIntEnv("DB_MAX_OPEN_CONNS", 25),
-		DBMaxIdleConns: getIntEnv("DB_MAX_IDLE_CONNS", 10),
-		// Pencairan otomatis memindahkan uang sungguhan, jadi default-nya mati
-		// dan harus dinyalakan secara sadar setelah saldo Xendit disiapkan.
-		EnableAutoPayout:  getBoolEnv("ENABLE_AUTOMATIC_PAYOUT", false),
-		XenditPayoutToken: getEnv("XENDIT_PAYOUT_WEBHOOK_TOKEN", getEnv("XENDIT_WEBHOOK_TOKEN", "")),
+		DBMaxOpenConns:     getIntEnv("DB_MAX_OPEN_CONNS", 25),
+		DBMaxIdleConns:     getIntEnv("DB_MAX_IDLE_CONNS", 10),
+		EnableAutoPayout:   getBoolEnv("ENABLE_AUTOMATIC_PAYOUT", false),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -122,15 +123,6 @@ func (c *Config) Validate() error {
 	if err := validatePort("PORT", c.Port); err != nil {
 		return err
 	}
-	if c.EnableAutoPayout && strings.TrimSpace(c.XenditPayoutToken) == "" {
-		return fmt.Errorf("XENDIT_PAYOUT_WEBHOOK_TOKEN wajib diisi saat ENABLE_AUTOMATIC_PAYOUT=true")
-	}
-	if c.EnableAutoPayout && strings.TrimSpace(c.XenditAPIKey) == "" {
-		return fmt.Errorf("XENDIT_SECRET_KEY dengan izin MONEY-OUT wajib diisi saat ENABLE_AUTOMATIC_PAYOUT=true")
-	}
-	if c.EnableAutoPayout && !c.EnableJobs {
-		return fmt.Errorf("ENABLE_BACKGROUND_JOBS wajib true saat ENABLE_AUTOMATIC_PAYOUT=true agar payout dapat direkonsiliasi")
-	}
 	if c.DBMaxOpenConns < 1 {
 		return fmt.Errorf("DB_MAX_OPEN_CONNS wajib minimal 1")
 	}
@@ -145,8 +137,8 @@ func (c *Config) Validate() error {
 	}
 
 	required := map[string]string{
-		"XENDIT_SECRET_KEY":    c.XenditAPIKey,
-		"XENDIT_WEBHOOK_TOKEN": c.XenditWebhookToken,
+		"IPAYMU_VA":            c.IPaymuVA,
+		"IPAYMU_API_KEY":       c.IPaymuAPIKey,
 		"GOOGLE_CLIENT_ID":     c.GoogleClientID,
 		"GOOGLE_CLIENT_SECRET": c.GoogleClientSecret,
 		"GOOGLE_REDIRECT_URI":  c.GoogleRedirectURI,
@@ -161,8 +153,7 @@ func (c *Config) Validate() error {
 		"DATABASE_URL":         c.DatabaseURL,
 		"DB_PASSWORD":          c.DBPass,
 		"JWT_SECRET":           c.JWTSecret,
-		"XENDIT_SECRET_KEY":    c.XenditAPIKey,
-		"XENDIT_WEBHOOK_TOKEN": c.XenditWebhookToken,
+		"IPAYMU_API_KEY":       c.IPaymuAPIKey,
 		"GOOGLE_CLIENT_ID":     c.GoogleClientID,
 		"GOOGLE_CLIENT_SECRET": c.GoogleClientSecret,
 		"SMTP_PASS":            c.SMTPPass,

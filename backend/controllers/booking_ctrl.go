@@ -1,12 +1,12 @@
 package controllers
 
 import (
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -559,41 +559,55 @@ func (ctrl *BookingController) ProcessMockPayment(c *gin.Context) {
 	c.Redirect(http.StatusFound, redirectURL)
 }
 
-func (ctrl *BookingController) XenditWebhook(c *gin.Context) {
-	if ctrl.cfg.XenditWebhookToken == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Webhook belum dikonfigurasi"})
-		return
-	}
-	callbackToken := c.GetHeader("x-callback-token")
-	if len(callbackToken) != len(ctrl.cfg.XenditWebhookToken) || subtle.ConstantTimeCompare([]byte(callbackToken), []byte(ctrl.cfg.XenditWebhookToken)) != 1 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Invalid Xendit callback token"})
-		return
+func (ctrl *BookingController) IPaymuWebhook(c *gin.Context) {
+	trxID := c.PostForm("trx_id")
+	referenceID := c.PostForm("reference_id")
+	status := c.PostForm("status")
+	via := c.PostForm("via")
+	statusCodeStr := c.PostForm("status_code")
+	totalStr := c.PostForm("total")
+
+	statusCode, _ := strconv.Atoi(statusCodeStr)
+	total, _ := strconv.ParseInt(totalStr, 10, 64)
+
+	if trxID == "" {
+		var req struct {
+			TrxID       interface{} `json:"trx_id"`
+			ReferenceID string      `json:"reference_id"`
+			StatusCode  interface{} `json:"status_code"`
+			Status      string      `json:"status"`
+			Via         string      `json:"via"`
+			Total       int64       `json:"total"`
+		}
+		if err := c.ShouldBindJSON(&req); err == nil {
+			trxID = fmt.Sprintf("%v", req.TrxID)
+			referenceID = req.ReferenceID
+			status = req.Status
+			via = req.Via
+			total = req.Total
+			switch v := req.StatusCode.(type) {
+			case float64:
+				statusCode = int(v)
+			case string:
+				statusCode, _ = strconv.Atoi(v)
+			}
+		}
 	}
 
-	var req struct {
-		ID             string `json:"id" binding:"required,max=255"`
-		ExternalID     string `json:"external_id" binding:"max=255"`
-		Status         string `json:"status" binding:"required,max=50"`
-		PaymentMethod  string `json:"payment_method" binding:"max=100"`
-		PaymentChannel string `json:"payment_channel" binding:"max=100"`
-		Amount         int64  `json:"amount" binding:"gte=0"`
-		Currency       string `json:"currency" binding:"max=10"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	if via == "" {
+		via = "iPaymu Payment"
 	}
 
-	payMethod := req.PaymentMethod
-	if payMethod == "" && req.PaymentChannel != "" {
-		payMethod = req.PaymentChannel
-	}
-	if payMethod == "" {
-		payMethod = "Xendit Payment"
+	paymentStatus := "PENDING"
+	if statusCode == 1 || strings.ToLower(status) == "berhasil" {
+		paymentStatus = "PAID"
+	} else if statusCode == 6 || strings.ToLower(status) == "batal" || strings.ToLower(status) == "expired" {
+		paymentStatus = "EXPIRED"
 	}
 
-	err := ctrl.service.UpdateStatusByWebhook(req.ID, req.ExternalID, req.Status, payMethod, req.Amount, req.Currency)
+	err := ctrl.service.UpdateStatusByWebhook(trxID, referenceID, paymentStatus, via, total, "IDR")
 	if err != nil {
+		log.Printf("[iPaymu Webhook Error] %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Webhook belum dapat diproses"})
 		return
 	}
