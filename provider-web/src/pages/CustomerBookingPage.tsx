@@ -3,6 +3,22 @@ import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { ArrowLeft, User, Mail, Phone, Calendar, Users, ShieldAlert, CheckCircle2, AlertCircle } from 'lucide-react';
 
+// Tanggal hari ini (zona waktu lokal) dalam format YYYY-MM-DD untuk validasi tanggal lahir
+const getTodayIso = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
+// Mengembalikan pesan error tanggal lahir, atau '' jika valid (tidak di masa depan & >= 1900-01-01)
+const getBirthDateError = (value: string, label: string) => {
+  if (!value) return `Tanggal lahir ${label} wajib diisi.`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || isNaN(new Date(value).getTime()) || value < '1900-01-01') {
+    return `Tanggal lahir ${label} tidak valid.`;
+  }
+  if (value > getTodayIso()) return `Tanggal lahir ${label} tidak boleh berada di masa depan.`;
+  return '';
+};
+
 interface Participant {
   nama: string;
   hp: string;
@@ -37,8 +53,8 @@ export const CustomerBookingPage: React.FC = () => {
   const [pemesanPhone, setPemesanPhone] = useState(() => 
     customerProfile?.whatsapp || activeFormData?.pemesan?.whatsapp || ''
   );
-  const [pemesanBirthDate, setPemesanBirthDate] = useState(() => customerProfile?.birthDate || activeFormData?.peserta?.[0]?.tanggalLahir || '1998-05-15');
-  const [pemesanGender, setPemesanGender] = useState(() => customerProfile?.gender || activeFormData?.peserta?.[0]?.gender || 'Laki-laki');
+  const [pemesanBirthDate, setPemesanBirthDate] = useState(() => customerProfile?.birthDate || activeFormData?.peserta?.[0]?.tanggalLahir || '');
+  const [pemesanGender, setPemesanGender] = useState(() => customerProfile?.gender || activeFormData?.peserta?.[0]?.gender || '');
 
   // Checkbox state: Peserta 1 sama dengan Pemesan (Do NOT auto-check!)
   const [isSameAsPemesan, setIsSameAsPemesan] = useState(() => {
@@ -56,9 +72,9 @@ export const CustomerBookingPage: React.FC = () => {
       return activeFormData.peserta.map(p => ({
         nama: p.nama || '',
         hp: p.hp || '',
-        gender: p.gender || 'Laki-laki',
-        tanggalLahir: p.tanggalLahir || '2000-01-01',
-        riwayatPenyakit: p.riwayatPenyakit || 'Tidak Ada'
+        gender: p.gender || '',
+        tanggalLahir: p.tanggalLahir || '',
+        riwayatPenyakit: p.riwayatPenyakit || ''
       }));
     }
     return [];
@@ -80,10 +96,10 @@ export const CustomerBookingPage: React.FC = () => {
         setPemesanPhone(customerProfile.whatsapp || '');
       }
       if (customerProfile.birthDate) {
-        setPemesanBirthDate(customerProfile.birthDate || '1998-05-15');
+        setPemesanBirthDate(customerProfile.birthDate);
       }
       if (customerProfile.gender) {
-        setPemesanGender(customerProfile.gender || 'Laki-laki');
+        setPemesanGender(customerProfile.gender);
       }
     }
   }, [customerProfile]);
@@ -98,9 +114,9 @@ export const CustomerBookingPage: React.FC = () => {
           updated.push({
             nama: isFirst && customerProfile ? (customerProfile.picName || customerProfile.businessName || '') : '',
             hp: isFirst && customerProfile ? (customerProfile.whatsapp || '') : '',
-            gender: isFirst && customerProfile ? (customerProfile.gender || 'Laki-laki') : 'Laki-laki',
-            tanggalLahir: isFirst && customerProfile ? (customerProfile.birthDate || '2000-01-01') : '2000-01-01',
-            riwayatPenyakit: 'Tidak Ada'
+            gender: isFirst && customerProfile ? (customerProfile.gender || '') : '',
+            tanggalLahir: isFirst && customerProfile ? (customerProfile.birthDate || '') : '',
+            riwayatPenyakit: ''
           });
         }
       } else if (updated.length > guestsCount) {
@@ -120,7 +136,7 @@ export const CustomerBookingPage: React.FC = () => {
           hp: pemesanPhone,
           gender: pemesanGender,
           tanggalLahir: pemesanBirthDate,
-          riwayatPenyakit: prev[0]?.riwayatPenyakit || 'Tidak Ada'
+          riwayatPenyakit: prev[0]?.riwayatPenyakit || ''
         };
         return copy;
       });
@@ -181,10 +197,14 @@ export const CustomerBookingPage: React.FC = () => {
     }
 
     // Validate Pemesan Birthdate
-    if (!pemesanBirthDate) {
-      newErrors.pemesanBirthDate = 'Tanggal lahir wajib diisi.';
-    } else if (new Date(pemesanBirthDate) > new Date()) {
-      newErrors.pemesanBirthDate = 'Tanggal lahir tidak boleh berada di masa depan.';
+    const pemesanBirthDateError = getBirthDateError(pemesanBirthDate, 'pemesan');
+    if (pemesanBirthDateError) {
+      newErrors.pemesanBirthDate = pemesanBirthDateError;
+    }
+
+    // Validate Pemesan Gender
+    if (pemesanGender !== 'Laki-laki' && pemesanGender !== 'Perempuan') {
+      newErrors.pemesanGender = 'Jenis kelamin pemesan wajib dipilih.';
     }
 
     // Validate Participants
@@ -197,6 +217,15 @@ export const CustomerBookingPage: React.FC = () => {
 
       if (!p.hp || !/^(08|62)\d{8,12}$/.test(p.hp)) {
         newErrors[`p_hp_${idx}`] = `Nomor HP Peserta ${idx + 1} harus diawali 08 atau 62 (10–14 digit angka).`;
+      }
+
+      if (p.gender !== 'Laki-laki' && p.gender !== 'Perempuan') {
+        newErrors[`p_gender_${idx}`] = `Jenis kelamin Peserta ${idx + 1} wajib dipilih.`;
+      }
+
+      const birthDateError = getBirthDateError(p.tanggalLahir, `Peserta ${idx + 1}`);
+      if (birthDateError) {
+        newErrors[`p_tanggalLahir_${idx}`] = birthDateError;
       }
     });
 
@@ -383,6 +412,8 @@ export const CustomerBookingPage: React.FC = () => {
                       type="date"
                       value={pemesanBirthDate}
                       onChange={(e) => setPemesanBirthDate(e.target.value)}
+                      min="1900-01-01"
+                      max={getTodayIso()}
                       required
                       style={{
                         width: '100%',
@@ -416,7 +447,7 @@ export const CustomerBookingPage: React.FC = () => {
                         width: '100%',
                         padding: '12px 14px',
                         borderRadius: '10px',
-                        border: '1px solid #cbd5e1',
+                        border: errors.pemesanGender ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
                         fontSize: '14px',
                         outline: 'none',
                         color: '#0f172a',
@@ -425,9 +456,15 @@ export const CustomerBookingPage: React.FC = () => {
                         boxSizing: 'border-box'
                       }}
                     >
+                      <option value="">Pilih</option>
                       <option value="Laki-laki">Laki-laki</option>
                       <option value="Perempuan">Perempuan</option>
                     </select>
+                    {errors.pemesanGender && (
+                      <span style={{ fontSize: '11.5px', color: '#ef4444', fontWeight: '700', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertCircle size={13} /> {errors.pemesanGender}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -540,7 +577,7 @@ export const CustomerBookingPage: React.FC = () => {
                             width: '100%',
                             padding: '10px 12px',
                             borderRadius: '8px',
-                            border: '1px solid #cbd5e1',
+                            border: errors[`p_gender_${idx}`] ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
                             fontSize: '13px',
                             outline: 'none',
                             color: '#0f172a',
@@ -549,9 +586,15 @@ export const CustomerBookingPage: React.FC = () => {
                             boxSizing: 'border-box'
                           }}
                         >
+                          <option value="">Pilih</option>
                           <option value="Laki-laki">Laki-laki</option>
                           <option value="Perempuan">Perempuan</option>
                         </select>
+                        {errors[`p_gender_${idx}`] && (
+                          <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: '700', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <AlertCircle size={12} /> {errors[`p_gender_${idx}`]}
+                          </span>
+                        )}
                       </div>
 
                       <div>
@@ -560,15 +603,17 @@ export const CustomerBookingPage: React.FC = () => {
                         </label>
                         <input 
                           type="date"
-                          value={p.tanggalLahir || '2000-01-01'}
+                          value={p.tanggalLahir || ''}
                           onChange={(e) => handleParticipantChange(idx, 'tanggalLahir', e.target.value)}
                           disabled={idx === 0 && isSameAsPemesan}
+                          min="1900-01-01"
+                          max={getTodayIso()}
                           required
                           style={{
                             width: '100%',
                             padding: '10px 12px',
                             borderRadius: '8px',
-                            border: '1px solid #cbd5e1',
+                            border: errors[`p_tanggalLahir_${idx}`] ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
                             fontSize: '13px',
                             outline: 'none',
                             color: '#0f172a',
@@ -576,6 +621,11 @@ export const CustomerBookingPage: React.FC = () => {
                             boxSizing: 'border-box'
                           }}
                         />
+                        {errors[`p_tanggalLahir_${idx}`] && (
+                          <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: '700', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <AlertCircle size={12} /> {errors[`p_tanggalLahir_${idx}`]}
+                          </span>
+                        )}
                       </div>
                     </div>
 

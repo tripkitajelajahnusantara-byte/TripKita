@@ -4,8 +4,24 @@ import { useCustomAlert } from '../components/CustomAlertModal';
 import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare } from 'lucide-react';
 import { API_BASE_URL, request } from '../utils/api';
 import { TravelokaCalendarModal } from '../components/TravelokaCalendarModal';
+import { TripImage, PhotoPlaceholder } from '../components/TripImage';
 
-const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
+// Format tanggal lokal ke YYYY-MM-DD (tanpa pergeseran zona waktu UTC)
+const toLocalIsoDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Parse YYYY-MM-DD sebagai tanggal lokal
+const parseLocalIsoDate = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
+// Ambil bagian tanggal (YYYY-MM-DD) dari string tanggal paket, '' bila tidak valid
+const normalizeIsoDate = (value: unknown) => {
+  if (typeof value !== 'string') return '';
+  const iso = value.trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : '';
+};
 
 interface AddOn {
   id: string;
@@ -123,13 +139,20 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const getH7MinDateIso = () => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
-    return d.toISOString().split('T')[0];
+    return toLocalIsoDate(d);
   };
 
   const h7MinDateStr = getH7MinDateIso();
+  const todayIso = toLocalIsoDate(new Date());
 
   const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
-  const isCorporateTrip = pkg.tripType === 'Corporate' || pkg.category === 'Corporate';
+
+  // Periode paket yang diatur mitra (YYYY-MM-DD). Backend menolak tanggal trip di luar periode ini.
+  const pkgStartIso = normalizeIsoDate(pkg.startDate);
+  const pkgEndIso = normalizeIsoDate(pkg.endDate);
+  // Paket selain Open Trip: tanggal paling awal = max(H+7, tanggal mulai paket), paling akhir = tanggal akhir paket
+  const periodMinDateIso = pkgStartIso && pkgStartIso > h7MinDateStr ? pkgStartIso : h7MinDateStr;
+  const periodMaxDateIso = pkgEndIso;
 
   const minRequiredGuests = Math.max(1, Number(pkg.minGuests) || 1);
 
@@ -138,7 +161,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
 
   const [customStartDate, setCustomStartDate] = useState<string>(
-    pkg.bookingDate && pkg.bookingDate.length === 10 && pkg.bookingDate >= h7MinDateStr ? pkg.bookingDate : h7MinDateStr
+    pkg.bookingDate && pkg.bookingDate.length === 10 && pkg.bookingDate >= periodMinDateIso ? pkg.bookingDate : periodMinDateIso
   );
 
   const [customEndDate, setCustomEndDate] = useState<string>(customStartDate);
@@ -154,7 +177,12 @@ export const CustomerPackageDetailPage: React.FC = () => {
     : [];
   const restrictsDates = currentPkgAvailableDates.length > 0;
   const isSelectedDateClosed =
-    restrictsDates && !!customStartDate && !currentPkgAvailableDates.includes(customStartDate);
+    !isOpenTrip && restrictsDates && !!customStartDate && !currentPkgAvailableDates.includes(customStartDate);
+
+  // Tanggal mulai di luar periode paket (sebelum startDate atau setelah endDate)
+  const isDateOutsidePeriod = !isOpenTrip && !!customStartDate && (
+    (!!pkgStartIso && customStartDate < pkgStartIso) || (!!pkgEndIso && customStartDate > pkgEndIso)
+  );
 
   const getBookedDatesInSelectedRange = (startIso: string, endIso: string, bookedList: string[]) => {
     if (!startIso || !endIso) return [];
@@ -181,90 +209,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
   
   const totalQuotaMax = Math.max(0, Number(pkg.quotaMax) || 0);
 
-  const getDestinationDefaults = (nameStr: string): string[] => {
-    const nameLower = nameStr.toLowerCase();
-    if (nameLower.includes('bromo')) {
-      return [
-        'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?auto=format&fit=crop&w=1200&q=80'
-      ];
-    }
-    if (nameLower.includes('tidung')) {
-      return [
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1506953711105-89bf2347e221?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1471922694854-ff24a5692694?auto=format&fit=crop&w=1200&q=80'
-      ];
-    }
-    if (nameLower.includes('cilember')) {
-      return [
-        'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80'
-      ];
-    }
-    if (nameLower.includes('bandung')) {
-      return [
-        'https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80'
-      ];
-    }
-    if (nameLower.includes('ranu') || nameLower.includes('kumbolo')) {
-      return [
-        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80'
-      ];
-    }
-    if (nameLower.includes('baduy')) {
-      return [
-        'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80'
-      ];
-    }
-    if (nameLower.includes('palu') || nameLower.includes('tanjung karang')) {
-      return [
-        'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1471922694854-ff24a5692694?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1506953711105-89bf2347e221?auto=format&fit=crop&w=1200&q=80'
-      ];
-    }
-    if (nameLower.includes('yogyakarta') || nameLower.includes('jogja')) {
-      return [
-        'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80'
-      ];
-    }
-    return [
-      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80',
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
-      'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1200&q=80',
-      'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80',
-      'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1200&q=80'
-    ];
-  };
-
-  const getGalleryImages = (name: string): string[] => {
+  // Hanya foto asli yang diunggah mitra; tidak ada foto stok pengganti
+  const getGalleryImages = (): string[] => {
     const formatUrl = (url: string) => {
       if (!url) return '';
       const trimmed = url.trim();
@@ -291,28 +237,19 @@ export const CustomerPackageDetailPage: React.FC = () => {
       if (formatted) rawList = [formatted];
     }
 
-    if (rawList.length > 0) {
-      const defaults = getDestinationDefaults(name);
-      while (rawList.length < 3) {
-        const fallback = defaults[rawList.length % defaults.length] || FALLBACK_IMAGE;
-        rawList.push(fallback);
-      }
-      return rawList;
-    }
-
-    return getDestinationDefaults(name);
+    return rawList;
   };
 
   const photos = (() => {
     let images: string[] = [];
-    if (pkg.images && pkg.images.trim()) {
+    if (typeof pkg.images === 'string' && pkg.images.trim()) {
       images = pkg.images.split(',').map((img: string) => img.trim()).filter(Boolean);
     }
     if (images.length === 0 && pkg.image) {
       images = [pkg.image];
     }
     if (images.length === 0) {
-      images = getGalleryImages(pkg.name);
+      images = getGalleryImages();
     }
     return images;
   })();
@@ -320,55 +257,30 @@ export const CustomerPackageDetailPage: React.FC = () => {
   // Add-on dinonaktifkan sampai katalog dan harga dikelola dari database.
   const addOnsList: AddOn[] = [];
 
-  const getActiveSchedules = () => {
-    const today = new Date();
-    const addDays = (d: Date, days: number) => {
-      const copy = new Date(d);
-      copy.setDate(copy.getDate() + days);
-      return copy;
-    };
-    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+  // Open Trip hanya memiliki SATU keberangkatan yang diatur mitra (startDate..endDate).
+  // endDate kosong/tidak valid -> startDate + durasi - 1.
+  const getOpenTripDeparture = () => {
+    if (!pkgStartIso) return null;
     const durationDays = Math.max(1, Number(pkg.duration) || 1);
-    const formatLabel = (start: Date, days: number) => {
-      const end = addDays(start, days - 1);
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-      return `${start.getDate()} ${months[start.getMonth()]}–${end.getDate()} ${months[end.getMonth()]} ${end.getFullYear()} (${days} Hari)`;
-    };
-
-    // Generate active schedules for 3 full months ahead (12 departure dates)
-    const baseStart = pkg.startDate ? new Date(pkg.startDate) : addDays(today, 3);
-    const validStart = !isNaN(baseStart.getTime()) ? baseStart : addDays(today, 3);
-    const configuredEnd = pkg.endDate ? new Date(pkg.endDate) : null;
-    const validEnd = configuredEnd && !isNaN(configuredEnd.getTime()) ? configuredEnd : null;
-    const schedules = [];
-    for (let i = 0; i < 12; i++) {
-      const tripStart = addDays(validStart, i * 7);
-      if (validEnd && tripStart > validEnd) break;
-      schedules.push({
-        label: formatLabel(tripStart, durationDays),
-        dateValue: formatDate(tripStart)
-      });
+    const start = parseLocalIsoDate(pkgStartIso);
+    let endIso = pkgEndIso;
+    if (!endIso || endIso < pkgStartIso) {
+      const end = new Date(start);
+      end.setDate(end.getDate() + durationDays - 1);
+      endIso = toLocalIsoDate(end);
     }
-    return schedules;
+    const end = parseLocalIsoDate(endIso);
+    const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const label = pkgStartIso === endIso
+      ? `${start.getDate()} ${months[start.getMonth()]} ${start.getFullYear()} (1 Hari)`
+      : `${start.getDate()} ${months[start.getMonth()]}–${end.getDate()} ${months[end.getMonth()]} ${end.getFullYear()} (${totalDays} Hari)`;
+    return { startIso: pkgStartIso, endIso, label };
   };
 
-  const availableSchedules = getActiveSchedules();
-
-  // Pre-select schedule date closest to user's selected bookingDate
-  const [selectedScheduleDate, setSelectedScheduleDate] = useState(
-    pkg.bookingDate || (availableSchedules.length > 0 ? availableSchedules[0].dateValue : '')
-  );
-
-  useEffect(() => {
-    if (pkg.bookingDate) {
-      const match = availableSchedules.find((s: { label: string; dateValue: string }) => s.dateValue >= pkg.bookingDate);
-      if (match) {
-        setSelectedScheduleDate(match.dateValue);
-      }
-    } else if (availableSchedules.length > 0) {
-      setSelectedScheduleDate(availableSchedules[0].dateValue);
-    }
-  }, [pkg.bookingDate, pkg.schedule]);
+  const openTripDeparture = isOpenTrip ? getOpenTripDeparture() : null;
+  const hasUpcomingDeparture = !!openTripDeparture && openTripDeparture.startIso > todayIso;
+  const openTripUnavailable = isOpenTrip && !hasUpcomingDeparture;
 
   if (!selectedPackageForDetail) {
     return (
@@ -381,14 +293,13 @@ export const CustomerPackageDetailPage: React.FC = () => {
     );
   }
 
-  const getScheduleQuotaUsed = (dateStr: string): number => {
-    void dateStr;
-    return Math.max(0, Number(pkg.quotaUsed) || 0);
-  };
-
-  const currentScheduleQuotaUsed = isOpenTrip ? getScheduleQuotaUsed(selectedScheduleDate) : (pkg.quotaUsed || 0);
-  const totalQuotaUsed = currentScheduleQuotaUsed;
+  const totalQuotaUsed = Math.max(0, Number(pkg.quotaUsed) || 0);
   const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
+
+  // Pemesanan diblokir bila jadwal/tanggal tidak valid
+  const dateBlocked = isOpenTrip
+    ? openTripUnavailable
+    : (isRangeBooked || isSelectedDateClosed || isDateOutsidePeriod);
 
   const toggleAddOn = (id: string) => {
     setSelectedAddOnIds(prev =>
@@ -470,6 +381,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
   };
 
   const continueBooking = () => {
+    if (openTripUnavailable) {
+      showAlert({ type: 'warning', title: 'Belum Ada Jadwal', message: 'Belum ada jadwal keberangkatan yang akan datang untuk Open Trip ini.' });
+      return;
+    }
     if (availableSeats <= 0) {
       showAlert({ type: 'warning', title: 'Kuota Habis', message: 'Maaf, kuota untuk paket ini telah habis. Silakan pilih paket wisata lain.' });
       return;
@@ -490,13 +405,18 @@ export const CustomerPackageDetailPage: React.FC = () => {
       showAlert({ type: 'error', title: 'Tanggal Tidak Dibuka', message: `Penyelenggara tidak membuka tanggal ${formatDateIndoFull(customStartDate)} untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.` });
       return;
     }
+    if (isDateOutsidePeriod) {
+      showAlert({ type: 'warning', title: 'Di Luar Periode Paket', message: `Tanggal ${formatDateIndoFull(customStartDate)} berada di luar periode paket${pkgStartIso ? ` (${formatDateIndoFull(pkgStartIso)}${pkgEndIso ? ` - ${formatDateIndoFull(pkgEndIso)}` : ''})` : ''}. Silakan pilih tanggal lain pada kalender.` });
+      return;
+    }
     if (!isOpenTrip && customStartDate < h7MinDateStr) {
       showAlert({ type: 'warning', title: 'Pemesanan Wajib H-7', message: `Pemesanan paket ${pkg.tripType || 'ini'} wajib H-7 sebelum keberangkatan. Tanggal paling awal yang dapat dipesan adalah ${formatDateIndoFull(h7MinDateStr)}.` });
       return;
     }
     // Generate ISO string to match what's expected in booking
-    const finalBookingDate = (isOpenTrip || isCorporateTrip)
-      ? (customStartDate || selectedScheduleDate)
+    // Open Trip: kirim tanggal mulai keberangkatan yang ditetapkan mitra
+    const finalBookingDate = isOpenTrip
+      ? (openTripDeparture?.startIso || '')
       : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`;
     
     if (!finalBookingDate) {
@@ -550,17 +470,22 @@ export const CustomerPackageDetailPage: React.FC = () => {
         {/* Dynamic Photo Gallery Grid */}
         {(() => {
           const count = photos.length;
-          if (count === 0) return null;
+          if (count === 0) {
+            return (
+              <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)', height: '378px' }}>
+                <PhotoPlaceholder iconSize={48} />
+              </div>
+            );
+          }
 
           if (count === 1) {
             return (
               <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)', height: '378px' }}>
                 <div onClick={() => openLightbox(0)} style={{ width: '100%', height: '100%', cursor: 'pointer', overflow: 'hidden' }}>
-                  <img 
+                  <TripImage 
                     src={photos[0]} 
                     alt="Main preview" 
                     style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }}
-                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
                   />
                 </div>
               </div>
@@ -573,11 +498,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
                   {photos.map((imgUrl, idx) => (
                     <div key={idx} onClick={() => openLightbox(idx)} style={{ cursor: 'pointer', overflow: 'hidden' }}>
-                      <img 
+                      <TripImage 
                         src={imgUrl} 
                         alt={`Preview ${idx + 1}`} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />
                     </div>
                   ))}
@@ -591,27 +515,24 @@ export const CustomerPackageDetailPage: React.FC = () => {
               <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
                   <div onClick={() => openLightbox(0)} style={{ gridColumn: '1 / 2', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img 
+                    <TripImage 
                       src={photos[0]} 
                       alt="Main preview" 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </div>
                   <div onClick={() => openLightbox(1)} style={{ gridColumn: '2 / 3', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img 
+                    <TripImage 
                       src={photos[1]} 
                       alt="Sub 1" 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </div>
                   <div onClick={() => openLightbox(2)} style={{ gridColumn: '2 / 3', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img 
+                    <TripImage 
                       src={photos[2]} 
                       alt="Sub 2" 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </div>
                 </div>
@@ -624,35 +545,31 @@ export const CustomerPackageDetailPage: React.FC = () => {
               <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
                   <div onClick={() => openLightbox(0)} style={{ gridColumn: '1 / 2', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img 
+                    <TripImage 
                       src={photos[0]} 
                       alt="Main preview" 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </div>
                   <div onClick={() => openLightbox(1)} style={{ gridColumn: '2 / 3', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img 
+                    <TripImage 
                       src={photos[1]} 
                       alt="Sub 1" 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </div>
                   <div onClick={() => openLightbox(2)} style={{ gridColumn: '2 / 3', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img 
+                    <TripImage 
                       src={photos[2]} 
                       alt="Sub 2" 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </div>
                   <div onClick={() => openLightbox(3)} style={{ gridColumn: '3 / 4', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                    <img 
+                    <TripImage 
                       src={photos[3]} 
                       alt="Sub 3" 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </div>
                 </div>
@@ -665,43 +582,38 @@ export const CustomerPackageDetailPage: React.FC = () => {
             <div style={{ borderRadius: '20px', overflow: 'hidden', marginBottom: '30px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
               <div className="detail-gallery-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridTemplateRows: '185px 185px', gap: '8px', height: '378px', backgroundColor: '#e2e8f0' }}>
                 <div onClick={() => openLightbox(0)} style={{ gridColumn: '1 / 2', gridRow: '1 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                  <img 
+                  <TripImage 
                     src={photos[0]} 
                     alt="Main preview" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </div>
                 <div onClick={() => openLightbox(1)} style={{ gridColumn: '2 / 3', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
-                  <img 
+                  <TripImage 
                     src={photos[1]} 
                     alt="Sub 1" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </div>
                 <div onClick={() => openLightbox(2)} style={{ gridColumn: '2 / 3', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden' }}>
-                  <img 
+                  <TripImage 
                     src={photos[2]} 
                     alt="Sub 2" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </div>
                 <div onClick={() => openLightbox(3)} style={{ gridColumn: '3 / 4', gridRow: '1 / 2', cursor: 'pointer', overflow: 'hidden' }}>
-                  <img 
+                  <TripImage 
                     src={photos[3]} 
                     alt="Sub 3" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </div>
                 <div onClick={() => openLightbox(4)} style={{ gridColumn: '3 / 4', gridRow: '2 / 3', cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
-                  <img 
+                  <TripImage 
                     src={photos[4]} 
                     alt="Sub 4" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                   <div 
                     style={{
@@ -1174,28 +1086,21 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   Jadwal Keberangkatan (Open Trip)
                 </label>
                 
-                <select
-                  value={selectedScheduleDate}
-                  onChange={(e) => setSelectedScheduleDate(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #007bff',
-                    fontSize: '13.5px',
-                    fontWeight: '700',
-                    color: '#0f172a',
-                    backgroundColor: '#ffffff',
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {availableSchedules.map((sch: { label: string; dateValue: string }) => (
-                    <option key={sch.dateValue} value={sch.dateValue}>
-                      {sch.label}
-                    </option>
-                  ))}
-                </select>
+                {hasUpcomingDeparture && openTripDeparture ? (
+                  <div style={{ padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #007bff', fontSize: '13.5px', fontWeight: '700', color: '#0f172a', backgroundColor: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Calendar size={15} color="#007bff" /> {openTripDeparture.label}
+                  </div>
+                ) : (
+                  <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '10px 12px', borderRadius: '8px', color: '#92400e', fontSize: '12px', fontWeight: '700', lineHeight: '1.5' }}>
+                    ⚠️ Belum ada jadwal keberangkatan yang akan datang untuk Open Trip ini.
+                  </div>
+                )}
+
+                {hasUpcomingDeparture && typeof pkg.schedule === 'string' && pkg.schedule.trim() && (
+                  <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-line' }}>
+                    {pkg.schedule.trim()}
+                  </p>
+                )}
 
                 {(() => {
                   const quotaMin = Math.max(1, Number(pkg.quotaMin) || 1);
@@ -1203,7 +1108,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   const quotaShortage = Math.max(0, quotaMin - quotaUsed);
 
                   // If quota is fulfilled (e.g. 4/4 or 5/4), hide notification completely
-                  if (quotaUsed >= quotaMin) return null;
+                  if (!hasUpcomingDeparture || quotaUsed >= quotaMin) return null;
 
                   return (
                     <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fffbebfb', border: '1px solid #fde68a', borderRadius: '10px', fontSize: '12px', color: '#92400e', fontWeight: '700', lineHeight: '1.5' }}>
@@ -1221,22 +1126,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     </div>
                   );
                 })()}
-              </div>
-            ) : isCorporateTrip ? (
-              <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', border: '1px solid #dbeafe' }}>
-                <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-                  Jadwal Keberangkatan (Corporate Trip)
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #007bff' }}>
-                  <div>
-                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Tanggal Mulai</span>
-                    <strong style={{ fontSize: '13px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Tanggal Selesai</span>
-                    <strong style={{ fontSize: '13px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
-                  </div>
-                </div>
               </div>
             ) : (
               <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', border: '1px solid #dbeafe' }}>
@@ -1258,7 +1147,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     padding: '12px 14px',
                     borderRadius: '10px',
                     backgroundColor: '#ffffff',
-                    border: isRangeBooked ? '2px solid #ef4444' : '2px solid #007bff',
+                    border: (isRangeBooked || isDateOutsidePeriod) ? '2px solid #ef4444' : '2px solid #007bff',
                     textAlign: 'left',
                     cursor: 'pointer',
                     boxShadow: '0 2px 8px rgba(0,123,255,0.08)',
@@ -1285,6 +1174,18 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     </div>
                   </div>
                 </button>
+
+                {(pkgStartIso || pkgEndIso) && (
+                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', display: 'block', marginTop: '8px' }}>
+                    Periode paket: {pkgStartIso ? formatDateIndoFull(pkgStartIso) : '-'} s/d {pkgEndIso ? formatDateIndoFull(pkgEndIso) : 'tanpa batas'}
+                  </span>
+                )}
+
+                {isDateOutsidePeriod && (
+                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '10px 12px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
+                    ❌ Tanggal {formatDateIndoFull(customStartDate)} berada di luar periode paket. Silakan pilih tanggal mulai antara {formatDateIndoFull(periodMinDateIso)}{periodMaxDateIso ? ` dan ${formatDateIndoFull(periodMaxDateIso)}` : ''} pada kalender.
+                  </div>
+                )}
 
                 {isSelectedDateClosed && !isRangeBooked && (
                   <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '10px 12px', borderRadius: '8px', color: '#92400e', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
@@ -1379,24 +1280,26 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Pesan Sekarang Button (Directly Visible!) */}
             <button
               onClick={handleBookNow}
-              disabled={availableSeats <= 0 || guestsCount > availableSeats || isSelectedDateClosed || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)}
+              disabled={availableSeats <= 0 || guestsCount > availableSeats || dateBlocked}
               style={{
                 width: '100%',
                 padding: '14px',
-                backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? '#94a3b8' : '#007bff',
+                backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || dateBlocked) ? '#94a3b8' : '#007bff',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '15px',
                 fontWeight: '700',
-                cursor: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? 'not-allowed' : 'pointer',
-                boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
+                cursor: (availableSeats <= 0 || guestsCount > availableSeats || dateBlocked) ? 'not-allowed' : 'pointer',
+                boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || dateBlocked) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
                 transition: 'all 0.2s'
               }}
             >
               {availableSeats <= 0 ? 'Kuota Habis (Tidak Bisa Dipesan)' :
                guestsCount > availableSeats ? 'Peserta Melebihi Kuota' :
-               (!(isOpenTrip || isCorporateTrip) && isRangeBooked) ? 'Tanggal Terbooking (Tidak Tersedia)' : 'Pesan Sekarang'}
+               openTripUnavailable ? 'Belum Ada Jadwal Keberangkatan' :
+               (!isOpenTrip && isRangeBooked) ? 'Tanggal Terbooking (Tidak Tersedia)' :
+               dateBlocked ? 'Tanggal Tidak Tersedia' : 'Pesan Sekarang'}
             </button>
 
           </div>
@@ -1432,21 +1335,21 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
         <button
           onClick={handleBookNow}
-          disabled={availableSeats <= 0 || guestsCount > availableSeats || isSelectedDateClosed || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)}
+          disabled={availableSeats <= 0 || guestsCount > availableSeats || dateBlocked}
           style={{
             padding: '12px 24px',
-            backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? '#94a3b8' : '#007bff',
+            backgroundColor: (availableSeats <= 0 || guestsCount > availableSeats || dateBlocked) ? '#94a3b8' : '#007bff',
             color: '#ffffff',
             border: 'none',
             borderRadius: '12px',
             fontSize: '14.5px',
             fontWeight: '700',
-            cursor: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? 'not-allowed' : 'pointer',
-            boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || (!(isOpenTrip || isCorporateTrip) && isRangeBooked)) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
+            cursor: (availableSeats <= 0 || guestsCount > availableSeats || dateBlocked) ? 'not-allowed' : 'pointer',
+            boxShadow: (availableSeats <= 0 || guestsCount > availableSeats || dateBlocked) ? 'none' : '0 4px 12px rgba(0, 123, 255, 0.3)',
             whiteSpace: 'nowrap'
           }}
         >
-          {availableSeats <= 0 ? 'Kuota Habis' : 'Pesan Sekarang'}
+          {availableSeats <= 0 ? 'Kuota Habis' : openTripUnavailable ? 'Belum Ada Jadwal' : 'Pesan Sekarang'}
         </button>
       </div>
 
@@ -1497,11 +1400,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
           {/* Main Enlarged Image */}
           <div style={{ position: 'relative', maxWidth: '900px', maxHeight: '70vh', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img 
+            <TripImage 
               src={photos[lightboxPhotoIdx]} 
               alt={`Gallery ${lightboxPhotoIdx + 1}`}
               style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '12px', objectFit: 'contain', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
-              onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
             />
 
             {/* Prev Arrow */}
@@ -1563,11 +1465,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   opacity: lightboxPhotoIdx === i ? 1 : 0.6
                 }}
               >
-                <img 
+                <TripImage 
                   src={img} 
                   alt={`Thumbnail ${i + 1}`} 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                  onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </div>
             ))}
@@ -1588,7 +1489,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
         }}
         bookedDates={currentPkgBookedDates}
         availableDates={currentPkgAvailableDates}
-        minDateIso={h7MinDateStr}
+        minDateIso={periodMinDateIso}
+        maxDateIso={periodMaxDateIso || undefined}
         tripType={pkg.tripType}
         durationDays={pkg.duration}
       />

@@ -35,8 +35,11 @@ type Booking struct {
 	CreatedAt        time.Time  `json:"createdAt"`
 	UpdatedAt        time.Time  `json:"updatedAt"`
 	SelectedAddOnIDs []string   `gorm:"-" json:"-"`
-	ProviderWhatsApp string     `gorm:"->;-:migration" json:"providerWhatsApp,omitempty"`
-	ProviderName     string     `gorm:"->;-:migration" json:"providerName,omitempty"`
+	// Participants hanya dimuat pada endpoint mitra pemilik paket dan
+	// customer pemilik booking; endpoint publik tidak menyertakannya.
+	Participants     []BookingParticipant `gorm:"foreignKey:BookingID;constraint:OnDelete:CASCADE" json:"participants,omitempty"`
+	ProviderWhatsApp string               `gorm:"->;-:migration" json:"providerWhatsApp,omitempty"`
+	ProviderName     string               `gorm:"->;-:migration" json:"providerName,omitempty"`
 }
 
 const (

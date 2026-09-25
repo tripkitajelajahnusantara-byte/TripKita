@@ -34,8 +34,8 @@ export const CustomerHelpPage: React.FC = () => {
     {
       id: 'faq-2',
       category: 'pembayaran',
-      question: 'Bagaimana skema pembayaran DP 50% & Pelunasan bekerja?',
-      answer: 'Untuk menjamin keamanan transaksi Anda dan kenyamanan mitra provider, pembayaran dilakukan dalam 2 tahap: DP 50% dibayarkan saat memesan awal, dan sisa 50% dilunasi saat perjalanan wisata telah selesai dilaksanakan.'
+      question: 'Bagaimana skema pembayaran di TemenTrip?',
+      answer: 'Pembayaran dilakukan penuh di muka melalui satu invoice Xendit, tanpa uang muka (DP). Invoice berlaku 24 jam sejak pesanan dibuat. Untuk melindungi Anda, TripKita menahan separuh bagian mitra provider sampai perjalanan wisata selesai dilaksanakan.'
     },
     {
       id: 'faq-3',
@@ -87,14 +87,14 @@ export const CustomerHelpPage: React.FC = () => {
         <div className="container help-hero-container">
           <span className="help-hero-tag">PUSAT BANTUAN TEMENTRIP</span>
           <h1>Ada yang Bisa Kami Bantu?</h1>
-          <p>Temukan jawaban lengkap atas pertanyaan seputar pemesanan paket wisata, skema pembayaran DP 50%, akses grup WA, dan layanan pelanggan TemenTrip.</p>
+          <p>Temukan jawaban lengkap atas pertanyaan seputar pemesanan paket wisata, skema pembayaran, akses grup WA, dan layanan pelanggan TemenTrip.</p>
 
           {/* Search Box */}
           <div className="help-search-box">
             <Search size={20} color="#0284c7" />
             <input 
               type="text" 
-              placeholder="Cari pertanyaan... (contoh: cara bayar, DP 50%, refund, provider)"
+              placeholder="Cari pertanyaan... (contoh: cara bayar, refund, provider)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -118,7 +118,7 @@ export const CustomerHelpPage: React.FC = () => {
             </div>
             <div className={`category-card ${activeCategory === 'pembayaran' ? 'active' : ''}`} onClick={() => setActiveCategory('pembayaran')}>
               <div className="cat-icon bg-purple"><CreditCard size={22} color="#8b5cf6" /></div>
-              <h3>Pembayaran & DP 50%</h3>
+              <h3>Pembayaran & Refund</h3>
               <p>Xendit QRIS & Bank Transfer</p>
             </div>
             <div className={`category-card ${activeCategory === 'refund' ? 'active' : ''}`} onClick={() => setActiveCategory('refund')}>

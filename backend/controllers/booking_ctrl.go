@@ -163,6 +163,9 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 		Guests          int       `json:"guests" binding:"required,gt=0"`
 		TripDate        time.Time `json:"tripDate" binding:"required"`
 		AddOnIDs        []string  `json:"addOnIds" binding:"max=10,dive,max=50"`
+		// Participants bersifat opsional agar klien lama tetap dapat checkout;
+		// bila dikirim, jumlahnya divalidasi terhadap jumlah tamu di service.
+		Participants []models.BookingParticipantInput `json:"participants" binding:"max=100,dive"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -184,6 +187,15 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 		TripDate:         req.TripDate,
 		PaymentMethod:    "Xendit Invoice",
 		SelectedAddOnIDs: req.AddOnIDs,
+	}
+	for _, p := range req.Participants {
+		booking.Participants = append(booking.Participants, models.BookingParticipant{
+			Name:         p.Name,
+			Phone:        p.Phone,
+			Gender:       p.Gender,
+			BirthDate:    p.BirthDate,
+			MedicalNotes: p.MedicalNotes,
+		})
 	}
 	if role, _ := c.Get("role"); role == "CUSTOMER" {
 		if customerID, exists := c.Get("provider_id"); exists {
@@ -213,6 +225,15 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, booking)
+}
+
+// GetCheckoutConfig memberi web dan aplikasi mobile angka checkout yang sama
+// dengan perhitungan backend, agar ringkasan pembayaran tidak menebak sendiri.
+func (ctrl *BookingController) GetCheckoutConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"serviceFee":           models.BookingServiceFee,
+		"paymentWindowSeconds": int(models.PaymentWindow.Seconds()),
+	})
 }
 
 func (ctrl *BookingController) CustomerCancelBooking(c *gin.Context) {

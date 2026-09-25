@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
+import { getTripImage } from '../utils/tripImages';
+import { TripImage } from '../components/TripImage';
 import type { TripPlan, TripChecklistItem, TripSavingsLog, PackageItem } from '../types';
 import { 
   Target, Calendar, Users, Wallet, CheckCircle2, Circle, Sparkles, Compass, 
@@ -100,107 +102,11 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
   };
 };
 
-const CATALOG_PACKAGES: PackageItem[] = [
-  {
-    id: 'pkg_palu',
-    name: 'Open Trip Palu & Teluk Tomini 3D2N',
-    destination: 'Palu, Sulawesi Tengah',
-    price: 'Rp 1.450.000',
-    quota: '10 Pax',
-    schedule: 'Tersedia tiap weekend',
-    status: 'Aktif',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600',
-    tripType: 'Open Trip'
-  },
-  {
-    id: 'pkg_rajaampat',
-    name: 'Private Trip Wisata Raja Ampat 4D3N',
-    destination: 'Raja Ampat, Papua Barat',
-    price: 'Rp 3.850.000',
-    quota: '8 Pax',
-    schedule: 'Fleksibel',
-    status: 'Aktif',
-    rating: 5.0,
-    image: 'https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600',
-    tripType: 'Private Trip'
-  },
-  {
-    id: 'pkg_bali',
-    name: 'Honeymoon Romantic Bali Villa 3D2N',
-    destination: 'Denpasar & Ubud, Bali',
-    price: 'Rp 2.950.000',
-    quota: '2 Pax',
-    schedule: 'Fleksibel',
-    status: 'Aktif',
-    rating: 5.0,
-    image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=600',
-    tripType: 'Honeymoon'
-  },
-  {
-    id: 'pkg_bromo',
-    name: 'Open Trip Gunung Bromo Sunrise',
-    destination: 'Probolinggo, Jawa Timur',
-    price: 'Rp 350.000',
-    quota: '15 Pax',
-    schedule: 'Setiap Hari',
-    status: 'Aktif',
-    rating: 4.8,
-    image: 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=600',
-    tripType: 'Open Trip'
-  },
-  {
-    id: 'pkg_tidung',
-    name: 'Open Trip Pulau Tidung Kepulauan Seribu',
-    destination: 'Kepulauan Seribu, Jakarta',
-    price: 'Rp 450.000',
-    quota: '12 Pax',
-    schedule: 'Setiap Sabtu-Minggu',
-    status: 'Aktif',
-    rating: 4.7,
-    image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600',
-    tripType: 'Open Trip'
-  },
-  {
-    id: 'pkg_cilember',
-    name: 'Trip Curug Cilember & Puncak',
-    destination: 'Bogor, Jawa Barat',
-    price: 'Rp 275.000',
-    quota: '10 Pax',
-    schedule: 'Weekend',
-    status: 'Aktif',
-    rating: 4.6,
-    image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=600',
-    tripType: 'Open Trip'
-  },
-  {
-    id: 'pkg_bandung',
-    name: 'Bandung City Tour & Lembang',
-    destination: 'Bandung, Jawa Barat',
-    price: 'Rp 420.000',
-    quota: '15 Pax',
-    schedule: 'Weekend',
-    status: 'Aktif',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=600',
-    tripType: 'Open Trip'
-  },
-  {
-    id: 'pkg_jogja',
-    name: 'Family Vacation Yogyakarta & Borobudur',
-    destination: 'Yogyakarta, DI Yogyakarta',
-    price: 'Rp 850.000',
-    quota: '15 Pax',
-    schedule: 'Fleksibel',
-    status: 'Aktif',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=600',
-    tripType: 'Family'
-  }
-];
+// Rekomendasi paket hanya berasal dari paket aktif di backend; tidak ada
+// katalog contoh yang tidak dapat dipesan.
 
 export const CustomerTripPlannerPage: React.FC = () => {
-  const { customerProfile, navigateTo } = useNavigation();
+  const { customerProfile, navigateTo, setSelectedPackageForDetail } = useNavigation();
 
   // Storage key linked to customer account
   const storageKey = customerProfile 
@@ -294,20 +200,12 @@ export const CustomerTripPlannerPage: React.FC = () => {
       request('/public/packages')
         .then((data: any) => {
           const apiList: PackageItem[] = Array.isArray(data) ? data : (data?.data || []);
-          const combined = [...apiList];
-          CATALOG_PACKAGES.forEach(catPkg => {
-            if (!combined.some(p => p.id === catPkg.id || p.name === catPkg.name)) {
-              combined.push(catPkg);
-            }
-          });
-
-          const filtered = filterMatchingPackages(combined, activePlan.destination);
-          setMatchingPackages(filtered);
+          const active = apiList.filter(p => !p.status || p.status === 'Aktif');
+          setMatchingPackages(filterMatchingPackages(active, activePlan.destination));
         })
         .catch(err => {
           console.error('Error fetching packages:', err);
-          const filtered = filterMatchingPackages(CATALOG_PACKAGES, activePlan.destination);
-          setMatchingPackages(filtered);
+          setMatchingPackages([]);
         })
         .finally(() => setLoadingPackages(false));
     }
@@ -1527,7 +1425,12 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   {matchingPackages.slice(0, 3).map(pkg => (
                     <div
                       key={pkg.id}
-                      onClick={() => autoSaveDraftAndNavigate('paket-detail')}
+                      onClick={() => {
+                        // Paket yang diklik harus dipilih dulu; tanpa ini halaman
+                        // detail terbuka kosong atau menampilkan paket sebelumnya.
+                        setSelectedPackageForDetail(pkg);
+                        autoSaveDraftAndNavigate('paket-detail');
+                      }}
                       style={{
                         backgroundColor: '#ffffff',
                         borderRadius: '16px',
@@ -1541,7 +1444,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                     >
                       <div style={{ height: '140px', width: '100%', position: 'relative' }}>
-                        <img src={pkg.image || 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600'} alt={pkg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <TripImage src={getTripImage(pkg)} alt={pkg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         <span style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: '#0f8b8d', color: 'white', fontSize: '10px', fontWeight: '800', padding: '3px 8px', borderRadius: '6px' }}>
                           {pkg.tripType || 'Open Trip'}
                         </span>
@@ -1550,8 +1453,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                         <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0', lineHeight: 1.3 }}>{pkg.name}</h4>
                         <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 10px 0' }}>{pkg.destination}</p>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                          <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '800' }}>⭐ {pkg.rating || '5.0'}</span>
-                          <strong style={{ fontSize: '14px', color: '#0f8b8d', fontWeight: '800' }}>{pkg.price}</strong>
+                          <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '800' }}>⭐ {pkg.rating && Number(pkg.rating) > 0 ? Number(pkg.rating).toFixed(1) : 'Baru'}</span>
+                          <strong style={{ fontSize: '14px', color: '#0f8b8d', fontWeight: '800' }}>{typeof pkg.price === 'number' ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(pkg.price) : pkg.price}</strong>
                         </div>
                       </div>
                     </div>

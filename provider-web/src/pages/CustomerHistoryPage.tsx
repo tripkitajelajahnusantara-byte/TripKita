@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
+import { fetchCheckoutConfig } from '../utils/checkoutConfig';
 import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, MessageSquare, Star } from 'lucide-react';
 
 interface BookingItem {
@@ -9,7 +10,9 @@ interface BookingItem {
   customerName: string;
   customerInitial: string;
   packageDetails?: {
+    id?: number;
     name: string;
+    tripType?: string;
     category: string;
     destination: string;
     price: number;
@@ -52,7 +55,11 @@ const getTrustedPaymentURL = (value?: string): string | null => {
   }
 };
 
-const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = ({ createdAt, onExpire }) => {
+// Batas waktu pembayaran invoice. Nilai sebenarnya diambil dari /public/checkout-config;
+// konstanta ini hanya dipakai selama konfigurasi belum termuat.
+const DEFAULT_PAYMENT_WINDOW_SECONDS = 24 * 60 * 60;
+
+const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; onExpire?: () => void }> = ({ createdAt, windowSeconds, onExpire }) => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const onExpireRef = useRef(onExpire);
 
@@ -65,7 +72,7 @@ const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = 
     const createdMs = new Date(createdAt).getTime();
     if (!Number.isFinite(createdMs) || createdMs <= 0) return;
 
-    const expireMs = createdMs + 24 * 60 * 60 * 1000;
+    const expireMs = createdMs + windowSeconds * 1000;
 
     const updateTimer = () => {
       const diff = Math.max(0, Math.floor((expireMs - Date.now()) / 1000));
@@ -82,7 +89,7 @@ const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = 
       if (updateTimer()) clearInterval(interval);
     }, 1000);
     return () => clearInterval(interval);
-  }, [createdAt]);
+  }, [createdAt, windowSeconds]);
 
   const hours = String(Math.floor(timeLeft / 3600)).padStart(2, '0');
   const minutes = String(Math.floor((timeLeft % 3600) / 60)).padStart(2, '0');
@@ -97,7 +104,18 @@ const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = 
 };
 
 export const CustomerHistoryPage: React.FC = () => {
-  const { navigateTo, customerProfile } = useNavigation();
+  const { navigateTo, customerProfile, setSelectedPackageForDetail } = useNavigation();
+
+  // Batas waktu pembayaran dari backend (detik)
+  const [paymentWindowSeconds, setPaymentWindowSeconds] = useState<number>(DEFAULT_PAYMENT_WINDOW_SECONDS);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCheckoutConfig()
+      .then((cfg) => { if (!cancelled) setPaymentWindowSeconds(cfg.paymentWindowSeconds); })
+      .catch((err) => console.error('Failed to load checkout config:', err));
+    return () => { cancelled = true; };
+  }, []);
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -228,7 +246,7 @@ export const CustomerHistoryPage: React.FC = () => {
     if (!createdAt) return false;
     const createdTime = new Date(createdAt).getTime();
     if (isNaN(createdTime)) return false;
-    const expireTime = createdTime + 24 * 60 * 60 * 1000; // 24 Hours Xendit Invoice Limit
+    const expireTime = createdTime + paymentWindowSeconds * 1000; // Batas waktu invoice Xendit
     return Date.now() > expireTime;
   };
 
@@ -693,12 +711,20 @@ export const CustomerHistoryPage: React.FC = () => {
                         </div>
                         
                         <p style={{ fontSize: '13px', color: '#7f1d1d', margin: 0, lineHeight: '1.5' }}>
-                          Batas waktu pembayaran 24 jam untuk transaksi ini telah kadaluwarsa. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.
+                          Batas waktu pembayaran {Math.round(paymentWindowSeconds / 3600)} jam untuk transaksi ini telah kadaluwarsa. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.
                         </p>
 
                         <div style={{ marginTop: '4px' }}>
                           <button
-                            onClick={() => navigateTo('beranda')}
+                            onClick={() => {
+                              // Buka detail paket yang sama bila datanya tersedia
+                              if (booking.packageDetails?.id) {
+                                setSelectedPackageForDetail(booking.packageDetails);
+                                navigateTo('paket-detail');
+                              } else {
+                                navigateTo('beranda');
+                              }
+                            }}
                             style={{
                               display: 'inline-block',
                               backgroundColor: '#dc2626',
@@ -721,7 +747,7 @@ export const CustomerHistoryPage: React.FC = () => {
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                           <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Pembayaran Xendit:</strong>
-                          <CountdownTimer createdAt={booking.createdAt} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
+                          <CountdownTimer createdAt={booking.createdAt} windowSeconds={paymentWindowSeconds} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
                         </div>
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
@@ -730,7 +756,10 @@ export const CustomerHistoryPage: React.FC = () => {
                         
                         <div style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
                           <div style={{ fontSize: '13px', color: '#1e293b', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <div><span style={{ color: '#64748b' }}>Tipe Trip:</span> <strong>{booking.packageDetails?.category || 'Open Trip'}</strong></div>
+                            <div><span style={{ color: '#64748b' }}>Tipe Trip:</span> <strong>{booking.packageDetails?.tripType || 'Open Trip'}</strong></div>
+                            {booking.packageDetails?.category && (
+                              <div><span style={{ color: '#64748b' }}>Kategori:</span> <strong>{booking.packageDetails.category}</strong></div>
+                            )}
                             <div><span style={{ color: '#64748b' }}>Tujuan Trip:</span> <strong>{booking.packageDetails?.destination || tripName}</strong></div>
                             <div><span style={{ color: '#64748b' }}>Nama Pemesan:</span> <strong>{booking.customerName || (customerProfile as any)?.name || 'Pelanggan TripKita'}</strong></div>
                           </div>

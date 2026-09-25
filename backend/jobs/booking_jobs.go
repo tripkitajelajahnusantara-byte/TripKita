@@ -21,7 +21,7 @@ import (
 // permanen, booking yang sudah dibayar pelanggan ikut dikedaluwarsakan padahal
 // dananya sudah diterima.
 func (r *Runner) ExpirePendingBookings(ctx context.Context) {
-	cutoff := time.Now().Add(-24 * time.Hour)
+	cutoff := time.Now().Add(-models.PaymentWindow)
 	var candidates []models.Booking
 	if err := r.db.WithContext(ctx).Select("id", "xendit_invoice_id").
 		Where("status = ? AND created_at < ?", models.StatusPendingPayment, cutoff).

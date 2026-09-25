@@ -15,6 +15,8 @@ interface TravelokaCalendarModalProps {
    */
   availableDates?: string[];
   minDateIso: string;
+  /** Tanggal mulai terakhir yang boleh dipilih (akhir periode paket, YYYY-MM-DD). */
+  maxDateIso?: string;
   tripType?: string;
   durationDays?: number;
 }
@@ -28,6 +30,7 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
   bookedDates,
   availableDates,
   minDateIso,
+  maxDateIso,
   tripType = 'Private Trip',
   durationDays
 }) => {
@@ -112,6 +115,11 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
     return dateIso < minDateIso;
   };
 
+  // Tanggal setelah akhir periode paket tidak dapat dipilih.
+  const isAfterMaxDate = (dateIso: string) => {
+    return !!maxDateIso && dateIso > maxDateIso;
+  };
+
   const restrictsDates = Array.isArray(availableDates) && availableDates.length > 0;
 
   // Tanggal di luar daftar yang dibuka penyelenggara tidak dapat dipilih.
@@ -149,7 +157,7 @@ export const TravelokaCalendarModal: React.FC<TravelokaCalendarModalProps> = ({
             const dateIso = cell.dateIso;
             const inBooked = isBooked(dateIso);
             const closed = isClosed(dateIso);
-            const disabled = isBeforeMinDate(dateIso) || inBooked || closed;
+            const disabled = isBeforeMinDate(dateIso) || isAfterMaxDate(dateIso) || inBooked || closed;
             const isStart = dateIso === startDateIso;
             const isEnd = dateIso === endDateIso;
             const inRange = isDateInRange(dateIso);

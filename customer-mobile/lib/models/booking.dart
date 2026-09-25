@@ -1,186 +1,170 @@
+import 'package:customer_mobile/services/checkout_config.dart';
 import 'package:customer_mobile/models/package.dart';
 
+/// Status pesanan dari backend (`backend/models/booking.go`).
+class BookingStatus {
+  static const pendingPayment = 'PENDING_PAYMENT';
+  static const paid = 'PAID';
+  static const confirmed = 'CONFIRMED';
+  static const completed = 'COMPLETED';
+  static const expired = 'EXPIRED';
+  static const cancelledByCustomer = 'CANCELLED_BY_CUSTOMER';
+  static const cancelledByProvider = 'CANCELLED_BY_PROVIDER';
+  static const refundRequired = 'REFUND_REQUIRED';
+  static const refunded = 'REFUNDED';
+  static const rescheduleOffered = 'RESCHEDULE_OFFERED';
+}
+
+/// Data peserta yang diisi pada form pemesanan.
 class Participant {
-  String fullName;
-  String email;
-  String whatsappNumber;
-  String gender; // Laki-laki, Perempuan
-  String dateOfBirth;
-  String optionalNotes;
+  String name;
+  String phone;
+  String gender;
+  String birthDate;
+  String medicalHistory;
 
   Participant({
-    this.fullName = '',
-    this.email = '',
-    this.whatsappNumber = '',
-    this.gender = 'Laki-laki',
-    this.dateOfBirth = '',
-    this.optionalNotes = '',
+    this.name = '',
+    this.phone = '',
+    this.gender = '',
+    this.birthDate = '',
+    this.medicalHistory = '',
   });
 
-  factory Participant.fromJson(Map<String, dynamic> json) {
-    return Participant(
-      fullName: json['fullName'] as String? ?? '',
-      email: json['email'] as String? ?? '',
-      whatsappNumber: json['whatsappNumber'] as String? ?? '',
-      gender: json['gender'] as String? ?? 'Laki-laki',
-      dateOfBirth: json['dateOfBirth'] as String? ?? '',
-      optionalNotes: json['optionalNotes'] as String? ?? '',
-    );
-  }
-
-  Map<String, dynamic> toJson() {
+  /// Format `participants` pada `POST /public/bookings`.
+  Map<String, dynamic> toApiJson() {
+    final notes = medicalHistory.trim();
     return {
-      'fullName': fullName,
-      'email': email,
-      'whatsappNumber': whatsappNumber,
+      'name': name.trim(),
+      'phone': phone.trim(),
       'gender': gender,
-      'dateOfBirth': dateOfBirth,
-      'optionalNotes': optionalNotes,
+      'birthDate': birthDate,
+      'medicalNotes': notes == '-' || notes.toLowerCase() == 'tidak ada' ? '' : notes,
     };
   }
+
+  Participant copy() => Participant(
+        name: name,
+        phone: phone,
+        gender: gender,
+        birthDate: birthDate,
+        medicalHistory: medicalHistory,
+      );
+}
+
+/// Kontak utama pemesan.
+class BookerContact {
+  final String name;
+  final String email;
+  final String whatsapp;
+
+  const BookerContact({required this.name, required this.email, required this.whatsapp});
+}
+
+/// Pilihan yang dibawa dari halaman detail paket ke form pemesanan.
+class BookingDraft {
+  final TripPackage package;
+  final int guests;
+
+  /// Tanggal berangkat (YYYY-MM-DD).
+  final String startDate;
+
+  /// Tanggal selesai (YYYY-MM-DD).
+  final String endDate;
+
+  /// Label jadwal yang ditampilkan ke pengguna.
+  final String scheduleLabel;
+
+  const BookingDraft({
+    required this.package,
+    required this.guests,
+    required this.startDate,
+    required this.endDate,
+    required this.scheduleLabel,
+  });
+
+  int get packageTotal => package.price * guests;
+  /// Total tagihan dengan biaya layanan dari `CheckoutConfig` backend.
+  int totalWithFee(int serviceFee) => packageTotal + serviceFee;
 }
 
 class Booking {
   final int id;
   final String bookingCode;
-  final int providerId;
   final int packageId;
   final TripPackage? packageDetails;
+  final String packageNameFallback;
   final String customerName;
-  final String customerInitial;
-  final DateTime tripDate;
+  final DateTime? tripDate;
   final int guests;
   final int totalPrice;
-  final int dpAmount;
-  final String paymentMethod;
-  String status; // PENDING_PAYMENT, PAID, CONFIRMED, COMPLETED, CANCELLED, EXPIRED
+  final String status;
   final String paymentUrl;
-  final DateTime createdAt;
-  final List<Participant> participants;
-  bool hasReviewed;
-  double? reviewRating;
-  String? reviewComment;
+  final DateTime? createdAt;
+  final String providerWhatsApp;
+  final String providerName;
+  final DateTime? rescheduleDate;
+  final String cancellationReason;
 
-  DateTime get bookingDate => tripDate;
-
-  Booking({
+  const Booking({
     required this.id,
     required this.bookingCode,
-    required this.providerId,
-    required this.packageId,
+    this.packageId = 0,
     this.packageDetails,
-    required this.customerName,
-    required this.customerInitial,
-    required this.tripDate,
-    required this.guests,
-    required this.totalPrice,
-    required this.dpAmount,
-    required this.paymentMethod,
-    required this.status,
-    required this.paymentUrl,
-    required this.createdAt,
-    required this.participants,
-    this.hasReviewed = false,
-    this.reviewRating,
-    this.reviewComment,
+    this.packageNameFallback = '',
+    this.customerName = '',
+    this.tripDate,
+    this.guests = 0,
+    this.totalPrice = 0,
+    this.status = BookingStatus.pendingPayment,
+    this.paymentUrl = '',
+    this.createdAt,
+    this.providerWhatsApp = '',
+    this.providerName = '',
+    this.rescheduleDate,
+    this.cancellationReason = '',
   });
 
-  static final List<Booking> mockBookings = [
-    Booking(
-      id: 101,
-      bookingCode: 'TK-2824-9988',
-      providerId: 101,
-      packageId: 1,
-      packageDetails: TripPackage.allPackages[0], // Raja Ampat
-      customerName: 'Budi Santoso',
-      customerInitial: 'BS',
-      tripDate: DateTime.now().add(const Duration(days: 5, hours: 6)),
-      guests: 2,
-      totalPrice: 5500000,
-      dpAmount: 0,
-      paymentMethod: 'QRIS',
-      status: 'PAID',
-      paymentUrl: '',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      participants: [
-        Participant(fullName: 'Budi Santoso', email: 'budi.santoso@gmail.com', whatsappNumber: '08123456789', gender: 'Laki-laki', dateOfBirth: '1990-05-15'),
-        Participant(fullName: 'Siti Aminah', email: 'siti.aminah@gmail.com', whatsappNumber: '08129876543', gender: 'Perempuan', dateOfBirth: '1992-08-20'),
-      ],
-    ),
-    Booking(
-      id: 102,
-      bookingCode: 'TK-2824-1122',
-      providerId: 102,
-      packageId: 2,
-      packageDetails: TripPackage.allPackages[1], // Labuan Bajo
-      customerName: 'Budi Santoso',
-      customerInitial: 'BS',
-      tripDate: DateTime.now().subtract(const Duration(days: 10)),
-      guests: 1,
-      totalPrice: 2190000,
-      dpAmount: 0,
-      paymentMethod: 'Virtual Account',
-      status: 'COMPLETED',
-      paymentUrl: '',
-      createdAt: DateTime.now().subtract(const Duration(days: 15)),
-      hasReviewed: false,
-      participants: [
-        Participant(fullName: 'Budi Santoso', email: 'budi.santoso@gmail.com', whatsappNumber: '08123456789', gender: 'Laki-laki', dateOfBirth: '1990-05-15'),
-      ],
-    ),
-  ];
-
   factory Booking.fromJson(Map<String, dynamic> json) {
+    int asInt(Object? v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
+    String asString(Object? v) => v is String ? v : '';
+    DateTime? asDate(Object? v) => v is String && v.isNotEmpty ? DateTime.tryParse(v)?.toLocal() : null;
+
+    final details = json['packageDetails'];
+    final pkg = details is Map<String, dynamic> && asInt(details['id']) > 0 ? TripPackage.fromJson(details) : null;
     return Booking(
-      id: json['id'] as int,
-      bookingCode: json['bookingCode'] as String? ?? '',
-      providerId: json['providerId'] as int,
-      packageId: json['packageId'] as int,
-      packageDetails: json['packageDetails'] != null
-          ? TripPackage.fromJson(json['packageDetails'] as Map<String, dynamic>)
-          : null,
-      customerName: json['customerName'] as String,
-      customerInitial: json['customerInitial'] as String? ?? '',
-      tripDate: DateTime.parse(json['tripDate'] as String),
-      guests: json['guests'] as int,
-      totalPrice: (json['totalPrice'] as num).toInt(),
-      dpAmount: (json['dpAmount'] as num? ?? 0).toInt(),
-      paymentMethod: json['paymentMethod'] as String? ?? '',
-      status: json['status'] as String? ?? 'PENDING_PAYMENT',
-      paymentUrl: json['paymentUrl'] as String? ?? '',
-      createdAt: DateTime.parse(json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
-      participants: json['participants'] != null
-          ? (json['participants'] as List)
-              .map((p) => Participant.fromJson(p as Map<String, dynamic>))
-              .toList()
-          : [],
-      hasReviewed: json['hasReviewed'] as bool? ?? false,
-      reviewRating: json['reviewRating'] != null ? (json['reviewRating'] as num).toDouble() : null,
-      reviewComment: json['reviewComment'] as String?,
+      id: asInt(json['id']),
+      bookingCode: asString(json['bookingCode']).isNotEmpty ? asString(json['bookingCode']) : asString(json['booking_code']),
+      packageId: asInt(json['packageId']),
+      packageDetails: pkg,
+      packageNameFallback: details is Map ? asString(details['name']) : asString(json['packageName']),
+      customerName: asString(json['customerName']),
+      tripDate: asDate(json['tripDate']),
+      guests: asInt(json['guests']),
+      totalPrice: asInt(json['totalPrice']),
+      status: asString(json['status']).isEmpty ? BookingStatus.pendingPayment : asString(json['status']),
+      paymentUrl: asString(json['paymentUrl']).isNotEmpty ? asString(json['paymentUrl']) : asString(json['payment_url']),
+      createdAt: asDate(json['createdAt']),
+      providerWhatsApp: asString(json['providerWhatsApp']),
+      providerName: asString(json['providerName']),
+      rescheduleDate: asDate(json['rescheduleDate']),
+      cancellationReason: asString(json['cancellationReason']),
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'bookingCode': bookingCode,
-      'providerId': providerId,
-      'packageId': packageId,
-      'packageDetails': packageDetails?.toJson(),
-      'customerName': customerName,
-      'customerInitial': customerInitial,
-      'tripDate': tripDate.toIso8601String(),
-      'guests': guests,
-      'totalPrice': totalPrice,
-      'dpAmount': dpAmount,
-      'paymentMethod': paymentMethod,
-      'status': status,
-      'paymentUrl': paymentUrl,
-      'createdAt': createdAt.toIso8601String(),
-      'participants': participants.map((p) => p.toJson()).toList(),
-      'hasReviewed': hasReviewed,
-      'reviewRating': reviewRating,
-      'reviewComment': reviewComment,
-    };
+  String get packageName =>
+      packageDetails?.name ?? (packageNameFallback.isNotEmpty ? packageNameFallback : 'Paket Wisata Nusantara');
+
+  DateTime? get paymentDeadline => createdAt?.add(CheckoutConfig.currentPaymentWindow);
+
+  /// Invoice Xendit berlaku 24 jam; setelah itu pesanan dianggap kedaluwarsa
+  /// di tampilan walaupun backend belum memperbarui statusnya.
+  bool get isPaymentExpired {
+    if (status == BookingStatus.expired) return true;
+    final deadline = paymentDeadline;
+    return status == BookingStatus.pendingPayment && deadline != null && DateTime.now().isAfter(deadline);
   }
+
+  bool get isPaidOrActive =>
+      status == BookingStatus.paid || status == BookingStatus.confirmed || status == BookingStatus.completed;
 }

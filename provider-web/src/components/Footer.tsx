@@ -19,7 +19,7 @@ export const Footer: React.FC = () => {
               <span className="logo-badge">Partner</span>
             </div>
             <p className="brand-description">
-              TemenTrip (PT TripKita Jelajah Nusantara) adalah platform penyedia paket perjalanan wisata terpercaya di Indonesia. Temukan Open Trip, Private Trip, dan paket liburan impian dengan transaksi transparan & garansi DP 50%.
+              TemenTrip (PT TripKita Jelajah Nusantara) adalah platform penyedia paket perjalanan wisata terpercaya di Indonesia. Temukan Open Trip, Private Trip, dan paket liburan impian dengan transaksi transparan & dana tertahan hingga trip selesai.
             </p>
             <div className="security-badge">
               <ShieldCheck size={16} color="#00c9a7" />
@@ -133,7 +133,7 @@ export const Footer: React.FC = () => {
       <div className="footer-bottom">
         <div className="container footer-bottom-container">
           <span className="copyright-text">
-            © 2026 TemenTrip (PT TripKita Jelajah Nusantara). Hak cipta dilindungi undang-undang.
+            © {new Date().getFullYear()} TemenTrip (PT TripKita Jelajah Nusantara). Hak cipta dilindungi undang-undang.
           </span>
           <div className="footer-legal-links">
             <button type="button" onClick={() => setShowPrivacy(true)} className="footer-legal-btn">

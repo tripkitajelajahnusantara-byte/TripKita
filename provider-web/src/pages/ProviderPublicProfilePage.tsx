@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
+import { TripImage } from '../components/TripImage';
 import { ArrowLeft, MapPin, Star, Package, MessageSquare, Award } from 'lucide-react';
 
 interface TripPackage {
@@ -24,6 +25,10 @@ interface TripPackage {
   image?: string;
   images?: string;
   highlights?: string[];
+  includedFacilities?: string;
+  duration?: number;
+  minGuests?: number;
+  meetingPoint?: string;
 }
 
 interface PublicProviderProfile {
@@ -129,9 +134,8 @@ export const ProviderPublicProfilePage: React.FC = () => {
     );
   }
 
-  const bannerImage = packages.length > 0
-    ? getTripImage(packages[0].id, packages[0].name, packages[0].category)
-    : getTripImage(providerInfo.id, providerInfo.businessName, providerInfo.businessCategory);
+  // Banner memakai foto asli paket pertama; tanpa foto -> gradien polos (bukan foto stok)
+  const bannerImage = packages.length > 0 ? getTripImage(packages[0]) : '';
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '80px', fontFamily: 'Inter, sans-serif' }}>
@@ -141,7 +145,9 @@ export const ProviderPublicProfilePage: React.FC = () => {
         style={{ 
           position: 'relative', 
           height: '240px', 
-          backgroundImage: `linear-gradient(to bottom, rgba(15,23,42,0.4), rgba(15,23,42,0.8)), url(${bannerImage})`,
+          backgroundImage: bannerImage
+            ? `linear-gradient(to bottom, rgba(15,23,42,0.4), rgba(15,23,42,0.8)), url(${JSON.stringify(bannerImage)})`
+            : 'linear-gradient(135deg, #0c4a6e 0%, #0f172a 100%)',
           backgroundSize: 'cover',
           backgroundPosition: 'center 40%',
           color: '#ffffff'
@@ -338,8 +344,8 @@ export const ProviderPublicProfilePage: React.FC = () => {
                   >
                     {/* Image & Badges */}
                     <div style={{ position: 'relative', height: '150px', overflow: 'hidden' }}>
-                      <img 
-                        src={getTripImage(pkg.id, pkg.name, pkg.category, (pkg as any).images || (pkg as any).image || (pkg as any).imageUrl)} 
+                      <TripImage
+                        src={getTripImage(pkg.id, pkg.name, pkg.category, (pkg as any).images || (pkg as any).image || (pkg as any).imageUrl)}  
                         alt={pkg.name} 
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />

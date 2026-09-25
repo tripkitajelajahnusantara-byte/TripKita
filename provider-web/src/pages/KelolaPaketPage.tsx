@@ -16,6 +16,7 @@ import {
 import type { PackageItem } from '../types';
 import { request } from '../utils/api';
 import { getTripImage } from '../utils/tripImages';
+import { TripImage } from '../components/TripImage';
 
 
 export const KelolaPaketPage: React.FC = () => {
@@ -204,8 +205,10 @@ export const KelolaPaketPage: React.FC = () => {
                     <tr key={pkg.id}>
                       <td>
                         <div className="pkg-item-cell">
-                          <img 
-                            src={getTripImage(Number(pkg.id), pkg.name, (pkg as any).category, (pkg as any).images || (pkg as any).image || (pkg as any).imageUrl)} 
+                          <TripImage
+                            src={getTripImage(Number(pkg.id), pkg.name, (pkg as any).category, (pkg as any).images || (pkg as any).image || (pkg as any).imageUrl)}
+                            placeholderIconSize={18}
+                            placeholderShowText={false} 
                             alt={pkg.name} 
                             style={{ width: '42px', height: '42px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} 
                           />

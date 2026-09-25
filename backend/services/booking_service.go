@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -235,7 +236,7 @@ func reverseProviderFinanceTx(tx *gorm.DB, booking *models.Booking) error {
 	if settlement.Status == "CANCELLED" {
 		return nil
 	}
-	const serviceFee int64 = 5000
+	serviceFee := models.BookingServiceFee
 	packageGross := booking.TotalPrice - serviceFee
 	if packageGross < 0 {
 		packageGross = 0
@@ -382,6 +383,9 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 	if booking.TripDate.Before(time.Now().Add(-5 * time.Minute)) {
 		return &BookingInputError{Message: "tanggal perjalanan harus berada di masa mendatang"}
 	}
+	if err := normalizeBookingParticipants(booking); err != nil {
+		return err
+	}
 
 	var pkg models.Package
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
@@ -421,7 +425,7 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 
 		booking.ProviderID = pkg.ProviderID
 		booking.TripEndDate = calculateTripEnd(booking.TripDate, pkg.Duration)
-		const serviceFee int64 = 5000
+		serviceFee := models.BookingServiceFee
 		booking.TotalPrice = int64(booking.Guests)*pkg.Price + addOnTotal + serviceFee
 		booking.Status = "PENDING_PAYMENT"
 		booking.PaymentMethod = "Xendit Invoice"
@@ -473,6 +477,47 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 	}
 	if result.RowsAffected != 1 {
 		return fmt.Errorf("status booking berubah sebelum invoice tersimpan")
+	}
+	return nil
+}
+
+var participantPhonePattern = regexp.MustCompile(`^(08|62)\d{8,12}$`)
+var participantNamePattern = regexp.MustCompile(`^[a-zA-Z\s.'-]{3,255}$`)
+
+// normalizeBookingParticipants memvalidasi data peserta yang dikirim saat
+// checkout dan mengisi urutannya. Klien lama yang belum mengirim peserta tetap
+// dilayani; bila dikirim, jumlahnya wajib sama dengan jumlah tamu.
+func normalizeBookingParticipants(booking *models.Booking) error {
+	if len(booking.Participants) == 0 {
+		return nil
+	}
+	if len(booking.Participants) != booking.Guests {
+		return &BookingInputError{Message: fmt.Sprintf("data peserta harus berjumlah %d orang sesuai jumlah tamu", booking.Guests)}
+	}
+	today := time.Now().Format("2006-01-02")
+	for i := range booking.Participants {
+		p := &booking.Participants[i]
+		label := fmt.Sprintf("Peserta %d", i+1)
+		p.ID = 0
+		p.Position = i + 1
+		p.Name = strings.TrimSpace(p.Name)
+		p.Phone = strings.TrimSpace(p.Phone)
+		p.MedicalNotes = strings.TrimSpace(p.MedicalNotes)
+		if !participantNamePattern.MatchString(p.Name) {
+			return &BookingInputError{Message: label + ": nama minimal 3 karakter dan hanya berisi huruf"}
+		}
+		if !participantPhonePattern.MatchString(p.Phone) {
+			return &BookingInputError{Message: label + ": nomor HP harus diawali 08 atau 62 (10–14 digit)"}
+		}
+		if p.Gender != "Laki-laki" && p.Gender != "Perempuan" {
+			return &BookingInputError{Message: label + ": jenis kelamin tidak valid"}
+		}
+		if _, err := time.Parse("2006-01-02", p.BirthDate); err != nil || p.BirthDate > today || p.BirthDate < "1900-01-01" {
+			return &BookingInputError{Message: label + ": tanggal lahir tidak valid"}
+		}
+		if len(p.MedicalNotes) > 255 {
+			return &BookingInputError{Message: label + ": riwayat penyakit maksimal 255 karakter"}
+		}
 	}
 	return nil
 }
@@ -682,7 +727,7 @@ func recordFinanceOnPaymentTx(tx *gorm.DB, booking *models.Booking) error {
 		return err
 	}
 
-	const serviceFee int64 = 5000
+	serviceFee := models.BookingServiceFee
 	packageGross := booking.TotalPrice - serviceFee
 	if packageGross < 0 {
 		packageGross = 0

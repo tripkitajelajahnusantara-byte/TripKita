@@ -70,6 +70,7 @@ func ConnectDB(cfg *config.Config) {
 			&models.AuthSession{},
 			&models.Package{},
 			&models.Booking{},
+			&models.BookingParticipant{},
 			&models.ProviderStatusHistory{},
 			&models.Payout{},
 			&models.Review{},
@@ -88,6 +89,7 @@ func ConnectDB(cfg *config.Config) {
 		// Ensure RLS (Row Level Security) is enabled on all tables for Supabase security compliance
 		execMigration(`ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS bookings ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS booking_participants ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS packages ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS providers ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS payouts ENABLE ROW LEVEL SECURITY;`)

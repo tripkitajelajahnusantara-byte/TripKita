@@ -68,6 +68,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			// Packages public endpoint for mobile customers
 			public.GET("/packages", packageCtrl.GetAllPublic)
 			public.GET("/providers/:id", packageCtrl.GetPublicProviderProfile)
+			public.GET("/checkout-config", bookingCtrl.GetCheckoutConfig)
 
 			// Reviews public read endpoints
 			public.GET("/reviews/package/:packageId", reviewCtrl.GetReviewsByPackage)

@@ -1,716 +1,337 @@
-import 'dart:async';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+
 import 'package:customer_mobile/models/booking.dart';
-import 'package:customer_mobile/widgets/bottom_navigation.dart';
-import 'package:intl/intl.dart';
+import 'package:customer_mobile/screens/payment_verification_screen.dart';
+import 'package:customer_mobile/services/api_service.dart';
+import 'package:customer_mobile/services/checkout_config.dart';
+import 'package:customer_mobile/services/package_catalog.dart';
+import 'package:customer_mobile/theme/app_theme.dart';
+import 'package:customer_mobile/utils/external_links.dart';
+import 'package:customer_mobile/utils/formatters.dart';
+import 'package:customer_mobile/widgets/common.dart';
+import 'package:customer_mobile/widgets/legal_content.dart';
 
+/// Konfirmasi pesanan sebelum invoice Xendit dibuat, padanan
+/// `CustomerConfirmationPage` di web.
 class PaymentScreen extends StatefulWidget {
-  final Function(int, {Map<String, dynamic>? arguments}) onNavigate;
-  final Map<String, dynamic>? arguments;
+  final BookingDraft draft;
+  final BookerContact booker;
+  final List<Participant> participants;
 
-  const PaymentScreen({
-    Key? key,
-    required this.onNavigate,
-    this.arguments,
-  }) : super(key: key);
+  const PaymentScreen({super.key, required this.draft, required this.booker, required this.participants});
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  late Booking booking;
-  String activePaymentTab = 'QRIS'; // Default to QRIS
+  bool _agreed = false;
+  String? _agreementError;
+  bool _submitting = false;
+  CheckoutConfig? _config;
+  String? _configError;
 
-  // Countdown timer state
-  late Timer _timer;
-  Duration _remainingTime = const Duration(hours: 24); // 24 hours default countdown
-
-  // FAQ accordion state
-  List<bool> isInstructionExpanded = [true, false, false];
+  late final TapGestureRecognizer _termsTap = TapGestureRecognizer()..onTap = () => showGeneralTerms(context);
+  late final TapGestureRecognizer _policyTap = TapGestureRecognizer()..onTap = () => showCancellationPolicy(context);
 
   @override
   void initState() {
     super.initState();
-    // Retrieve passed arguments
-    if (widget.arguments != null && widget.arguments!['booking'] != null) {
-      booking = widget.arguments!['booking'] as Booking;
-    } else {
-      // Fallback default mock
-      booking = Booking(
-        id: 501,
-        bookingCode: 'TK-2824-1891',
-        providerId: 101,
-        packageId: 1,
-        customerName: 'Budi Santoso',
-        customerInitial: 'BS',
-        tripDate: DateTime(2024, 5, 28),
-        guests: 4,
-        totalPrice: 11000000,
-        dpAmount: 0,
-        paymentMethod: 'QRIS',
-        status: 'PENDING_PAYMENT',
-        paymentUrl: '',
-        createdAt: DateTime.now(),
-        participants: [],
-      );
-    }
-
-    _startTimer();
+    _loadConfig();
   }
 
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remainingTime.inSeconds > 0) {
-        setState(() {
-          _remainingTime = _remainingTime - const Duration(seconds: 1);
-        });
-      } else {
-        _timer.cancel();
-      }
-    });
+  /// Biaya layanan diambil dari backend; tanpa angka itu total tidak
+  /// ditampilkan dan pembayaran tidak dapat dilanjutkan, alih-alih menebak.
+  Future<void> _loadConfig() async {
+    setState(() => _configError = null);
+    try {
+      final config = await CheckoutConfig.load();
+      if (mounted) setState(() => _config = config);
+    } catch (e) {
+      if (mounted) setState(() => _configError = e is ApiException ? e.message : 'Rincian biaya belum dapat dimuat.');
+    }
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _termsTap.dispose();
+    _policyTap.dispose();
     super.dispose();
   }
 
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = twoDigits(duration.inHours);
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return '$hours:$minutes:$seconds';
+  Future<void> _confirm() async {
+    if (!_agreed) {
+      setState(() => _agreementError = 'Anda wajib menyetujui Syarat & Ketentuan untuk melanjutkan.');
+      return;
+    }
+    setState(() => _agreementError = null);
+    final config = _config;
+    if (config == null) return;
+    final total = widget.draft.totalWithFee(config.serviceFee);
+    final ok = await showConfirmDialog(
+      context,
+      icon: Icons.help_outline,
+      iconColor: AppColors.primary,
+      iconBackground: AppColors.accentLight,
+      title: 'Konfirmasi Pemesanan',
+      message: Text.rich(
+        TextSpan(
+          text: 'Apakah Anda yakin data pemesanan dan seluruh peserta sudah benar dan ingin melanjutkan ke pembayaran sebesar ',
+          children: [
+            TextSpan(text: formatIDR(total), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.textDark)),
+            const TextSpan(text: '?'),
+          ],
+        ),
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 14, color: AppColors.textMuted, height: 1.5),
+      ),
+      cancelLabel: 'Batal (No)',
+      confirmLabel: 'Ya, Bayar Sekarang',
+    );
+    if (ok) await _createInvoice();
+  }
+
+  Future<void> _createInvoice() async {
+    setState(() => _submitting = true);
+    try {
+      final draft = widget.draft;
+      if (draft.package.id <= 0) {
+        throw const ApiException('Paket yang dipilih tidak valid. Silakan kembali dan pilih paket lagi.', 0);
+      }
+      final booking = await ApiService.createBooking(
+        packageId: draft.package.id,
+        booker: widget.booker,
+        guests: draft.guests,
+        tripDateIso: draft.startDate,
+        participants: widget.participants,
+      );
+      final paymentUri = trustedPaymentUri(booking.paymentUrl);
+      if (paymentUri == null) {
+        throw const ApiException('Backend tidak mengembalikan Invoice URL Xendit yang valid', 0);
+      }
+      if (booking.bookingCode.isEmpty) {
+        throw const ApiException('Backend tidak mengembalikan kode booking', 0);
+      }
+      // Kuota paket berubah setelah pemesanan.
+      PackageCatalog.load(force: true).ignore();
+      if (!mounted) return;
+      await Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => PaymentVerificationScreen(
+            booking: booking,
+            packageName: draft.package.name,
+            openImmediately: true,
+          ),
+        ),
+        (route) => route.isFirst,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      await showNoticeDialog(
+        context,
+        title: 'Gagal Membuat Invoice',
+        message: 'Gagal membuat Invoice Xendit: ${e is ApiException ? e.message : 'Terjadi kesalahan sistem'}',
+        isError: true,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormatter = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    );
-
+    final d = widget.draft;
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF374151)),
-          onPressed: () {
-            widget.onNavigate(6, arguments: {
-              'package': booking.packageDetails,
-              'participants': booking.guests,
-              'selectedDate': DateFormat('dd MMM yyyy').format(booking.tripDate),
-            }); // Back to booking (Index 6)
-          },
-        ),
-        title: const Text(
-          'Pembayaran',
-          style: TextStyle(color: Color(0xFF1F2937), fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Stepper progress indicator
-            _buildProgressStepper(),
-
-            // Timer & Booking Code Card
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Batas Akhir Pembayaran', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11)),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatDuration(_remainingTime),
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text('Kode Booking', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11)),
-                            const SizedBox(height: 4),
-                            Text(
-                              booking.bookingCode,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF374151)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 24, thickness: 1),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Total Pembayaran', style: TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
-                        Text(
-                          currencyFormatter.format(booking.totalPrice),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F8B8D),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Payment Methods Tabs selector
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: ['QRIS', 'Virtual Account', 'E-Wallet'].map((tab) {
-                    final bool isActive = activePaymentTab == tab;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            activePaymentTab = tab;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: isActive ? const Color(0xFF0F8B8D) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            tab,
-                            style: TextStyle(
-                              color: isActive ? Colors.white : const Color(0xFF4B5563),
-                              fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Tab contents
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: _buildActivePaymentTabContent(),
-            ),
-
-            // Payment Instructions accordions
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Petunjuk Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F2937))),
-                  const SizedBox(height: 12),
-                  _buildInstructionAccordion(0, 'Langkah 1: Buka aplikasi E-Wallet atau M-Banking', 'Pastikan saldo mencukupi dan cari menu transfer / scan QR.'),
-                  _buildInstructionAccordion(1, 'Langkah 2: Arahkan kamera ke QR Code', 'Posisikan QR code TemenTrip di dalam kotak pemindai di aplikasi pembayaran Anda.'),
-                  _buildInstructionAccordion(2, 'Langkah 3: Konfirmasi dan Bayar', 'Masukkan PIN transaksi dan tunggu status pembayaran berhasil di halaman ini.'),
-                ],
-              ),
-            ),
-
-            // Security assurance info
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.shade100),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.shield_outlined, color: Colors.green.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Pembayaran Anda dilindungi dengan enkripsi SSL 256-bit aman dan bersertifikat OJK.',
-                        style: TextStyle(color: Colors.green.shade800, fontSize: 11),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Support & Help Center
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.help_outline, size: 16, color: Color(0xFF6B7280)),
-                    label: const Text('Bantuan', style: TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
-                  ),
-                  TextButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.support_agent, size: 16, color: Color(0xFF0F8B8D)),
-                    label: const Text('Hubungi CS TemenTrip', style: TextStyle(color: Color(0xFF0F8B8D), fontSize: 12, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
-
-      // Bottom verification notification and navigation
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
-              offset: const Offset(0, -4),
-            )
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0F2F1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Row(
-                      children: [
-                        SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F8B8D)),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Menunggu pembayaran... Sistem mendeteksi otomatis.',
-                            style: TextStyle(color: Color(0xFF0F8B8D), fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        // Set booking status to PAID & payment method in shared mock store
-                        booking.status = 'PAID';
-                        final methodStr = 'Xendit ($activePaymentTab)';
-                        final index = Booking.mockBookings.indexWhere((b) => b.id == booking.id || b.bookingCode == booking.bookingCode);
-                        if (index != -1) {
-                          Booking.mockBookings[index].status = 'PAID';
-                        } else {
-                          Booking.mockBookings.add(booking);
-                        }
-
-                        // Navigate to Payment Verification Screen (Index 8)
-                        widget.onNavigate(8, arguments: {'booking': booking});
-                      },
-                      icon: const Icon(Icons.check_circle_outline, size: 18),
-                      label: const Text(
-                        'Bayar via Xendit (Simulasi Lunas)',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F8B8D),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            TripKitaBottomNavigation(
-              currentIndex: 2, // Booking active
-              onTap: (index) {
-                widget.onNavigate(index);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProgressStepper() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      appBar: AppBar(title: const Text('Konfirmasi & Pembayaran Trip')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
-          _buildStepItem('Booking', true, true),
-          _buildStepLine(true),
-          _buildStepItem('Pembayaran', true, false),
-          _buildStepLine(false),
-          _buildStepItem('Verifikasi', false, false),
-          _buildStepLine(false),
-          _buildStepItem('Selesai', false, false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepItem(String title, bool isCompleted, bool isPast) {
-    Color nodeColor = const Color(0xFF0F8B8D); // Teal
-    Color textColor = const Color(0xFF1F2937);
-
-    if (!isCompleted) {
-      nodeColor = Colors.grey.shade300;
-      textColor = Colors.grey.shade400;
-    }
-
-    return Column(
-      children: [
-        Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            color: isPast ? const Color(0xFF0F8B8D) : Colors.white,
-            border: Border.all(color: nodeColor, width: 2),
-            shape: BoxShape.circle,
-          ),
-          child: isPast
-              ? const Icon(Icons.check, size: 12, color: Colors.white)
-              : Center(
-                  child: Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: isCompleted ? const Color(0xFF0F8B8D) : Colors.transparent,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 10,
-            color: textColor,
-            fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStepLine(bool isActive) {
-    return Container(
-      width: 40,
-      height: 2,
-      margin: const EdgeInsets.only(bottom: 16),
-      color: isActive ? const Color(0xFF0F8B8D) : Colors.grey.shade200,
-    );
-  }
-
-  Widget _buildActivePaymentTabContent() {
-    switch (activePaymentTab) {
-      case 'QRIS':
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            children: [
-              // QRIS logos
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('QRIS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, fontStyle: FontStyle.italic, color: Color(0xFF1F2937))),
-                  const SizedBox(width: 8),
-                  Text('GPN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.blue.shade800)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Simulated QR code
-              Container(
-                width: 200,
-                height: 200,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)
-                  ],
-                  border: Border.all(color: Colors.grey.shade100),
-                ),
-                child: CustomPaint(
-                  painter: QrPatternPainter(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Scan QR di atas menggunakan aplikasi perbankan atau e-wallet Anda.',
-                style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        );
-      case 'Virtual Account':
-        return Column(
-          children: [
-            _buildVaItem('Bank Central Asia (BCA)', '88001894124029', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
-            const SizedBox(height: 12),
-            _buildVaItem('Bank Mandiri', '89008894124029', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
-            const SizedBox(height: 12),
-            _buildVaItem('Bank Rakyat Indonesia (BRI)', '12388894124029', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
-            const SizedBox(height: 12),
-            _buildVaItem('Bank Negara Indonesia (BNI)', '98888894124029', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
-          ],
-        );
-      case 'E-Wallet':
-        return Column(
-          children: [
-            _buildEwalletItem('GoPay', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
-            const SizedBox(height: 12),
-            _buildEwalletItem('OVO', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
-            const SizedBox(height: 12),
-            _buildEwalletItem('ShopeePay', 'https://images.unsplash.com/photo-1614036417651-efe5912149d8?w=100'),
-          ],
-        );
-      default:
-        return const SizedBox();
-    }
-  }
-
-  Widget _buildVaItem(String bankName, String vaNumber, String logoUrl) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 32,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: AppColors.primary, padding: EdgeInsets.zero),
+              onPressed: _submitting ? null : () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: const Text('Ubah Data Pemesan & Peserta'),
             ),
-            alignment: Alignment.center,
-            child: const Icon(Icons.account_balance, color: Colors.blue, size: 20),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(bankName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1F2937))),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(vaNumber, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F8B8D), letterSpacing: 0.5)),
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () {},
-                      child: const Icon(Icons.copy, size: 14, color: Colors.grey),
-                    ),
-                  ],
-                ),
+          const SizedBox(height: 8),
+          SectionCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('Daftar Peserta Trip (${widget.participants.length} Orang)',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              const SizedBox(height: 14),
+              for (var i = 0; i < widget.participants.length; i++) ...[
+                _participantCard(i, widget.participants[i]),
+                if (i < widget.participants.length - 1) const SizedBox(height: 12),
               ],
-            ),
+            ]),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEwalletItem(String walletName, String logoUrl) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(10),
+          const SizedBox(height: 16),
+          SectionCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Text('Ringkasan Pembayaran',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              const SizedBox(height: 14),
+              Text(d.package.category.toUpperCase(),
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.primary, letterSpacing: 0.5)),
+              const SizedBox(height: 4),
+              Text(d.package.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              const SizedBox(height: 8),
+              _iconLine(Icons.calendar_today_outlined, d.scheduleLabel),
+              const SizedBox(height: 4),
+              _iconLine(Icons.groups_outlined, '${d.guests} Peserta'),
+              const Divider(height: 26),
+              PriceRow('Harga (${d.guests}x)', formatIDR(d.packageTotal)),
+              PriceRow('Biaya Admin', _config == null ? (_configError == null ? 'Memuat...' : '-') : formatIDR(_config!.serviceFee)),
+              if (_configError != null) ...[
+                const SizedBox(height: 6),
+                Row(children: [
+                  Expanded(child: ErrorText(_configError)),
+                  TextButton(onPressed: _loadConfig, child: const Text('Coba Lagi')),
+                ]),
+              ],
+              const SizedBox(height: 10),
+              const _DashedDivider(),
+              const SizedBox(height: 12),
+              Row(children: [
+                const Expanded(
+                  child: Text('TOTAL PEMBAYARAN',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textDark)),
                 ),
-                child: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF0F8B8D)),
-              ),
-              const SizedBox(width: 16),
-              Text(walletName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1F2937))),
-            ],
+                Text(_config == null ? '-' : formatIDR(d.totalWithFee(_config!.serviceFee)),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary)),
+              ]),
+            ]),
           ),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F8B8D),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Buka Aplikasi', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          const InfoBanner(
+            icon: Icons.verified_user_outlined,
+            title: 'Kebijakan Pembatalan Strict H-7 TripKita',
+            color: AppColors.primaryDark,
+            background: Color(0xFFF0F9FF),
+            border: Color(0xFFBAE6FD),
+            textColor: Color(0xFF0C4A6E),
+            message: '• Pembatalan ≥ 7 hari sebelum trip berhak pengembalian dana 100% Full Refund.\n'
+                '• Pembatalan < 7 hari sebelum trip (H-6 s/d Hari H) dikenakan biaya pembatalan 100% (0% Refund / Uang Hangus).\n'
+                '• Jika trip dibatalkan oleh Provider/Cuaca/Kuota Kurang, Pemesan berhak atas 100% Refund atau Reschedule Maks 1x.',
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            padding: const EdgeInsets.fromLTRB(8, 10, 16, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Checkbox(
+                  value: _agreed,
+                  onChanged: (v) => setState(() {
+                    _agreed = v ?? false;
+                    if (_agreed) _agreementError = null;
+                  }),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text.rich(
+                      TextSpan(
+                        text: 'Saya telah membaca dan menyetujui ',
+                        style: const TextStyle(fontSize: 13, color: AppColors.textBody, height: 1.5),
+                        children: [
+                          TextSpan(text: 'Syarat & Ketentuan', style: _linkStyle, recognizer: _termsTap),
+                          const TextSpan(text: ' serta '),
+                          TextSpan(text: 'Kebijakan Pembatalan Strict H-7 TripKita', style: _linkStyle, recognizer: _policyTap),
+                          const TextSpan(text: '. Seluruh data peserta yang diisikan adalah benar.'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ]),
+              Padding(padding: const EdgeInsets.only(left: 12), child: ErrorText(_agreementError)),
+            ]),
+          ),
+          const SizedBox(height: 20),
+          PrimaryButton(
+            label: _submitting ? 'Memproses Booking...' : 'Konfirmasi & Bayar Sekarang',
+            loading: _submitting,
+            color: AppColors.primary,
+            onPressed: _config == null ? null : _confirm,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInstructionAccordion(int index, String title, String body) {
-    final isExpanded = isInstructionExpanded[index];
+  static const _linkStyle = TextStyle(
+    color: AppColors.primary,
+    fontWeight: FontWeight.w700,
+    decoration: TextDecoration.underline,
+  );
+
+  Widget _iconLine(IconData icon, String text) => Row(children: [
+        Icon(icon, size: 14, color: AppColors.textLight),
+        const SizedBox(width: 6),
+        Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.textMuted))),
+      ]);
+
+  Widget _participantCard(int index, Participant p) {
+    final hasMedical = p.medicalHistory.trim().isNotEmpty && p.medicalHistory.trim() != 'Tidak Ada' && p.medicalHistory.trim() != '-';
+    Widget field(String label, String value) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text(value.isEmpty ? '-' : value,
+              style: const TextStyle(fontSize: 13.5, color: AppColors.textDark, fontWeight: FontWeight.w600)),
+        ]);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
       ),
-      child: Column(
-        children: [
-          ListTile(
-            title: Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF374151))),
-            trailing: Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 18),
-            dense: true,
-            onTap: () {
-              setState(() {
-                isInstructionExpanded[index] = !isInstructionExpanded[index];
-              });
-            },
-          ),
-          if (isExpanded) ...[
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Text(
-                body,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 11, height: 1.4),
-              ),
-            ),
-          ],
-        ],
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Peserta ${index + 1}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary)),
+        const Divider(height: 20),
+        field('Nama Lengkap', p.name),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: field('Nomor HP / WhatsApp', p.phone)),
+          Expanded(child: field('Jenis Kelamin', p.gender)),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: field('Tanggal Lahir', formatIsoLong(p.birthDate))),
+          Expanded(child: field('Umur', ageLabel(p.birthDate))),
+        ]),
+        const Divider(height: 20),
+        const Text('Riwayat Penyakit & Alergi',
+            style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 2),
+        Text(hasMedical ? p.medicalHistory : 'Tidak Ada',
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: hasMedical ? AppColors.danger : AppColors.success,
+            )),
+      ]),
     );
   }
 }
 
-// Simple Painter to draw a QR lookalike pattern for the QRIS block
-class QrPatternPainter extends CustomPainter {
+class _DashedDivider extends StatelessWidget {
+  const _DashedDivider();
+
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.fill;
-
-    // Corner Anchor 1 (Top-Left)
-    canvas.drawRect(Rect.fromLTWH(0, 0, 40, 40), paint);
-    canvas.drawRect(Rect.fromLTWH(8, 8, 24, 24), Paint()..color = Colors.white);
-    canvas.drawRect(Rect.fromLTWH(13, 13, 14, 14), paint);
-
-    // Corner Anchor 2 (Top-Right)
-    canvas.drawRect(Rect.fromLTWH(size.width - 40, 0, 40, 40), paint);
-    canvas.drawRect(Rect.fromLTWH(size.width - 32, 8, 24, 24), Paint()..color = Colors.white);
-    canvas.drawRect(Rect.fromLTWH(size.width - 27, 13, 14, 14), paint);
-
-    // Corner Anchor 3 (Bottom-Left)
-    canvas.drawRect(Rect.fromLTWH(0, size.height - 40, 40, 40), paint);
-    canvas.drawRect(Rect.fromLTWH(8, size.height - 32, 24, 24), Paint()..color = Colors.white);
-    canvas.drawRect(Rect.fromLTWH(13, size.height - 27, 14, 14), paint);
-
-    // Draw some random bits
-    final bitPaint = Paint()..color = Colors.black;
-    final double bitSize = 8.0;
-
-    // A simple grid pattern of bits to look like a QR code
-    for (double y = 48; y < size.height - 48; y += bitSize * 1.5) {
-      for (double x = 8; x < size.width - 8; x += bitSize * 1.5) {
-        if ((x + y).toInt() % 3 == 0 || (x * y).toInt() % 7 == 2) {
-          canvas.drawRect(Rect.fromLTWH(x, y, bitSize, bitSize), bitPaint);
-        }
-      }
-    }
-
-    // Additional anchors and center markers
-    canvas.drawRect(Rect.fromLTWH(size.width - 32, size.height - 32, 16, 16), bitPaint);
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final count = (constraints.maxWidth / 8).floor();
+      return Row(
+        children: List.generate(
+          count,
+          (_) => Expanded(child: Container(height: 1.5, margin: const EdgeInsets.symmetric(horizontal: 2), color: AppColors.borderStrong)),
+        ),
+      );
+    });
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

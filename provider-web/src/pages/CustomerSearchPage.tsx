@@ -5,6 +5,7 @@ import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
 import { Star, MapPin, Calendar, ChevronRight, ArrowLeft, Heart, Share2 } from 'lucide-react';
 import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 import { ShareModal } from '../components/ShareModal';
+import { TripImage } from '../components/TripImage';
 
 interface TripPackage {
   id: number;
@@ -26,30 +27,20 @@ interface TripPackage {
   image?: string;
   images?: string;
   highlights?: string[];
+  includedFacilities?: string;
+  duration?: number;
+  minGuests?: number;
+  meetingPoint?: string;
 }
 
-const getTodayIsoDate = () => {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const getDynamicScheduleStr = (daysFromToday: number, durationDays: number) => {
-  const d1 = new Date();
-  d1.setDate(d1.getDate() + daysFromToday);
-  const d2 = new Date(d1);
-  d2.setDate(d2.getDate() + durationDays - 1);
-
+// Format YYYY-MM-DD menjadi "15 Okt 2026" untuk ringkasan jadwal
+const formatShortDate = (value?: string) => {
+  if (!value) return '';
+  const iso = value.slice(0, 10);
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '';
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  const m1 = months[d1.getMonth()];
-  const m2 = months[d2.getMonth()];
-
-  if (m1 === m2) {
-    return `${d1.getDate()} ${m1} ${d1.getFullYear()} - ${d2.getDate()} ${m2} ${d2.getFullYear()} (${durationDays} Hari)`;
-  }
-  return `${d1.getDate()} ${m1} - ${d2.getDate()} ${m2} ${d2.getFullYear()} (${durationDays} Hari)`;
+  return `${d} ${months[m - 1]} ${y}`;
 };
 
 export const CustomerSearchPage: React.FC = () => {
@@ -58,35 +49,38 @@ export const CustomerSearchPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('Rekomendasi');
 
-  const DEFAULT_PACKAGES: TripPackage[] = [
-    { id: 1, providerId: 1, name: "Open Trip Gunung Bromo", destination: "Probolinggo, Jawa Timur", category: "Gunung", tripType: "Open Trip", price: 350000, quotaMin: 5, quotaUsed: 3, quotaMax: 15, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 3), status: "Aktif", rating: 4.8 },
-    { id: 2, providerId: 1, name: "Open Trip Pulau Tidung", destination: "Kepulauan Seribu, Jakarta", category: "Pantai", tripType: "Open Trip", price: 450000, quotaMin: 4, quotaUsed: 2, quotaMax: 12, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 3), status: "Aktif", rating: 4.7 },
-    { id: 3, providerId: 1, name: "Trip Curug Cilember", destination: "Bogor, Jawa Barat", category: "Curug", tripType: "Open Trip", price: 275000, quotaMin: 5, quotaUsed: 4, quotaMax: 10, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 2), status: "Aktif", rating: 4.6 },
-    { id: 4, providerId: 1, name: "Bandung City Tour", destination: "Bandung, Jawa Barat", category: "City Tour", tripType: "Open Trip", price: 420000, quotaMin: 4, quotaUsed: 3, quotaMax: 15, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 3), status: "Aktif", rating: 4.9 },
-    { id: 5, providerId: 1, name: "Wisata Budaya Suku Baduy", destination: "Lebak, Banten", category: "Wisata Budaya & Sejarah", tripType: "Open Trip", price: 380000, quotaMin: 5, quotaUsed: 2, quotaMax: 15, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 3), status: "Aktif", rating: 4.8 },
-    { id: 6, providerId: 1, name: "Open Trip Ranu Kumbolo", destination: "Malang, Jawa Timur", category: "Gunung", tripType: "Open Trip", price: 550000, quotaMin: 6, quotaUsed: 4, quotaMax: 15, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 4), status: "Aktif", rating: 4.9 },
-    { id: 7, providerId: 1, name: "Wisata Pantai Tanjung Karang Palu", destination: "Palu, Sulawesi Tengah", category: "Pantai", tripType: "Open Trip", price: 850000, quotaMin: 4, quotaUsed: 2, quotaMax: 10, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 4), status: "Aktif", rating: 4.7 },
-    { id: 8, providerId: 1, name: "Yogyakarta City Tour", destination: "Yogyakarta, DI Yogyakarta", category: "City Tour", tripType: "Open Trip", price: 490000, quotaMin: 4, quotaUsed: 3, quotaMax: 15, startDate: getTodayIsoDate(), endDate: getTodayIsoDate(), schedule: getDynamicScheduleStr(0, 3), status: "Aktif", rating: 4.8 }
-  ];
+  const [loadError, setLoadError] = useState('');
+
+  // Hanya paket asli dari backend; tidak ada paket contoh saat gagal/kosong
+  const loadPackages = async (): Promise<{ list: TripPackage[]; error: string }> => {
+    try {
+      const data = await request('/public/packages');
+      const list: TripPackage[] = Array.isArray(data) ? data : [];
+      return { list: list.filter((p: TripPackage) => p.status === 'Aktif'), error: '' };
+    } catch (err: unknown) {
+      console.error('Failed to load search packages:', err);
+      return { list: [], error: err instanceof Error && err.message ? err.message : 'Gagal memuat daftar paket wisata.' };
+    }
+  };
+
+  const applyPackages = (result: { list: TripPackage[]; error: string }) => {
+    setPackages(result.list);
+    setLoadError(result.error);
+    setLoading(false);
+  };
+
+  const fetchPackages = () => {
+    setLoading(true);
+    setLoadError('');
+    loadPackages().then(applyPackages);
+  };
 
   useEffect(() => {
-    const fetchPackages = async () => {
-      try {
-        const data = await request('/public/packages');
-        if (Array.isArray(data) && data.length > 0) {
-          const activePkgs = data.filter((p: TripPackage) => p.status === 'Aktif');
-          setPackages(activePkgs.length > 0 ? activePkgs : DEFAULT_PACKAGES);
-        } else {
-          setPackages(DEFAULT_PACKAGES);
-        }
-      } catch (err) {
-        console.error('Failed to load search packages:', err);
-        setPackages(DEFAULT_PACKAGES);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPackages();
+    let cancelled = false;
+    loadPackages().then((result) => {
+      if (!cancelled) applyPackages(result);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const [wishlistIds, setWishlistIds] = useState<number[]>(() => 
@@ -135,11 +129,16 @@ export const CustomerSearchPage: React.FC = () => {
   const handleSelectPackage = (pkg: TripPackage) => {
     const updatedPkg = {
       ...pkg,
-      bookingDate: searchParams.date || pkg.startDate || '2026-05-22'
+      bookingDate: searchParams.date || pkg.startDate || ''
     };
     setSelectedPackageForDetail(updatedPkg);
     navigateTo('paket-detail');
   };
+
+  // Tipe trip boleh lebih dari satu, dipisah koma (mis. 'Private Trip,Honeymoon')
+  const selectedTypes = (searchParams.type && searchParams.type !== 'Semua Tipe')
+    ? searchParams.type.split(',').map((t: string) => t.trim()).filter(Boolean)
+    : [];
 
   // Filter packages based on active search parameters
   const processedPackages = packages.filter((pkg) => {
@@ -149,7 +148,7 @@ export const CustomerSearchPage: React.FC = () => {
     if (searchParams.category && searchParams.category !== 'Semua Kategori' && !pkg.category.toLowerCase().includes(searchParams.category.toLowerCase())) {
       return false;
     }
-    if (searchParams.type && searchParams.type !== 'Semua Tipe' && pkg.tripType !== searchParams.type) {
+    if (selectedTypes.length > 0 && !selectedTypes.includes(pkg.tripType || 'Open Trip')) {
       return false;
     }
     return true;
@@ -159,7 +158,7 @@ export const CustomerSearchPage: React.FC = () => {
   if (sortBy === 'Terpopuler') {
     processedPackages.sort((a, b) => (b.quotaUsed || 0) - (a.quotaUsed || 0));
   } else if (sortBy === 'Rating Tertinggi') {
-    processedPackages.sort((a, b) => (b.rating || 4.8) - (a.rating || 4.8));
+    processedPackages.sort((a, b) => (b.rating || 0) - (a.rating || 0));
   } else if (sortBy === 'Termahal') {
     processedPackages.sort((a, b) => b.price - a.price);
   } else if (sortBy === 'Termurah') {
@@ -202,8 +201,8 @@ export const CustomerSearchPage: React.FC = () => {
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
               Daftar Paket {
-                (searchParams.type && searchParams.type !== 'Semua Tipe')
-                  ? searchParams.type
+                selectedTypes.length > 0
+                  ? selectedTypes.join(' & ')
                   : (searchParams.category && searchParams.category !== 'Semua Kategori')
                   ? searchParams.category
                   : 'Wisata'
@@ -256,6 +255,18 @@ export const CustomerSearchPage: React.FC = () => {
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
             <p>Memuat daftar paket wisata...</p>
           </div>
+        ) : loadError ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #fecaca', color: '#64748b' }}>
+            <h3 style={{ color: '#0f172a', fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>Gagal Memuat Daftar Paket</h3>
+            <p style={{ fontSize: '13px', margin: '0 0 16px 0' }}>{loadError}</p>
+            <button
+              type="button"
+              onClick={() => fetchPackages()}
+              style={{ padding: '10px 22px', backgroundColor: '#007bff', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}
+            >
+              Coba Lagi
+            </button>
+          </div>
         ) : processedPackages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#64748b' }}>
             <h3 style={{ color: '#0f172a', fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>Tidak Ada Paket Ditemukan</h3>
@@ -265,9 +276,13 @@ export const CustomerSearchPage: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {processedPackages.map((pkg) => {
               // Calculate active reserved seats from pending/paid/completed bookings
-              const totalQuotaMax = pkg.quotaMax || 15;
-              const totalQuotaUsed = pkg.quotaUsed || 0;
+              const totalQuotaMax = Math.max(0, Number(pkg.quotaMax) || 0);
+              const totalQuotaUsed = Math.max(0, Number(pkg.quotaUsed) || 0);
               const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
+              const periodText = pkg.startDate
+                ? `${formatShortDate(pkg.startDate)}${pkg.endDate && pkg.endDate.slice(0, 10) !== pkg.startDate.slice(0, 10) ? ` - ${formatShortDate(pkg.endDate)}` : ''}`
+                : '';
+              const scheduleText = (pkg.schedule || '').trim() || periodText;
 
               const badge = getBadgeColor(pkg.category);
               const isFavorite = wishlistIds.includes(Number(pkg.id));
@@ -291,13 +306,10 @@ export const CustomerSearchPage: React.FC = () => {
                 >
                   {/* Image Left */}
                   <div style={{ height: '180px', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
-                    <img 
+                    <TripImage 
                       src={getImageUrl(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image)} 
                       alt={pkg.name} 
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => {
-                        e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80';
-                      }}
                     />
                     <button 
                       onClick={(e) => toggleFavorite(e, pkg)}
@@ -388,27 +400,30 @@ export const CustomerSearchPage: React.FC = () => {
                       </div>
 
                       {/* Description */}
-                      <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                        {pkg.description || 'Spesialis open trip gunung dengan pengalaman tim profesional dan fasilitas lengkap.'}
-                      </p>
+                      {pkg.description && pkg.description.trim() && (
+                        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 12px 0', lineHeight: '1.4' }}>
+                          {pkg.description}
+                        </p>
+                      )}
 
                       {/* Schedule */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: '500' }}>
-                        <Calendar size={14} color="#94a3b8" />
-                        <span>Jadwal tersedia: <strong>{pkg.schedule || getDynamicScheduleStr(0, 3)}</strong></span>
-                      </div>
+                      {scheduleText && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: '500' }}>
+                          <Calendar size={14} color="#94a3b8" />
+                          <span>Jadwal tersedia: <strong>{scheduleText}</strong></span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Bottom Row: Rating + Seats & Action Buttons (Share & Detail) */}
                     <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: '700' }}>
-                          <Star size={14} fill="#f59e0b" color="#f59e0b" /> {pkg.rating > 0 ? pkg.rating.toFixed(1) : '4.8'}
+                          <Star size={14} fill="#f59e0b" color="#f59e0b" /> {pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Baru'}
                         </span>
-                        <span style={{ color: '#94a3b8' }}>({(pkg.id * 17) % 50 + 80} ulasan)</span>
                         <span style={{ color: '#cbd5e1' }}>|</span>
                         <span style={{ color: availableSeats < 5 ? '#ef4444' : '#10b981', fontWeight: '700' }}>
-                          Sisa {availableSeats > 0 ? availableSeats : 4} seat
+                          {availableSeats > 0 ? `Sisa ${availableSeats} seat` : 'Kuota habis'}
                         </span>
                       </div>
 
