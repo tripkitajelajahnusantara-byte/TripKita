@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// PaymentWindow adalah masa berlaku invoice Xendit sejak booking dibuat.
+// PaymentWindow adalah masa berlaku tagihan iPaymu sejak booking dibuat.
 // Setelah lewat, booking yang belum dibayar dikedaluwarsakan oleh job.
 const PaymentWindow = 24 * time.Hour
 

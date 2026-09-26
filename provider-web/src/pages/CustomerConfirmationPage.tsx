@@ -165,11 +165,11 @@ export const CustomerConfirmationPage: React.FC = () => {
 	  try {
 		parsedPaymentURL = new URL(paymentUrl);
 	  } catch {
-		throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
+		throw new Error('Backend tidak mengembalikan URL checkout iPaymu yang valid');
 	  }
 	  const paymentHost = parsedPaymentURL.hostname.toLowerCase();
-	  if (parsedPaymentURL.protocol !== 'https:' || (paymentHost !== 'xendit.co' && !paymentHost.endsWith('.xendit.co'))) {
-		throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
+	  if (parsedPaymentURL.protocol !== 'https:' || (paymentHost !== 'my.ipaymu.com' && paymentHost !== 'sandbox.ipaymu.com')) {
+		throw new Error('Backend tidak mengembalikan URL checkout iPaymu yang valid');
 	  }
 
 	  const finalBookingCode = response.bookingCode || response.booking_code;
@@ -193,7 +193,7 @@ export const CustomerConfirmationPage: React.FC = () => {
       localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
       sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
-      // Direct external redirect to Xendit Invoice URL (using replace so back button doesn't loop)!
+	  // Redirect langsung ke hosted checkout resmi iPaymu.
 	  window.location.replace(parsedPaymentURL.toString());
 
     } catch (err: any) {

@@ -64,7 +64,7 @@ class _BookingListScreenState extends State<BookingListScreen> with WidgetsBindi
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Kembali dari halaman pembayaran Xendit: muat ulang status terbaru.
+    // Kembali dari halaman pembayaran iPaymu: muat ulang status terbaru.
     if (state == AppLifecycleState.resumed && widget.isActive) _fetch();
   }
 
@@ -150,7 +150,7 @@ class _BookingListScreenState extends State<BookingListScreen> with WidgetsBindi
       showNoticeDialog(
         context,
         title: 'Tautan Tidak Ditemukan',
-        message: 'Tautan pembayaran Xendit tidak ditemukan. Silakan lakukan pemesanan ulang.',
+        message: 'Tautan pembayaran iPaymu tidak ditemukan. Silakan lakukan pemesanan ulang.',
         isError: true,
       );
       return;
@@ -706,7 +706,7 @@ class _BookingCard extends StatelessWidget {
         border: Border.all(color: AppColors.primary, width: 1.5),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('Informasi Pembayaran Xendit:',
+        const Text('Informasi Pembayaran iPaymu:',
             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.primaryDark)),
         if (b.paymentDeadline != null) ...[
           const SizedBox(height: 8),
@@ -719,7 +719,7 @@ class _BookingCard extends StatelessWidget {
               text: formatIDR(b.totalPrice),
               style: const TextStyle(color: AppColors.primary, fontSize: 15, fontWeight: FontWeight.w800),
             ),
-            const TextSpan(text: ' via Payment Gateway Xendit.'),
+            const TextSpan(text: ' melalui checkout resmi iPaymu.'),
           ]),
           style: const TextStyle(fontSize: 13, color: AppColors.textDark),
         ),

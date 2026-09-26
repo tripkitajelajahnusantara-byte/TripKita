@@ -27,7 +27,7 @@ export const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Column 2: Kontak Resmi (Xendit Compliance Requirement) */}
+          {/* Column 2: Kontak resmi */}
           <div className="footer-col contact-col">
             <h4 className="footer-col-title">Kontak & Operasional</h4>
             <ul className="contact-info-list">

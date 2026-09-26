@@ -53,7 +53,7 @@ const _generalTerms = _LegalDocument(
       '5.2 Pembatalan oleh Provider / Cuaca Buruk / Kuota Tidak Terpenuhi:',
       '• Jika trip dibatalkan oleh Provider karena cuaca buruk (Force Majeure) atau kuota minimal Open Trip belum terpenuhi di H-3, Customer berhak memilih Full Refund 100% atau Pindah Jadwal (Reschedule).',
       '• Penjadwalan ulang (Reschedule) akibat kuota kurang berlaku maksimal 1 (satu) kali. Jika pada jadwal pengganti kuota masih tidak terpenuhi di H-3, sistem akan melakukan Full Refund 100% otomatis.',
-      '5.3 Pembayaran Penuh & Dana Tertahan (Escrow System): Customer membayar penuh di muka melalui satu invoice Xendit, tanpa uang muka (DP). Setelah dipotong biaya layanan dan komisi platform, separuh bagian Provider dapat dicairkan segera dan separuh sisanya ditahan TripKita sampai trip selesai dilaksanakan.',
+      '5.3 Pembayaran Penuh & Dana Tertahan: Customer membayar penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari customer. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Provider tersedia untuk diajukan sebagai biaya persiapan dan separuh sisanya baru tersedia setelah trip selesai.',
     ]),
   ],
 );

@@ -596,7 +596,7 @@ export const RegisterPage: React.FC = () => {
 
               <strong>4. BIAYA DAN PENCAIRAN DANA (ESCROW SYSTEM)</strong>
               <p>4.1 Biaya Layanan: TemenTrip mengenakan biaya komisi sebesar 10% dari setiap transaksi pembayaran paket wisata yang berhasil dilakukan melalui platform.<br/>
-              4.2 Pencairan Dana Mitra: Pengguna membayar penuh di muka melalui invoice Xendit, tanpa uang muka (DP). Setelah dipotong biaya layanan dan komisi platform, separuh bagian Mitra tersedia untuk dicairkan segera sebagai biaya persiapan operasional, dan separuh sisanya ditahan sistem sampai trip selesai dilaksanakan.<br/>
+              4.2 Pencairan Dana Mitra: Pengguna membayar penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari pengguna. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Mitra tersedia untuk diajukan sebagai biaya persiapan operasional, dan separuh sisanya baru tersedia setelah trip selesai.<br/>
               4.3 Batas Waktu Kuota H-3: Jika pada H-3 kuota minimal belum terpenuhi, Mitra diberikan wewenang di dashboard untuk memilih [Tetap Berangkat], [Jadwalkan Ulang], atau [Batalkan] (seluruh pesanan dikembalikan penuh kepada pengguna).</p>
 
               <strong>5. PEMBATALAN, REFUND & RESCHEDULE</strong>

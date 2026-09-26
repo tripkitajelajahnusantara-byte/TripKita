@@ -12,7 +12,7 @@ import 'package:customer_mobile/utils/formatters.dart';
 import 'package:customer_mobile/widgets/common.dart';
 import 'package:customer_mobile/widgets/legal_content.dart';
 
-/// Konfirmasi pesanan sebelum invoice Xendit dibuat, padanan
+/// Konfirmasi pesanan sebelum checkout iPaymu dibuat, padanan
 /// `CustomerConfirmationPage` di web.
 class PaymentScreen extends StatefulWidget {
   final BookingDraft draft;
@@ -108,7 +108,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       );
       final paymentUri = trustedPaymentUri(booking.paymentUrl);
       if (paymentUri == null) {
-        throw const ApiException('Backend tidak mengembalikan Invoice URL Xendit yang valid', 0);
+        throw const ApiException('Backend tidak mengembalikan URL checkout iPaymu yang valid', 0);
       }
       if (booking.bookingCode.isEmpty) {
         throw const ApiException('Backend tidak mengembalikan kode booking', 0);
@@ -132,7 +132,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       await showNoticeDialog(
         context,
         title: 'Gagal Membuat Invoice',
-        message: 'Gagal membuat Invoice Xendit: ${e is ApiException ? e.message : 'Terjadi kesalahan sistem'}',
+        message: 'Gagal membuat checkout iPaymu: ${e is ApiException ? e.message : 'Terjadi kesalahan sistem'}',
         isError: true,
       );
     }

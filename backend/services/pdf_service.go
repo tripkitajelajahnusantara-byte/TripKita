@@ -17,7 +17,7 @@ func NewPDFService() *PDFService {
 func (s *PDFService) GenerateBookingReceiptPDF(b *models.Booking, pkg *models.Package) ([]byte, string, error) {
 	packageName := "Paket Wisata TemenTrip"
 	destination := "Indonesia"
-	meetingPoint := "Lokasi Utama Destinasi"
+	meetingPoint := "Lihat detail paket"
 
 	if pkg != nil {
 		if pkg.Name != "" {
@@ -32,14 +32,27 @@ func (s *PDFService) GenerateBookingReceiptPDF(b *models.Booking, pkg *models.Pa
 	}
 
 	travelDateStr := b.TripDate.Format("02 Jan 2006")
-	filename := fmt.Sprintf("E-Voucher_TemenTrip_%s.pdf", b.BookingCode)
+	filename := fmt.Sprintf("Pembayaran_Berhasil_TemenTrip_%s.pdf", b.BookingCode)
+	paidAt := time.Now()
+	if b.PaidAt != nil && !b.PaidAt.IsZero() {
+		paidAt = *b.PaidAt
+	}
+	transactionID := b.IPaymuTransactionID
+	if transactionID == "" {
+		transactionID = b.XenditInvoiceID
+	}
+	paymentMethod := b.PaymentMethod
+	if paymentMethod == "" {
+		paymentMethod = "iPaymu"
+	}
 
 	pdfContent := fmt.Sprintf(`================================================================================
-                        E-VOUCHER BUKTI PEMBAYARAN TEMENTRIP
+						HALAMAN PEMBAYARAN BERHASIL - TEMENTRIP
 ================================================================================
 Kode Invoice    : %s
 Status Pesanan  : LUNAS (%s)
-Tanggal Waktu   : %s
+Waktu Dibayar   : %s
+ID Transaksi    : %s
 
 --------------------------------------------------------------------------------
 INFORMASI PEMESAN:
@@ -56,20 +69,21 @@ Tanggal Trip    : %s
 Jumlah Peserta  : %d Orang
 --------------------------------------------------------------------------------
 TOTAL DIBAYAR   : Rp %s
-METODE BAYAR    : Xendit Payment Gateway (Virtual Account / QRIS / E-Wallet)
+METODE BAYAR    : %s
 --------------------------------------------------------------------------------
 
 PETUNJUK PERJALANAN:
 1. Harap menunjukkan E-Voucher PDF ini saat tiba di Titik Kumpul.
 2. Tiba di Titik Kumpul (%s) setidaknya 15 menit sebelum keberangkatan.
-3. Hubungi Layanan Bantuan TemenTrip (+62 800-0000-0000) jika butuh kendala.
+3. Hubungi tripkitajelajahnusantara@gmail.com bila membutuhkan bantuan.
 
 Terima kasih telah memilih TemenTrip sebagai sahabat perjalanan Anda!
 ================================================================================
 `,
 		b.BookingCode,
 		b.Status,
-		time.Now().Format("02 Jan 2006 15:04 WIB"),
+		paidAt.Format("02 Jan 2006 15:04 WIB"),
+		transactionID,
 		b.CustomerName,
 		b.CustomerPhone,
 		b.CustomerEmail,
@@ -79,10 +93,11 @@ Terima kasih telah memilih TemenTrip sebagai sahabat perjalanan Anda!
 		travelDateStr,
 		b.Guests,
 		formatIDRNumber(b.TotalPrice),
+		paymentMethod,
 		meetingPoint,
 	)
 
-	pdfBuf := createSimplePDFDocument("E-VOUCHER RESMI TEMENTRIP", pdfContent)
+	pdfBuf := createSimplePDFDocument("PEMBAYARAN BERHASIL TEMENTRIP", pdfContent)
 	return pdfBuf, filename, nil
 }
 
@@ -308,14 +323,6 @@ Terima kasih telah memilih TemenTrip!
 }
 
 func createSimplePDFDocument(title, content string) []byte {
-	var buf bytes.Buffer
-
-	buf.WriteString("%PDF-1.4\n")
-	buf.WriteString("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
-	buf.WriteString("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
-	buf.WriteString("3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n")
-	buf.WriteString("4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n")
-
 	var streamBuf bytes.Buffer
 	streamBuf.WriteString("BT\n")
 	streamBuf.WriteString("/F1 10 Tf\n")
@@ -329,11 +336,29 @@ func createSimplePDFDocument(title, content string) []byte {
 	}
 	streamBuf.WriteString("ET\n")
 
-	streamLen := streamBuf.Len()
-	buf.WriteString(fmt.Sprintf("5 0 obj\n<< /Length %d >>\nstream\n%s\nendstream\nendobj\n", streamLen, streamBuf.String()))
+	objects := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+		"<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>",
+		"<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%sendstream", streamBuf.Len(), streamBuf.String()),
+		fmt.Sprintf("<< /Title (%s) /Producer (TemenTrip) >>", escapePDFString(title)),
+	}
 
-	buf.WriteString("xref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000244 00000 n \n0000000318 00000 n \n")
-	buf.WriteString("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n500\n%%EOF\n")
+	var buf bytes.Buffer
+	buf.WriteString("%PDF-1.4\n")
+	offsets := make([]int, len(objects)+1)
+	for i, object := range objects {
+		offsets[i+1] = buf.Len()
+		buf.WriteString(fmt.Sprintf("%d 0 obj\n%s\nendobj\n", i+1, object))
+	}
+	xrefOffset := buf.Len()
+	buf.WriteString(fmt.Sprintf("xref\n0 %d\n", len(objects)+1))
+	buf.WriteString("0000000000 65535 f \n")
+	for i := 1; i < len(offsets); i++ {
+		buf.WriteString(fmt.Sprintf("%010d 00000 n \n", offsets[i]))
+	}
+	buf.WriteString(fmt.Sprintf("trailer\n<< /Size %d /Root 1 0 R /Info 6 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(objects)+1, xrefOffset))
 
 	return buf.Bytes()
 }

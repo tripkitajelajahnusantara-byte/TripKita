@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, X, CreditCard, RefreshCw, Calendar, Wallet, Info, UserPlus, ShieldCheck, CheckCheck } from 'lucide-react';
+import { Bell, X, CreditCard, RefreshCw, Calendar, Wallet, Info, UserPlus, ShieldCheck, CheckCheck, Target } from 'lucide-react';
 import { request } from '../utils/api';
 import { useNavigation } from '../context/NavigationContext';
 
@@ -10,6 +10,7 @@ export type NotificationType =
   | 'PAYOUT'
   | 'REGISTRATION'
   | 'ACCOUNT'
+  | 'TRIP_PLAN'
   | 'GENERAL'
   | string;
 
@@ -165,7 +166,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
     }
 
     if (basePath === '/customer') {
-      navigateTo('riwayat-booking');
+      navigateTo(item.type === 'TRIP_PLAN' ? 'rencana-trip' : 'riwayat-booking');
       return;
     }
 
@@ -195,6 +196,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
         return <UserPlus size={16} color="#7c3aed" />;
       case 'ACCOUNT':
         return <ShieldCheck size={16} color="#0f766e" />;
+      case 'TRIP_PLAN':
+        return <Target size={16} color="#0f8b8d" />;
       default:
         return <Info size={16} color="#0284c7" />;
     }

@@ -1,14 +1,14 @@
 import 'package:url_launcher/url_launcher.dart';
 
-/// Hanya invoice HTTPS milik Xendit yang boleh dibuka sebagai halaman
+/// Hanya checkout HTTPS resmi iPaymu yang boleh dibuka sebagai halaman
 /// pembayaran, sama dengan pemeriksaan di web.
 Uri? trustedPaymentUri(String? value) {
   if (value == null || value.isEmpty) return null;
   final uri = Uri.tryParse(value);
   if (uri == null) return null;
   final host = uri.host.toLowerCase();
-  final isXendit = host == 'xendit.co' || host.endsWith('.xendit.co');
-  return uri.scheme == 'https' && isXendit ? uri : null;
+  final isIPaymu = host == 'my.ipaymu.com' || host == 'sandbox.ipaymu.com';
+  return uri.scheme == 'https' && isIPaymu ? uri : null;
 }
 
 /// Tautan `wa.me` untuk nomor mitra, atau null bila nomornya tidak valid.

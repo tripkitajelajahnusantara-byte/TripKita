@@ -76,7 +76,7 @@ func LoadConfig() (*Config, error) {
 		GoogleRedirectURI:  getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/v1/public/auth/google/callback"),
 		FrontendURL:        strings.TrimRight(getEnv("FRONTEND_URL", "http://localhost:5173"), "/"),
 		BackendURL:         strings.TrimRight(getEnv("BACKEND_URL", "http://localhost:8080"), "/"),
-		IPaymuVA:           getEnv("IPAYMU_VA", "0000000813208875"),
+		IPaymuVA:           getEnv("IPAYMU_VA", ""),
 		IPaymuAPIKey:       getEnv("IPAYMU_API_KEY", ""),
 		IPaymuBaseURL:      getEnv("IPAYMU_BASE_URL", "https://sandbox.ipaymu.com/api/v2"),
 		IPaymuCallbackURL:  getEnv("IPAYMU_CALLBACK_URL", ""),
@@ -128,6 +128,9 @@ func (c *Config) Validate() error {
 	}
 	if c.DBMaxIdleConns < 0 || c.DBMaxIdleConns > c.DBMaxOpenConns {
 		return fmt.Errorf("DB_MAX_IDLE_CONNS wajib antara 0 dan DB_MAX_OPEN_CONNS")
+	}
+	if c.EnableAutoPayout {
+		return fmt.Errorf("ENABLE_AUTOMATIC_PAYOUT belum didukung: integrasi API pembayaran massal dua tahap iPaymu belum dikonfigurasi")
 	}
 	if c.DatabaseURL == "" && (c.DBHost == "" || c.DBUser == "" || c.DBPass == "" || c.DBName == "") {
 		return fmt.Errorf("konfigurasi database belum lengkap")
@@ -187,6 +190,23 @@ func (c *Config) Validate() error {
 		parsed, err := url.Parse(rawURL)
 		if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
 			return fmt.Errorf("URL production wajib berupa HTTPS yang valid: %s", rawURL)
+		}
+	}
+	ipaymuBaseURL, err := url.Parse(c.IPaymuBaseURL)
+	if err != nil || ipaymuBaseURL.Scheme != "https" || !strings.EqualFold(ipaymuBaseURL.Hostname(), "my.ipaymu.com") || strings.TrimRight(ipaymuBaseURL.Path, "/") != "/api/v2" {
+		return fmt.Errorf("IPAYMU_BASE_URL production wajib https://my.ipaymu.com/api/v2")
+	}
+	for name, rawURL := range map[string]string{
+		"IPAYMU_CALLBACK_URL": c.IPaymuCallbackURL,
+		"IPAYMU_RETURN_URL":   c.IPaymuReturnURL,
+		"IPAYMU_CANCEL_URL":   c.IPaymuCancelURL,
+	} {
+		if strings.TrimSpace(rawURL) == "" {
+			continue
+		}
+		parsed, parseErr := url.Parse(rawURL)
+		if parseErr != nil || parsed.Scheme != "https" || parsed.Host == "" {
+			return fmt.Errorf("%s production wajib berupa URL HTTPS yang valid", name)
 		}
 	}
 	backendURL, _ := url.Parse(c.BackendURL)

@@ -6,6 +6,7 @@ import 'package:customer_mobile/screens/auth_screen.dart';
 import 'package:customer_mobile/screens/trip_detail_screen.dart';
 import 'package:customer_mobile/screens/trip_list_screen.dart';
 import 'package:customer_mobile/screens/trip_planner_screen.dart';
+import 'package:customer_mobile/screens/notification_screen.dart';
 import 'package:customer_mobile/services/auth_session.dart';
 import 'package:customer_mobile/services/package_catalog.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
@@ -72,17 +73,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _submitSearch() {
-    widget.onSearch(TripSearchParams(destination: _destination, date: toIsoDate(_date), type: _type));
+    widget.onSearch(TripSearchParams(
+        destination: _destination, date: toIsoDate(_date), type: _type));
   }
 
   void _openPackage(TripPackage pkg) {
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => TripDetailScreen(package: pkg, preferredDate: toIsoDate(_date)),
+      builder: (_) =>
+          TripDetailScreen(package: pkg, preferredDate: toIsoDate(_date)),
     ));
   }
 
-  void _openPlanner() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TripPlannerScreen()));
+  Future<void> _openPlanner() async {
+    if (!await ensureLoggedIn(context) || !context.mounted) return;
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const TripPlannerScreen()));
   }
 
   @override
@@ -97,26 +102,42 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (context, _) {
               final profile = AuthSession.instance.profile;
               if (profile != null) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () => appShellKey.currentState?.selectTab(AppTab.akun),
-                    child: CircleAvatar(
-                      radius: 17,
-                      backgroundColor: AppColors.accentLight,
-                      child: Text(
-                        profile.name.isNotEmpty ? profile.name[0].toUpperCase() : 'T',
-                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800),
+                return Row(mainAxisSize: MainAxisSize.min, children: [
+                  IconButton(
+                    tooltip: 'Notifikasi',
+                    onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const NotificationScreen())),
+                    icon: const Icon(Icons.notifications_none,
+                        color: AppColors.primary),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () =>
+                          appShellKey.currentState?.selectTab(AppTab.akun),
+                      child: CircleAvatar(
+                        radius: 17,
+                        backgroundColor: AppColors.accentLight,
+                        child: Text(
+                          profile.name.isNotEmpty
+                              ? profile.name[0].toUpperCase()
+                              : 'T',
+                          style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w800),
+                        ),
                       ),
                     ),
                   ),
-                );
+                ]);
               }
               return Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: TextButton.icon(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen())),
+                  onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AuthScreen())),
                   icon: const Icon(Icons.person_outline, size: 18),
                   label: const Text('Masuk'),
                 ),
@@ -132,7 +153,9 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Stack(clipBehavior: Clip.none, children: [
               _buildHero(),
-              Padding(padding: const EdgeInsets.only(top: 132), child: _buildSearchCard()),
+              Padding(
+                  padding: const EdgeInsets.only(top: 132),
+                  child: _buildSearchCard()),
             ]),
             const SizedBox(height: 20),
             _buildCategoryChips(),
@@ -143,7 +166,8 @@ class _HomeScreenState extends State<HomeScreen> {
               future: _packages,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
-                  return const LoadingView('Sedang memuat paket wisata terbaik...');
+                  return const LoadingView(
+                      'Sedang memuat paket wisata terbaik...');
                 }
                 if (snapshot.hasError) {
                   return Padding(
@@ -152,7 +176,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.wifi_off_outlined,
                       title: 'Paket Wisata Belum Dapat Dimuat',
                       message: '${snapshot.error}',
-                      actions: [ElevatedButton(onPressed: _refresh, child: const Text('Coba Lagi'))],
+                      actions: [
+                        ElevatedButton(
+                            onPressed: _refresh, child: const Text('Coba Lagi'))
+                      ],
                     ),
                   );
                 }
@@ -163,7 +190,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: EmptyState(
                       icon: Icons.travel_explore,
                       title: 'Paket Wisata Tidak Ditemukan',
-                      message: 'Belum ada paket wisata aktif saat ini. Coba lagi nanti.',
+                      message:
+                          'Belum ada paket wisata aktif saat ini. Coba lagi nanti.',
                     ),
                   );
                 }
@@ -172,7 +200,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Trip Populer (Open Trip)',
                     marker: '✦',
                     markerColor: AppColors.accent,
-                    subtitle: 'Paket gabungan hemat & seru dengan jadwal teratur',
+                    subtitle:
+                        'Paket gabungan hemat & seru dengan jadwal teratur',
                     items: packages.where((p) => p.isOpenTrip).take(4).toList(),
                     seeAllTypes: const ['Open Trip'],
                   ),
@@ -180,16 +209,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Private Trip & Honeymoon',
                     marker: '🌹',
                     markerColor: AppColors.honeymoon,
-                    subtitle: 'Jadwal bebas pilih • Fasilitas eksklusif & privat',
-                    items: packages.where((p) => p.tripType == 'Private Trip' || p.tripType == 'Honeymoon').take(4).toList(),
+                    subtitle:
+                        'Jadwal bebas pilih • Fasilitas eksklusif & privat',
+                    items: packages
+                        .where((p) =>
+                            p.tripType == 'Private Trip' ||
+                            p.tripType == 'Honeymoon')
+                        .take(4)
+                        .toList(),
                     seeAllTypes: const ['Private Trip', 'Honeymoon'],
                   ),
                   _buildSection(
                     title: 'Family & Corporate',
                     marker: '🏢',
                     markerColor: AppColors.corporate,
-                    subtitle: 'Liburan keluarga & gathering kantor • Tanggal bebas pilih',
-                    items: packages.where((p) => p.tripType == 'Family' || p.tripType == 'Corporate').take(4).toList(),
+                    subtitle:
+                        'Liburan keluarga & gathering kantor • Tanggal bebas pilih',
+                    items: packages
+                        .where((p) =>
+                            p.tripType == 'Family' || p.tripType == 'Corporate')
+                        .take(4)
+                        .toList(),
                     seeAllTypes: const ['Family', 'Corporate'],
                   ),
                 ]);
@@ -198,8 +238,11 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildFeatureRibbon(),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              child: Text('© ${DateTime.now().year} TripKita. All rights reserved.',
-                  textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textLight, fontSize: 12)),
+              child: Text(
+                  '© ${DateTime.now().year} TripKita. All rights reserved.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: AppColors.textLight, fontSize: 12)),
             ),
           ],
         ),
@@ -226,29 +269,43 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
         alignment: Alignment.topLeft,
-        child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-            'Cari Open Trip\nIndonesia dengan Mudah',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 21,
-              fontWeight: FontWeight.w800,
-              height: 1.2,
-              shadows: [Shadow(color: Color(0x66000000), blurRadius: 10, offset: Offset(0, 2))],
-            ),
-          ),
-          SizedBox(height: 6),
-          Text(
-            'Open trip seru & tour guide terpercaya di seluruh Indonesia.',
-            style: TextStyle(color: Color(0xFFF1F5F9), fontSize: 12.5, fontWeight: FontWeight.w600),
-          ),
-        ]),
+        child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Cari Open Trip\nIndonesia dengan Mudah',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
+                  height: 1.2,
+                  shadows: [
+                    Shadow(
+                        color: Color(0x66000000),
+                        blurRadius: 10,
+                        offset: Offset(0, 2))
+                  ],
+                ),
+              ),
+              SizedBox(height: 6),
+              Text(
+                'Open trip seru & tour guide terpercaya di seluruh Indonesia.',
+                style: TextStyle(
+                    color: Color(0xFFF1F5F9),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600),
+              ),
+            ]),
       ),
     );
   }
 
   Widget _buildSearchCard() {
-    Widget field({required IconData icon, required String label, required String value, required VoidCallback onTap}) {
+    Widget field(
+        {required IconData icon,
+        required String label,
+        required String value,
+        required VoidCallback onTap}) {
       return Material(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(12),
@@ -261,14 +318,23 @@ class _HomeScreenState extends State<HomeScreen> {
               Icon(icon, size: 18, color: AppColors.accent),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 1),
-                  Text(value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14, color: AppColors.textDark, fontWeight: FontWeight.w700)),
-                ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label,
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 1),
+                      Text(value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textDark,
+                              fontWeight: FontWeight.w700)),
+                    ]),
               ),
             ]),
           ),
@@ -284,9 +350,13 @@ class _HomeScreenState extends State<HomeScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
-          boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 24, offset: Offset(0, 8))],
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x14000000), blurRadius: 24, offset: Offset(0, 8))
+          ],
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           field(
             icon: Icons.location_on_outlined,
             label: 'Mau ke mana?',
@@ -309,10 +379,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 initialValue: _type,
                 onSelected: (v) => setState(() => _type = v),
                 itemBuilder: (_) => [
-                  for (final t in [allTripTypesLabel, ...officialTripTypes]) PopupMenuItem(value: t, child: Text(t)),
+                  for (final t in [allTripTypesLabel, ...officialTripTypes])
+                    PopupMenuItem(value: t, child: Text(t)),
                 ],
                 child: IgnorePointer(
-                  child: field(icon: Icons.groups_outlined, label: 'Tipe Trip', value: _type, onTap: () {}),
+                  child: field(
+                      icon: Icons.groups_outlined,
+                      label: 'Tipe Trip',
+                      value: _type,
+                      onTap: () {}),
                 ),
               ),
             ),
@@ -322,7 +397,8 @@ class _HomeScreenState extends State<HomeScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: _submitSearch,
             icon: const Icon(Icons.search, size: 18),
@@ -337,7 +413,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Padding(
         padding: EdgeInsets.symmetric(horizontal: 16),
-        child: Text('Jelajahi Kategori', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+        child: Text('Jelajahi Kategori',
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark)),
       ),
       const SizedBox(height: 10),
       SizedBox(
@@ -350,13 +430,19 @@ class _HomeScreenState extends State<HomeScreen> {
           itemBuilder: (context, i) {
             final category = officialCategories[i];
             return ActionChip(
-              avatar: Icon(_categoryIcons[category] ?? Icons.explore_outlined, size: 16, color: AppColors.primary),
+              avatar: Icon(_categoryIcons[category] ?? Icons.explore_outlined,
+                  size: 16, color: AppColors.primary),
               label: Text(category),
-              labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textBody),
+              labelStyle: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textBody),
               backgroundColor: Colors.white,
               side: const BorderSide(color: AppColors.border),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              onPressed: () => widget.onSearch(TripSearchParams(category: category)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              onPressed: () =>
+                  widget.onSearch(TripSearchParams(category: category)),
             );
           },
         ),
@@ -374,25 +460,35 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: _openPlanner,
           child: Ink(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [AppColors.primary, AppColors.accent]),
+              gradient:
+                  LinearGradient(colors: [AppColors.primary, AppColors.accent]),
             ),
             padding: const EdgeInsets.all(16),
             child: Row(children: [
               Container(
                 width: 44,
                 height: 44,
-                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(12)),
                 child: const Icon(Icons.savings_outlined, color: Colors.white),
               ),
               const SizedBox(width: 14),
               const Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Rencanakan Perjalananmu',
-                      style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
-                  SizedBox(height: 2),
-                  Text('Atur target budget, catat tabungan, dan checklist persiapan trip.',
-                      style: TextStyle(color: Color(0xE6FFFFFF), fontSize: 12)),
-                ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Rencanakan Perjalananmu',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800)),
+                      SizedBox(height: 2),
+                      Text(
+                          'Atur target budget, catat tabungan, dan checklist persiapan trip.',
+                          style: TextStyle(
+                              color: Color(0xE6FFFFFF), fontSize: 12)),
+                    ]),
               ),
               const Icon(Icons.chevron_right, color: Colors.white),
             ]),
@@ -418,15 +514,25 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text.rich(TextSpan(
-                  text: '$title ',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark),
-                  children: [TextSpan(text: marker, style: TextStyle(color: markerColor))],
-                )),
-                const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-              ]),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text.rich(TextSpan(
+                      text: '$title ',
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textDark),
+                      children: [
+                        TextSpan(
+                            text: marker, style: TextStyle(color: markerColor))
+                      ],
+                    )),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textMuted)),
+                  ]),
             ),
             TextButton(
               style: TextButton.styleFrom(
@@ -454,7 +560,10 @@ class _HomeScreenState extends State<HomeScreen> {
               runSpacing: gap,
               children: [
                 for (final pkg in items)
-                  SizedBox(width: width, child: TripGridCard(pkg: pkg, onTap: () => _openPackage(pkg))),
+                  SizedBox(
+                      width: width,
+                      child: TripGridCard(
+                          pkg: pkg, onTap: () => _openPackage(pkg))),
               ],
             );
           }),
@@ -465,7 +574,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildFeatureRibbon() {
     const features = [
-      (Icons.verified_user_outlined, 'Aman & Terpercaya', 'Provider terverifikasi'),
+      (
+        Icons.verified_user_outlined,
+        'Aman & Terpercaya',
+        'Provider terverifikasi'
+      ),
       (Icons.headset_mic_outlined, 'Layanan 24/7', 'CS siap membantu'),
       (Icons.credit_card_outlined, 'Pembayaran Mudah', 'Transfer & QR Code'),
       (Icons.thumb_up_alt_outlined, 'Banyak Pilihan', 'Beragam destinasi'),
@@ -483,15 +596,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(children: [
                   Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(color: AppColors.accentLight, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(
+                        color: AppColors.accentLight, shape: BoxShape.circle),
                     child: Icon(f.$1, color: AppColors.primary, size: 18),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(f.$2, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                      Text(f.$3, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                    ]),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(f.$2,
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textDark)),
+                          Text(f.$3,
+                              style: const TextStyle(
+                                  fontSize: 11, color: AppColors.textMuted)),
+                        ]),
                   ),
                 ]),
               ),
@@ -519,15 +641,18 @@ class _DestinationSheetState extends State<_DestinationSheet> {
   @override
   Widget build(BuildContext context) {
     final q = _query.toLowerCase();
-    final results = indonesiaProvinces.where((p) => p.toLowerCase().contains(q)).toList();
+    final results =
+        indonesiaProvinces.where((p) => p.toLowerCase().contains(q)).toList();
     return SafeArea(
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.75,
         child: Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
           child: Column(children: [
             const SizedBox(height: 16),
-            const Text('Pilih Destinasi', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            const Text('Pilih Destinasi',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: TextField(
@@ -545,20 +670,27 @@ class _DestinationSheetState extends State<_DestinationSheet> {
                   ListTile(
                     leading: const Icon(Icons.public, color: AppColors.primary),
                     title: const Text('Semua destinasi'),
-                    trailing: widget.current.isEmpty ? const Icon(Icons.check, color: AppColors.accent) : null,
+                    trailing: widget.current.isEmpty
+                        ? const Icon(Icons.check, color: AppColors.accent)
+                        : null,
                     onTap: () => Navigator.pop(context, ''),
                   ),
                 for (final p in results)
                   ListTile(
-                    leading: const Icon(Icons.location_on_outlined, color: AppColors.textLight),
+                    leading: const Icon(Icons.location_on_outlined,
+                        color: AppColors.textLight),
                     title: Text(p),
-                    trailing: widget.current == p ? const Icon(Icons.check, color: AppColors.accent) : null,
+                    trailing: widget.current == p
+                        ? const Icon(Icons.check, color: AppColors.accent)
+                        : null,
                     onTap: () => Navigator.pop(context, p),
                   ),
                 if (results.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(24),
-                    child: Text('Provinsi tidak ditemukan.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted)),
+                    child: Text('Provinsi tidak ditemukan.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textMuted)),
                   ),
               ]),
             ),

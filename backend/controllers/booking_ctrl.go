@@ -3,6 +3,7 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -17,12 +18,13 @@ import (
 )
 
 type BookingController struct {
-	service services.BookingService
-	cfg     *config.Config
+	service       services.BookingService
+	ipaymuService services.IPaymuService
+	cfg           *config.Config
 }
 
-func NewBookingController(service services.BookingService, cfg *config.Config) *BookingController {
-	return &BookingController{service: service, cfg: cfg}
+func NewBookingController(service services.BookingService, ipaymuService services.IPaymuService, cfg *config.Config) *BookingController {
+	return &BookingController{service: service, ipaymuService: ipaymuService, cfg: cfg}
 }
 
 func (ctrl *BookingController) GetAll(c *gin.Context) {
@@ -185,7 +187,7 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 		CustomerInitial:  req.CustomerInitial,
 		Guests:           req.Guests,
 		TripDate:         req.TripDate,
-		PaymentMethod:    "Xendit Invoice",
+		PaymentMethod:    "iPaymu Redirect Payment",
 		SelectedAddOnIDs: req.AddOnIDs,
 	}
 	for _, p := range req.Participants {
@@ -273,7 +275,7 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 			Guests:          2,
 			TotalPrice:      1500000,
 			TripDate:        time.Now().AddDate(0, 0, 7),
-			XenditInvoiceID: fmt.Sprintf("xendit_inv_%d", id),
+			XenditInvoiceID: fmt.Sprintf("ipaymu_mock_%d", id),
 			Package:         models.Package{Name: "Paket Wisata TemenTrip"},
 		}
 	}
@@ -281,14 +283,14 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 		booking.Package.Name = "Paket Wisata TemenTrip"
 	}
 
-	// Render a very premium Stripe/Xendit-like HTML checkout page
+	// Render halaman checkout iPaymu tiruan khusus development.
 	htmlContent := fmt.Sprintf(`
 	<!DOCTYPE html>
 	<html lang="id">
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>TemenTrip Invoice - Xendit Payment Simulator</title>
+		<title>TemenTrip Invoice - iPaymu Payment Simulator</title>
 		<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 		<style>
 			:root {
@@ -463,7 +465,7 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 		<div class="checkout-card">
 			<div class="header">
 				<div class="logo">Trip<span>Kita</span></div>
-				<div class="invoice-title">Xendit Payment Simulator</div>
+				<div class="invoice-title">iPaymu Payment Simulator</div>
 			</div>
 			
 			<div class="amount-display">Rp %d</div>
@@ -511,7 +513,7 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 				</div>
 			</div>
 
-			<form id="payment-form" action="/api/v1/public/xendit-mock-checkout/%d/pay" method="POST">
+			<form id="payment-form" action="/api/v1/public/ipaymu-mock-checkout/%d/pay" method="POST">
 				<input type="hidden" name="status" id="payment-status" value="PAID">
 				<input type="hidden" name="payment_method" id="selected-method" value="QRIS">
 				
@@ -526,7 +528,7 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 			</form>
 
 			<div class="footer">
-				Mock Invoice ID: %s &bull; Powered by Xendit Simulator
+				Mock Invoice ID: %s &bull; Powered by iPaymu Simulator
 			</div>
 		</div>
 
@@ -581,52 +583,74 @@ func (ctrl *BookingController) ProcessMockPayment(c *gin.Context) {
 }
 
 func (ctrl *BookingController) IPaymuWebhook(c *gin.Context) {
-	trxID := c.PostForm("trx_id")
-	referenceID := c.PostForm("reference_id")
-	status := c.PostForm("status")
-	via := c.PostForm("via")
-	statusCodeStr := c.PostForm("status_code")
-	totalStr := c.PostForm("total")
-
-	statusCode, _ := strconv.Atoi(statusCodeStr)
-	total, _ := strconv.ParseInt(totalStr, 10, 64)
-
-	if trxID == "" {
-		var req struct {
-			TrxID       interface{} `json:"trx_id"`
-			ReferenceID string      `json:"reference_id"`
-			StatusCode  interface{} `json:"status_code"`
-			Status      string      `json:"status"`
-			Via         string      `json:"via"`
-			Total       int64       `json:"total"`
-		}
-		if err := c.ShouldBindJSON(&req); err == nil {
-			trxID = fmt.Sprintf("%v", req.TrxID)
-			referenceID = req.ReferenceID
-			status = req.Status
-			via = req.Via
-			total = req.Total
-			switch v := req.StatusCode.(type) {
-			case float64:
-				statusCode = int(v)
-			case string:
-				statusCode, _ = strconv.Atoi(v)
-			}
-		}
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, 1024*1024))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Payload callback tidak dapat dibaca"})
+		return
+	}
+	payload, err := services.ParseIPaymuCallback(body, c.GetHeader("Content-Type"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	signature := c.GetHeader("X-Signature")
+	if ctrl.ipaymuService == nil || !ctrl.ipaymuService.VerifyCallbackSignature(signature, payload) {
+		log.Printf("[iPaymu Webhook] signature tidak valid; external_id=%s", c.GetHeader("X-External-ID"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Signature callback tidak valid"})
+		return
+	}
+	normalized, err := services.NormalizeIPaymuCallback(payload)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	if via == "" {
+	merchant := callbackString(normalized, "merchant")
+	if merchant != "" && merchant != "null" && ctrl.cfg != nil && merchant != ctrl.cfg.IPaymuVA {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Merchant callback tidak sesuai"})
+		return
+	}
+	trxID := callbackString(normalized, "trx_id")
+	referenceID := callbackString(normalized, "reference_id")
+	if referenceID == "" || referenceID == "null" {
+		referenceID = callbackString(normalized, "referenceId")
+	}
+	if trxID == "" || trxID == "null" || referenceID == "" || referenceID == "null" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "trx_id dan reference_id callback wajib diisi"})
+		return
+	}
+
+	status := strings.ToLower(strings.TrimSpace(callbackString(normalized, "status")))
+	statusCode, _ := strconv.Atoi(callbackString(normalized, "status_code"))
+	total, totalErr := strconv.ParseInt(callbackString(normalized, "total"), 10, 64)
+	via := strings.TrimSpace(callbackString(normalized, "via"))
+	channel := strings.TrimSpace(callbackString(normalized, "channel"))
+	if channel != "" && channel != "null" {
+		via = strings.TrimSpace(via + " " + channel)
+	}
+	if via == "" || via == "null" {
 		via = "iPaymu Payment"
+	} else {
+		via = "iPaymu " + via
 	}
 
 	paymentStatus := "PENDING"
-	if statusCode == 1 || strings.ToLower(status) == "berhasil" {
-		paymentStatus = "PAID"
-	} else if statusCode == 6 || strings.ToLower(status) == "batal" || strings.ToLower(status) == "expired" {
-		paymentStatus = "EXPIRED"
+	switch {
+	case statusCode == 1 || status == "berhasil" || status == "success":
+		if totalErr != nil || total <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Nominal callback pembayaran tidak valid"})
+			return
+		}
+		paymentStatus = models.StatusPaid
+	case statusCode == -2 || status == "expired" || status == "kedaluwarsa":
+		paymentStatus = models.StatusExpired
+	case status == "batal" || status == "cancel" || status == "cancelled" || status == "canceled":
+		paymentStatus = models.StatusCancelledByCustomer
+	case status == "gagal" || status == "failed" || status == "declined":
+		paymentStatus = models.StatusPaymentFailed
 	}
 
-	err := ctrl.service.UpdateStatusByWebhook(trxID, referenceID, paymentStatus, via, total, "IDR")
+	err = ctrl.service.UpdateStatusByWebhook(trxID, referenceID, paymentStatus, via, total, "IDR")
 	if err != nil {
 		log.Printf("[iPaymu Webhook Error] %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Webhook belum dapat diproses"})
@@ -634,6 +658,14 @@ func (ctrl *BookingController) IPaymuWebhook(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func callbackString(payload map[string]interface{}, key string) string {
+	value, exists := payload[key]
+	if !exists || value == nil {
+		return ""
+	}
+	return fmt.Sprint(value)
 }
 
 func (ctrl *BookingController) GetRefunds(c *gin.Context) {

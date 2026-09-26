@@ -6,7 +6,9 @@ import 'package:customer_mobile/config/app_config.dart';
 import 'package:customer_mobile/models/booking.dart';
 import 'package:customer_mobile/models/customer.dart';
 import 'package:customer_mobile/models/package.dart';
+import 'package:customer_mobile/models/notification.dart';
 import 'package:customer_mobile/models/review.dart';
+import 'package:customer_mobile/models/trip_plan.dart';
 import 'package:customer_mobile/services/checkout_config.dart';
 
 /// Galat API yang membawa status HTTP, sama seperti `ApiError` di web.
@@ -46,7 +48,9 @@ class ApiService {
     final token = tokenOverride ?? (withAuth ? tokenProvider() : null);
     final client = HttpClient()..connectionTimeout = _timeout;
     try {
-      final request = await client.openUrl(method, Uri.parse('${AppConfig.apiBaseUrl}$endpoint')).timeout(_timeout);
+      final request = await client
+          .openUrl(method, Uri.parse('${AppConfig.apiBaseUrl}$endpoint'))
+          .timeout(_timeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       if (token != null && token.isNotEmpty) {
         request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
@@ -57,7 +61,8 @@ class ApiService {
       }
 
       final response = await request.close().timeout(_timeout);
-      final text = await response.transform(utf8.decoder).join().timeout(_timeout);
+      final text =
+          await response.transform(utf8.decoder).join().timeout(_timeout);
       dynamic data;
       if (text.isNotEmpty) {
         try {
@@ -68,13 +73,19 @@ class ApiService {
       }
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final serverMessage = data is Map && data['error'] is String ? data['error'] as String : null;
+        final serverMessage = data is Map && data['error'] is String
+            ? data['error'] as String
+            : null;
         if (response.statusCode == 401 && token != null && token.isNotEmpty) {
           onSessionExpired(token);
-          throw ApiException(serverMessage ?? 'Sesi Anda telah berakhir. Silakan masuk kembali.', 401);
+          throw ApiException(
+              serverMessage ??
+                  'Sesi Anda telah berakhir. Silakan masuk kembali.',
+              401);
         }
         throw ApiException(
-          serverMessage ?? 'Terjadi gangguan pada server (${response.statusCode}).',
+          serverMessage ??
+              'Terjadi gangguan pada server (${response.statusCode}).',
           response.statusCode,
         );
       }
@@ -82,37 +93,95 @@ class ApiService {
     } on ApiException {
       rethrow;
     } on TimeoutException {
-      throw const ApiException('Permintaan terlalu lama. Periksa koneksi Anda lalu coba lagi.', 0);
+      throw const ApiException(
+          'Permintaan terlalu lama. Periksa koneksi Anda lalu coba lagi.', 0);
     } catch (_) {
-      throw const ApiException('Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.', 0);
+      throw const ApiException(
+          'Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.',
+          0);
     } finally {
       client.close(force: true);
     }
   }
 
-  static Map<String, dynamic> _asMap(dynamic data) => data is Map<String, dynamic> ? data : <String, dynamic>{};
+  static Map<String, dynamic> _asMap(dynamic data) =>
+      data is Map<String, dynamic> ? data : <String, dynamic>{};
   static List<dynamic> _asList(dynamic data) => data is List ? data : const [];
 
   // ---------------------------------------------------------------- Paket
 
   static Future<List<TripPackage>> fetchPackages() async {
     final data = await _request('GET', '/public/packages', withAuth: false);
-    return _asList(data).whereType<Map<String, dynamic>>().map(TripPackage.fromJson).toList();
+    return _asList(data)
+        .whereType<Map<String, dynamic>>()
+        .map(TripPackage.fromJson)
+        .toList();
   }
 
   static Future<PublicProvider> fetchProvider(int providerId) async {
-    final data = await _request('GET', '/public/providers/$providerId', withAuth: false);
+    final data =
+        await _request('GET', '/public/providers/$providerId', withAuth: false);
     return PublicProvider.fromJson(_asMap(data));
   }
 
   static Future<List<PackageReview>> fetchPackageReviews(int packageId) async {
-    final data = await _request('GET', '/public/reviews/package/$packageId', withAuth: false);
-    return _asList(data).whereType<Map<String, dynamic>>().map(PackageReview.fromJson).toList();
+    final data = await _request('GET', '/public/reviews/package/$packageId',
+        withAuth: false);
+    return _asList(data)
+        .whereType<Map<String, dynamic>>()
+        .map(PackageReview.fromJson)
+        .toList();
   }
 
   static Future<bool> isBookingReviewed(int bookingId) async {
-    final data = await _request('GET', '/public/reviews/booking/$bookingId', withAuth: false);
+    final data = await _request('GET', '/public/reviews/booking/$bookingId',
+        withAuth: false);
     return _asMap(data)['reviewed'] == true;
+  }
+
+  // ---------------------------------------------------------- Rencana Trip
+
+  static Future<List<TripPlan>> fetchTripPlans() async {
+    final data = await _request('GET', '/customer/trip-plans');
+    return _asList(data)
+        .whereType<Map<String, dynamic>>()
+        .map(TripPlan.fromJson)
+        .toList();
+  }
+
+  static Future<TripPlan> createTripPlan(TripPlan plan) async {
+    final data =
+        await _request('POST', '/customer/trip-plans', body: plan.toJson());
+    return TripPlan.fromJson(_asMap(data));
+  }
+
+  static Future<TripPlan> updateTripPlan(TripPlan plan) async {
+    final data = await _request(
+        'PUT', '/customer/trip-plans/${Uri.encodeComponent(plan.id)}',
+        body: plan.toJson());
+    return TripPlan.fromJson(_asMap(data));
+  }
+
+  static Future<void> deleteTripPlan(String id) async {
+    await _request('DELETE', '/customer/trip-plans/${Uri.encodeComponent(id)}');
+  }
+
+  // ------------------------------------------------------------- Notifikasi
+
+  static Future<List<AppNotification>> fetchNotifications() async {
+    final data = _asMap(await _request('GET', '/customer/notifications'));
+    return _asList(data['data'])
+        .whereType<Map<String, dynamic>>()
+        .map(AppNotification.fromJson)
+        .toList();
+  }
+
+  static Future<void> markNotificationRead(int id) async {
+    await _request('PUT', '/customer/notifications/$id/read');
+  }
+
+  static Future<void> markAllNotificationsRead() async {
+    await _request('PUT', '/customer/notifications/read-all');
   }
 
   // ----------------------------------------------------------------- Auth
@@ -126,8 +195,11 @@ class ApiService {
     ));
     final token = data['token'];
     final provider = data['provider'];
-    if (token is! String || token.isEmpty || provider is! Map<String, dynamic>) {
-      throw const ApiException('Respons login tidak valid. Silakan coba kembali.', 0);
+    if (token is! String ||
+        token.isEmpty ||
+        provider is! Map<String, dynamic>) {
+      throw const ApiException(
+          'Respons login tidak valid. Silakan coba kembali.', 0);
     }
     return AuthResult(token, CustomerProfile.fromJson(provider));
   }
@@ -141,7 +213,12 @@ class ApiService {
     final data = _asMap(await _request(
       'POST',
       '/public/auth/register-customer',
-      body: {'name': name, 'email': email, 'password': password, 'whatsapp': whatsapp},
+      body: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'whatsapp': whatsapp
+      },
       withAuth: false,
     ));
     final token = data['token'];
@@ -153,11 +230,13 @@ class ApiService {
   }
 
   static Future<CustomerProfile> fetchProfile({String? token}) async {
-    final data = await _request('GET', '/provider/profile', tokenOverride: token);
+    final data =
+        await _request('GET', '/provider/profile', tokenOverride: token);
     return CustomerProfile.fromJson(_asMap(data));
   }
 
-  static Future<CustomerProfile> updateProfile(Map<String, dynamic> fields) async {
+  static Future<CustomerProfile> updateProfile(
+      Map<String, dynamic> fields) async {
     final data = await _request('PUT', '/provider/profile', body: fields);
     return CustomerProfile.fromJson(_asMap(data));
   }
@@ -180,10 +259,12 @@ class ApiService {
   }) async {
     final data = await _request('POST', '/public/bookings', body: {
       'packageId': packageId,
-      'customerName': booker.name.isNotEmpty ? booker.name : 'Pelanggan TripKita',
+      'customerName':
+          booker.name.isNotEmpty ? booker.name : 'Pelanggan TripKita',
       'customerEmail': booker.email,
       'customerPhone': booker.whatsapp,
-      'customerInitial': (booker.name.isNotEmpty ? booker.name[0] : 'P').toUpperCase(),
+      'customerInitial':
+          (booker.name.isNotEmpty ? booker.name[0] : 'P').toUpperCase(),
       'guests': guests,
       'tripDate': '${tripDateIso}T00:00:00.000Z',
       'addOnIds': <String>[],
@@ -193,22 +274,30 @@ class ApiService {
   }
 
   static Future<CheckoutConfig> fetchCheckoutConfig() async {
-    final data = _asMap(await _request('GET', '/public/checkout-config', withAuth: false));
+    final data = _asMap(
+        await _request('GET', '/public/checkout-config', withAuth: false));
     final fee = data['serviceFee'];
     final window = data['paymentWindowSeconds'];
     if (fee is! num || window is! num) {
-      throw const ApiException('Konfigurasi pembayaran dari server tidak valid.', 0);
+      throw const ApiException(
+          'Konfigurasi pembayaran dari server tidak valid.', 0);
     }
-    return CheckoutConfig(serviceFee: fee.toInt(), paymentWindow: Duration(seconds: window.toInt()));
+    return CheckoutConfig(
+        serviceFee: fee.toInt(),
+        paymentWindow: Duration(seconds: window.toInt()));
   }
 
   static Future<List<Booking>> fetchCustomerBookings() async {
     final data = await _request('GET', '/customer/bookings');
-    return _asList(data).whereType<Map<String, dynamic>>().map(Booking.fromJson).toList();
+    return _asList(data)
+        .whereType<Map<String, dynamic>>()
+        .map(Booking.fromJson)
+        .toList();
   }
 
   static Future<Booking> cancelBooking(int bookingId) async {
-    final data = await _request('PUT', '/customer/bookings/$bookingId/cancel', body: <String, dynamic>{});
+    final data = await _request('PUT', '/customer/bookings/$bookingId/cancel',
+        body: <String, dynamic>{});
     return Booking.fromJson(_asMap(data));
   }
 
@@ -218,10 +307,15 @@ class ApiService {
       '/customer/bookings/$bookingId/reschedule-response',
       body: {'accept': accept},
     ));
-    return data['message'] is String ? data['message'] as String : 'Jawaban Anda telah tersimpan.';
+    return data['message'] is String
+        ? data['message'] as String
+        : 'Jawaban Anda telah tersimpan.';
   }
 
-  static Future<void> submitReview({required int bookingId, required int rating, required String comment}) async {
+  static Future<void> submitReview(
+      {required int bookingId,
+      required int rating,
+      required String comment}) async {
     await _request('POST', '/customer/reviews', body: {
       'bookingId': bookingId,
       'rating': rating,
@@ -230,7 +324,8 @@ class ApiService {
   }
 
   static Future<Booking> trackBooking(String bookingCode) async {
-    final data = await _request('GET', '/public/bookings/status/${Uri.encodeComponent(bookingCode)}');
+    final data = await _request(
+        'GET', '/public/bookings/status/${Uri.encodeComponent(bookingCode)}');
     return Booking.fromJson(_asMap(data));
   }
 }

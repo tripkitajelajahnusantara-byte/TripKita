@@ -7,6 +7,7 @@ class BookingStatus {
   static const paid = 'PAID';
   static const confirmed = 'CONFIRMED';
   static const completed = 'COMPLETED';
+  static const failed = 'FAILED';
   static const expired = 'EXPIRED';
   static const cancelledByCustomer = 'CANCELLED_BY_CUSTOMER';
   static const cancelledByProvider = 'CANCELLED_BY_PROVIDER';
@@ -157,7 +158,7 @@ class Booking {
 
   DateTime? get paymentDeadline => createdAt?.add(CheckoutConfig.currentPaymentWindow);
 
-  /// Invoice Xendit berlaku 24 jam; setelah itu pesanan dianggap kedaluwarsa
+  /// Checkout iPaymu berlaku 24 jam; setelah itu pesanan dianggap kedaluwarsa
   /// di tampilan walaupun backend belum memperbarui statusnya.
   bool get isPaymentExpired {
     if (status == BookingStatus.expired) return true;

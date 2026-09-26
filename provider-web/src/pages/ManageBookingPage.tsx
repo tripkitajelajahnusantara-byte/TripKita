@@ -89,7 +89,7 @@ export const ManageBookingPage: React.FC = () => {
           tripDate: b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
           guests: b.guests || 1,
           totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice || 0),
-          paymentMethod: b.paymentMethod || 'Xendit Invoice',
+          paymentMethod: b.paymentMethod || 'iPaymu Redirect Payment',
           createdAt: b.createdAt || '',
           paidAt: b.updatedAt || '',
           paymentUrl: b.paymentUrl,

@@ -128,6 +128,7 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 			log.Printf("[Notifikasi] Gagal memberi tahu admin tentang pengajuan pencairan %d: %v", payout.ID, err)
 		}
 	}
+	s.notifyProviderPayout(payout)
 
 	return payout, nil
 }
@@ -147,12 +148,16 @@ func payoutTypeLabel(payoutType string) string {
 
 // notifyProviderPayout memberi tahu mitra hasil akhir pengajuan pencairannya.
 func (s *payoutService) notifyProviderPayout(payout *models.Payout) {
-	if s.notifService == nil || payout == nil {
+	if payout == nil {
 		return
 	}
 
 	var title, message string
 	switch payout.Status {
+	case models.PayoutStatusPending:
+		title = "Pengajuan Pencairan Diterima"
+		message = fmt.Sprintf("Pengajuan pencairan %s sebesar Rp %s telah tercatat dan menunggu verifikasi admin.",
+			payoutTypeLabel(payout.Type), formatIDRNumber(payout.Amount))
 	case models.PayoutStatusApproved:
 		title = "Pencairan Dana Berhasil"
 		message = fmt.Sprintf("Pencairan %s sebesar Rp %s telah ditransfer ke %s %s.",
@@ -173,8 +178,17 @@ func (s *payoutService) notifyProviderPayout(payout *models.Payout) {
 		return
 	}
 
-	if err := s.notifService.CreateNotification(payout.ProviderID, "PROVIDER", title, message, NotifTypePayout, "/provider/keuangan"); err != nil {
-		log.Printf("[Notifikasi] Gagal memberi tahu provider %d tentang pencairan %d: %v", payout.ProviderID, payout.ID, err)
+	if s.notifService != nil {
+		if err := s.notifService.CreateNotification(payout.ProviderID, "PROVIDER", title, message, NotifTypePayout, "/provider/keuangan"); err != nil {
+			log.Printf("[Notifikasi] Gagal memberi tahu provider %d tentang pencairan %d: %v", payout.ProviderID, payout.ID, err)
+		}
+	}
+	if s.emailService != nil {
+		if provider, err := s.providerRepo.FindByID(payout.ProviderID); err == nil {
+			if err := s.emailService.SendPayoutStatusEmail(payout, provider); err != nil {
+				log.Printf("[Email] Gagal memberi tahu provider %d tentang pencairan %d: %v", payout.ProviderID, payout.ID, err)
+			}
+		}
 	}
 }
 
@@ -287,6 +301,9 @@ func (s *payoutService) GetAllPayouts() ([]models.Payout, error) {
 // semula: admin mentransfer manual lalu mencatat buktinya.
 func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string, proofPath string) (*models.Payout, error) {
 	automatic := s.cfg != nil && s.cfg.EnableAutoPayout && status == models.PayoutStatusApproved
+	if automatic {
+		return nil, errors.New("payout otomatis iPaymu belum boleh digunakan: API redirect/split payment tidak membuktikan transfer bank dua tahap; gunakan verifikasi dan bukti transfer admin")
+	}
 
 	var payout models.Payout
 	var routing BankRouting

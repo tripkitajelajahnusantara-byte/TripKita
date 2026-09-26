@@ -49,7 +49,7 @@ const getTrustedPaymentURL = (value?: string): string | null => {
   try {
     const parsed = new URL(value);
     const host = parsed.hostname.toLowerCase();
-    return parsed.protocol === 'https:' && (host === 'xendit.co' || host.endsWith('.xendit.co')) ? parsed.toString() : null;
+    return parsed.protocol === 'https:' && (host === 'my.ipaymu.com' || host === 'sandbox.ipaymu.com') ? parsed.toString() : null;
   } catch {
     return null;
   }
@@ -185,7 +185,7 @@ export const CustomerHistoryPage: React.FC = () => {
 	};
 
   useEffect(() => {
-    // Handle return from Xendit payment gateway
+	// Parameter redirect iPaymu hanya informasional; webhook tetap sumber status.
     const urlParams = new URLSearchParams(window.location.search);
 	const paymentResult = urlParams.get('payment_result');
 	const bookingId = urlParams.get('booking_id');
@@ -246,7 +246,7 @@ export const CustomerHistoryPage: React.FC = () => {
     if (!createdAt) return false;
     const createdTime = new Date(createdAt).getTime();
     if (isNaN(createdTime)) return false;
-    const expireTime = createdTime + paymentWindowSeconds * 1000; // Batas waktu invoice Xendit
+    const expireTime = createdTime + paymentWindowSeconds * 1000; // Batas waktu checkout iPaymu
     return Date.now() > expireTime;
   };
 
@@ -358,8 +358,17 @@ export const CustomerHistoryPage: React.FC = () => {
           bgColor: '#fee2e2',
           icon: <XCircle size={14} color="#ef4444" />
         };
+	  case 'FAILED':
+		return {
+		  label: 'Pembayaran Gagal',
+		  color: '#ef4444',
+		  bgColor: '#fee2e2',
+		  icon: <XCircle size={14} color="#ef4444" />
+		};
       case 'DIBATALKAN':
       case 'CANCELLED':
+	  case 'CANCELLED_BY_CUSTOMER':
+	  case 'CANCELLED_BY_PROVIDER':
         return {
           label: 'Pesanan Dibatalkan',
           color: '#ef4444',
@@ -388,6 +397,13 @@ export const CustomerHistoryPage: React.FC = () => {
           bgColor: '#eff6ff',
           icon: <AlertCircle size={14} color="#3b82f6" />
         };
+	  case 'REFUNDED':
+		return {
+		  label: 'Refund Selesai',
+		  color: '#10b981',
+		  bgColor: '#dcfce7',
+		  icon: <CheckCircle2 size={14} color="#10b981" />
+		};
       default:
         return {
           label: 'Dibatalkan',
@@ -514,7 +530,7 @@ export const CustomerHistoryPage: React.FC = () => {
                           if (trustedURL) {
                             window.location.href = trustedURL;
                           } else {
-                            alert('Tautan pembayaran Xendit tidak ditemukan. Silakan lakukan pemesanan ulang.');
+                            alert('Tautan pembayaran iPaymu tidak ditemukan. Silakan lakukan pemesanan ulang.');
                           }
                         }}
                         style={{
@@ -746,12 +762,12 @@ export const CustomerHistoryPage: React.FC = () => {
                       /* ACTIVE PENDING PAYMENT BANNER */
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Pembayaran Xendit:</strong>
+                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Pembayaran iPaymu:</strong>
                           <CountdownTimer createdAt={booking.createdAt} windowSeconds={paymentWindowSeconds} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
                         </div>
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
-                          Silakan lakukan pembayaran sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> via Payment Gateway Xendit.
+                          Silakan lakukan pembayaran sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> melalui checkout resmi iPaymu.
                         </span>
                         
                         <div style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
@@ -788,7 +804,7 @@ export const CustomerHistoryPage: React.FC = () => {
                                 if (trustedURL) {
                                   window.location.href = trustedURL;
                                 } else {
-                                  alert('Tautan pembayaran Xendit tidak ditemukan. Silakan lakukan pemesanan ulang.');
+                                  alert('Tautan pembayaran iPaymu tidak ditemukan. Silakan lakukan pemesanan ulang.');
                                 }
                               }}
                               style={{

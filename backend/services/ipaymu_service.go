@@ -12,6 +12,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,7 +39,7 @@ type IPaymuPaymentStatus struct {
 type IPaymuService interface {
 	CreatePayment(booking *models.Booking, packageName string) (*IPaymuPaymentResponse, error)
 	GetTransactionStatus(transactionID string) (*IPaymuPaymentStatus, error)
-	VerifyCallbackSignature(va, signature, timestamp string, body []byte) bool
+	VerifyCallbackSignature(signature string, payload map[string]interface{}) bool
 }
 
 type ipaymuService struct {
@@ -73,15 +75,120 @@ func (s *ipaymuService) generateSignature(method string, body []byte) (string, s
 	return signature, timestamp
 }
 
-func (s *ipaymuService) VerifyCallbackSignature(va, signature, timestamp string, body []byte) bool {
-	if s.cfg.IPaymuVA == "" || s.cfg.IPaymuAPIKey == "" {
+func (s *ipaymuService) VerifyCallbackSignature(signature string, payload map[string]interface{}) bool {
+	if s.cfg.IPaymuVA == "" || strings.TrimSpace(signature) == "" || payload == nil {
 		return false
 	}
-	if va != s.cfg.IPaymuVA {
+	normalized, err := NormalizeIPaymuCallback(payload)
+	if err != nil {
 		return false
 	}
-	// Di sandbox, verifikasi signature dipastikan valid
-	return true
+	delete(normalized, "signature")
+
+	// encoding/json mengurutkan map key secara leksikografis. Slash di-escape
+	// terpisah agar byte yang di-HMAC sama dengan implementasi resmi iPaymu.
+	body, err := marshalSortedIPaymuCallback(normalized)
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(s.cfg.IPaymuVA))
+	_, _ = mac.Write(body)
+	expected := mac.Sum(nil)
+	received, err := hex.DecodeString(strings.TrimSpace(signature))
+	return err == nil && hmac.Equal(expected, received)
+}
+
+// ParseIPaymuCallback membaca kedua content type callback yang didukung iPaymu.
+// Form-urlencoded adalah format default mereka; JSON merupakan alternatif.
+func ParseIPaymuCallback(body []byte, contentType string) (map[string]interface{}, error) {
+	payload := make(map[string]interface{})
+	if strings.Contains(strings.ToLower(contentType), "application/json") {
+		decoder := json.NewDecoder(bytes.NewReader(body))
+		decoder.UseNumber()
+		if err := decoder.Decode(&payload); err != nil {
+			return nil, fmt.Errorf("payload callback JSON tidak valid: %w", err)
+		}
+		return payload, nil
+	}
+
+	values, err := url.ParseQuery(string(body))
+	if err != nil {
+		return nil, fmt.Errorf("payload callback form tidak valid: %w", err)
+	}
+	for key, entries := range values {
+		if len(entries) > 0 {
+			payload[key] = entries[0]
+		}
+	}
+	if len(payload) == 0 {
+		return nil, fmt.Errorf("payload callback kosong")
+	}
+	return payload, nil
+}
+
+// NormalizeIPaymuCallback mengikuti aturan tipe data pada dokumentasi callback
+// iPaymu. Perbedaan satu tipe saja akan menghasilkan HMAC yang berbeda.
+func NormalizeIPaymuCallback(payload map[string]interface{}) (map[string]interface{}, error) {
+	normalized := make(map[string]interface{}, len(payload)+1)
+	integerFields := map[string]bool{
+		"trx_id": true, "status_code": true, "transaction_status_code": true, "paid_off": true,
+	}
+	for key, value := range payload {
+		switch {
+		case integerFields[key]:
+			n, err := strconv.ParseInt(stringValue(value), 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("field callback %s bukan integer", key)
+			}
+			normalized[key] = n
+		case key == "is_escrow":
+			raw := strings.ToLower(stringValue(value))
+			normalized[key] = raw == "true" || raw == "1"
+		case key == "additional_info":
+			if value == nil || stringValue(value) == "" || stringValue(value) == "[]" {
+				normalized[key] = []interface{}{}
+			} else if _, ok := value.([]interface{}); ok {
+				normalized[key] = value
+			} else {
+				normalized[key] = stringValue(value)
+			}
+		default:
+			normalized[key] = stringValue(value)
+		}
+	}
+	if _, exists := normalized["additional_info"]; !exists {
+		normalized["additional_info"] = []interface{}{}
+	}
+	return normalized, nil
+}
+
+func marshalSortedIPaymuCallback(payload map[string]interface{}) ([]byte, error) {
+	// Explicit sort documents the case-sensitive ordering requirement. The
+	// reconstructed map is then serialized deterministically by encoding/json.
+	keys := make([]string, 0, len(payload))
+	for key := range payload {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	ordered := make(map[string]interface{}, len(keys))
+	for _, key := range keys {
+		ordered[key] = payload[key]
+	}
+	body, err := json.Marshal(ordered)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(strings.ReplaceAll(string(body), "/", `\/`)), nil
+}
+
+func stringValue(value interface{}) string {
+	if value == nil {
+		return "null"
+	}
+	if number, ok := value.(json.Number); ok {
+		return number.String()
+	}
+	return fmt.Sprint(value)
 }
 
 func (s *ipaymuService) CreatePayment(booking *models.Booking, packageName string) (*IPaymuPaymentResponse, error) {
@@ -123,6 +230,7 @@ func (s *ipaymuService) CreatePayment(booking *models.Booking, packageName strin
 		"product":     []string{packageName},
 		"qty":         []int{1},
 		"price":       []int64{booking.TotalPrice},
+		"description": []string{fmt.Sprintf("Pemesanan %s - %d peserta", packageName, booking.Guests)},
 		"returnUrl":   returnURL,
 		"cancelUrl":   cancelURL,
 		"notifyUrl":   callbackURL,
@@ -168,20 +276,21 @@ func (s *ipaymuService) CreatePayment(booking *models.Booking, packageName strin
 
 	var ipaymuResp struct {
 		Status  int    `json:"Status"`
-		Success bool   `json:"Success"`
 		Message string `json:"Message"`
 		Data    struct {
-			SessionID     string `json:"SessionID"`
-			TransactionID int64  `json:"TransactionID"`
-			URL           string `json:"Url"`
+			SessionID     string      `json:"SessionID"`
+			TransactionID json.Number `json:"TransactionID"`
+			URL           string      `json:"Url"`
 		} `json:"Data"`
 	}
 
-	if err := json.Unmarshal(bodyBytes, &ipaymuResp); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
+	decoder.UseNumber()
+	if err := decoder.Decode(&ipaymuResp); err != nil {
 		return nil, err
 	}
 
-	if !ipaymuResp.Success || ipaymuResp.Data.URL == "" {
+	if ipaymuResp.Status < 200 || ipaymuResp.Status >= 300 || ipaymuResp.Data.URL == "" || ipaymuResp.Data.SessionID == "" {
 		return nil, fmt.Errorf("iPaymu error: %s", ipaymuResp.Message)
 	}
 
@@ -189,10 +298,15 @@ func (s *ipaymuService) CreatePayment(booking *models.Booking, packageName strin
 	if err != nil || parsedURL.Scheme != "https" {
 		return nil, fmt.Errorf("payment gateway mengembalikan URL tidak valid")
 	}
+	paymentHost := strings.ToLower(parsedURL.Hostname())
+	if paymentHost != "my.ipaymu.com" && paymentHost != "sandbox.ipaymu.com" {
+		return nil, fmt.Errorf("payment gateway mengembalikan host URL tidak resmi")
+	}
 
+	transactionID, _ := strconv.ParseInt(ipaymuResp.Data.TransactionID.String(), 10, 64)
 	return &IPaymuPaymentResponse{
 		SessionID:     ipaymuResp.Data.SessionID,
-		TransactionID: ipaymuResp.Data.TransactionID,
+		TransactionID: transactionID,
 		PaymentURL:    ipaymuResp.Data.URL,
 	}, nil
 }

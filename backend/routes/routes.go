@@ -45,7 +45,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 	authCtrl := controllers.NewAuthController(c.AuthService, cfg)
 	adminCtrl := controllers.NewAdminController(c.AdminService)
 	packageCtrl := controllers.NewPackageController(c.PackageService)
-	bookingCtrl := controllers.NewBookingController(c.BookingService, cfg)
+	bookingCtrl := controllers.NewBookingController(c.BookingService, c.IPaymuService, cfg)
 	dashboardCtrl := controllers.NewDashboardController(c.DashService)
 	uploadCtrl := controllers.NewUploadController(db)
 	oauthCtrl := controllers.NewOAuthController(db, cfg)
@@ -53,6 +53,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 	reviewCtrl := controllers.NewReviewController(c.ReviewService)
 	notifCtrl := controllers.NewNotificationController(c.NotifService)
 	departureCtrl := controllers.NewDepartureController(c.DepartureService)
+	tripPlanCtrl := controllers.NewTripPlanController(c.TripPlanService)
 
 	// Dokumen verifikasi tidak boleh menjadi file publik di production.
 	if !cfg.IsProduction() {
@@ -79,12 +80,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			public.POST("/bookings", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.CreateBooking)
 			public.GET("/bookings/status/:code", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.GetPublicStatus)
 			public.POST("/webhooks/ipaymu", middleware.RateLimit(120, time.Minute), bookingCtrl.IPaymuWebhook)
-			public.POST("/webhooks/ipaymu/payout", middleware.RateLimit(120, time.Minute), payoutCtrl.IPaymuPayoutWebhook)
-			public.POST("/webhooks/xendit", middleware.RateLimit(120, time.Minute), bookingCtrl.IPaymuWebhook)
 
 			if cfg.EnableDevMocks {
-				public.GET("/xendit-mock-checkout/:id", bookingCtrl.RenderMockCheckout)
-				public.POST("/xendit-mock-checkout/:id/pay", bookingCtrl.ProcessMockPayment)
+				public.GET("/ipaymu-mock-checkout/:id", bookingCtrl.RenderMockCheckout)
+				public.POST("/ipaymu-mock-checkout/:id/pay", bookingCtrl.ProcessMockPayment)
 			}
 
 			// Auth routes
@@ -200,6 +199,11 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			customer.GET("/notifications", notifCtrl.GetUserNotifications)
 			customer.PUT("/notifications/read-all", notifCtrl.MarkAllAsRead)
 			customer.PUT("/notifications/:id/read", notifCtrl.MarkAsRead)
+
+			customer.GET("/trip-plans", tripPlanCtrl.List)
+			customer.POST("/trip-plans", tripPlanCtrl.Create)
+			customer.PUT("/trip-plans/:id", tripPlanCtrl.Update)
+			customer.DELETE("/trip-plans/:id", tripPlanCtrl.Delete)
 		}
 	}
 

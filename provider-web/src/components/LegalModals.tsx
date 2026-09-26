@@ -291,7 +291,7 @@ export const GeneralTermsContent: React.FC = () => (
         <li>Penjadwalan ulang (Reschedule) akibat kuota kurang berlaku <strong>maksimal 1 (satu) kali</strong>. Jika pada jadwal pengganti kuota masih tidak terpenuhi di H-3, sistem akan melakukan Full Refund 100% otomatis.</li>
       </ul>
       <p style={{ margin: 0 }}>
-        5.3 <strong>Pembayaran Penuh & Dana Tertahan (Escrow System):</strong> Customer membayar penuh di muka melalui satu invoice Xendit, tanpa uang muka (DP). Setelah dipotong biaya layanan dan komisi platform, separuh bagian Provider dapat dicairkan segera dan separuh sisanya ditahan TripKita sampai trip selesai dilaksanakan.
+        5.3 <strong>Pembayaran Penuh & Dana Tertahan:</strong> Customer membayar penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari customer. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Provider tersedia untuk diajukan sebagai biaya persiapan dan separuh sisanya baru tersedia setelah trip selesai.
       </p>
     </LegalSection>
   </div>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"gorm.io/gorm/clause"
 
 	"tripkita-provider/models"
-	"tripkita-provider/services"
 )
 
 // ExpirePendingBookings menutup booking yang tidak dibayar dalam 24 jam.
@@ -23,7 +23,7 @@ import (
 func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 	cutoff := time.Now().Add(-models.PaymentWindow)
 	var candidates []models.Booking
-	if err := r.db.WithContext(ctx).Select("id", "xendit_invoice_id").
+	if err := r.db.WithContext(ctx).Select("id", "xendit_invoice_id", "ipaymu_transaction_id").
 		Where("status = ? AND created_at < ?", models.StatusPendingPayment, cutoff).
 		Find(&candidates).Error; err != nil {
 		log.Printf("[Auto Expire] Gagal mencari booking kedaluwarsa: %v", err)
@@ -47,7 +47,7 @@ func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 			continue
 		}
 
-		if err := r.expireOne(ctx, candidate.ID, cutoff); err != nil {
+		if err := r.container.BookingService.ExpirePendingBooking(candidate.ID, cutoff); err != nil {
 			if err != gorm.ErrRecordNotFound {
 				log.Printf("[Auto Expire] Booking %d gagal diproses: %v", candidate.ID, err)
 			}
@@ -84,11 +84,19 @@ const (
 // checkInvoiceBeforeExpiry memastikan status invoice ke payment gateway sebelum
 // booking dikedaluwarsakan.
 func (r *Runner) checkInvoiceBeforeExpiry(booking models.Booking) invoiceCheckResult {
-	if strings.TrimSpace(booking.XenditInvoiceID) == "" {
+	transactionID := strings.TrimSpace(booking.IPaymuTransactionID)
+	if transactionID == "" {
+		// Data lama dari integrasi direct dapat menyimpan transaction ID pada
+		// kolom legacy. Session UUID redirect tidak valid untuk endpoint status.
+		if _, err := strconv.ParseInt(booking.XenditInvoiceID, 10, 64); err == nil {
+			transactionID = booking.XenditInvoiceID
+		}
+	}
+	if transactionID == "" {
 		return invoiceUnpaid
 	}
 
-	txStatus, err := r.container.IPaymuService.GetTransactionStatus(booking.XenditInvoiceID)
+	txStatus, err := r.container.IPaymuService.GetTransactionStatus(transactionID)
 	if err != nil {
 		log.Printf("[Rekonsiliasi] Booking %d tidak dapat diverifikasi ke gateway, ditunda: %v", booking.ID, err)
 		return invoiceUnverified
@@ -107,21 +115,6 @@ func (r *Runner) checkInvoiceBeforeExpiry(booking models.Booking) invoiceCheckRe
 	}
 	log.Printf("[Rekonsiliasi] Booking %d diselesaikan dari status tagihan gateway (webhook tidak diterima).", booking.ID)
 	return invoiceSettled
-}
-
-func (r *Runner) expireOne(ctx context.Context, bookingID uint, cutoff time.Time) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var booking models.Booking
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ? AND status = ? AND created_at < ?", bookingID, models.StatusPendingPayment, cutoff).
-			First(&booking).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&booking).Update("status", "EXPIRED").Error; err != nil {
-			return err
-		}
-		return services.RecalculatePackageAvailability(tx, booking.PackageID)
-	})
 }
 
 // AutoCompleteFinishedBookings menandai trip yang sudah lewat sebagai selesai dan

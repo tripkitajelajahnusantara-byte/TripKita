@@ -11,8 +11,8 @@ import 'package:customer_mobile/utils/formatters.dart';
 import 'package:customer_mobile/widgets/common.dart';
 
 /// Halaman pembayaran, padanan `CustomerPaymentInvoicePage` di web: membuka
-/// invoice Xendit di browser, lalu memperbarui status saat pengguna kembali.
-/// Status lunas hanya diterima dari backend (webhook Xendit), tidak dari
+/// checkout iPaymu di browser, lalu memperbarui status saat pengguna kembali.
+/// Status lunas hanya diterima dari backend (webhook iPaymu), tidak dari
 /// halaman ini.
 class PaymentVerificationScreen extends StatefulWidget {
   final Booking booking;
@@ -33,7 +33,7 @@ class PaymentVerificationScreen extends StatefulWidget {
 class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> with WidgetsBindingObserver {
   late Booking _booking = widget.booking;
   bool _checking = false;
-  String _message = 'Mengarahkan ke halaman pembayaran aman Xendit...';
+  String _message = 'Mengarahkan ke halaman pembayaran aman iPaymu...';
   Timer? _ticker;
 
   @override
@@ -46,7 +46,7 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
     if (widget.openImmediately) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openInvoice());
     } else {
-      _message = 'Selesaikan pembayaran melalui halaman aman Xendit.';
+      _message = 'Selesaikan pembayaran melalui halaman aman iPaymu.';
     }
   }
 
@@ -71,7 +71,7 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
     final opened = await openExternal(uri);
     if (!mounted) return;
     setState(() => _message = opened
-        ? 'Halaman pembayaran Xendit telah dibuka. Setelah membayar, kembali ke aplikasi untuk melihat status pesanan.'
+        ? 'Halaman pembayaran iPaymu telah dibuka. Setelah membayar, kembali ke aplikasi untuk melihat status pesanan.'
         : 'Halaman pembayaran tidak dapat dibuka otomatis. Ketuk tombol di bawah untuk membukanya.');
   }
 
@@ -189,7 +189,7 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
           const SizedBox(height: 20),
           if (pending) ...[
             PrimaryButton(
-              label: 'Buka Halaman Pembayaran Xendit',
+              label: 'Buka Halaman Pembayaran iPaymu',
               color: AppColors.primary,
               icon: Icons.open_in_new,
               onPressed: _openInvoice,

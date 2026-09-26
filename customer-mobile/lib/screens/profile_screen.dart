@@ -61,15 +61,17 @@ class _GuestAccountTab extends StatelessWidget {
         EmptyState(
           icon: Icons.person_outline,
           title: 'Anda Belum Masuk',
-          message: 'Masuk untuk pesan open trip, menyimpan tiket, dan melihat riwayat perjalanan kamu.',
+          message:
+              'Masuk untuk pesan open trip, menyimpan tiket, dan melihat riwayat perjalanan kamu.',
           actions: [
             ElevatedButton(
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen())),
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const AuthScreen())),
               child: const Text('Masuk'),
             ),
             OutlinedButton(
-              onPressed: () => Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const AuthScreen(startInRegisterMode: true))),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const AuthScreen(startInRegisterMode: true))),
               child: const Text('Daftar gratis'),
             ),
           ],
@@ -96,13 +98,27 @@ class _PlannerMenu extends StatelessWidget {
         leading: Container(
           width: 42,
           height: 42,
-          decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(
+              color: AppColors.accentLight,
+              borderRadius: BorderRadius.circular(12)),
           child: const Icon(Icons.savings_outlined, color: AppColors.primary),
         ),
-        title: const Text('Rencanakan Perjalananmu', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
-        subtitle: const Text('Target budget, tabungan & checklist trip', style: TextStyle(fontSize: 12)),
+        title: const Text('Rencanakan Perjalananmu',
+            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
+        subtitle: const Text('Target budget, tabungan & checklist trip',
+            style: TextStyle(fontSize: 12)),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TripPlannerScreen())),
+        onTap: () async {
+          if (!AuthSession.instance.isLoggedIn) {
+            final ok = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(builder: (_) => const AuthScreen()));
+            if (ok != true || !context.mounted) return;
+          }
+          if (context.mounted) {
+            Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TripPlannerScreen()));
+          }
+        },
       ),
     );
   }
@@ -113,16 +129,20 @@ class _LegalLinks extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget tile(IconData icon, String label, VoidCallback onTap) => ListTile(
           leading: Icon(icon, color: AppColors.primary),
-          title: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          title: Text(label,
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           trailing: const Icon(Icons.chevron_right),
           onTap: onTap,
         );
     return SectionCard(
       padding: EdgeInsets.zero,
       child: Column(children: [
-        tile(Icons.description_outlined, 'Syarat & Ketentuan', () => showGeneralTerms(context)),
+        tile(Icons.description_outlined, 'Syarat & Ketentuan',
+            () => showGeneralTerms(context)),
         const Divider(),
-        tile(Icons.verified_user_outlined, 'Kebijakan Pembatalan Strict H-7', () => showCancellationPolicy(context)),
+        tile(Icons.verified_user_outlined, 'Kebijakan Pembatalan Strict H-7',
+            () => showCancellationPolicy(context)),
       ]),
     );
   }
@@ -149,7 +169,8 @@ class _AccountTabState extends State<_AccountTab> {
     _name.text = p.name;
     _whatsapp.text = p.whatsapp;
     if (_genders.contains(p.gender)) _gender = p.gender;
-    if (parseIsoDate(p.birthDate) != null) _birthDate = p.birthDate.substring(0, 10);
+    if (parseIsoDate(p.birthDate) != null)
+      _birthDate = p.birthDate.substring(0, 10);
   }
 
   @override
@@ -162,7 +183,10 @@ class _AccountTabState extends State<_AccountTab> {
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
     if (_name.text.trim().isEmpty) {
-      await showNoticeDialog(context, title: 'Periksa Form', message: 'Nama Lengkap wajib diisi.', isError: true);
+      await showNoticeDialog(context,
+          title: 'Periksa Form',
+          message: 'Nama Lengkap wajib diisi.',
+          isError: true);
       return;
     }
     setState(() => _saving = true);
@@ -176,10 +200,13 @@ class _AccountTabState extends State<_AccountTab> {
       });
       if (mounted) {
         await showNoticeDialog(context,
-            title: 'Profil Berhasil Diperbarui', message: 'Data akun Anda telah berhasil disimpan di database.');
+            title: 'Profil Berhasil Diperbarui',
+            message: 'Data akun Anda telah berhasil disimpan di database.');
       }
     } catch (e) {
-      if (mounted) await showNoticeDialog(context, title: 'Profil Gagal Disimpan', message: '$e', isError: true);
+      if (mounted)
+        await showNoticeDialog(context,
+            title: 'Profil Gagal Disimpan', message: '$e', isError: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -215,24 +242,44 @@ class _AccountTabState extends State<_AccountTab> {
             CircleAvatar(
               radius: 28,
               backgroundColor: AppColors.accentLight,
-              child: Text(profile.name.isNotEmpty ? profile.name[0].toUpperCase() : 'T',
-                  style: const TextStyle(fontSize: 22, color: AppColors.primary, fontWeight: FontWeight.w800)),
+              child: Text(
+                  profile.name.isNotEmpty ? profile.name[0].toUpperCase() : 'T',
+                  style: const TextStyle(
+                      fontSize: 22,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800)),
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(profile.name.isEmpty ? 'Pelanggan TripKita' : profile.name,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textDark)),
-                const SizedBox(height: 2),
-                Text(profile.email, style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(6)),
-                  child: const Text('Traveler',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                ),
-              ]),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                        profile.name.isEmpty
+                            ? 'Pelanggan TripKita'
+                            : profile.name,
+                        style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textDark)),
+                    const SizedBox(height: 2),
+                    Text(profile.email,
+                        style: const TextStyle(
+                            fontSize: 13, color: AppColors.textMuted)),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: AppColors.accentLight,
+                          borderRadius: BorderRadius.circular(6)),
+                      child: const Text('Traveler',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary)),
+                    ),
+                  ]),
             ),
           ]),
         ),
@@ -240,14 +287,20 @@ class _AccountTabState extends State<_AccountTab> {
         const _PlannerMenu(),
         const SizedBox(height: 16),
         SectionCard(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const Text('Akun', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Text('Akun',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark)),
             const Divider(height: 26),
             const FieldLabel('Nama Lengkap', required: true),
             TextField(
               controller: _name,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(hintText: 'Masukkan nama lengkap sesuai identitas'),
+              decoration: const InputDecoration(
+                  hintText: 'Masukkan nama lengkap sesuai identitas'),
             ),
             const SizedBox(height: 14),
             const FieldLabel('Alamat Email'),
@@ -262,50 +315,69 @@ class _AccountTabState extends State<_AccountTab> {
             TextField(
               controller: _whatsapp,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(hintText: 'Contoh: 08123456789'),
+              decoration:
+                  const InputDecoration(hintText: 'Contoh: 08123456789'),
             ),
             const SizedBox(height: 14),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const FieldLabel('Jenis Kelamin'),
-                  DropdownButtonFormField<String>(
-                    value: _gender,
-                    isExpanded: true,
-                    items: [for (final g in _genders) DropdownMenuItem(value: g, child: Text(g))],
-                    onChanged: (v) => setState(() => _gender = v ?? _gender),
-                  ),
-                ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const FieldLabel('Jenis Kelamin'),
+                      DropdownButtonFormField<String>(
+                        value: _gender,
+                        isExpanded: true,
+                        items: [
+                          for (final g in _genders)
+                            DropdownMenuItem(value: g, child: Text(g))
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _gender = v ?? _gender),
+                      ),
+                    ]),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const FieldLabel('Tanggal Lahir'),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () async {
-                      final today = dateOnly(DateTime.now());
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: parseIsoDate(_birthDate) ?? DateTime(2000),
-                        firstDate: DateTime(1920),
-                        lastDate: today,
-                      );
-                      if (picked != null) setState(() => _birthDate = toIsoDate(picked));
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        suffixIcon: Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.textLight),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const FieldLabel('Tanggal Lahir'),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () async {
+                          final today = dateOnly(DateTime.now());
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate:
+                                parseIsoDate(_birthDate) ?? DateTime(2000),
+                            firstDate: DateTime(1920),
+                            lastDate: today,
+                          );
+                          if (picked != null)
+                            setState(() => _birthDate = toIsoDate(picked));
+                        },
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            suffixIcon: Icon(Icons.calendar_today_outlined,
+                                size: 16, color: AppColors.textLight),
+                          ),
+                          child: Text(
+                              _birthDate.isEmpty
+                                  ? 'Pilih tanggal'
+                                  : formatIsoLong(_birthDate),
+                              style: const TextStyle(fontSize: 14)),
+                        ),
                       ),
-                      child: Text(_birthDate.isEmpty ? 'Pilih tanggal' : formatIsoLong(_birthDate),
-                          style: const TextStyle(fontSize: 14)),
-                    ),
-                  ),
-                ]),
+                    ]),
               ),
             ]),
             const SizedBox(height: 20),
-            PrimaryButton(label: 'Simpan Perubahan', loading: _saving, color: AppColors.primary, onPressed: _save),
+            PrimaryButton(
+                label: 'Simpan Perubahan',
+                loading: _saving,
+                color: AppColors.primary,
+                onPressed: _save),
           ]),
         ),
         const SizedBox(height: 16),
@@ -343,8 +415,13 @@ class _FavoritesTab extends StatelessWidget {
               EmptyState(
                 icon: Icons.favorite_border,
                 title: 'Belum Ada Paket Favorit',
-                message: 'Simpan paket wisata incaran Anda dengan menekan ikon hati pada kartu paket.',
-                actions: [ElevatedButton(onPressed: onBrowseTrips, child: const Text('Cari Paket Wisata'))],
+                message:
+                    'Simpan paket wisata incaran Anda dengan menekan ikon hati pada kartu paket.',
+                actions: [
+                  ElevatedButton(
+                      onPressed: onBrowseTrips,
+                      child: const Text('Cari Paket Wisata'))
+                ],
               )
             else
               for (final pkg in items) ...[
@@ -368,7 +445,8 @@ class _FavoriteTile extends StatelessWidget {
     return SectionCard(
       padding: const EdgeInsets.all(12),
       child: InkWell(
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripDetailScreen(package: pkg))),
+        onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => TripDetailScreen(package: pkg))),
         child: Row(children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
@@ -376,28 +454,43 @@ class _FavoriteTile extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${pkg.category}',
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                  '${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${pkg.category}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.accent)),
               const SizedBox(height: 4),
               Text(pkg.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark)),
               const SizedBox(height: 4),
-              Text(pkg.destination, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              Text(pkg.destination,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textMuted)),
               const SizedBox(height: 4),
               Text(formatIDR(pkg.price),
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.accent)),
             ]),
           ),
           IconButton(
             tooltip: 'Hapus dari Favorit',
             onPressed: () async {
-              await WishlistStore.instance.toggle(pkg, syncToAccount: AuthSession.instance.isLoggedIn);
-              if (context.mounted) showSnack(context, 'Paket berhasil dihapus dari Favorit.');
+              await WishlistStore.instance
+                  .toggle(pkg, syncToAccount: AuthSession.instance.isLoggedIn);
+              if (context.mounted)
+                showSnack(context, 'Paket berhasil dihapus dari Favorit.');
             },
             icon: const Icon(Icons.delete_outline, color: AppColors.danger),
           ),
