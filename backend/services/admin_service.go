@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 type AdminService interface {
 	ListProviders() ([]models.Provider, error)
 	UpdateProviderStatus(id uint, status string, notes string) error
+	UpdateProviderPlatformFee(id uint, platformFeePercent int64) error
 	DeleteProvider(id uint) error
 	GetProviderStatusHistory(providerID uint) ([]models.ProviderStatusHistory, error)
 	VerifyProviderLegal(id uint, action string, reason string) error
@@ -27,14 +29,51 @@ type adminService struct {
 	db           *gorm.DB
 	repo         repositories.ProviderRepository
 	notifService *NotificationService
+	emailService *EmailService
 }
 
-func NewAdminService(db *gorm.DB, repo repositories.ProviderRepository, notifService *NotificationService) AdminService {
-	return &adminService{db: db, repo: repo, notifService: notifService}
+func NewAdminService(db *gorm.DB, repo repositories.ProviderRepository, notifService *NotificationService, emailService *EmailService) AdminService {
+	return &adminService{db: db, repo: repo, notifService: notifService, emailService: emailService}
 }
 
 func (s *adminService) ListProviders() ([]models.Provider, error) {
 	return s.repo.FindAllProviders()
+}
+
+func (s *adminService) UpdateProviderPlatformFee(id uint, platformFeePercent int64) error {
+	if !models.IsAllowedProviderPlatformFeePercent(platformFeePercent) {
+		return errors.New("potongan platform harus berupa angka bulat antara 1% dan 100%")
+	}
+
+	provider, err := s.repo.FindByID(id)
+	if err != nil {
+		return err
+	}
+	if provider.Role != "PROVIDER" {
+		return errors.New("potongan platform hanya dapat diatur untuk provider")
+	}
+	if provider.PlatformFeePercent == platformFeePercent {
+		return nil
+	}
+
+	provider.PlatformFeePercent = platformFeePercent
+	if err := s.repo.Update(provider); err != nil {
+		return err
+	}
+
+	title := "Potongan Platform Diperbarui"
+	message := fmt.Sprintf("Potongan platform untuk transaksi baru akun Anda ditetapkan menjadi %d%%. Transaksi yang sudah dibuat tetap menggunakan tarif sebelumnya.", platformFeePercent)
+	if s.notifService != nil {
+		if err := s.notifService.CreateNotification(provider.ID, "PROVIDER", title, message, NotifTypeAccount, "/provider/keuangan"); err != nil {
+			log.Printf("[Notifikasi] Gagal memberi tahu provider %d tentang perubahan potongan: %v", provider.ID, err)
+		}
+	}
+	if s.emailService != nil {
+		if err := s.emailService.SendProviderPlatformFeeChangedEmail(provider, platformFeePercent); err != nil {
+			log.Printf("[Email] Gagal memberi tahu provider %d tentang perubahan potongan: %v", provider.ID, err)
+		}
+	}
+	return nil
 }
 
 func (s *adminService) UpdateProviderStatus(id uint, status string, notes string) error {

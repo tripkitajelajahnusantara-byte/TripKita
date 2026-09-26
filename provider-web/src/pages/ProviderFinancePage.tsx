@@ -31,6 +31,7 @@ interface PayoutItem {
 }
 
 interface PayoutSummary {
+  platformFeePercent: number;
   totalEarnings: number;
   platformFee: number;
   netEarnings: number;
@@ -223,7 +224,7 @@ export const ProviderFinancePage: React.FC = () => {
               {formatIDR(summary?.netEarnings || 0)}
             </strong>
             <span style={{ fontSize: '11.5px', color: '#16a34a', fontWeight: '600' }}>
-              Net 85% Paket (Setelah komisi platform 15% & Biaya Admin Rp 5rb)
+              Tarif booking baru {summary?.platformFeePercent || providerProfile?.platformFeePercent || 10}% + biaya layanan Rp5 ribu; transaksi lama mengikuti tarif saat dibuat
             </span>
           </div>
 

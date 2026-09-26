@@ -70,7 +70,7 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 		NotifService:     notifService,
 		IPaymuService:    ipaymuService,
 		AuthService:      NewAuthService(db, providerRepo, cfg, emailService, notifService),
-		AdminService:     NewAdminService(db, providerRepo, notifService),
+		AdminService:     NewAdminService(db, providerRepo, notifService, emailService),
 		PackageService:   NewPackageService(packageRepo, providerRepo, packageDateRepo),
 		BookingService:   bookingService,
 		DashService:      NewDashboardService(packageRepo, bookingRepo, providerRepo, reviewRepo),

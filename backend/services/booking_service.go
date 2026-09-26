@@ -421,7 +421,7 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 			return &BookingInputError{Message: "paket tidak ditemukan"}
 		}
 		var activeProvider models.Provider
-		if err := tx.Select("id").Where("id = ? AND role = ? AND status = ? AND is_verified = ?", pkg.ProviderID, "PROVIDER", "APPROVED", true).First(&activeProvider).Error; err != nil {
+		if err := tx.Select("id", "platform_fee_percent").Where("id = ? AND role = ? AND status = ? AND is_verified = ?", pkg.ProviderID, "PROVIDER", "APPROVED", true).First(&activeProvider).Error; err != nil {
 			return &BookingInputError{Message: "provider paket sedang tidak tersedia"}
 		}
 		if pkg.Status != "Aktif" {
@@ -453,6 +453,7 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		}
 
 		booking.ProviderID = pkg.ProviderID
+		booking.PlatformFeePercent = models.NormalizePlatformFeePercent(activeProvider.PlatformFeePercent)
 		booking.TripEndDate = calculateTripEnd(booking.TripDate, pkg.Duration)
 		serviceFee := models.BookingServiceFee
 		booking.TotalPrice = int64(booking.Guests)*pkg.Price + addOnTotal + serviceFee
@@ -701,21 +702,31 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID stri
 	var oldStatus, newStatus string
 	changed := false
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Package")
-		findErr := query.Where("ipaymu_transaction_id = ? OR xendit_invoice_id = ?", invoiceID, invoiceID).First(&booking).Error
+		// Start every fallback lookup from a fresh GORM chain. Reusing a chain
+		// after First returns ErrRecordNotFound keeps that error attached and
+		// prevents the reference/booking-code fallback from reaching PostgreSQL.
+		findBooking := func(condition string, args ...interface{}) error {
+			booking = models.Booking{}
+			return tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Preload("Package").
+				Where(condition, args...).
+				First(&booking).Error
+		}
+
+		findErr := findBooking("ipaymu_transaction_id = ? OR xendit_invoice_id = ?", invoiceID, invoiceID)
 		if findErr != nil && externalID != "" {
-			findErr = query.Where("booking_code = ?", externalID).First(&booking).Error
+			findErr = findBooking("booking_code = ?", externalID)
 		}
 		if findErr != nil && externalID != "" {
 			parts := strings.Split(externalID, "_")
 			if len(parts) == 3 && parts[0] == "booking" {
 				if idVal, parseErr := strconv.ParseUint(parts[1], 10, 32); parseErr == nil {
-					findErr = query.Where("id = ?", uint(idVal)).First(&booking).Error
+					findErr = findBooking("id = ?", uint(idVal))
 				}
 			} else if strings.HasPrefix(externalID, "TK-BOOK-") {
 				idStr := strings.TrimPrefix(externalID, "TK-BOOK-")
 				if idVal, parseErr := strconv.ParseUint(idStr, 10, 32); parseErr == nil {
-					findErr = query.Where("id = ?", uint(idVal)).First(&booking).Error
+					findErr = findBooking("id = ?", uint(idVal))
 				}
 			}
 		}
@@ -796,7 +807,7 @@ func recordFinanceOnPaymentTx(tx *gorm.DB, booking *models.Booking) error {
 		return err
 	}
 
-	split := models.SplitBookingEarning(booking.TotalPrice)
+	split := models.SplitBookingEarning(booking.TotalPrice, booking.PlatformFeePercent)
 	availableAmount := split.DPAmount
 	heldAmount := split.SettlementHeld
 

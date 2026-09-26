@@ -35,21 +35,17 @@ func (s *ExcelService) GenerateProviderFinanceCSV(provider *models.Provider, boo
 
 	// Section 1: Bookings & Revenue Breakdown
 	buf.WriteString("1. RIWAYAT PEMESANAN & PENDAPATAN BERSIH\n")
-	buf.WriteString("ID Booking,Kode Invoice,Nama Paket,Pelanggan,Tanggal Trip,Status,Gross Sales (Rp),Platform Fee 15% + Biaya Layanan (Rp),Net Revenue Provider (Rp)\n")
+	buf.WriteString("ID Booking,Kode Invoice,Nama Paket,Pelanggan,Tanggal Trip,Status,Gross Sales (Rp),Potongan Platform (%),Platform Fee + Biaya Layanan (Rp),Net Revenue Provider (Rp)\n")
 
 	var totalGross int64 = 0
 	var totalFee int64 = 0
 	var totalNet int64 = 0
 
 	for _, b := range bookings {
-		adminFee := int64(5000)
-		if b.TotalPrice < adminFee {
-			adminFee = 0
-		}
-		packageGross := b.TotalPrice - adminFee
-		commission := packageGross * 15 / 100
-		fee := commission + adminFee
-		net := packageGross - commission
+		feePercent := models.NormalizePlatformFeePercent(b.PlatformFeePercent)
+		split := models.SplitBookingEarning(b.TotalPrice, feePercent)
+		fee := split.PlatformFee
+		net := split.NetEarning
 		totalGross += b.TotalPrice
 		totalFee += fee
 		totalNet += net
@@ -61,7 +57,7 @@ func (s *ExcelService) GenerateProviderFinanceCSV(provider *models.Provider, boo
 
 		travelDateStr := b.TripDate.Format("02/01/2006")
 
-		buf.WriteString(fmt.Sprintf("%d,%s,\"%s\",\"%s\",%s,%s,%d,%d,%d\n",
+		buf.WriteString(fmt.Sprintf("%d,%s,\"%s\",\"%s\",%s,%s,%d,%d,%d,%d\n",
 			b.ID,
 			sanitizeCSV(b.BookingCode),
 			sanitizeCSV(pkgName),
@@ -69,11 +65,12 @@ func (s *ExcelService) GenerateProviderFinanceCSV(provider *models.Provider, boo
 			sanitizeCSV(travelDateStr),
 			sanitizeCSV(b.Status),
 			b.TotalPrice,
+			feePercent,
 			fee,
 			net,
 		))
 	}
-	buf.WriteString(fmt.Sprintf("TOTAL AUDIT,,,,,,%d,%d,%d\n\n", totalGross, totalFee, totalNet))
+	buf.WriteString(fmt.Sprintf("TOTAL AUDIT,,,,,,%d,,%d,%d\n\n", totalGross, totalFee, totalNet))
 
 	// Section 2: Payouts & Disbursement History
 	buf.WriteString("2. RIWAYAT PENCAIRAN DANA (PAYOUT DISBURSEMENT)\n")

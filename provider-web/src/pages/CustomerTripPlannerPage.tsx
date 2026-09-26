@@ -201,7 +201,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
     setPlannerError('');
     request('/customer/trip-plans')
       .then(async (data: any) => {
-        let remote = (Array.isArray(data) ? data : []).map(normalizeTripPlan);
+        const remote = (Array.isArray(data) ? data : []).map(normalizeTripPlan);
         const saved = localStorage.getItem(storageKey);
         if (remote.length === 0 && saved) {
           try {

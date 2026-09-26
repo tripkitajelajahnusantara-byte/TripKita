@@ -51,6 +51,29 @@ func (ctrl *AdminController) UpdateProviderStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Provider status updated successfully"})
 }
 
+func (ctrl *AdminController) UpdateProviderPlatformFee(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid provider ID"})
+		return
+	}
+
+	var req models.UpdateProviderPlatformFeeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Potongan platform harus berupa angka bulat antara 1 dan 100 persen"})
+		return
+	}
+	if err := ctrl.service.UpdateProviderPlatformFee(uint(id), req.PlatformFeePercent); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":            "Potongan platform berhasil diperbarui",
+		"platformFeePercent": req.PlatformFeePercent,
+	})
+}
+
 func (ctrl *AdminController) DeleteProvider(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)

@@ -48,6 +48,7 @@ interface ProviderAdminData {
   status: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'FAILED' | 'REJECTED';
   failureCode?: string;
   verificationNotes?: string;
+  platformFeePercent: number;
   createdAt: string;
 
   // New fields
@@ -108,6 +109,8 @@ export const AdminDashboardPage: React.FC = () => {
   const [selectedProvider, setSelectedProvider] = useState<ProviderAdminData | null>(null);
   const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([]);
   const [adminNotes, setAdminNotes] = useState('');
+  const [platformFeePercent, setPlatformFeePercent] = useState('10');
+  const [savingPlatformFee, setSavingPlatformFee] = useState(false);
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewObjectUrl, setPreviewObjectUrl] = useState<string | null>(null);
   const [previewDocName, setPreviewDocName] = useState<string>('');
@@ -339,6 +342,7 @@ export const AdminDashboardPage: React.FC = () => {
   useEffect(() => {
     if (selectedProvider) {
       setAdminNotes(selectedProvider.verificationNotes || '');
+      setPlatformFeePercent(String(selectedProvider.platformFeePercent || 10));
       // Select KTP or other path as default preview doc
       if (selectedProvider.ktpPath) {
         setPreviewDocUrl(selectedProvider.ktpPath);
@@ -372,6 +376,7 @@ export const AdminDashboardPage: React.FC = () => {
       setPreviewDocUrl(null);
       setPreviewDocName('');
       setAdminNotes('');
+      setPlatformFeePercent('10');
     }
   }, [selectedProvider]);
 
@@ -409,6 +414,37 @@ export const AdminDashboardPage: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to update provider status:', err);
       setError(err.message || 'Gagal memperbarui status provider.');
+    }
+  };
+
+  const handleUpdatePlatformFee = async () => {
+    if (!selectedProvider) return;
+
+    const numericPercent = Number(platformFeePercent);
+    if (!/^\d{1,3}$/.test(platformFeePercent) || !Number.isInteger(numericPercent) || numericPercent < 1 || numericPercent > 100) {
+      setSuccessMsg('');
+      setError('Potongan platform harus berupa angka bulat antara 1 dan 100 persen.');
+      return;
+    }
+
+    setSavingPlatformFee(true);
+    try {
+      setError('');
+      setSuccessMsg('');
+      await request(`/admin/providers/${selectedProvider.id}/platform-fee`, {
+        method: 'PUT',
+        body: JSON.stringify({ platformFeePercent: numericPercent }),
+      });
+
+      const updatedProviders = await request('/admin/providers');
+      setProviders(updatedProviders);
+      const updated = updatedProviders.find((provider: ProviderAdminData) => provider.id === selectedProvider.id);
+      if (updated) setSelectedProvider(updated);
+      setSuccessMsg(`Potongan platform ${numericPercent}% berhasil disimpan.`);
+    } catch (err: any) {
+      setError(err.message || 'Gagal memperbarui potongan platform.');
+    } finally {
+      setSavingPlatformFee(false);
     }
   };
 
@@ -1178,6 +1214,7 @@ export const AdminDashboardPage: React.FC = () => {
                             <th>PIC / Kontak</th>
                             <th>Kategori</th>
                             <th>Kota</th>
+                            <th>Potongan</th>
                             <th>Tanggal Daftar</th>
                             <th>Status</th>
                             <th>Aksi</th>
@@ -1207,6 +1244,7 @@ export const AdminDashboardPage: React.FC = () => {
                                 </td>
                                 <td style={{ textTransform: 'capitalize' }}>{p.businessCategory}</td>
                                 <td>{p.operationalCity}{p.operationalProvince ? `, ${p.operationalProvince}` : ''}</td>
+                                <td><strong>{p.platformFeePercent || 10}%</strong></td>
                                 <td>
                                   {new Date(p.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}<br/>
                                   <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>
@@ -1227,7 +1265,7 @@ export const AdminDashboardPage: React.FC = () => {
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={7} className="empty-table-state">
+                              <td colSpan={8} className="empty-table-state">
                                 Tidak ada data provider yang sesuai dengan kriteria.
                               </td>
                             </tr>
@@ -1333,7 +1371,42 @@ export const AdminDashboardPage: React.FC = () => {
                       )}
                     </tbody>
                   </table>
-                </div>                  {/* Section 1.5: Data Legal & Rekening */}
+                </div>
+
+                {/* Hanya admin yang dapat mengubah potongan platform provider. */}
+                <div className="drawer-section">
+                  <h4 className="section-title">Potongan Platform</h4>
+                  <p style={{ margin: '0 0 12px', color: '#64748b', fontSize: '13px', lineHeight: 1.5 }}>
+                    Persentase keuntungan TemenTrip dari nilai paket, di luar biaya layanan tetap. Perubahan hanya berlaku untuk booking baru.
+                  </p>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ flex: 1, position: 'relative' }}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={3}
+                      aria-label="Potongan platform provider"
+                      value={platformFeePercent}
+                      onChange={(event) => setPlatformFeePercent(event.target.value.replace(/\D/g, ''))}
+                      disabled={savingPlatformFee}
+                      placeholder="Contoh: 8 atau 10"
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '10px 36px 10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#fff' }}
+                    />
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontWeight: 700 }}>%</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="action-btn approve-btn"
+                      onClick={handleUpdatePlatformFee}
+                      disabled={savingPlatformFee || Number(platformFeePercent) === (selectedProvider.platformFeePercent || 10)}
+                    >
+                      {savingPlatformFee ? 'Menyimpan...' : 'Simpan Potongan'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 1.5: Data Legal & Rekening */}
                 <div className="drawer-section">
                   <h4 className="section-title">Data Legal & Rekening</h4>
                   

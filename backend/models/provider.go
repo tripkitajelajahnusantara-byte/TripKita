@@ -28,6 +28,7 @@ type Provider struct {
 	Role                string    `gorm:"size:50;not null;default:'PROVIDER'" json:"role"`
 	Status              string    `gorm:"size:50;not null;default:'PENDING'" json:"status"`
 	VerificationNotes   string    `gorm:"type:text" json:"verificationNotes"`
+	PlatformFeePercent  int64     `gorm:"not null;default:10" json:"platformFeePercent"`
 	CreatedAt           time.Time `json:"createdAt"`
 	UpdatedAt           time.Time `json:"updatedAt"`
 
@@ -88,6 +89,10 @@ type ProviderStatusHistory struct {
 type UpdateProviderStatusRequest struct {
 	Status            string `json:"status" binding:"required,oneof=APPROVED REJECTED PENDING"`
 	VerificationNotes string `json:"verificationNotes"`
+}
+
+type UpdateProviderPlatformFeeRequest struct {
+	PlatformFeePercent int64 `json:"platformFeePercent" binding:"required,gte=1,lte=100"`
 }
 
 type RegisterRequest struct {

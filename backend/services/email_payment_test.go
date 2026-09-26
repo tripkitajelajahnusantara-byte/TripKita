@@ -81,6 +81,27 @@ func TestEveryCustomerTransactionOutcomeBuildsAnEmail(t *testing.T) {
 	}
 }
 
+func TestProviderPlatformFeeChangeBuildsAnEmail(t *testing.T) {
+	provider := &models.Provider{BusinessName: "Mitra Uji", Email: "provider@example.com"}
+	email := NewEmailService(&config.Config{SMTPHost: "smtp.example.test", SMTPPort: "587", SMTPUser: "user", SMTPPass: "pass", SMTPFrom: "no-reply@example.test"}, NewPDFService())
+
+	var sentMessage string
+	email.mailSender = func(addr string, auth smtp.Auth, from string, to []string, message []byte) error {
+		if len(to) != 1 || to[0] != provider.Email {
+			t.Fatalf("email dikirim ke tujuan yang salah: %v", to)
+		}
+		sentMessage = string(message)
+		return nil
+	}
+
+	if err := email.SendProviderPlatformFeeChangedEmail(provider, 8); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sentMessage, "8%") || !strings.Contains(sentMessage, "booking baru") {
+		t.Fatal("email perubahan potongan tidak memuat tarif dan masa berlakunya")
+	}
+}
+
 func assertPDFXRefOffsets(t *testing.T, pdf []byte, objectCount int) {
 	t.Helper()
 	for objectID := 1; objectID <= objectCount; objectID++ {
