@@ -47,7 +47,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 	packageCtrl := controllers.NewPackageController(c.PackageService)
 	bookingCtrl := controllers.NewBookingController(c.BookingService, c.IPaymuService, cfg)
 	dashboardCtrl := controllers.NewDashboardController(c.DashService)
-	uploadCtrl := controllers.NewUploadController(db)
+	uploadCtrl := controllers.NewUploadController(db, cfg.DocumentUploadDir())
 	oauthCtrl := controllers.NewOAuthController(db, cfg)
 	payoutCtrl := controllers.NewPayoutController(c.PayoutService, c.ExcelService, c.PDFService, c.ProviderRepo, c.BookingRepo, c.PayoutRepo, cfg)
 	reviewCtrl := controllers.NewReviewController(c.ReviewService)
@@ -57,7 +57,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 
 	// Dokumen verifikasi tidak boleh menjadi file publik di production.
 	if !cfg.IsProduction() {
-		r.Static("/uploads", "./uploads")
+		r.Static("/uploads", cfg.DocumentUploadDir())
 	}
 
 	// API Group

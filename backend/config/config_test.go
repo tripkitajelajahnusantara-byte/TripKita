@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -25,6 +27,7 @@ func validProductionEnv() map[string]string {
 		"SMTP_USER":            "mailer",
 		"SMTP_PASS":            "mailer-password",
 		"SMTP_FROM":            "no-reply@example.com",
+		"UPLOAD_DIR":           filepath.Join(os.TempDir(), "tripkita-uploads"),
 	}
 }
 
@@ -38,7 +41,7 @@ func loadWith(t *testing.T, env map[string]string) (*Config, error) {
 		"IPAYMU_VA", "IPAYMU_API_KEY", "IPAYMU_BASE_URL", "IPAYMU_CALLBACK_URL", "IPAYMU_RETURN_URL", "IPAYMU_CANCEL_URL",
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM",
 		"RUN_MIGRATIONS", "SEED_DB", "ENABLE_DEV_MOCKS", "ENABLE_BACKGROUND_JOBS",
-		"ENABLE_AUTOMATIC_PAYOUT",
+		"ENABLE_AUTOMATIC_PAYOUT", "UPLOAD_DIR", "RAILWAY_VOLUME_MOUNT_PATH",
 	} {
 		t.Setenv(key, "")
 	}
@@ -58,6 +61,21 @@ func TestLoadConfigAcceptsValidProductionEnv(t *testing.T) {
 	}
 	if cfg.DBMaxOpenConns != 25 || cfg.DBMaxIdleConns != 10 {
 		t.Errorf("default pool tidak sesuai: open=%d idle=%d", cfg.DBMaxOpenConns, cfg.DBMaxIdleConns)
+	}
+}
+
+func TestProductionUsesRailwayVolumeMountPath(t *testing.T) {
+	env := validProductionEnv()
+	delete(env, "UPLOAD_DIR")
+	want := filepath.Join(os.TempDir(), "railway-tripkita-volume")
+	env["RAILWAY_VOLUME_MOUNT_PATH"] = want
+
+	cfg, err := loadWith(t, env)
+	if err != nil {
+		t.Fatalf("mount path otomatis Railway ditolak: %v", err)
+	}
+	if cfg.DocumentUploadDir() != want {
+		t.Fatalf("upload dir=%q, ingin %q", cfg.DocumentUploadDir(), want)
 	}
 }
 
@@ -85,6 +103,8 @@ func TestProductionRejectsUnsafeValues(t *testing.T) {
 		{"ipaymu api key kosong", func(e map[string]string) { e["IPAYMU_API_KEY"] = "" }, "IPAYMU_API_KEY"},
 		{"ipaymu production memakai sandbox", func(e map[string]string) { e["IPAYMU_BASE_URL"] = "https://sandbox.ipaymu.com/api/v2" }, "IPAYMU_BASE_URL"},
 		{"payout otomatis belum terintegrasi", func(e map[string]string) { e["ENABLE_AUTOMATIC_PAYOUT"] = "true" }, "ENABLE_AUTOMATIC_PAYOUT"},
+		{"upload dir kosong", func(e map[string]string) { e["UPLOAD_DIR"] = "" }, "UPLOAD_DIR"},
+		{"upload dir relatif", func(e map[string]string) { e["UPLOAD_DIR"] = "uploads" }, "path absolut"},
 		{"pool idle melebihi open", func(e map[string]string) {
 			e["DB_MAX_OPEN_CONNS"] = "5"
 			e["DB_MAX_IDLE_CONNS"] = "10"

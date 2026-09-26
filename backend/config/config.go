@@ -6,6 +6,7 @@ import (
 	"net/mail"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -22,6 +23,7 @@ type Config struct {
 	DBPass             string
 	DBName             string
 	DBSSLMode          string
+	UploadDir          string
 	JWTSecret          string
 	GoogleClientID     string
 	GoogleClientSecret string
@@ -60,6 +62,16 @@ func LoadConfig() (*Config, error) {
 	appEnv := strings.ToLower(getEnv("APP_ENV", "development"))
 	isProduction := appEnv == "production"
 
+	defaultUploadDir := "uploads"
+	if isProduction {
+		// Production must explicitly point this at persistent storage (for
+		// example a Railway Volume mounted at /app/uploads). A container-local
+		// default would silently lose KTP/NIB files on the next deploy.
+		defaultUploadDir = ""
+	}
+	uploadDir := getEnv("RAILWAY_VOLUME_MOUNT_PATH", defaultUploadDir)
+	uploadDir = getEnv("UPLOAD_DIR", uploadDir)
+
 	cfg := &Config{
 		AppEnv:             appEnv,
 		Port:               getEnv("PORT", "8080"),
@@ -70,6 +82,7 @@ func LoadConfig() (*Config, error) {
 		DBPass:             getEnv("DB_PASSWORD", ""),
 		DBName:             getEnv("DB_NAME", "tripkita_provider"),
 		DBSSLMode:          getEnv("DB_SSLMODE", "disable"),
+		UploadDir:          uploadDir,
 		JWTSecret:          getEnv("JWT_SECRET", ""),
 		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
@@ -106,6 +119,13 @@ func LoadConfig() (*Config, error) {
 
 func (c *Config) IsProduction() bool { return c.AppEnv == "production" }
 
+func (c *Config) DocumentUploadDir() string {
+	if strings.TrimSpace(c.UploadDir) == "" {
+		return "uploads"
+	}
+	return filepath.Clean(c.UploadDir)
+}
+
 func (c *Config) Validate() error {
 	if c.AppEnv != "development" && c.AppEnv != "test" && c.AppEnv != "production" {
 		return fmt.Errorf("APP_ENV harus development, test, atau production")
@@ -137,6 +157,12 @@ func (c *Config) Validate() error {
 	}
 	if !c.IsProduction() {
 		return nil
+	}
+	if strings.TrimSpace(c.UploadDir) == "" {
+		return fmt.Errorf("UPLOAD_DIR atau RAILWAY_VOLUME_MOUNT_PATH wajib diisi pada production dan diarahkan ke persistent volume")
+	}
+	if !filepath.IsAbs(c.UploadDir) {
+		return fmt.Errorf("UPLOAD_DIR production wajib berupa path absolut")
 	}
 
 	required := map[string]string{

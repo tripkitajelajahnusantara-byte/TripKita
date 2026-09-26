@@ -556,9 +556,9 @@ export const AdminDashboardPage: React.FC = () => {
     const isRejected = status === 'REJECTED';
 
     return (
-      <div className="doc-row-container" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div className="doc-row-container">
+        <div className="doc-row-heading">
+          <div className="doc-row-identity">
             <FileText size={16} color={color} />
             <div>
               <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>{label}</div>
@@ -576,10 +576,10 @@ export const AdminDashboardPage: React.FC = () => {
               </span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div className="doc-row-actions">
             {activePath && (
               <>
-                <button className="doc-action-btn" onClick={() => { setPreviewDocUrl(activePath); setPreviewDocName(`${filename}_active`); }} style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', cursor: 'pointer', background: 'white' }}>Lihat Aktif</button>
+                <button className="doc-action-btn" onClick={() => { setPreviewDocUrl(activePath); setPreviewDocName(filename); }} style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', cursor: 'pointer', background: 'white' }}>Lihat Aktif</button>
               </>
             )}
           </div>
@@ -593,18 +593,18 @@ export const AdminDashboardPage: React.FC = () => {
 
         {isPending && pendingPath && (
           <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '10px', marginTop: '4px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div className="doc-pending-header">
               <span style={{ fontSize: '11px', fontWeight: 700, color: '#b45309' }}>Berkas Baru:</span>
               <button 
                 className="doc-action-btn" 
-                onClick={() => { setPreviewDocUrl(pendingPath); setPreviewDocName(`${filename}_pending`); }} 
+                onClick={() => { setPreviewDocUrl(pendingPath); setPreviewDocName(`${filename} (Berkas Baru)`); }} 
                 style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #b45309', cursor: 'pointer', background: 'white', color: '#b45309', fontWeight: 600 }}
               >
                 Lihat Berkas Baru
               </button>
             </div>
             
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div className="doc-verification-actions">
               <button 
                 type="button"
                 style={{ flex: 1, padding: '5px', fontSize: '10px', fontWeight: 700, color: 'white', backgroundColor: '#10b981', border: 0, borderRadius: '4px', cursor: 'pointer' }}
@@ -1379,8 +1379,8 @@ export const AdminDashboardPage: React.FC = () => {
                   <p style={{ margin: '0 0 12px', color: '#64748b', fontSize: '13px', lineHeight: 1.5 }}>
                     Persentase keuntungan TemenTrip dari nilai paket, di luar biaya layanan tetap. Perubahan hanya berlaku untuk booking baru.
                   </p>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <div style={{ flex: 1, position: 'relative' }}>
+                  <div className="platform-fee-form">
+                    <div className="platform-fee-input-wrap">
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1391,13 +1391,13 @@ export const AdminDashboardPage: React.FC = () => {
                       onChange={(event) => setPlatformFeePercent(event.target.value.replace(/\D/g, ''))}
                       disabled={savingPlatformFee}
                       placeholder="Contoh: 8 atau 10"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '10px 36px 10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#fff' }}
+                      className="platform-fee-input"
                     />
                     <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontWeight: 700 }}>%</span>
                     </div>
                     <button
                       type="button"
-                      className="action-btn approve-btn"
+                      className="platform-fee-save-btn"
                       onClick={handleUpdatePlatformFee}
                       disabled={savingPlatformFee || Number(platformFeePercent) === (selectedProvider.platformFeePercent || 10)}
                     >
@@ -1510,7 +1510,7 @@ export const AdminDashboardPage: React.FC = () => {
                 {/* Section 2: Dokumen Legalitas */}
                 <div className="drawer-section">
                   <h4 className="section-title">Dokumen Legalitas</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="document-list-rows">
                     {renderAdminDocRow('KTP PIC/Pemilik', 'KTP_PIC.jpg', selectedProvider.ktpPath, selectedProvider.pendingKtpPath, selectedProvider.ktpStatus, selectedProvider.ktpRejectionReason, 'ktp', '#3b82f6')}
                     {renderAdminDocRow('NIB', 'NIB.pdf', selectedProvider.nibPath, selectedProvider.pendingNibPath, selectedProvider.nibStatus, selectedProvider.nibRejectionReason, 'nib', '#f59e0b')}
                     {renderAdminDocRow('SIUP (Dokumen Pendukung)', 'SIUP_NIB.pdf', selectedProvider.documentPath, selectedProvider.pendingDocumentPath, selectedProvider.siupStatus, selectedProvider.siupRejectionReason, 'siup', '#10b981')}
@@ -1747,6 +1747,7 @@ export const AdminDashboardPage: React.FC = () => {
           display: flex;
           flex-direction: column;
           min-height: 100vh;
+          min-width: 0;
         }
 
         .admin-top-header {
@@ -1844,6 +1845,7 @@ export const AdminDashboardPage: React.FC = () => {
           display: flex;
           flex: 1;
           position: relative;
+          min-width: 0;
         }
 
         .admin-main-content {
@@ -2225,6 +2227,8 @@ export const AdminDashboardPage: React.FC = () => {
         /* Detail Provider Drawer */
         .detail-provider-drawer {
           width: 440px;
+          min-width: 0;
+          flex: 0 0 440px;
           background-color: #ffffff;
           border-left: 1px solid #e2e8f0;
           box-shadow: -4px 0 20px rgba(0, 0, 0, 0.05);
@@ -2232,6 +2236,7 @@ export const AdminDashboardPage: React.FC = () => {
           top: 64px;
           height: calc(100vh - 64px);
           overflow-y: auto;
+          overflow-x: hidden;
           z-index: 5;
         }
 
@@ -2240,6 +2245,7 @@ export const AdminDashboardPage: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 24px;
+          min-width: 0;
         }
 
         .drawer-header-row {
@@ -2278,6 +2284,16 @@ export const AdminDashboardPage: React.FC = () => {
           border: 1px solid #e2e8f0;
           border-radius: 12px;
           padding: 16px;
+          min-width: 0;
+        }
+
+        .drawer-profile-card > div:last-child {
+          min-width: 0;
+        }
+
+        .drawer-profile-card h3,
+        .drawer-profile-card p {
+          overflow-wrap: anywhere;
         }
 
         .profile-logo-avatar {
@@ -2353,6 +2369,48 @@ export const AdminDashboardPage: React.FC = () => {
         .info-table .field-value {
           color: #0f172a;
           font-weight: 600;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        .platform-fee-form {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .platform-fee-input-wrap {
+          position: relative;
+          min-width: 0;
+        }
+
+        .platform-fee-input {
+          width: 100%;
+          box-sizing: border-box;
+          padding: 10px 36px 10px 12px;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          background: #ffffff;
+        }
+
+        .platform-fee-save-btn {
+          min-height: 40px;
+          width: auto;
+          padding: 8px 14px;
+          border: 0;
+          border-radius: 8px;
+          background: #10b981;
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .platform-fee-save-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
         }
 
         .social-link {
@@ -2369,6 +2427,44 @@ export const AdminDashboardPage: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 12px;
+        }
+
+        .doc-row-container {
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 12px;
+          background-color: #ffffff;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .doc-row-heading,
+        .doc-pending-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .doc-row-identity {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+
+        .doc-row-identity > div {
+          min-width: 0;
+        }
+
+        .doc-row-actions,
+        .doc-verification-actions {
+          display: flex;
+          gap: 6px;
+          flex-shrink: 0;
         }
 
         .doc-row {
@@ -2391,6 +2487,7 @@ export const AdminDashboardPage: React.FC = () => {
           font-size: 12px;
           font-weight: 700;
           color: #334155;
+          overflow-wrap: anywhere;
         }
 
         .doc-badge {
@@ -2434,6 +2531,14 @@ export const AdminDashboardPage: React.FC = () => {
           align-items: center;
           justify-content: space-between;
           margin-bottom: 8px;
+          gap: 12px;
+          min-width: 0;
+        }
+
+        .preview-header-row .section-title {
+          min-width: 0;
+          margin-bottom: 0;
+          overflow-wrap: anywhere;
         }
 
         .preview-controls {
@@ -2574,12 +2679,16 @@ export const AdminDashboardPage: React.FC = () => {
         /* Drawer Actions Row */
         .drawer-actions-row {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 8px;
           margin-top: 12px;
         }
 
         .drawer-actions-row .action-btn {
+          width: 100%;
+          height: auto;
+          min-width: 0;
+          min-height: 42px;
           padding: 10px;
           border-radius: 8px;
           font-size: 12px;
@@ -2588,6 +2697,8 @@ export const AdminDashboardPage: React.FC = () => {
           text-align: center;
           border: none;
           transition: all 0.2s;
+          line-height: 1.25;
+          white-space: normal;
         }
 
         .drawer-actions-row .approve-btn {
@@ -2624,7 +2735,7 @@ export const AdminDashboardPage: React.FC = () => {
           background-color: #ffffff;
           border: 1px solid #ef4444;
           color: #ef4444;
-          grid-column: span 1;
+          grid-column: 1 / -1;
         }
 
         .drawer-actions-row .delete-btn:hover {
@@ -2636,6 +2747,88 @@ export const AdminDashboardPage: React.FC = () => {
           padding: 60px !important;
           color: #94a3b8;
           font-style: italic;
+        }
+
+        @media (max-width: 1200px) {
+          .detail-provider-drawer {
+            position: fixed;
+            top: 64px;
+            right: 0;
+            width: min(520px, 100vw);
+            height: calc(100dvh - 64px);
+            flex-basis: auto;
+            z-index: 30;
+            box-shadow: -12px 0 32px rgba(15, 23, 42, 0.18);
+          }
+        }
+
+        @media (max-width: 560px) {
+          .detail-provider-drawer {
+            left: 0;
+            width: 100vw;
+          }
+
+          .drawer-inner {
+            padding: 20px 16px 28px;
+            gap: 20px;
+          }
+
+          .drawer-profile-card {
+            align-items: flex-start;
+          }
+
+          .info-table,
+          .info-table tbody,
+          .info-table tr,
+          .info-table td {
+            display: block;
+            width: 100%;
+          }
+
+          .info-table tr {
+            padding: 7px 0;
+          }
+
+          .info-table td {
+            padding: 0;
+          }
+
+          .info-table .field-label {
+            width: auto;
+            margin-bottom: 2px;
+            font-size: 12px;
+          }
+
+          .platform-fee-form {
+            grid-template-columns: 1fr;
+          }
+
+          .platform-fee-save-btn {
+            width: 100%;
+          }
+
+          .doc-row-heading,
+          .doc-pending-header {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .doc-row-actions,
+          .doc-row-actions .doc-action-btn {
+            width: 100%;
+          }
+
+          .preview-header-row {
+            align-items: flex-start;
+          }
+
+          .drawer-actions-row {
+            grid-template-columns: 1fr;
+          }
+
+          .drawer-actions-row .action-btn {
+            grid-column: 1;
+          }
         }
       `}</style>
     </div>

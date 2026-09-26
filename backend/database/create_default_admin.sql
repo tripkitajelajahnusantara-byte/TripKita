@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 DO $$
 DECLARE
     v_email       TEXT := 'admin@tementrip.id';
-    v_password    TEXT := 'GANTI_PASSWORD_ADMIN_DI_SINI';
+    v_password    TEXT := '123123123123';
     v_name        TEXT := 'TemenTrip Admin';
     v_whatsapp    TEXT := '080000000000';
     v_hash        TEXT;
