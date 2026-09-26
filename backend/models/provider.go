@@ -28,7 +28,7 @@ type Provider struct {
 	Role                string    `gorm:"size:50;not null;default:'PROVIDER'" json:"role"`
 	Status              string    `gorm:"size:50;not null;default:'PENDING'" json:"status"`
 	VerificationNotes   string    `gorm:"type:text" json:"verificationNotes"`
-	PlatformFeePercent  int64     `gorm:"not null;default:10" json:"platformFeePercent"`
+	PlatformFeePercent  int64     `gorm:"not null;default:15" json:"platformFeePercent"`
 	CreatedAt           time.Time `json:"createdAt"`
 	UpdatedAt           time.Time `json:"updatedAt"`
 

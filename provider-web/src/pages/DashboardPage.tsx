@@ -313,18 +313,18 @@ export const DashboardPage: React.FC = () => {
             <div className="quick-actions-card">
               <h3>Aksi Cepat</h3>
               <div className="action-links-list">
-                <div className="action-item" onClick={() => navigateTo('tambah-paket')}>
+                <button type="button" className="action-item" onClick={() => navigateTo('tambah-paket')}>
                   <span>Tambah Paket Baru</span>
                   <ChevronRight size={16} />
-                </div>
-                <div className="action-item" onClick={() => navigateTo('booking')}>
+                </button>
+                <button type="button" className="action-item" onClick={() => navigateTo('booking')}>
                   <span>Lihat Semua Booking</span>
                   <ChevronRight size={16} />
-                </div>
-                <div className="action-item" onClick={() => navigateTo('kelola-paket')}>
+                </button>
+                <button type="button" className="action-item" onClick={() => navigateTo('kelola-paket')}>
                   <span>Kelola Paket</span>
                   <ChevronRight size={16} />
-                </div>
+                </button>
               </div>
             </div>
 

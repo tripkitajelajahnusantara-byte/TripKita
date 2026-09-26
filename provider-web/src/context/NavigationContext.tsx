@@ -124,7 +124,7 @@ interface ProviderProfile {
   role: 'ADMIN' | 'PROVIDER' | 'CUSTOMER';
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   verificationNotes?: string;
-  platformFeePercent?: 8 | 10;
+  platformFeePercent?: number;
 
   // New fields
   website?: string;

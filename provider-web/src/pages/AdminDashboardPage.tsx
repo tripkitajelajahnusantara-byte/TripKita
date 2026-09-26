@@ -109,7 +109,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [selectedProvider, setSelectedProvider] = useState<ProviderAdminData | null>(null);
   const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([]);
   const [adminNotes, setAdminNotes] = useState('');
-  const [platformFeePercent, setPlatformFeePercent] = useState('10');
+  const [platformFeePercent, setPlatformFeePercent] = useState('15');
   const [savingPlatformFee, setSavingPlatformFee] = useState(false);
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewObjectUrl, setPreviewObjectUrl] = useState<string | null>(null);
@@ -342,7 +342,7 @@ export const AdminDashboardPage: React.FC = () => {
   useEffect(() => {
     if (selectedProvider) {
       setAdminNotes(selectedProvider.verificationNotes || '');
-      setPlatformFeePercent(String(selectedProvider.platformFeePercent || 10));
+      setPlatformFeePercent(String(selectedProvider.platformFeePercent || 15));
       // Select KTP or other path as default preview doc
       if (selectedProvider.ktpPath) {
         setPreviewDocUrl(selectedProvider.ktpPath);
@@ -376,7 +376,7 @@ export const AdminDashboardPage: React.FC = () => {
       setPreviewDocUrl(null);
       setPreviewDocName('');
       setAdminNotes('');
-      setPlatformFeePercent('10');
+      setPlatformFeePercent('15');
     }
   }, [selectedProvider]);
 
@@ -674,10 +674,12 @@ export const AdminDashboardPage: React.FC = () => {
       {/* Sidebar Panel */}
       <aside className="admin-sidebar">
         <div>
-          <div className="sidebar-brand" onClick={() => navigateTo('beranda')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="/tementrip_official_logo.png" alt="TemenTrip" style={{ height: '34px', width: 'auto', objectFit: 'contain' }} />
-            <span className="logo-subtext" style={{ fontSize: '12px', color: '#ef4444', fontWeight: 700, backgroundColor: '#fee2e2', padding: '2px 8px', borderRadius: '10px' }}>Admin Panel</span>
-          </div>
+          <button type="button" className="sidebar-brand" onClick={() => navigateTo('beranda')}>
+            <span className="sidebar-logo-surface">
+              <img className="sidebar-brand-logo" src="/tementrip_official_logo.png" alt="TemenTrip" />
+            </span>
+            <span className="sidebar-context-badge admin">Admin</span>
+          </button>
 
           <nav className="sidebar-menu">
             <button 
@@ -784,7 +786,7 @@ export const AdminDashboardPage: React.FC = () => {
                   <p style={{ color: 'var(--color-text-medium)', maxWidth: '500px', margin: '8px auto 24px' }}>
                     Gunakan menu "Kelola Provider" untuk memverifikasi dokumen kelayakan provider baru atau "Administrasi Refund" untuk memproses refund dana.
                   </p>
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                  <div className="admin-dashboard-actions">
                     <button className="submit-form-btn" onClick={() => setActiveView('kelola-provider')} style={{ width: 'auto', padding: '12px 24px', display: 'inline-flex' }}>
                       Menuju Pusat Verifikasi <ArrowRight size={16} style={{ marginLeft: '8px' }} />
                     </button>
@@ -1244,7 +1246,7 @@ export const AdminDashboardPage: React.FC = () => {
                                 </td>
                                 <td style={{ textTransform: 'capitalize' }}>{p.businessCategory}</td>
                                 <td>{p.operationalCity}{p.operationalProvince ? `, ${p.operationalProvince}` : ''}</td>
-                                <td><strong>{p.platformFeePercent || 10}%</strong></td>
+                                <td><strong>{p.platformFeePercent || 15}%</strong></td>
                                 <td>
                                   {new Date(p.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}<br/>
                                   <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>
@@ -1399,7 +1401,7 @@ export const AdminDashboardPage: React.FC = () => {
                       type="button"
                       className="platform-fee-save-btn"
                       onClick={handleUpdatePlatformFee}
-                      disabled={savingPlatformFee || Number(platformFeePercent) === (selectedProvider.platformFeePercent || 10)}
+                      disabled={savingPlatformFee || Number(platformFeePercent) === (selectedProvider.platformFeePercent || 15)}
                     >
                       {savingPlatformFee ? 'Menyimpan...' : 'Simpan Potongan'}
                     </button>
@@ -1464,7 +1466,7 @@ export const AdminDashboardPage: React.FC = () => {
                           </tr>
                         </tbody>
                       </table>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div className="legal-verification-actions">
                         <button 
                           type="button"
                           className="action-btn approve-btn" 
@@ -1868,6 +1870,68 @@ export const AdminDashboardPage: React.FC = () => {
         .verification-header-box p {
           font-size: 14px;
           color: #64748b;
+        }
+
+        .admin-dashboard-actions {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .admin-dashboard-actions > button {
+          min-height: 42px;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .admin-layout .submit-form-btn,
+        .admin-layout .back-form-btn,
+        .admin-layout .approve-action-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          min-height: 38px;
+          padding: 9px 16px;
+          border-radius: 8px;
+          border: 1px solid transparent;
+          font-size: 13px;
+          line-height: 1.2;
+          font-weight: 700;
+          white-space: normal;
+          text-align: center;
+          cursor: pointer;
+          transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+        }
+
+        .admin-layout .submit-form-btn,
+        .admin-layout .approve-action-btn {
+          background: #2563eb;
+          color: #ffffff;
+        }
+
+        .admin-layout .submit-form-btn:hover:not(:disabled),
+        .admin-layout .approve-action-btn:hover:not(:disabled) {
+          background: #1d4ed8;
+        }
+
+        .admin-layout .back-form-btn {
+          background: #ffffff;
+          border-color: #cbd5e1;
+          color: #334155;
+        }
+
+        .admin-layout .back-form-btn:hover:not(:disabled) {
+          background: #f8fafc;
+          border-color: #94a3b8;
+        }
+
+        .admin-layout .submit-form-btn:disabled,
+        .admin-layout .back-form-btn:disabled,
+        .admin-layout .approve-action-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
         }
 
         /* Stats Row */
@@ -2413,6 +2477,20 @@ export const AdminDashboardPage: React.FC = () => {
           opacity: 0.55;
         }
 
+        .legal-verification-actions {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+
+        .legal-verification-actions .action-btn {
+          width: 100%;
+          height: auto;
+          min-width: 0;
+          min-height: 36px;
+          border-radius: 7px;
+        }
+
         .social-link {
           color: #3b82f6;
           text-decoration: none;
@@ -2762,6 +2840,76 @@ export const AdminDashboardPage: React.FC = () => {
           }
         }
 
+        @media (max-width: 900px) {
+          .admin-layout {
+            grid-template-columns: 1fr;
+          }
+
+          .admin-sidebar {
+            position: relative;
+            top: auto;
+            height: auto;
+            padding: 16px;
+            gap: 12px;
+          }
+
+          .admin-sidebar .sidebar-brand {
+            max-width: 220px;
+            margin-bottom: 14px;
+            padding: 0;
+          }
+
+          .admin-sidebar .sidebar-menu {
+            flex-direction: row;
+            overflow-x: auto;
+            padding-bottom: 4px;
+          }
+
+          .admin-sidebar .menu-btn {
+            width: auto;
+            flex: 0 0 auto;
+            white-space: nowrap;
+          }
+
+          .admin-sidebar .sidebar-bottom {
+            align-items: flex-start;
+          }
+
+          .admin-top-header {
+            padding: 0 16px;
+          }
+
+          .admin-top-header .hamburger-btn {
+            display: none;
+          }
+
+          .admin-main-content {
+            padding: 24px 18px;
+          }
+
+          .stats-cards-row {
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+          }
+
+          .tab-filters-row {
+            overflow-x: auto;
+            padding: 0 8px;
+          }
+
+          .tab-filter-btn {
+            flex: 0 0 auto;
+            white-space: nowrap;
+          }
+
+          .filter-controls-row {
+            flex-wrap: wrap;
+          }
+
+          .search-input-box {
+            flex-basis: 100%;
+          }
+        }
+
         @media (max-width: 560px) {
           .detail-provider-drawer {
             left: 0;
@@ -2828,6 +2976,25 @@ export const AdminDashboardPage: React.FC = () => {
 
           .drawer-actions-row .action-btn {
             grid-column: 1;
+          }
+
+          .admin-top-header .profile-details {
+            display: none;
+          }
+
+          .verification-header-box h1 {
+            font-size: 21px;
+          }
+
+          .admin-dashboard-actions,
+          .admin-dashboard-actions > button,
+          .filter-select,
+          .filter-btn-outline {
+            width: 100% !important;
+          }
+
+          .legal-verification-actions {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>

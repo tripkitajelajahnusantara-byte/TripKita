@@ -264,12 +264,8 @@ func reverseProviderFinanceTx(tx *gorm.DB, booking *models.Booking) error {
 	if settlement.Status == "CANCELLED" {
 		return nil
 	}
-	serviceFee := models.BookingServiceFee
-	packageGross := booking.TotalPrice - serviceFee
-	if packageGross < 0 {
-		packageGross = 0
-	}
-	providerNet := packageGross * 85 / 100
+	split := models.SplitBookingEarning(booking.TotalPrice, booking.PlatformFeePercent)
+	providerNet := split.NetEarning
 	heldReduction := int64(0)
 	availableReduction := providerNet
 	if settlement.Status == "HELD" {

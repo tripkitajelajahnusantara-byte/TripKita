@@ -88,15 +88,15 @@ func ConnectDB(cfg *config.Config) {
 		}
 		fmt.Println("Migrasi database selesai")
 
-		// Provider baru memakai tarif default 10%. Booking menyimpan snapshot
+		// Provider baru memakai tarif default 15%. Booking menyimpan snapshot
 		// tarif agar perubahan admin tidak mengubah laporan transaksi lama.
 		// Nilai kosong pada booking berasal dari versi lama yang masih memakai
 		// komisi hardcoded 15%, sehingga dibackfill dengan tarif legacy tersebut.
-		execMigration(`UPDATE providers SET platform_fee_percent = 10 WHERE platform_fee_percent IS NULL OR platform_fee_percent < 1 OR platform_fee_percent > 100;`)
-		execMigration(`ALTER TABLE providers ALTER COLUMN platform_fee_percent SET DEFAULT 10;`)
+		execMigration(`UPDATE providers SET platform_fee_percent = 15 WHERE platform_fee_percent IS NULL OR platform_fee_percent < 1 OR platform_fee_percent > 100;`)
+		execMigration(`ALTER TABLE providers ALTER COLUMN platform_fee_percent SET DEFAULT 15;`)
 		execMigration(`ALTER TABLE providers ALTER COLUMN platform_fee_percent SET NOT NULL;`)
 		execMigration(`UPDATE bookings SET platform_fee_percent = 15 WHERE platform_fee_percent IS NULL OR platform_fee_percent = 0;`)
-		execMigration(`ALTER TABLE bookings ALTER COLUMN platform_fee_percent SET DEFAULT 10;`)
+		execMigration(`ALTER TABLE bookings ALTER COLUMN platform_fee_percent SET DEFAULT 15;`)
 		execMigration(`ALTER TABLE bookings ALTER COLUMN platform_fee_percent SET NOT NULL;`)
 		execMigration(`ALTER TABLE providers DROP CONSTRAINT IF EXISTS providers_platform_fee_percent_check;`)
 		execMigration(`ALTER TABLE providers ADD CONSTRAINT providers_platform_fee_percent_check CHECK (platform_fee_percent BETWEEN 1 AND 100);`)

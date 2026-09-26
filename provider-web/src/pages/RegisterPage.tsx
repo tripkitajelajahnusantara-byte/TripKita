@@ -595,7 +595,7 @@ export const RegisterPage: React.FC = () => {
               3.4 Larangan Transaksi di Luar Platform: Mitra dilarang keras mengarahkan pengguna akhir untuk melakukan transaksi pembayaran di luar platform TemenTrip. Pelanggaran terhadap ketentuan ini dapat mengakibatkan penangguhan atau pemutusan akun Mitra secara permanen.</p>
 
               <strong>4. BIAYA DAN PENCAIRAN DANA (ESCROW SYSTEM)</strong>
-              <p>4.1 Biaya Layanan: TemenTrip mengenakan biaya komisi sesuai tarif kerja sama provider sebesar 8% atau 10% dari setiap transaksi pembayaran paket wisata yang berhasil dilakukan melalui platform.<br/>
+              <p>4.1 Biaya Layanan: TemenTrip mengenakan komisi sesuai tarif kerja sama yang tercantum pada akun Mitra. Tarif awal provider baru adalah 15% dan dapat disesuaikan oleh Administrator untuk kerja sama tertentu.<br/>
               4.2 Pencairan Dana Mitra: Pengguna membayar penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari pengguna. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Mitra tersedia untuk diajukan sebagai biaya persiapan operasional, dan separuh sisanya baru tersedia setelah trip selesai.<br/>
               4.3 Batas Waktu Kuota H-3: Jika pada H-3 kuota minimal belum terpenuhi, Mitra diberikan wewenang di dashboard untuk memilih [Tetap Berangkat], [Jadwalkan Ulang], atau [Batalkan] (seluruh pesanan dikembalikan penuh kepada pengguna).</p>
 

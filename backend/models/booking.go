@@ -21,7 +21,7 @@ type Booking struct {
 	TotalPrice      int64     `gorm:"not null" json:"totalPrice"`
 	// PlatformFeePercent adalah snapshot tarif provider saat booking dibuat.
 	// Nilai ini tidak ikut berubah saat admin mengganti tarif provider di kemudian hari.
-	PlatformFeePercent int64  `json:"platformFeePercent"`
+	PlatformFeePercent int64  `gorm:"not null;default:15" json:"platformFeePercent"`
 	PaymentMethod      string `gorm:"size:100" json:"paymentMethod"`
 	Status             string `gorm:"size:50;default:'PENDING_PAYMENT'" json:"status"` // PENDING_PAYMENT, PAID, CONFIRMED, COMPLETED, FAILED, EXPIRED, CANCELLED_BY_CUSTOMER, CANCELLED_BY_PROVIDER, REFUND_REQUIRED, REFUNDED
 	// XenditInvoiceID dipertahankan sementara agar klien/data lama tetap dapat

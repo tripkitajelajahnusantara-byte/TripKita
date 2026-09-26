@@ -23,13 +23,9 @@ type HeldSettlement struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
-// PlatformAdminFee adalah biaya layanan tetap yang dipungut dari setiap booking
-// berbayar sebelum komisi dihitung.
-const PlatformAdminFee int64 = 5000
-
 const (
 	// DefaultPlatformFeePercent berlaku untuk provider baru.
-	DefaultPlatformFeePercent int64 = 10
+	DefaultPlatformFeePercent int64 = 15
 	// LegacyPlatformFeePercent menjaga transaksi lama yang dibuat saat tarif
 	// platform masih hardcoded 15 persen.
 	LegacyPlatformFeePercent int64 = 15
@@ -62,7 +58,7 @@ type EarningSplit struct {
 // dihitung. Ringkasan pencairan, buku besar saldo, dan data seed wajib memakai
 // fungsi ini agar tidak ada dua versi rumus yang saling menyimpang.
 func SplitBookingEarning(totalCustomerPaid int64, platformFeePercent int64) EarningSplit {
-	adminFee := PlatformAdminFee
+	adminFee := BookingServiceFee
 	if totalCustomerPaid < adminFee {
 		adminFee = 0
 	}

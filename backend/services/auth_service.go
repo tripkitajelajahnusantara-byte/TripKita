@@ -85,11 +85,12 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 		Email:               req.Email,
 		// Kredensial kanonik disimpan di users; kolom lama dibiarkan kosong
 		// supaya tidak ada dua salinan password hash untuk akun baru.
-		PasswordHash: "",
-		WhatsApp:     req.WhatsApp,
-		Role:         "PROVIDER",
-		Status:       "PENDING",
-		IsVerified:   false,
+		PasswordHash:       "",
+		WhatsApp:           req.WhatsApp,
+		Role:               "PROVIDER",
+		Status:             "PENDING",
+		IsVerified:         false,
+		PlatformFeePercent: models.DefaultPlatformFeePercent,
 	}
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {

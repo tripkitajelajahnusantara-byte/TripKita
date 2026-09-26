@@ -40,3 +40,13 @@ func TestProviderPlatformFeeOptions(t *testing.T) {
 		t.Fatal("persentase di luar 1-100 harus ditolak")
 	}
 }
+
+func TestInvalidPlatformFeeFallsBackToFifteenPercent(t *testing.T) {
+	if got := NormalizePlatformFeePercent(0); got != 15 {
+		t.Fatalf("default potongan=%d, ingin 15", got)
+	}
+	split := SplitBookingEarning(1_005_000, 0)
+	if split.PlatformFee != 155_000 || split.NetEarning != 850_000 {
+		t.Fatalf("pembagian default 15%% salah: %+v", split)
+	}
+}

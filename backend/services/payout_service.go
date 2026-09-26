@@ -528,16 +528,11 @@ func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error)
 	var eligible int64
 	now := time.Now()
 	for _, booking := range bookings {
-		adminFee := int64(5000)
-		if booking.TotalPrice < adminFee {
-			adminFee = 0
-		}
-		providerNet := (booking.TotalPrice - adminFee) * 85 / 100
-		dpAmount := providerNet / 2
+		split := models.SplitBookingEarning(booking.TotalPrice, booking.PlatformFeePercent)
 		if current.Type == "DP_50" {
-			eligible += dpAmount
+			eligible += split.DPAmount
 		} else if tripHasEnded(booking, now) {
-			eligible += providerNet - dpAmount
+			eligible += split.SettlementHeld
 		}
 	}
 
