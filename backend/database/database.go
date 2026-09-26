@@ -69,6 +69,7 @@ func ConnectDB(cfg *config.Config) {
 			&models.User{},
 			&models.AuthSession{},
 			&models.Package{},
+			&models.PackageDate{},
 			&models.Booking{},
 			&models.BookingParticipant{},
 			&models.ProviderStatusHistory{},
@@ -87,6 +88,21 @@ func ConnectDB(cfg *config.Config) {
 		}
 		fmt.Println("Migrasi database selesai")
 
+		// Provider baru memakai tarif default 10%. Booking menyimpan snapshot
+		// tarif agar perubahan admin tidak mengubah laporan transaksi lama.
+		// Nilai kosong pada booking berasal dari versi lama yang masih memakai
+		// komisi hardcoded 15%, sehingga dibackfill dengan tarif legacy tersebut.
+		execMigration(`UPDATE providers SET platform_fee_percent = 10 WHERE platform_fee_percent IS NULL OR platform_fee_percent < 1 OR platform_fee_percent > 100;`)
+		execMigration(`ALTER TABLE providers ALTER COLUMN platform_fee_percent SET DEFAULT 10;`)
+		execMigration(`ALTER TABLE providers ALTER COLUMN platform_fee_percent SET NOT NULL;`)
+		execMigration(`UPDATE bookings SET platform_fee_percent = 15 WHERE platform_fee_percent IS NULL OR platform_fee_percent = 0;`)
+		execMigration(`ALTER TABLE bookings ALTER COLUMN platform_fee_percent SET DEFAULT 10;`)
+		execMigration(`ALTER TABLE bookings ALTER COLUMN platform_fee_percent SET NOT NULL;`)
+		execMigration(`ALTER TABLE providers DROP CONSTRAINT IF EXISTS providers_platform_fee_percent_check;`)
+		execMigration(`ALTER TABLE providers ADD CONSTRAINT providers_platform_fee_percent_check CHECK (platform_fee_percent BETWEEN 1 AND 100);`)
+		execMigration(`ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_platform_fee_percent_check;`)
+		execMigration(`ALTER TABLE bookings ADD CONSTRAINT bookings_platform_fee_percent_check CHECK (platform_fee_percent BETWEEN 1 AND 100);`)
+
 		// Ensure RLS (Row Level Security) is enabled on all tables for Supabase security compliance
 		execMigration(`ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS bookings ENABLE ROW LEVEL SECURITY;`)
@@ -103,6 +119,8 @@ func ConnectDB(cfg *config.Config) {
 		execMigration(`ALTER TABLE IF EXISTS auth_sessions ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS oauth_login_codes ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS trip_plans ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS trip_departures ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS package_dates ENABLE ROW LEVEL SECURITY;`)
 		if err := syncLegacyAuthUsers(); err != nil {
 			log.Fatalf("Migrasi identitas akun lama gagal: %v", err)
 		}
@@ -686,7 +704,13 @@ func SeedDatabase() {
 		},
 	}
 
+	providerFeeByID := make(map[uint]int64, len(createdProviders))
+	for _, provider := range createdProviders {
+		providerFeeByID[provider.ID] = models.NormalizePlatformFeePercent(provider.PlatformFeePercent)
+	}
+
 	for i := range bookingsList {
+		bookingsList[i].PlatformFeePercent = providerFeeByID[bookingsList[i].ProviderID]
 		if err := DB.Create(&bookingsList[i]).Error; err == nil {
 			b := bookingsList[i]
 			if b.Status == "CONFIRMED" || b.Status == "PAID" || b.Status == "COMPLETED" {
@@ -694,7 +718,7 @@ func SeedDatabase() {
 				// pencairan. Sebelumnya seeder membelah harga kotor menjadi dua
 				// tanpa memotong biaya layanan dan komisi, sehingga buku besar
 				// data contoh selalu dilaporkan selisih oleh job rekonsiliasi.
-				split := models.SplitBookingEarning(b.TotalPrice)
+				split := models.SplitBookingEarning(b.TotalPrice, b.PlatformFeePercent)
 
 				// Create held_settlements record
 				settlement := models.HeldSettlement{

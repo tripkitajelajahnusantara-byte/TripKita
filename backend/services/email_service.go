@@ -441,6 +441,35 @@ func (s *EmailService) SendTripPlanEventEmail(customer *models.Provider, plan *m
 	return s.sendMailWithAttachment(customer.Email, subject, htmlBody, nil, "")
 }
 
+// SendProviderPlatformFeeChangedEmail memberi tahu mitra ketika admin mengubah
+// persentase keuntungan platform. Tarif baru hanya berlaku untuk booking baru.
+func (s *EmailService) SendProviderPlatformFeeChangedEmail(provider *models.Provider, percent int64) error {
+	if provider == nil || strings.TrimSpace(provider.Email) == "" {
+		return nil
+	}
+
+	name := provider.BusinessName
+	if strings.TrimSpace(name) == "" {
+		name = provider.PicName
+	}
+	subject := fmt.Sprintf("Potongan Platform TemenTrip Diperbarui Menjadi %d%%", percent)
+	htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #1e293b;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #0284c7;">Temen<span style="color: #00c9a7;">Trip</span></h2>
+    <p>Halo <strong>%s</strong>,</p>
+    <p>Administrator telah menetapkan potongan platform akun Anda menjadi <strong>%d%%</strong>.</p>
+    <p>Tarif ini berlaku untuk booking baru. Booking yang sudah dibuat tetap memakai tarif yang tersimpan pada transaksi tersebut.</p>
+    <p>Anda dapat melihat ringkasan pendapatan melalui halaman Keuangan Partner Hub.</p>
+  </div>
+</body>
+</html>`, html.EscapeString(name), percent)
+
+	return s.sendMailWithAttachment(provider.Email, subject, htmlBody, nil, "")
+}
+
 func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfBytes []byte, pdfFilename string) error {
 	smtpUser := s.cfg.SMTPUser
 	smtpPass := s.cfg.SMTPPass

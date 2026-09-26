@@ -50,6 +50,7 @@ type CreatePayoutRequest struct {
 }
 
 type PayoutSummary struct {
+	PlatformFeePercent int64    `json:"platformFeePercent"`
 	TotalEarnings      int64    `json:"totalEarnings"`
 	PlatformFee        int64    `json:"platformFee"`
 	NetEarnings        int64    `json:"netEarnings"`

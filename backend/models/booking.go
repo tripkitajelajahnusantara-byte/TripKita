@@ -19,8 +19,11 @@ type Booking struct {
 	TripEndDate     time.Time `gorm:"not null" json:"tripEndDate"`
 	Guests          int       `gorm:"not null" json:"guests"`
 	TotalPrice      int64     `gorm:"not null" json:"totalPrice"`
-	PaymentMethod   string    `gorm:"size:100" json:"paymentMethod"`
-	Status          string    `gorm:"size:50;default:'PENDING_PAYMENT'" json:"status"` // PENDING_PAYMENT, PAID, CONFIRMED, COMPLETED, FAILED, EXPIRED, CANCELLED_BY_CUSTOMER, CANCELLED_BY_PROVIDER, REFUND_REQUIRED, REFUNDED
+	// PlatformFeePercent adalah snapshot tarif provider saat booking dibuat.
+	// Nilai ini tidak ikut berubah saat admin mengganti tarif provider di kemudian hari.
+	PlatformFeePercent int64  `json:"platformFeePercent"`
+	PaymentMethod      string `gorm:"size:100" json:"paymentMethod"`
+	Status             string `gorm:"size:50;default:'PENDING_PAYMENT'" json:"status"` // PENDING_PAYMENT, PAID, CONFIRMED, COMPLETED, FAILED, EXPIRED, CANCELLED_BY_CUSTOMER, CANCELLED_BY_PROVIDER, REFUND_REQUIRED, REFUNDED
 	// XenditInvoiceID dipertahankan sementara agar klien/data lama tetap dapat
 	// dibaca. Integrasi baru menggunakan kedua field iPaymu di bawah ini.
 	XenditInvoiceID     string     `gorm:"size:255" json:"xenditInvoiceId,omitempty"`

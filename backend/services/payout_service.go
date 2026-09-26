@@ -193,6 +193,10 @@ func (s *payoutService) notifyProviderPayout(payout *models.Payout) {
 }
 
 func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.PayoutSummary, error) {
+	provider, err := s.providerRepo.FindByID(providerID)
+	if err != nil {
+		return nil, err
+	}
 	bookings, err := s.bookingRepo.FindAllByProvider(providerID)
 	if err != nil {
 		return nil, err
@@ -213,7 +217,7 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 
 	for _, b := range bookings {
 		if b.Status == "CONFIRMED" || b.Status == "PAID" || b.Status == "COMPLETED" {
-			split := models.SplitBookingEarning(b.TotalPrice)
+			split := models.SplitBookingEarning(b.TotalPrice, b.PlatformFeePercent)
 
 			grossOmset += b.TotalPrice
 			totalPlatformFee += split.PlatformFee
@@ -274,6 +278,7 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 	expectedAvailable := availableDP + availablePelunasan + pendingPayout
 
 	return &models.PayoutSummary{
+		PlatformFeePercent: models.NormalizePlatformFeePercent(provider.PlatformFeePercent),
 		TotalEarnings:      grossOmset,
 		PlatformFee:        totalPlatformFee,
 		NetEarnings:        totalNetEarnings,

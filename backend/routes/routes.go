@@ -174,6 +174,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			admin.GET("/providers", adminCtrl.ListProviders)
 			admin.GET("/documents", uploadCtrl.GetAdminDocument)
 			admin.PUT("/providers/:id/status", adminCtrl.UpdateProviderStatus)
+			admin.PUT("/providers/:id/platform-fee", adminCtrl.UpdateProviderPlatformFee)
 			admin.DELETE("/providers/:id", adminCtrl.DeleteProvider)
 			admin.GET("/providers/:id/history", adminCtrl.GetStatusHistory)
 			admin.POST("/providers/:id/verify-legal", adminCtrl.VerifyProviderLegal)

@@ -27,9 +27,27 @@ type HeldSettlement struct {
 // berbayar sebelum komisi dihitung.
 const PlatformAdminFee int64 = 5000
 
-// PlatformCommissionPercent adalah komisi platform atas nilai paket setelah
-// biaya layanan tetap dipotong.
-const PlatformCommissionPercent int64 = 15
+const (
+	// DefaultPlatformFeePercent berlaku untuk provider baru.
+	DefaultPlatformFeePercent int64 = 10
+	// LegacyPlatformFeePercent menjaga transaksi lama yang dibuat saat tarif
+	// platform masih hardcoded 15 persen.
+	LegacyPlatformFeePercent int64 = 15
+)
+
+func IsAllowedProviderPlatformFeePercent(percent int64) bool {
+	return percent >= 1 && percent <= 100
+}
+
+// NormalizePlatformFeePercent menerima persentase bulat yang valid. Nilai di
+// luar rentang kembali ke tarif default agar perhitungan tidak menghasilkan
+// saldo negatif.
+func NormalizePlatformFeePercent(percent int64) int64 {
+	if IsAllowedProviderPlatformFeePercent(percent) {
+		return percent
+	}
+	return DefaultPlatformFeePercent
+}
 
 // EarningSplit memerinci satu booking berbayar menjadi bagian platform dan
 // bagian mitra, termasuk pembagian DP dan pelunasan.
@@ -43,14 +61,15 @@ type EarningSplit struct {
 // SplitBookingEarning adalah satu-satunya tempat pembagian uang per booking
 // dihitung. Ringkasan pencairan, buku besar saldo, dan data seed wajib memakai
 // fungsi ini agar tidak ada dua versi rumus yang saling menyimpang.
-func SplitBookingEarning(totalCustomerPaid int64) EarningSplit {
+func SplitBookingEarning(totalCustomerPaid int64, platformFeePercent int64) EarningSplit {
 	adminFee := PlatformAdminFee
 	if totalCustomerPaid < adminFee {
 		adminFee = 0
 	}
 
 	packageGross := totalCustomerPaid - adminFee
-	netEarning := packageGross * (100 - PlatformCommissionPercent) / 100
+	platformFeePercent = NormalizePlatformFeePercent(platformFeePercent)
+	netEarning := packageGross * (100 - platformFeePercent) / 100
 	dpAmount := netEarning / 2
 
 	return EarningSplit{
