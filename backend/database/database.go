@@ -70,6 +70,7 @@ func ConnectDB(cfg *config.Config) {
 			&models.AuthSession{},
 			&models.Package{},
 			&models.Booking{},
+			&models.BookingParticipant{},
 			&models.ProviderStatusHistory{},
 			&models.Payout{},
 			&models.Review{},
@@ -79,6 +80,7 @@ func ConnectDB(cfg *config.Config) {
 			&models.OAuthLoginCode{},
 			&models.RefundRecord{},
 			&models.TripDeparture{},
+			&models.TripPlan{},
 		)
 		if err != nil {
 			log.Fatalf("Migrasi database gagal: %v", err)
@@ -88,6 +90,7 @@ func ConnectDB(cfg *config.Config) {
 		// Ensure RLS (Row Level Security) is enabled on all tables for Supabase security compliance
 		execMigration(`ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS bookings ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS booking_participants ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS packages ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS providers ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS payouts ENABLE ROW LEVEL SECURITY;`)
@@ -99,6 +102,7 @@ func ConnectDB(cfg *config.Config) {
 		execMigration(`ALTER TABLE IF EXISTS users ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS auth_sessions ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS oauth_login_codes ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS trip_plans ENABLE ROW LEVEL SECURITY;`)
 		if err := syncLegacyAuthUsers(); err != nil {
 			log.Fatalf("Migrasi identitas akun lama gagal: %v", err)
 		}
@@ -638,7 +642,7 @@ func SeedDatabase() {
 			TripEndDate:     time.Now().AddDate(0, 0, 10+1),
 			Guests:          2,
 			TotalPrice:      700000,
-			PaymentMethod:   "Xendit Invoice",
+			PaymentMethod:   "iPaymu Redirect Payment",
 			Status:          "CONFIRMED",
 		},
 		{
@@ -651,7 +655,7 @@ func SeedDatabase() {
 			TripEndDate:     time.Now().AddDate(0, 0, 13+1),
 			Guests:          4,
 			TotalPrice:      1800000,
-			PaymentMethod:   "Xendit Invoice",
+			PaymentMethod:   "iPaymu Redirect Payment",
 			Status:          "CONFIRMED",
 		},
 		{

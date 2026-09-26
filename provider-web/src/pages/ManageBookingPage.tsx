@@ -11,9 +11,24 @@ import {
   X,
   FileSpreadsheet
 } from 'lucide-react';
-import type { Booking } from '../types';
+import type { Booking, BookingParticipant } from '../types';
 import { request } from '../utils/api';
 import { ForceMajeureForm } from '../components/ForceMajeureForm';
+
+// Format tanggal lahir peserta (YYYY-MM-DD) beserta umur saat ini
+const formatParticipantBirth = (birthDate?: string) => {
+  if (!birthDate) return '-';
+  const iso = birthDate.slice(0, 10);
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return birthDate;
+  const birth = new Date(y, m - 1, d);
+  if (isNaN(birth.getTime())) return birthDate;
+  const now = new Date();
+  let age = now.getFullYear() - y;
+  if (now.getMonth() < m - 1 || (now.getMonth() === m - 1 && now.getDate() < d)) age--;
+  const label = birth.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${label} (${Math.max(age, 0)} Tahun)`;
+};
 
 interface DashboardStats {
   totalPackages: number;
@@ -74,11 +89,14 @@ export const ManageBookingPage: React.FC = () => {
           tripDate: b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
           guests: b.guests || 1,
           totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice || 0),
-          paymentMethod: b.paymentMethod || 'Xendit Invoice',
+          paymentMethod: b.paymentMethod || 'iPaymu Redirect Payment',
           createdAt: b.createdAt || '',
           paidAt: b.updatedAt || '',
           paymentUrl: b.paymentUrl,
           rawEndDate: b.tripEndDate,
+          participants: Array.isArray(b.participants)
+            ? [...b.participants].sort((x: BookingParticipant, y: BookingParticipant) => (x.position || 0) - (y.position || 0))
+            : [],
           status: b.status,
         }));
         setBookings(mapped);
@@ -548,6 +566,50 @@ export const ManageBookingPage: React.FC = () => {
                         melalui menu Keuangan sesuai jadwal pencairan, bukan melalui transfer langsung.
                       </p>
                     </div>
+                  </div>
+
+                  {/* Data Peserta Trip */}
+                  <div className="detail-item full-width">
+                    <span className="detail-label" style={{ marginBottom: '8px', display: 'block' }}>
+                      Data Peserta ({selectedBooking.participants?.length || 0}/{selectedBooking.guests} Orang)
+                    </span>
+                    {selectedBooking.participants && selectedBooking.participants.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {selectedBooking.participants.map((p) => {
+                          const medical = (p.medicalNotes || '').trim();
+                          return (
+                            <div key={p.id ?? p.position} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px', backgroundColor: '#f8fafc' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                                  {p.position}. {p.name || '-'}
+                                </span>
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>{p.gender || '-'}</span>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '4px 12px', fontSize: '12px', color: '#475569' }}>
+                                <span>HP: <strong style={{ color: '#1e293b', fontWeight: 600 }}>{p.phone || '-'}</strong></span>
+                                <span>Lahir: <strong style={{ color: '#1e293b', fontWeight: 600 }}>{formatParticipantBirth(p.birthDate)}</strong></span>
+                              </div>
+                              <div style={{
+                                marginTop: '6px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: medical ? '#dc2626' : '#64748b',
+                                backgroundColor: medical ? '#fef2f2' : 'transparent',
+                                border: medical ? '1px solid #fecaca' : 'none',
+                                borderRadius: '6px',
+                                padding: medical ? '4px 8px' : 0
+                              }}>
+                                Riwayat Penyakit & Alergi: {medical || 'Tidak ada'}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+                        Data peserta tidak tersedia (pesanan lama)
+                      </span>
+                    )}
                   </div>
 
                   {/* Booking Timeline */}

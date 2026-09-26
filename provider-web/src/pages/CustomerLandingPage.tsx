@@ -5,6 +5,7 @@ import { getTripImage, getHighlightsForPackage, OFFICIAL_CATEGORIES, OFFICIAL_TR
 import { Search, ShieldCheck, CreditCard, Headset, ThumbsUp, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight, Share2 } from 'lucide-react';
 import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 import { ShareModal } from '../components/ShareModal';
+import { TripImage } from '../components/TripImage';
 
 import heroImage from '../assets/hero.jpg';
 
@@ -28,6 +29,10 @@ interface TripPackage {
   image?: string;
   images?: string;
   highlights?: string[];
+  includedFacilities?: string;
+  duration?: number;
+  minGuests?: number;
+  meetingPoint?: string;
 }
 
 // 38 Provinsi Indonesia (Ported 100% from customer-mobile/lib/screens/home_screen.dart)
@@ -54,22 +59,6 @@ const getTodayIsoDate = () => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-};
-
-const getDynamicScheduleStr = (daysFromToday: number, durationDays: number) => {
-  const d1 = new Date();
-  d1.setDate(d1.getDate() + daysFromToday);
-  const d2 = new Date(d1);
-  d2.setDate(d2.getDate() + durationDays - 1);
-
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  const m1 = months[d1.getMonth()];
-  const m2 = months[d2.getMonth()];
-
-  if (m1 === m2) {
-    return `${d1.getDate()} ${m1} ${d1.getFullYear()} - ${d2.getDate()} ${m2} ${d2.getFullYear()} (${durationDays} Hari)`;
-  }
-  return `${d1.getDate()} ${m1} - ${d2.getDate()} ${m2} ${d2.getFullYear()} (${durationDays} Hari)`;
 };
 
 export const CustomerLandingPage: React.FC = () => {
@@ -103,241 +92,40 @@ export const CustomerLandingPage: React.FC = () => {
     navigateTo('cari-trip');
   };
 
-const DEFAULT_PACKAGES: TripPackage[] = [
-  {
-    id: 1,
-    providerId: 1,
-    name: "Open Trip Gunung Bromo",
-    destination: "Probolinggo, Jawa Timur",
-    category: "Gunung",
-    tripType: "Open Trip",
-    price: 350000,
-    quotaMin: 5,
-    quotaUsed: 3,
-    quotaMax: 15,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: getDynamicScheduleStr(0, 3),
-    status: "Aktif",
-    rating: 4.8
-  },
-  {
-    id: 2,
-    providerId: 2,
-    name: "Open Trip Pulau Tidung",
-    destination: "Kepulauan Seribu, Jakarta",
-    category: "Pantai",
-    tripType: "Open Trip",
-    price: 450000,
-    quotaMin: 4,
-    quotaUsed: 2,
-    quotaMax: 12,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: getDynamicScheduleStr(0, 3),
-    status: "Aktif",
-    rating: 4.7
-  },
-  {
-    id: 3,
-    providerId: 3,
-    name: "Trip Curug Cilember",
-    destination: "Bogor, Jawa Barat",
-    category: "Curug",
-    tripType: "Open Trip",
-    price: 275000,
-    quotaMin: 5,
-    quotaUsed: 4,
-    quotaMax: 10,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: getDynamicScheduleStr(0, 2),
-    status: "Aktif",
-    rating: 4.6
-  },
-  {
-    id: 4,
-    providerId: 4,
-    name: "Bandung City Tour",
-    destination: "Bandung, Jawa Barat",
-    category: "City Tour",
-    tripType: "Open Trip",
-    price: 420000,
-    quotaMin: 4,
-    quotaUsed: 3,
-    quotaMax: 15,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: getDynamicScheduleStr(0, 3),
-    status: "Aktif",
-    rating: 4.9
-  },
-  {
-    id: 5,
-    providerId: 1,
-    name: "Private Trip Bromo Sunrise & Savana",
-    destination: "Probolinggo, Jawa Timur",
-    category: "Gunung",
-    tripType: "Private Trip",
-    price: 1250000,
-    quotaMin: 2,
-    quotaUsed: 1,
-    quotaMax: 10,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: "Fleksibel (Pilihan Customer)",
-    status: "Aktif",
-    rating: 4.9,
-    highlights: ['🌋 Golden Sunrise Bromo', '🚙 Hardtop Jeep 4x4', '☕ Kopi Klotok Pasuruan']
-  },
-  {
-    id: 6,
-    providerId: 8,
-    name: "Private Trip Wisata Raja Ampat 4D3N",
-    destination: "Papua Barat",
-    category: "Diving & Snorkeling",
-    tripType: "Private Trip",
-    price: 3850000,
-    quotaMin: 2,
-    quotaUsed: 0,
-    quotaMax: 8,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: "Fleksibel (Pilihan Customer)",
-    status: "Aktif",
-    rating: 5.0,
-    highlights: ['🪸 Diving Wayag & Piaynemo', '🛥️ Speedboat Charter', '🏨 Resort Ocean View']
-  },
-  {
-    id: 7,
-    providerId: 1,
-    name: "Honeymoon Romantic Bali Villa 3D2N",
-    destination: "Bali",
-    category: "Pantai",
-    tripType: "Honeymoon",
-    price: 2950000,
-    quotaMin: 2,
-    quotaUsed: 0,
-    quotaMax: 10,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: "Fleksibel (Pilihan Customer)",
-    status: "Aktif",
-    rating: 5.0,
-    highlights: ['👩‍❤️‍👨 Floating Breakfast', '🏡 Private Pool Villa', '🌅 Candlelight Sunset']
-  },
-  {
-    id: 8,
-    providerId: 2,
-    name: "Honeymoon Island Sunset Tidung 3D2N",
-    destination: "Kepulauan Seribu, Jakarta",
-    category: "Pantai",
-    tripType: "Honeymoon",
-    price: 1650000,
-    quotaMin: 2,
-    quotaUsed: 0,
-    quotaMax: 10,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: "Fleksibel (Pilihan Customer)",
-    status: "Aktif",
-    rating: 4.8,
-    highlights: ['👩‍❤️‍👨 Cottage Over the Sea', '🌅 Sunset Bridge Walk', '⛵ Private Boat & Dinner']
-  },
-  {
-    id: 9,
-    providerId: 8,
-    name: "Family Vacation Yogyakarta & Borobudur",
-    destination: "Yogyakarta, DI Yogyakarta",
-    category: "Wisata Budaya & Sejarah",
-    tripType: "Family",
-    price: 850000,
-    quotaMin: 3,
-    quotaUsed: 3,
-    quotaMax: 15,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: "Fleksibel (Pilihan Customer)",
-    status: "Aktif",
-    rating: 4.9,
-    highlights: ['🏛️ Candi Borobudur Pro', '👨‍👩‍👧‍👦 Ramah Anak & Lansia', '🚌 Mobil Family AC Private']
-  },
-  {
-    id: 10,
-    providerId: 3,
-    name: "Family Nature Retreat Cilember 2D1N",
-    destination: "Bogor, Jawa Barat",
-    category: "Curug",
-    tripType: "Family",
-    price: 650000,
-    quotaMin: 3,
-    quotaUsed: 3,
-    quotaMax: 12,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: "Fleksibel (Pilihan Customer)",
-    status: "Aktif",
-    rating: 4.7,
-    highlights: ['🌊 7 Tingkat Air Terjun', '🌲 Hutan Pinus Asri', '🔥 Campfire Family BBQ']
-  },
-  {
-    id: 11,
-    providerId: 4,
-    name: "Corporate Gathering & Outbound Bandung",
-    destination: "Bandung, Jawa Barat",
-    category: "City Tour",
-    tripType: "Corporate",
-    price: 750000,
-    quotaMin: 10,
-    quotaUsed: 15,
-    quotaMax: 100,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: "Fleksibel (Pilihan Customer)",
-    status: "Aktif",
-    rating: 4.9,
-    highlights: ['🎯 Outbound Team Building', '🚌 Bus Luxury VIP AC', '🍢 Gala Dinner & Music']
-  },
-  {
-    id: 12,
-    providerId: 3,
-    name: "Corporate Team Building Bogor 2D1N",
-    destination: "Bogor, Jawa Barat",
-    category: "Wisata Budaya & Sejarah",
-    tripType: "Corporate",
-    price: 680000,
-    quotaMin: 10,
-    quotaUsed: 20,
-    quotaMax: 80,
-    startDate: getTodayIsoDate(),
-    endDate: getTodayIsoDate(),
-    schedule: "Fleksibel (Pilihan Customer)",
-    status: "Aktif",
-    rating: 4.8,
-    highlights: ['🏆 Team Bonding Games', '🏨 Hotel Bintang 4 Resort', '🎤 Gala Night & BBQ']
-  }
-];
+  const [loadError, setLoadError] = useState('');
+
+  // Hanya paket asli dari backend; tidak ada paket contoh saat gagal/kosong
+  const loadPackages = async (): Promise<{ list: TripPackage[]; error: string }> => {
+    try {
+      const data = await request('/public/packages');
+      const list: TripPackage[] = Array.isArray(data) ? data : [];
+      return { list: list.filter((p: TripPackage) =>
+        !p.status || p.status === 'Aktif' || p.status === 'Published' || p.status === 'published'
+      ), error: '' };
+    } catch (err: unknown) {
+      console.error('Failed to load packages:', err);
+      return { list: [], error: err instanceof Error && err.message ? err.message : 'Gagal memuat paket wisata.' };
+    }
+  };
+
+  const applyPackages = (result: { list: TripPackage[]; error: string }) => {
+    setPackages(result.list);
+    setLoadError(result.error);
+    setLoading(false);
+  };
+
+  const fetchPackages = () => {
+    setLoading(true);
+    setLoadError('');
+    loadPackages().then(applyPackages);
+  };
 
   useEffect(() => {
-    const fetchPackages = async () => {
-      try {
-        const data = await request('/public/packages');
-        if (Array.isArray(data) && data.length > 0) {
-          const activePkgs = data.filter((p: TripPackage) => 
-            !p.status || p.status === 'Aktif' || p.status === 'Published' || p.status === 'published'
-          );
-          setPackages(activePkgs.length > 0 ? activePkgs : data);
-        } else {
-          setPackages(DEFAULT_PACKAGES);
-        }
-      } catch (err) {
-        console.error('Failed to load packages:', err);
-        setPackages(DEFAULT_PACKAGES);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPackages();
+    let cancelled = false;
+    loadPackages().then((result) => {
+      if (!cancelled) applyPackages(result);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const [wishlistIds, setWishlistIds] = useState<number[]>(() => 
@@ -404,21 +192,6 @@ const DEFAULT_PACKAGES: TripPackage[] = [
   // Single cohesive, user-friendly brand color for all badges
   const getBadgeColor = (_category: string) => {
     return { bg: '#007bff', text: '#ffffff' };
-  };
-
-  // Review counts mapping matching Gambar 1 reference image
-  const getReviewCount = (pkgId: number) => {
-    const counts: { [key: number]: number } = {
-      1: 120, // Bromo
-      2: 89,  // Tidung
-      3: 64,  // Cilember
-      4: 72,  // Bandung
-      5: 56,  // Ranu Kumbolo
-      6: 98,  // Karimunjawa / Baduy
-      7: 43,  // Palu / Leuwi Hejo
-      8: 81   // Yogyakarta
-    };
-    return counts[pkgId] || 50;
   };
 
   return (
@@ -671,6 +444,18 @@ const DEFAULT_PACKAGES: TripPackage[] = [
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
             <p>Sedang memuat paket wisata terbaik...</p>
           </div>
+        ) : loadError ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '16px', color: '#64748b', border: '1px solid #fecaca' }}>
+            <h3 style={{ color: '#0f172a', fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>Gagal Memuat Paket Wisata</h3>
+            <p style={{ margin: '0 0 16px 0' }}>{loadError}</p>
+            <button
+              type="button"
+              onClick={() => fetchPackages()}
+              style={{ padding: '10px 22px', backgroundColor: '#007bff', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}
+            >
+              Coba Lagi
+            </button>
+          </div>
         ) : processedPackages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 20px', backgroundColor: '#ffffff', borderRadius: '16px', color: '#64748b', border: '1px solid #e2e8f0' }}>
             <h3 style={{ color: '#0f172a', fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>Paket Wisata Tidak Ditemukan</h3>
@@ -724,13 +509,10 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                     >
                       {/* Image & Badges */}
                       <div style={{ position: 'relative', height: '150px', overflow: 'hidden', flexShrink: 0 }}>
-                        <img 
+                        <TripImage 
                           src={getImageUrl(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image || (pkg as any).imageUrl)} 
                           alt={pkg.name} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => {
-                            e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80';
-                          }}
                         />
                         <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px' }}>
                           <button 
@@ -830,8 +612,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#f59e0b', fontWeight: '700' }}>
                             <Star size={12} fill="#f59e0b" color="#f59e0b" />
-                            <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : '4.8'}</span>
-                            <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>({getReviewCount(pkg.id)})</span>
+                            <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Baru'}</span>
                           </div>
 
                           <span style={{ fontSize: '13px', fontWeight: '800', color: '#007bff' }}>
@@ -856,7 +637,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                 </div>
                 <span 
                   onClick={() => {
-                    setSearchParams({ destination: '', date: '', type: 'Private Trip', category: '' });
+                    setSearchParams({ destination: '', date: '', type: 'Private Trip,Honeymoon', category: '' });
                     navigateTo('cari-trip');
                   }}
                   style={{ fontSize: '13px', color: '#007bff', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
@@ -890,13 +671,10 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                     >
                       {/* Image & Badges */}
                       <div style={{ position: 'relative', height: '150px', overflow: 'hidden', flexShrink: 0 }}>
-                        <img 
+                        <TripImage 
                           src={getImageUrl(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image || (pkg as any).imageUrl)} 
                           alt={pkg.name} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => {
-                            e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80';
-                          }}
                         />
                         <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px' }}>
                           <button 
@@ -996,8 +774,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#f59e0b', fontWeight: '700' }}>
                             <Star size={12} fill="#f59e0b" color="#f59e0b" />
-                            <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : '5.0'}</span>
-                            <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>({getReviewCount(pkg.id)})</span>
+                            <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Baru'}</span>
                           </div>
 
                           <span style={{ fontSize: '13px', fontWeight: '800', color: '#007bff' }}>
@@ -1022,7 +799,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                 </div>
                 <span 
                   onClick={() => {
-                    setSearchParams({ destination: '', date: '', type: 'Corporate', category: '' });
+                    setSearchParams({ destination: '', date: '', type: 'Family,Corporate', category: '' });
                     navigateTo('cari-trip');
                   }}
                   style={{ fontSize: '13px', color: '#007bff', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
@@ -1056,13 +833,10 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                     >
                       {/* Image & Badges */}
                       <div style={{ position: 'relative', height: '150px', overflow: 'hidden', flexShrink: 0 }}>
-                        <img 
+                        <TripImage 
                           src={getImageUrl(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image || (pkg as any).imageUrl)} 
                           alt={pkg.name} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => {
-                            e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80';
-                          }}
                         />
                         <button 
                           onClick={(e) => toggleFavorite(e, pkg)}
@@ -1142,8 +916,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#f59e0b', fontWeight: '700' }}>
                             <Star size={12} fill="#f59e0b" color="#f59e0b" />
-                            <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : '4.9'}</span>
-                            <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>({getReviewCount(pkg.id)})</span>
+                            <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Baru'}</span>
                           </div>
 
                           <span style={{ fontSize: '13px', fontWeight: '800', color: '#007bff' }}>
@@ -1212,7 +985,7 @@ const DEFAULT_PACKAGES: TripPackage[] = [
 
         {/* Copyright Footer */}
         <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '12px', marginTop: '30px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
-          &copy; 2026 TripKita. All rights reserved.
+          &copy; {new Date().getFullYear()} TripKita. All rights reserved.
         </div>
       </div>
 

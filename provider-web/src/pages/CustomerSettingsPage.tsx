@@ -3,6 +3,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { request } from '../utils/api';
 import { getTripImage } from '../utils/tripImages';
+import { TripImage } from '../components/TripImage';
 import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin } from 'lucide-react';
 
 export const CustomerSettingsPage: React.FC = () => {
@@ -430,13 +431,10 @@ export const CustomerSettingsPage: React.FC = () => {
                     {wishlistItems.map((pkg: any) => (
                       <div key={pkg.id} style={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
                         <div style={{ height: '160px', overflow: 'hidden', position: 'relative' }}>
-                          <img 
-                            src={getTripImage(pkg.id, pkg.name || '', pkg.category || '', pkg.image)} 
-                            alt={pkg.name} 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                            onError={(e) => {
-                              e.currentTarget.src = getTripImage(pkg.id, pkg.name || '', pkg.category || '');
-                            }}
+                          <TripImage
+                            src={getTripImage(pkg.id, pkg.name || '', pkg.category || '', pkg.image)}
+                            alt={pkg.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           />
                           <button
                             onClick={() => handleRemoveWishlist(pkg.id)}

@@ -1,924 +1,1044 @@
 import 'package:flutter/material.dart';
+
+import 'package:customer_mobile/main.dart';
+import 'package:customer_mobile/models/booking.dart';
 import 'package:customer_mobile/models/package.dart';
-import 'package:customer_mobile/widgets/bottom_navigation.dart';
-import 'package:intl/intl.dart';
+import 'package:customer_mobile/models/review.dart';
+import 'package:customer_mobile/screens/booking_screen.dart';
+import 'package:customer_mobile/screens/provider_profile_screen.dart';
+import 'package:customer_mobile/services/api_service.dart';
+import 'package:customer_mobile/services/package_catalog.dart';
+import 'package:customer_mobile/theme/app_theme.dart';
+import 'package:customer_mobile/utils/external_links.dart';
+import 'package:customer_mobile/utils/formatters.dart';
+import 'package:customer_mobile/utils/trip_utils.dart';
+import 'package:customer_mobile/widgets/common.dart';
+import 'package:customer_mobile/widgets/date_range_calendar.dart';
+import 'package:customer_mobile/widgets/trip_card_widget.dart';
 
+/// Detail paket, padanan `CustomerPackageDetailPage` di web.
 class TripDetailScreen extends StatefulWidget {
-  final Function(int, {Map<String, dynamic>? arguments}) onNavigate;
-  final Map<String, dynamic>? arguments;
+  final TripPackage package;
 
-  const TripDetailScreen({
-    Key? key,
-    required this.onNavigate,
-    this.arguments,
-  }) : super(key: key);
+  /// Tanggal yang dipilih pengguna pada pencarian (YYYY-MM-DD).
+  final String preferredDate;
+
+  const TripDetailScreen({super.key, required this.package, this.preferredDate = ''});
 
   @override
   State<TripDetailScreen> createState() => _TripDetailScreenState();
 }
 
-class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerProviderStateMixin {
-  late TripPackage package;
-  int currentCarouselPage = 0;
-  String activeTab = 'Deskripsi';
-  String? selectedDepartureDate;
-  int participantCount = 2; // Default to 2 participants
-  bool isWishlisted = false;
+class _TripDetailScreenState extends State<TripDetailScreen> {
+  static const _reviewsPerPage = 3;
 
-  final PageController _carouselController = PageController();
+  late TripPackage _pkg = widget.package;
+  DepartureOption? _departure;
+  late String _customStart;
+  late String _customEnd;
+  late int _guests;
 
-  // Departure schedules parsed from backend schedule string
-  List<String> departureDates = [];
+  List<PackageReview> _reviews = const [];
+  PublicProvider? _provider;
+  int _reviewPage = 1;
+  int _photoIndex = 0;
+  bool _extrasFailed = false;
 
   @override
   void initState() {
     super.initState();
-    // Retrieve package from arguments, or fallback to mock
-    if (widget.arguments != null && widget.arguments!['package'] != null) {
-      package = widget.arguments!['package'] as TripPackage;
-    } else {
-      // Fallback default mock
-      package = TripPackage(
-        id: 1,
-        providerId: 101,
-        name: 'Open Trip Raja Ampat',
-        destination: 'Raja Ampat, Papua',
-        price: 2750000,
-        quotaUsed: 4,
-        quotaMax: 16,
-        schedule: '25 Mei, 26 Mei, 27 Mei, 28 Mei, 29 Mei, 30 Mei, 31 Mei',
-        status: 'Aktif',
-        rating: 4.8,
-        reviewCount: 120,
-        duration: '4 Hari 3 Malam',
-        tripType: 'Open Trip',
-        minParticipants: 4,
-        availableSeats: 12,
-        description: 'Jelajahi keindahan surga tersembunyi di Raja Ampat. Nikmati laut biru jernih, gugusan pulau karst yang memukau, dan pengalaman snorkeling tak terlupakan bersama trip open trip seru ini!',
-        images: [
-          'https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=800',
-          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
-          'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800',
-          'https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=800'
-        ],
-        itinerary: [
-          'Hari 1: Penjemputan Sorong - Menuju Waisai - Check-in Resort',
-          'Hari 2: Snorkeling di Pulau Wayag - Puncak Wayag',
-          'Hari 3: Island Hopping Pianemo - Manta Point - Pasir Timbul',
-          'Hari 4: Kembali ke Sorong - Airport Drop-off'
-        ],
-        facilities: ['Resort Ac', 'Speedboat Premium', 'Makan 3x Sehari', 'Alat Snorkeling', 'Dokumentasi GoPro', 'Pemandu Lokal'],
-        includes: ['Pianemo Entry Fee', 'Raja Ampat Pin Kartu', 'Asuransi Perjalanan', 'Transportasi Sorong - Resort (PP)'],
-        excludes: ['Tiket Pesawat ke Sorong', 'Pengeluaran Pribadi', 'Tips Pemandu & Kru'],
-        meetingPoint: 'Bandara Domine Eduard Osok, Sorong',
-      );
+    _applyPackage(_pkg, initial: true);
+    _refreshPackage();
+    _loadExtras();
+  }
+
+  void _applyPackage(TripPackage pkg, {bool initial = false}) {
+    _pkg = pkg;
+    _departure = openTripDeparture(pkg);
+    final preferred = widget.preferredDate;
+
+    if (initial) {
+      final minIso = _minCustomIso;
+      var start = parseIsoDate(preferred) != null && preferred.compareTo(minIso) >= 0 ? preferred : minIso;
+      final open = pkg.availableDates.where((d) => d.compareTo(minIso) >= 0 && !pkg.bookedDates.contains(d)).toList()
+        ..sort();
+      if (open.isNotEmpty && !open.contains(start)) start = open.first;
+      _setCustomStart(start);
+      _guests = pkg.minRequiredGuests;
+    } else if (_guests < pkg.minRequiredGuests) {
+      _guests = pkg.minRequiredGuests;
+    }
+  }
+
+  void _setCustomStart(String startIso) {
+    _customStart = startIso;
+    final d = parseIsoDate(startIso)!;
+    _customEnd = toIsoDate(d.add(Duration(days: _pkg.durationDays - 1)));
+  }
+
+  /// Memuat ulang kuota dan tanggal terbaru, karena data dari daftar atau
+  /// favorit bisa sudah usang.
+  Future<void> _refreshPackage() async {
+    try {
+      await PackageCatalog.load(force: true);
+      final fresh = await PackageCatalog.findById(widget.package.id);
+      if (fresh != null && mounted) setState(() => _applyPackage(fresh));
+    } catch (_) {}
+  }
+
+  Future<void> _loadExtras() async {
+    if (_pkg.id <= 0 || _pkg.providerId <= 0) {
+      _extrasFailed = true;
+      return;
+    }
+    try {
+      final results = await Future.wait([
+        ApiService.fetchPackageReviews(_pkg.id),
+        ApiService.fetchProvider(_pkg.providerId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _reviews = results[0] as List<PackageReview>;
+        _provider = results[1] as PublicProvider;
+      });
+    } catch (_) {
+      // Ulasan dan profil mitra bersifat pelengkap.
+      if (mounted) setState(() => _extrasFailed = true);
+    }
+  }
+
+  bool get _isOpenTrip => _pkg.isOpenTrip;
+
+  /// Tanggal berangkat paling awal untuk paket non-Open Trip: H-7 dan tidak
+  /// sebelum awal periode paket (backend menolak tanggal di luar periode).
+  String get _minCustomIso {
+    final h7 = toIsoDate(h7MinDate());
+    final start = parseIsoDate(_pkg.startDate) == null ? '' : _pkg.startDate.substring(0, 10);
+    return start.compareTo(h7) > 0 ? start : h7;
+  }
+
+  /// Tanggal berangkat paling akhir: akhir periode paket, bila diatur.
+  String? get _maxCustomIso => parseIsoDate(_pkg.endDate) == null ? null : _pkg.endDate.substring(0, 10);
+
+  bool get _isOutsidePeriod {
+    if (_isOpenTrip) return false;
+    final max = _maxCustomIso;
+    return _customStart.compareTo(_minCustomIso) < 0 || (max != null && _customStart.compareTo(max) > 0);
+  }
+  int get _availableSeats => _pkg.availableSeats;
+  int get _maxGuests {
+    final byQuota = _availableSeats;
+    return _pkg.maxGuests > 0 && _pkg.maxGuests < byQuota ? _pkg.maxGuests : byQuota;
+  }
+
+  List<String> get _bookedInRange => _pkg.bookedDates
+      .where((b) => b.compareTo(_customStart) >= 0 && b.compareTo(_customEnd) <= 0)
+      .toList();
+  bool get _isRangeBooked => !_isOpenTrip && _bookedInRange.isNotEmpty;
+  bool get _isSelectedDateClosed =>
+      !_isOpenTrip && _pkg.availableDates.isNotEmpty && !_pkg.availableDates.contains(_customStart);
+
+  bool get _bookingBlocked =>
+      _availableSeats <= 0 || _guests > _availableSeats || _isSelectedDateClosed || _isRangeBooked ||
+      _isOutsidePeriod || (_isOpenTrip && _departure == null);
+
+  String get _ctaLabel {
+    // Satu-satunya tombol pesan ada di bar bawah, jadi labelnya harus
+    // menjelaskan sendiri kenapa tombol nonaktif.
+    if (_availableSeats <= 0) return 'Kuota Habis';
+    if (_guests > _availableSeats) return 'Melebihi Kuota';
+    if (_isRangeBooked) return 'Tanggal Penuh';
+    if (_isOpenTrip && _departure == null) return 'Jadwal Belum Ada';
+    if (_isOutsidePeriod) return 'Ganti Tanggal';
+    if (_isSelectedDateClosed) return 'Ganti Tanggal';
+    return 'Pesan Sekarang';
+  }
+
+  int get _total => _pkg.price * _guests;
+
+  Future<void> _warn(String title, String message) =>
+      showNoticeDialog(context, title: title, message: message, isError: true);
+
+  Future<void> _continueBooking() async {
+    final typeLabel = _pkg.tripType.isEmpty ? 'ini' : _pkg.tripType;
+    if (_availableSeats <= 0) {
+      return _warn('Kuota Habis', 'Maaf, kuota untuk paket ini telah habis. Silakan pilih paket wisata lain.');
+    }
+    if (_guests < _pkg.minRequiredGuests) {
+      return _warn('Jumlah Peserta Kurang', 'Minimal pemesanan untuk paket $typeLabel adalah ${_pkg.minRequiredGuests} orang.');
+    }
+    if (_guests > _availableSeats) {
+      return _warn('Melebihi Sisa Kuota',
+          'Jumlah peserta ($_guests orang) melebihi sisa kuota yang tersedia ($_availableSeats seat).');
+    }
+    if (_isRangeBooked) {
+      return _warn('Jadwal Terbooking',
+          'Rentang tanggal ${formatIsoLong(_customStart)} - ${formatIsoLong(_customEnd)} sudah TERBOOKING oleh pemesan lain. Silakan pilih rentang tanggal lain.');
+    }
+    if (_isSelectedDateClosed) {
+      return _warn('Tanggal Tidak Dibuka',
+          'Penyelenggara tidak membuka tanggal ${formatIsoLong(_customStart)} untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.');
+    }
+    final h7Iso = toIsoDate(h7MinDate());
+    if (!_isOpenTrip && _customStart.compareTo(h7Iso) < 0) {
+      return _warn('Pemesanan Wajib H-7',
+          'Pemesanan paket $typeLabel wajib H-7 sebelum keberangkatan. Tanggal paling awal yang dapat dipesan adalah ${formatIsoLong(h7Iso)}.');
+    }
+    if (_isOutsidePeriod) {
+      return _warn('Di Luar Periode Paket', _periodMessage);
     }
 
-    // Split backend schedule string to list
-    departureDates = package.schedule.split(',').map((e) => e.trim()).toList();
-    if (departureDates.isNotEmpty) {
-      selectedDepartureDate = departureDates[3]; // Default active selection (e.g. 28 Mei)
+    final String startIso;
+    final String endIso;
+    final String label;
+    if (_isOpenTrip) {
+      final departure = _departure;
+      if (departure == null) {
+        return _warn('Jadwal Belum Tersedia',
+            'Penyelenggara belum menetapkan jadwal keberangkatan yang akan datang untuk Open Trip ini.');
+      }
+      startIso = departure.dateIso;
+      endIso = departure.endIso;
+      label = departure.label;
+    } else {
+      startIso = _customStart;
+      endIso = _customEnd;
+      label = _customStart == _customEnd
+          ? formatIsoLong(_customStart)
+          : '${formatIsoLong(_customStart)} - ${formatIsoLong(_customEnd)}';
     }
+
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BookingScreen(
+        draft: BookingDraft(package: _pkg, guests: _guests, startDate: startIso, endDate: endIso, scheduleLabel: label),
+      ),
+    ));
+  }
+
+  String get _periodMessage {
+    final max = _maxCustomIso;
+    return max == null
+        ? 'Tanggal paling awal yang dapat dipesan untuk paket ini adalah ${formatIsoLong(_minCustomIso)}.'
+        : 'Paket ini hanya dapat dipesan untuk keberangkatan ${formatIsoLong(_minCustomIso)} sampai ${formatIsoLong(max)}.';
+  }
+
+  Future<void> _bookNow() async {
+    if (!await ensureLoggedIn(context)) return;
+    if (!mounted) return;
+    await _continueBooking();
+  }
+
+  Future<void> _openCalendar() async {
+    final result = await showTripCalendarSheet(
+      context,
+      tripType: _pkg.tripType.isEmpty ? 'Private Trip' : _pkg.tripType,
+      durationDays: _pkg.durationDays,
+      startIso: _customStart,
+      endIso: _customEnd,
+      bookedDates: _pkg.bookedDates,
+      availableDates: _pkg.availableDates,
+      minDate: parseIsoDate(_minCustomIso)!,
+      maxDate: parseIsoDate(_maxCustomIso ?? ''),
+    );
+    if (result != null) {
+      setState(() {
+        _customStart = result.startIso;
+        _customEnd = result.endIso;
+      });
+    }
+  }
+
+  void _openProvider() {
+    if (_pkg.providerId <= 0) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ProviderProfileScreen(providerId: _pkg.providerId, initial: _provider),
+    ));
+  }
+
+  void _openLightbox(List<String> photos, int index) {
+    Navigator.of(context).push(PageRouteBuilder(
+      opaque: false,
+      pageBuilder: (_, __, ___) => _PhotoLightbox(photos: photos, initialIndex: index),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormatter = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    );
-
-    int totalPrice = package.price * participantCount;
-
+    final photos = _pkg.photos;
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Image Carousel with Page indicator & Overlays
-            Stack(
-              children: [
-                SizedBox(
-                  height: 320,
-                  child: PageView.builder(
-                    controller: _carouselController,
-                    itemCount: package.images.length,
-                    onPageChanged: (index) {
-                      setState(() {
-                        currentCarouselPage = index;
-                      });
-                    },
-                    itemBuilder: (context, index) {
-                      return Image.network(
-                        package.images[index],
-                        fit: BoxFit.cover,
-                      );
-                    },
-                  ),
-                ),
-                // Carousel Counter Indicator badge (1 / 12 style)
-                Positioned(
-                  bottom: 20,
-                  right: 20,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${currentCarouselPage + 1} / ${package.images.length}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                // Page Indicator Dots
-                Positioned(
-                  bottom: 20,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      package.images.length,
-                      (index) => Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: currentCarouselPage == index ? 16 : 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: currentCarouselPage == index ? const Color(0xFF0F8B8D) : Colors.white70,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // Navigation overlays
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Back Button
-                        Container(
-                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                          child: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
-                            onPressed: () => widget.onNavigate(1), // Back to list
-                          ),
-                        ),
-                        // Action buttons (Share & Wishlist)
-                        Row(
-                          children: [
-                            Container(
-                              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                              child: IconButton(
-                                icon: const Icon(Icons.share_outlined, color: Color(0xFF1F2937)),
-                                onPressed: () {},
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Container(
-                              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                              child: IconButton(
-                                icon: Icon(
-                                  isWishlisted ? Icons.favorite : Icons.favorite_border,
-                                  color: isWishlisted ? Colors.red : const Color(0xFF1F2937),
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    isWishlisted = !isWishlisted;
-                                  });
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // Content Container
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Badge Open Trip / Category
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F8B8D).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      package.tripType.toUpperCase(),
-                      style: const TextStyle(
-                        color: Color(0xFF0F8B8D),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Package Name
-                  Text(
-                    package.name,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Location, Rating, Total joined
-                  Row(
-                    children: [
-                      Icon(Icons.location_on_outlined, size: 16, color: Colors.grey.shade500),
-                      const SizedBox(width: 4),
-                      Text(
-                        package.destination,
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(Icons.star, size: 16, color: Colors.amber.shade600),
-                      const SizedBox(width: 2),
-                      Text(
-                        package.rating.toString(),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        ' (${package.reviewCount} ulasan)',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  // Participants Joined text
-                  Row(
-                    children: [
-                      Icon(Icons.people_outline, size: 16, color: Colors.grey.shade500),
-                      const SizedBox(width: 4),
-                      Text(
-                        '1.2K+ sudah bergabung',
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-                  // Provider Public Profile Card
-                  _buildProviderPublicCard(),
-
-                  const SizedBox(height: 16),
-                  // Summary Information Cards Grid
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF9FAFB),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade100),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildSummaryItem(Icons.access_time, 'Durasi', package.duration),
-                        _buildSummaryItem(Icons.explore_outlined, 'Tipe Trip', package.tripType),
-                        _buildSummaryItem(Icons.person_outline, 'Min. Peserta', '${package.minParticipants} Orang'),
-                        _buildSummaryItem(Icons.chair_alt_outlined, 'Seat Tersedia', '${package.availableSeats} Seat'),
-                      ],
-                    ),
-                  ),
-
-                  // Tab Navigation
-                  const SizedBox(height: 24),
-                  _buildTabNavBar(),
-                  const SizedBox(height: 16),
-                  // Active Tab Content
-                  _buildActiveTabContent(),
-
-                  // Gallery Highlights
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Highlight Destinasi',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 100,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: package.images.length,
-                      itemBuilder: (context, index) {
-                        return Container(
-                          width: 100,
-                          margin: const EdgeInsets.only(right: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            image: DecorationImage(
-                              image: NetworkImage(package.images[index]),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // Departure Date Selection Card list
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Pilih Tanggal Keberangkatan',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
-                      ),
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 4),
-                          Text('Tersedia ${package.availableSeats} Seat', style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 70,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: departureDates.length,
-                      itemBuilder: (context, index) {
-                        final dateStr = departureDates[index];
-                        final bool isSelected = selectedDepartureDate == dateStr;
-
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              selectedDepartureDate = dateStr;
-                            });
-                          },
-                          child: Container(
-                            width: 80,
-                            margin: const EdgeInsets.only(right: 10),
-                            decoration: BoxDecoration(
-                              color: isSelected ? const Color(0xFF0F8B8D).withOpacity(0.08) : Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isSelected ? const Color(0xFF0F8B8D) : Colors.grey.shade200,
-                                width: isSelected ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  dateStr.split(' ')[0], // Day (e.g. 28)
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: isSelected ? const Color(0xFF0F8B8D) : const Color(0xFF1F2937),
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  dateStr.split(' ')[1], // Month (e.g. Mei)
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: isSelected ? const Color(0xFF0F8B8D) : Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // Open Trip Quota Info Box
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFDE68A)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline, size: 18, color: Color(0xFFD97706)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Status Open Trip: Min. Kuota ${package.minParticipants > 0 ? package.minParticipants : 4} pax. '
-                            'Terisi: ${package.quotaUsed}/${package.minParticipants > 0 ? package.minParticipants : 4} pax '
-                            '${(package.minParticipants > 0 ? package.minParticipants : 4) > package.quotaUsed ? "(Kurang ${(package.minParticipants > 0 ? package.minParticipants : 4) - package.quotaUsed} pax lagi agar PASTI BERANGKAT)" : "(PASTI BERANGKAT)"}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF92400E), fontWeight: FontWeight.bold, height: 1.3),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Participant selector
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFAFAFA),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Jumlah Peserta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            const SizedBox(height: 4),
-                            Text('Minimal ${package.minParticipants} orang', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            // Minus Button
-                            IconButton(
-                              onPressed: () {
-                                if (participantCount > 1) {
-                                  setState(() {
-                                    participantCount--;
-                                  });
-                                }
-                              },
-                              icon: const Icon(Icons.remove_circle_outline),
-                              color: const Color(0xFF0F8B8D),
-                            ),
-                            Text(
-                              '$participantCount Orang',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                            // Plus Button
-                            IconButton(
-                              onPressed: () {
-                                if (participantCount < package.availableSeats) {
-                                  setState(() {
-                                    participantCount++;
-                                  });
-                                }
-                              },
-                              icon: const Icon(Icons.add_circle_outline),
-                              color: const Color(0xFF0F8B8D),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-
-      // Price Ticker & Booking sticky bottom bar
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
-              offset: const Offset(0, -4),
-            )
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Pricing layout
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Total Harga', style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
-                      const SizedBox(height: 2),
-                      Text(
-                        currencyFormatter.format(totalPrice),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F8B8D),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      const Text('Termasuk pajak & biaya layanan', style: TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
-                    ],
-                  ),
-                  SizedBox(
-                    width: 180,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        widget.onNavigate(6, arguments: {
-                          'package': package,
-                          'participants': participantCount,
-                          'selectedDate': selectedDepartureDate,
-                          'totalPrice': totalPrice,
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F8B8D),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Booking Sekarang',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Reuses the identical BottomNavigationBar (Trip is index 1 active)
-            TripKitaBottomNavigation(
-              currentIndex: 1, // Trip active
-              onTap: (index) {
-                widget.onNavigate(index);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryItem(IconData icon, String title, String value) {
-    return Column(
-      children: [
-        Icon(icon, color: const Color(0xFF0F8B8D), size: 20),
-        const SizedBox(height: 6),
-        Text(title, style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
-        const SizedBox(height: 2),
-        Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF374151))),
-      ],
-    );
-  }
-
-  Widget _buildTabNavBar() {
-    final tabs = ['Deskripsi', 'Itinerary', 'Fasilitas', 'Include', 'Exclude', 'Meeting Point', 'Ulasan'];
-    return SizedBox(
-      height: 38,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: tabs.length,
-        itemBuilder: (context, index) {
-          final tabName = tabs[index];
-          final bool isActive = activeTab == tabName;
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  activeTab = tabName;
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: isActive ? const Color(0xFF0F8B8D) : Colors.transparent,
-                      width: 2.0,
-                    ),
-                  ),
-                ),
-                child: Text(
-                  tabName,
-                  style: TextStyle(
-                    color: isActive ? const Color(0xFF0F8B8D) : Colors.grey.shade500,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ),
-          );
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _refreshPackage();
+          await _loadExtras();
         },
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              expandedHeight: 280,
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.textDark,
+              leading: Padding(
+                padding: const EdgeInsets.all(8),
+                child: CircleAvatar(
+                  backgroundColor: Colors.white.withValues(alpha: 0.92),
+                  child: IconButton(
+                    tooltip: 'Kembali ke Daftar Trip',
+                    icon: const Icon(Icons.arrow_back, color: AppColors.textDark, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+              actions: [
+                ShareButton(_pkg),
+                const SizedBox(width: 8),
+                FavoriteButton(_pkg),
+                const SizedBox(width: 12),
+              ],
+              flexibleSpace: FlexibleSpaceBar(background: _buildGallery(photos)),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              sliver: SliverList.list(children: [
+                _buildTitleCard(),
+                const SizedBox(height: 16),
+                _buildBookingCard(),
+                const SizedBox(height: 16),
+                _buildDescription(),
+                const SizedBox(height: 16),
+                _buildItinerary(),
+                const SizedBox(height: 16),
+                _buildFacilities(),
+                const SizedBox(height: 16),
+                _buildMeetingPoint(),
+                const SizedBox(height: 16),
+                _buildProviderCard(),
+                const SizedBox(height: 16),
+                _buildReviews(),
+              ]),
+            ),
+          ],
+        ),
       ),
+      bottomNavigationBar: _buildBottomBar(),
     );
   }
 
-  Widget _buildActiveTabContent() {
-    switch (activeTab) {
-      case 'Deskripsi':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Tentang Perjalanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 6),
-            Text(
-              package.description,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.5),
-            ),
-          ],
-        );
-      case 'Itinerary':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: package.itinerary.map((item) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6),
-                    child: Icon(Icons.circle, size: 8, color: Color(0xFF0F8B8D)),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      item,
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4),
-                    ),
-                  ),
-                ],
+  Widget _buildGallery(List<String> photos) {
+    if (photos.isEmpty) return const NetworkPhoto('');
+    return Stack(fit: StackFit.expand, children: [
+      PageView.builder(
+        itemCount: photos.length,
+        onPageChanged: (i) => setState(() => _photoIndex = i),
+        itemBuilder: (context, i) => GestureDetector(
+          onTap: () => _openLightbox(photos, i),
+          child: NetworkPhoto(photos[i]),
+        ),
+      ),
+      Positioned(
+        right: 12,
+        bottom: 12,
+        child: GestureDetector(
+          onTap: () => _openLightbox(photos, _photoIndex),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(color: const Color(0x800F172A), borderRadius: BorderRadius.circular(8)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.layers_outlined, size: 15, color: Colors.white),
+              const SizedBox(width: 6),
+              Text('Lihat semua foto (${photos.length})',
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+        ),
+      ),
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 16,
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          for (var i = 0; i < photos.length; i++)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: i == _photoIndex ? 18 : 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: i == _photoIndex ? Colors.white : Colors.white54,
+                borderRadius: BorderRadius.circular(4),
               ),
-            );
-          }).toList(),
-        );
-      case 'Fasilitas':
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: package.facilities.map((facility) {
-            return Chip(
-              backgroundColor: Colors.grey.shade50,
-              avatar: const Icon(Icons.check, size: 14, color: Color(0xFF0F8B8D)),
-              label: Text(facility, style: const TextStyle(fontSize: 11)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            );
-          }).toList(),
-        );
-      case 'Include':
-        return Column(
-          children: package.includes.map((inc) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
-                  const SizedBox(width: 8),
-                  Text(inc, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
-                ],
-              ),
-            );
-          }).toList(),
-        );
-      case 'Exclude':
-        return Column(
-          children: package.excludes.map((exc) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Row(
-                children: [
-                  const Icon(Icons.cancel_outlined, color: Colors.red, size: 18),
-                  const SizedBox(width: 8),
-                  Text(exc, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
-                ],
-              ),
-            );
-          }).toList(),
-        );
-      case 'Meeting Point':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.flag_outlined, color: Color(0xFF0F8B8D)),
-                const SizedBox(width: 8),
-                Text(package.meetingPoint, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Detail lokasi penjemputan dan nomor kontak koordinator lapangan akan dikirimkan 2 hari sebelum keberangkatan melalui WhatsApp.',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500, height: 1.4),
-            ),
-          ],
-        );
-      case 'Ulasan':
-        final reviews = package.reviews.isNotEmpty
-            ? package.reviews
-            : [
-                ReviewItem(
-                  id: 1,
-                  packageId: package.id,
-                  customerName: 'Rian Hidayat',
-                  customerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-                  rating: 5.0,
-                  comment: 'Trip paling berkesan! Pemandu ramah, resort bersih, dan spot snorkeling-nya luar biasa indah.',
-                  date: '12 Mei 2024',
-                  providerResponse: 'Terima kasih Kak Rian! Sampai jumpa di trip berikutnya bersama kami.',
-                ),
-                ReviewItem(
-                  id: 2,
-                  packageId: package.id,
-                  customerName: 'Anisa Putri',
-                  customerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-                  rating: 4.5,
-                  comment: 'Makanan enak dan jadwal tepat waktu. Sangat direkomendasikan untuk liburan keluarga!',
-                  date: '28 April 2024',
-                ),
-              ];
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.star, color: Colors.amber, size: 24),
-                const SizedBox(width: 8),
-                Text(
-                  package.rating > 0 ? package.rating.toStringAsFixed(1) : '4.8',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1F2937)),
-                ),
-                Text(
-                  ' / 5.0 (${reviews.length} Ulasan)',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...reviews.map((rev) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundImage: NetworkImage(rev.customerAvatar.isNotEmpty ? rev.customerAvatar : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(rev.customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                              Text(rev.date, style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
-                            ],
-                          ),
-                        ),
-                        Row(
-                          children: List.generate(
-                            5,
-                            (starIndex) => Icon(
-                              starIndex < rev.rating ? Icons.star : Icons.star_border,
-                              color: Colors.amber,
-                              size: 14,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(rev.comment, style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.4)),
-                    if (rev.providerResponse != null && rev.providerResponse!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE0F2F1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Respon Provider: ${rev.providerResponse}',
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF0F8B8D), fontStyle: FontStyle.italic),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              );
-            }).toList(),
-          ],
-        );
-      default:
-        return const SizedBox();
-    }
+        ]),
+      ),
+    ]);
   }
 
-  Widget _buildProviderPublicCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF0F8B8D).withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F8B8D).withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundImage: NetworkImage(package.providerAvatar),
-          ),
-          const SizedBox(width: 14),
+  Widget _buildTitleCard() {
+    return SectionCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(_pkg.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 16, runSpacing: 6, children: [
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.location_on_outlined, size: 16, color: AppColors.accent),
+            const SizedBox(width: 4),
+            Text(_pkg.destination, style: const TextStyle(fontSize: 14, color: AppColors.textMuted)),
+          ]),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.calendar_today_outlined, size: 15, color: AppColors.accent),
+            const SizedBox(width: 4),
+            Text.rich(TextSpan(
+              text: 'Kategori: ',
+              style: const TextStyle(fontSize: 14, color: AppColors.textMuted),
+              children: [TextSpan(text: _pkg.category, style: const TextStyle(fontWeight: FontWeight.w700))],
+            )),
+          ]),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildBookingCard() {
+    return SectionCard(
+      radius: 20,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        package.providerName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.verified, size: 16, color: Color(0xFF0F8B8D)),
-                  ],
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Harga per orang',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+              Text(formatIDR(_pkg.price),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.accent)),
+            ]),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(20)),
+            child: Text('${_pkg.tripType.isEmpty ? 'Open Trip' : _pkg.tripType} • Min. ${_pkg.minRequiredGuests} Pax',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          ),
+        ]),
+        const Divider(height: 26),
+        _isOpenTrip ? _buildOpenTripSchedule() : _buildCalendarTrigger(),
+        const SizedBox(height: 16),
+        _buildGuestCounter(),
+        const Divider(height: 26),
+        PriceRow('Paket (${_guests}x)', formatIDR(_total)),
+        const Divider(height: 14),
+        PriceRow('Total Estimasi', formatIDR(_total), valueColor: AppColors.accent, emphasize: true),
+      ]),
+    );
+  }
+
+  Widget _buildOpenTripSchedule() {
+    final quotaMin = _pkg.quotaMin < 1 ? 1 : _pkg.quotaMin;
+    final used = _pkg.quotaUsed;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.accentSoft,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accentBorder),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('JADWAL KEBERANGKATAN (OPEN TRIP)',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent)),
+        const SizedBox(height: 8),
+        if (_departure == null)
+          const Text('Belum ada jadwal keberangkatan yang akan datang untuk Open Trip ini.',
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted))
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.accent, width: 1.5),
+            ),
+            child: Row(children: [
+              const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(_departure!.label,
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+              ),
+            ]),
+          ),
+        // Keterangan jadwal tambahan yang ditulis mitra, bila berbeda dari
+        // label tanggal otomatis.
+        if (_pkg.schedule.isNotEmpty && !_pkg.schedule.contains(' s/d ')) ...[
+          const SizedBox(height: 8),
+          Text(_pkg.schedule, style: const TextStyle(fontSize: 12.5, color: AppColors.textMedium)),
+        ],
+        if (used < quotaMin) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.warningBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.warningBorder),
+            ),
+            child: Column(children: [
+              _quotaRow('Minimal Kuota Open Trip:', '$quotaMin Pax', AppColors.textDark),
+              const SizedBox(height: 4),
+              _quotaRow('Status Kuota Terisi:', '$used / $quotaMin Pax', AppColors.primary),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(6)),
+                child: Text('Kurang ${quotaMin - used} orang lagi agar trip PASTI BERANGKAT!',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.warningText)),
+              ),
+            ]),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  Widget _quotaRow(String label, String value, Color valueColor) => Row(children: [
+        Expanded(
+          child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.warningText)),
+        ),
+        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: valueColor)),
+      ]);
+
+  Widget _buildCalendarTrigger() {
+    final booked = _bookedInRange;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.accentSoft,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accentBorder),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const Expanded(
+            child: Text('PILIH JADWAL', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.accent)),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(color: AppColors.accentBorder, borderRadius: BorderRadius.circular(4)),
+            child: const Text('Min. H-7', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: _openCalendar,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _isRangeBooked ? AppColors.danger : AppColors.accent, width: 2),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  const Icon(Icons.calendar_month_outlined, size: 15, color: AppColors.accent),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text('Kalender Jadwal Perjalanan',
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.accent)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(4)),
+                    child: const Text('Pilih Tanggal >',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(8)),
+                  child: Row(children: [
+                    Expanded(child: _dateCell('Tanggal Mulai', formatIsoLong(_customStart))),
+                    Expanded(child: _dateCell('Tanggal Selesai', formatIsoLong(_customEnd))),
+                  ]),
                 ),
-                const SizedBox(height: 2),
-                const Text('Official Travel Partner TripKita', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.star, size: 14, color: Colors.amber.shade600),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${package.rating} Rating',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(width: 10),
-                    const Icon(Icons.check_circle_outline, size: 14, color: Color(0xFF0F8B8D)),
-                    const SizedBox(width: 4),
-                    const Text('120+ Trip Selesai', style: TextStyle(fontSize: 11, color: Color(0xFF4B5563))),
-                  ],
-                ),
-              ],
+              ]),
             ),
           ),
+        ),
+        if (_isOutsidePeriod) ...[
+          const SizedBox(height: 10),
+          InfoBanner(message: '⚠️ $_periodMessage Silakan pilih tanggal lain pada kalender.'),
         ],
+        if (_isSelectedDateClosed && !_isRangeBooked && !_isOutsidePeriod) ...[
+          const SizedBox(height: 10),
+          InfoBanner(
+            message:
+                '⚠️ Tanggal ${formatIsoLong(_customStart)} tidak dibuka penyelenggara untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.',
+          ),
+        ],
+        if (_isRangeBooked) ...[
+          const SizedBox(height: 10),
+          InfoBanner(
+            color: AppColors.dangerDark,
+            background: AppColors.dangerSoft,
+            border: AppColors.dangerBorder,
+            textColor: const Color(0xFF991B1B),
+            message:
+                '❌ Dalam rentang tanggal yang Anda pilih (${_customStart == _customEnd ? formatIsoLong(_customStart) : '${formatIsoLong(_customStart)} - ${formatIsoLong(_customEnd)}'}), terdapat tanggal yang sudah terbooking (${booked.map(formatIsoLong).join(', ')} FULL). Silakan pilih rentang tanggal lain pada kalender.',
+          ),
+        ],
+      ]),
+    );
+  }
+
+  Widget _dateCell(String label, String value) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+        const SizedBox(height: 2),
+        Text(value, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+      ]);
+
+  Widget _buildGuestCounter() {
+    final seats = _availableSeats;
+    final remaining = (seats - _guests) < 0 ? 0 : seats - _guests;
+    final ok = seats > 0 && _guests <= seats;
+    final seatLabel = seats <= 0
+        ? 'Sisa 0 seat'
+        : _guests > seats
+            ? 'Melebihi Kuota ($seats seat)'
+            : 'Sisa $remaining seat';
+    final canDecrease = _guests > _pkg.minRequiredGuests && seats > 0;
+    final canIncrease = _guests < _maxGuests && seats > 0;
+
+    Widget stepButton(String symbol, bool enabled, VoidCallback onTap) => SizedBox(
+          width: 34,
+          height: 34,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              backgroundColor: enabled ? AppColors.background : AppColors.border,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            onPressed: enabled ? onTap : null,
+            child: Text(symbol, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ),
+        );
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        const Expanded(
+          child: Text('Jumlah Peserta', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMedium)),
+        ),
+        Text(seatLabel,
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: ok ? AppColors.success : AppColors.danger)),
+      ]),
+      const SizedBox(height: 6),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.borderStrong),
+        ),
+        child: Row(children: [
+          const Icon(Icons.groups_outlined, size: 18, color: AppColors.textLight),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text('$_guests Orang',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+          ),
+          stepButton('-', canDecrease, () => setState(() => _guests--)),
+          const SizedBox(width: 10),
+          stepButton('+', canIncrease, () => setState(() => _guests++)),
+        ]),
+      ),
+      if (_pkg.minRequiredGuests > 1)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            '* Minimal pemesanan paket ${_pkg.tripType.isEmpty ? 'ini' : _pkg.tripType} adalah ${_pkg.minRequiredGuests} orang.',
+            style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+          ),
+        ),
+    ]);
+  }
+
+  Widget _buildDescription() {
+    return SectionCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SectionHeading('Deskripsi Paket Wisata'),
+        const SizedBox(height: 10),
+        Text(_pkg.description.isEmpty ? 'Deskripsi paket belum dilengkapi oleh provider.' : _pkg.description,
+            style: const TextStyle(fontSize: 14, color: AppColors.textMedium, height: 1.7)),
+      ]),
+    );
+  }
+
+  Widget _buildItinerary() {
+    final items = _pkg.itinerary;
+    return SectionCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SectionHeading('Rencana Perjalanan (Itinerary)'),
+        const SizedBox(height: 14),
+        if (items.isEmpty)
+          const Text('Itinerary belum dilengkapi oleh provider.', style: TextStyle(color: AppColors.textMuted)),
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(6)),
+                child: Text(item.day,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(item.title,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                  if (item.description.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(item.description, style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5)),
+                  ],
+                ]),
+              ),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  Widget _buildFacilities() {
+    Widget list(String title, IconData icon, Color color, List<String> items, Color textColor) =>
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
+          ]),
+          const SizedBox(height: 10),
+          if (items.isEmpty) const Text('Belum diinformasikan.', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+          for (final f in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 15, color: color)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(f, style: TextStyle(fontSize: 13, color: textColor))),
+              ]),
+            ),
+        ]);
+
+    return SectionCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SectionHeading('Fasilitas Paket'),
+        const Divider(height: 24),
+        list('Fasilitas Termasuk', Icons.check_circle_outline, AppColors.success, _pkg.includedFacilities, AppColors.textBody),
+        const SizedBox(height: 14),
+        list('Fasilitas Tidak Termasuk', Icons.cancel_outlined, AppColors.danger, _pkg.excludedFacilities, AppColors.textMuted),
+      ]),
+    );
+  }
+
+  Widget _buildMeetingPoint() {
+    final point = _pkg.meetingPoint.trim();
+    final hasPoint = point.length > 3;
+    return SectionCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SectionHeading('Lokasi Titik Kumpul (Meeting Point)', icon: Icons.location_on_outlined, iconColor: AppColors.primary),
+        const SizedBox(height: 12),
+        if (!hasPoint)
+          const Text('Titik kumpul belum dilengkapi oleh provider.', style: TextStyle(fontSize: 14, color: AppColors.textMuted))
+        else ...[
+          Text('📍 $point',
+              style: const TextStyle(fontSize: 14, color: AppColors.textBody, fontWeight: FontWeight.w700, height: 1.6)),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+            ),
+            onPressed: () => openExternal(mapsSearchUri(point)),
+            icon: const Icon(Icons.map_outlined, size: 18),
+            label: const Text('Buka di Google Maps'),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  Widget _buildProviderCard() {
+    // Selama profil mitra belum termuat (atau gagal dimuat), jangan tampilkan
+    // nama/kota karangan.
+    final loaded = _provider != null && _provider!.businessName.isNotEmpty;
+    final name = loaded ? _provider!.businessName : (_extrasFailed ? 'Info mitra belum dapat dimuat' : 'Memuat info mitra...');
+    final city = loaded ? _provider!.operationalCity : '';
+    final rating = _provider?.rating ?? 0;
+    return SectionCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('DISELENGGARAKAN OLEH MITRA PROVIDER',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 0.5)),
+        const SizedBox(height: 14),
+        InkWell(
+          onTap: _openProvider,
+          child: Row(children: [
+            Container(
+              width: 56,
+              height: 56,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(14)),
+              child: Text(loaded ? name[0].toUpperCase() : '·',
+                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(name,
+                    style: TextStyle(
+                      fontSize: loaded ? 16 : 14,
+                      fontWeight: loaded ? FontWeight.w800 : FontWeight.w600,
+                      color: loaded ? AppColors.textDark : AppColors.textMuted,
+                    )),
+                const SizedBox(height: 4),
+                if (loaded)
+                Wrap(spacing: 10, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                  if (city.isNotEmpty)
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.location_on_outlined, size: 13, color: AppColors.accent),
+                    const SizedBox(width: 3),
+                    Text(city, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                  ]),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(rating > 0 ? Icons.star : Icons.star_border, size: 13, color: AppColors.warning),
+                    const SizedBox(width: 3),
+                    Text(rating > 0 ? '${rating.toStringAsFixed(1)} / 5.0' : 'Belum ada rating',
+                        style: const TextStyle(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.w700)),
+                  ]),
+                ]),
+              ]),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 14),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            backgroundColor: AppColors.accentSoft,
+            foregroundColor: AppColors.accent,
+            side: const BorderSide(color: Color(0xFFBFDBFE)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: _pkg.providerId > 0 ? _openProvider : null,
+          child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text('Lihat Profil & Paket'),
+            SizedBox(width: 6),
+            Icon(Icons.chevron_right, size: 16),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildReviews() {
+    final totalPages = (_reviews.length / _reviewsPerPage).ceil();
+    final page = _reviewPage.clamp(1, totalPages < 1 ? 1 : totalPages);
+    final current = _reviews.skip((page - 1) * _reviewsPerPage).take(_reviewsPerPage).toList();
+    final average = _reviews.isEmpty ? 0.0 : _reviews.fold<int>(0, (sum, r) => sum + r.rating) / _reviews.length;
+
+    return SectionCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SectionHeading('Ulasan & Rating Pengunjung', icon: Icons.chat_bubble_outline),
+        const SizedBox(height: 6),
+        Text.rich(TextSpan(
+          text: 'Berdasarkan ',
+          style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+          children: [
+            TextSpan(text: '${_reviews.length}', style: const TextStyle(fontWeight: FontWeight.w800)),
+            const TextSpan(text: ' ulasan wisatawan terverifikasi'),
+          ],
+        )),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.warningBg,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: const Color(0xFFFEF3C7)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(_reviews.isEmpty ? Icons.star_border : Icons.star, size: 18, color: AppColors.warning),
+            const SizedBox(width: 6),
+            Text(_reviews.isEmpty ? 'Belum ada rating' : '${average.toStringAsFixed(1)} / 5.0',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFFB45309))),
+          ]),
+        ),
+        const Divider(height: 26),
+        if (current.isEmpty)
+          const Text('Belum ada ulasan terverifikasi untuk paket ini.', style: TextStyle(color: AppColors.textMuted)),
+        for (final r in current)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const CircleAvatar(
+                  radius: 18,
+                  backgroundColor: AppColors.accent,
+                  child: Text('W', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Wisatawan terverifikasi',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                    Row(children: [
+                      Icon(Icons.check_circle_outline, size: 12, color: AppColors.success),
+                      SizedBox(width: 4),
+                      Text('Terverifikasi Pembeli',
+                          style: TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600)),
+                    ]),
+                  ]),
+                ),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Row(children: [
+                    for (var i = 0; i < 5; i++)
+                      Icon(i < r.rating ? Icons.star : Icons.star_border,
+                          size: 13, color: i < r.rating ? AppColors.warning : AppColors.borderStrong),
+                  ]),
+                  Text(formatDateShort(r.createdAt), style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
+                ]),
+              ]),
+              const SizedBox(height: 8),
+              Text('"${r.comment}"', style: const TextStyle(fontSize: 13.5, color: AppColors.textBody, height: 1.5)),
+            ]),
+          ),
+        if (totalPages > 1) ...[
+          const Divider(height: 20),
+          Text('Halaman $page dari $totalPages (${_reviews.length} Ulasan)',
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Row(children: [
+            OutlinedButton.icon(
+              onPressed: page > 1 ? () => setState(() => _reviewPage = page - 1) : null,
+              icon: const Icon(Icons.chevron_left, size: 16),
+              label: const Text('Sebelumnya'),
+            ),
+            const Spacer(),
+            OutlinedButton(
+              onPressed: page < totalPages ? () => setState(() => _reviewPage = page + 1) : null,
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [Text('Berikutnya'), Icon(Icons.chevron_right, size: 16)]),
+            ),
+          ]),
+        ],
+      ]),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.borderStrong)),
+        boxShadow: [BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, -4))],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          child: Row(children: [
+            Expanded(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Total (${_guests}x)',
+                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                Text(formatIDR(_total), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.accent)),
+              ]),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+              onPressed: _bookingBlocked ? null : _bookNow,
+              child: Text(_ctaLabel),
+            ),
+          ]),
+        ),
       ),
     );
   }
 }
 
-// Small helper widget for margin in custom icons
-extension WidgetMargin on Widget {
-  Widget margin({required EdgeInsets margin}) {
-    return Container(
-      margin: margin,
-      child: this,
+class _PhotoLightbox extends StatefulWidget {
+  final List<String> photos;
+  final int initialIndex;
+
+  const _PhotoLightbox({required this.photos, required this.initialIndex});
+
+  @override
+  State<_PhotoLightbox> createState() => _PhotoLightboxState();
+}
+
+class _PhotoLightboxState extends State<_PhotoLightbox> {
+  late final _controller = PageController(initialPage: widget.initialIndex);
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xEB0F172A),
+      body: SafeArea(
+        child: Column(children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.close, color: Colors.white, size: 26),
+            ),
+          ),
+          Expanded(
+            child: PageView.builder(
+              controller: _controller,
+              itemCount: widget.photos.length,
+              onPageChanged: (i) => setState(() => _index = i),
+              itemBuilder: (context, i) => InteractiveViewer(
+                child: Center(child: NetworkPhoto(widget.photos[i], fit: BoxFit.contain)),
+              ),
+            ),
+          ),
+          SizedBox(
+            height: 64,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              itemCount: widget.photos.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, i) => GestureDetector(
+                onTap: () => _controller.animateToPage(i, duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
+                child: Opacity(
+                  opacity: i == _index ? 1 : 0.6,
+                  child: Container(
+                    width: 64,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: i == _index ? AppColors.accent : Colors.transparent, width: 2),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: NetworkPhoto(widget.photos[i]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ]),
+      ),
     );
   }
 }

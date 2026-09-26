@@ -596,8 +596,8 @@ export const RegisterPage: React.FC = () => {
 
               <strong>4. BIAYA DAN PENCAIRAN DANA (ESCROW SYSTEM)</strong>
               <p>4.1 Biaya Layanan: TemenTrip mengenakan biaya komisi sebesar 10% dari setiap transaksi pembayaran paket wisata yang berhasil dilakukan melalui platform.<br/>
-              4.2 Pencairan DP 50% Open Trip: Pembayaran DP dari pengguna ditahan sementara oleh sistem. DP 50% dapat dicairkan langsung ke saldo Mitra setelah Kuota Minimal paket Open Trip terpenuhi (misal 4/4 orang terisi) atau saat trip dikonfirmasi pada H-3 untuk biaya persiapan operasional (DP kapal/homestay). Sisa pembayaran diselesaikan setelah trip selesai.<br/>
-              4.3 Batas Waktu Kuota H-3: Jika pada H-3 kuota minimal belum terpenuhi, Mitra diberikan wewenang di dashboard untuk memilih [Tetap Berangkat] (DP 50% dicairkan) atau [Buka Reschedule / Batalkan].</p>
+              4.2 Pencairan Dana Mitra: Pengguna membayar penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari pengguna. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Mitra tersedia untuk diajukan sebagai biaya persiapan operasional, dan separuh sisanya baru tersedia setelah trip selesai.<br/>
+              4.3 Batas Waktu Kuota H-3: Jika pada H-3 kuota minimal belum terpenuhi, Mitra diberikan wewenang di dashboard untuk memilih [Tetap Berangkat], [Jadwalkan Ulang], atau [Batalkan] (seluruh pesanan dikembalikan penuh kepada pengguna).</p>
 
               <strong>5. PEMBATALAN, REFUND & RESCHEDULE</strong>
               <p>5.1 Pembatalan oleh Pengguna (Strict H-7 Policy): Pembatalan oleh pengguna ≥ 7 hari sebelum keberangkatan berhak menerima 100% Full Refund. Pembatalan pengguna &lt; 7 hari (H-6 s/d H-0) dikenakan biaya pembatalan 100% (0% Refund / Uang Hangus) dan uang pembayaran diteruskan ke saldo Mitra sebagai kompensasi ganti rugi slot operasional.<br/>

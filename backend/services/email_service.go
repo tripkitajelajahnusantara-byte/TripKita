@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"mime"
 	"net/smtp"
+	"strings"
 	"time"
 
 	"tripkita-provider/config"
@@ -16,16 +18,19 @@ import (
 type EmailService struct {
 	cfg        *config.Config
 	pdfService *PDFService
+	mailSender func(string, smtp.Auth, string, []string, []byte) error
 }
 
 func NewEmailService(cfg *config.Config, pdfService *PDFService) *EmailService {
 	return &EmailService{
 		cfg:        cfg,
 		pdfService: pdfService,
+		mailSender: smtp.SendMail,
 	}
 }
 
-// SendPaymentSuccessEmail sends payment confirmation email to Customer with PDF E-Voucher attachment
+// SendPaymentSuccessEmail sends payment confirmation email to Customer with a
+// PDF rendering of the successful-payment page.
 func (s *EmailService) SendPaymentSuccessEmail(b *models.Booking, pkg *models.Package) error {
 	to := b.CustomerEmail
 	if to == "" {
@@ -33,7 +38,7 @@ func (s *EmailService) SendPaymentSuccessEmail(b *models.Booking, pkg *models.Pa
 		return nil
 	}
 
-	subject := fmt.Sprintf("✨ Pembayaran Berhasil! E-Voucher Pesanan #%s - TemenTrip", b.BookingCode)
+	subject := fmt.Sprintf("✨ Pembayaran Berhasil! Bukti Pesanan #%s - TemenTrip", b.BookingCode)
 
 	pdfBytes, pdfFilename, err := s.pdfService.GenerateBookingReceiptPDF(b, pkg)
 	if err != nil {
@@ -42,7 +47,7 @@ func (s *EmailService) SendPaymentSuccessEmail(b *models.Booking, pkg *models.Pa
 
 	packageName := "Paket Wisata TemenTrip"
 	destination := "Indonesia"
-	meetingPoint := "Lokasi Utama Destinasi"
+	meetingPoint := "Lihat detail paket"
 
 	if pkg != nil {
 		if pkg.Name != "" {
@@ -86,8 +91,8 @@ func (s *EmailService) SendPaymentSuccessEmail(b *models.Booking, pkg *models.Pa
       </table>
 
       <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 14px; border-radius: 8px; font-size: 13.5px; color: #0369a1;">
-        <strong>📄 Bukti E-Voucher PDF Terlampir:</strong><br>
-        Kami telah melampirkan berkas PDF E-Voucher resmi pada email ini. Harap mengunduh dan menyimpannya untuk ditunjukkan kepada petugas saat tiba di Titik Kumpul.
+        <strong>📄 Halaman Pembayaran Berhasil dalam PDF:</strong><br>
+        Halaman pembayaran berhasil beserta detail transaksi telah kami ubah menjadi PDF dan dilampirkan pada email ini. Simpan juga sebagai E-Voucher untuk ditunjukkan saat tiba di titik kumpul.
       </div>
     </div>
 
@@ -178,6 +183,40 @@ func (s *EmailService) SendExpiredEmail(b *models.Booking) error {
 	return s.sendMailWithAttachment(to, subject, htmlBody, nil, "")
 }
 
+// SendPaymentFailedEmail memberi tahu pelanggan saat gateway menolak/gagal
+// membuat atau menyelesaikan pembayaran. Status gagal sengaja dibedakan dari
+// kedaluwarsa agar pelanggan tidak mendapat alasan yang menyesatkan.
+func (s *EmailService) SendPaymentFailedEmail(b *models.Booking) error {
+	if strings.TrimSpace(b.CustomerEmail) == "" {
+		return nil
+	}
+	subject := fmt.Sprintf("Pembayaran Gagal - Pesanan #%s TemenTrip", b.BookingCode)
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px"><h2 style="color:#0284c7;text-align:center">Temen<span style="color:#00c9a7">Trip</span></h2><div style="background:#fef2f2;border:1px solid #fecaca;padding:16px;border-radius:12px"><h3 style="color:#dc2626;margin-top:0">Pembayaran Belum Berhasil</h3><p>Halo <strong>%s</strong>, pembayaran untuk pesanan <strong>#%s</strong> belum berhasil diproses. Tidak ada pembayaran yang kami catat untuk transaksi ini.</p></div><p>Silakan buat pemesanan baru atau hubungi layanan pelanggan bila saldo Anda sempat terpotong.</p></div></body></html>`, html.EscapeString(b.CustomerName), html.EscapeString(b.BookingCode))
+	return s.sendMailWithAttachment(b.CustomerEmail, subject, body, nil, "")
+}
+
+// SendRefundPendingEmail membedakan permintaan refund dari refund yang benar-
+// benar sudah ditransfer. Bukti refund PDF hanya dikirim pada status REFUNDED.
+func (s *EmailService) SendRefundPendingEmail(b *models.Booking) error {
+	if strings.TrimSpace(b.CustomerEmail) == "" {
+		return nil
+	}
+	subject := fmt.Sprintf("Pesanan Dibatalkan, Refund Sedang Diproses - #%s TemenTrip", b.BookingCode)
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px"><h2 style="color:#0284c7;text-align:center">Temen<span style="color:#00c9a7">Trip</span></h2><div style="background:#fff7ed;border:1px solid #fed7aa;padding:16px;border-radius:12px"><h3 style="color:#c2410c;margin-top:0">Pesanan Dibatalkan, Refund Menunggu Diproses</h3><p>Halo <strong>%s</strong>, pembatalan pesanan <strong>#%s</strong> sudah tercatat dan refund sedang menunggu verifikasi admin.</p></div><p>Email bukti refund akan dikirim setelah transfer refund benar-benar selesai.</p></div></body></html>`, html.EscapeString(b.CustomerName), html.EscapeString(b.BookingCode))
+	return s.sendMailWithAttachment(b.CustomerEmail, subject, body, nil, "")
+}
+
+// SendProviderTransactionStatusEmail memastikan mitra juga menerima jejak email
+// untuk hasil akhir transaksi, tidak hanya notifikasi dalam aplikasi.
+func (s *EmailService) SendProviderTransactionStatusEmail(provider *models.Provider, b *models.Booking, title, message string) error {
+	if provider == nil || strings.TrimSpace(provider.Email) == "" {
+		return nil
+	}
+	subject := fmt.Sprintf("%s - Pesanan #%s TemenTrip Partner", title, b.BookingCode)
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px"><h2 style="color:#0284c7">Temen<span style="color:#00c9a7">Trip</span> Partner</h2><h3>%s</h3><p>Halo <strong>%s</strong>, %s</p><p>Kode pesanan: <strong>#%s</strong></p></div></body></html>`, html.EscapeString(title), html.EscapeString(provider.BusinessName), html.EscapeString(message), html.EscapeString(b.BookingCode))
+	return s.sendMailWithAttachment(provider.Email, subject, body, nil, "")
+}
+
 // SendPayoutDisbursedEmail sends payout completion notification email to Provider with PDF Transfer Proof attachment
 func (s *EmailService) SendPayoutDisbursedEmail(payout *models.Payout, provider *models.Provider) error {
 	to := provider.Email
@@ -222,6 +261,38 @@ func (s *EmailService) SendPayoutDisbursedEmail(payout *models.Payout, provider 
 `, html.EscapeString(provider.BusinessName), html.EscapeString(payoutTypeLabel), formatIDRNumber(payout.Amount), html.EscapeString(payout.BankName), html.EscapeString(payout.BankAccount), html.EscapeString(payout.BankAccountName), formatIDRNumber(payout.Amount))
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
+}
+
+// SendPayoutStatusEmail mengirim hasil setiap tahap pencairan. Status APPROVED
+// memakai email bukti transfer PDF yang lebih lengkap.
+func (s *EmailService) SendPayoutStatusEmail(payout *models.Payout, provider *models.Provider) error {
+	if payout == nil || provider == nil || strings.TrimSpace(provider.Email) == "" {
+		return nil
+	}
+	if payout.Status == models.PayoutStatusApproved {
+		return s.SendPayoutDisbursedEmail(payout, provider)
+	}
+
+	var title, detail string
+	switch payout.Status {
+	case models.PayoutStatusPending:
+		title = "Pengajuan Pencairan Diterima"
+		detail = "Pengajuan telah tercatat dan menunggu verifikasi admin."
+	case models.PayoutStatusProcessing:
+		title = "Pencairan Sedang Diproses"
+		detail = "Instruksi transfer sedang diproses."
+	case models.PayoutStatusRejected:
+		title = "Pengajuan Pencairan Ditolak"
+		detail = "Pengajuan ditolak. Catatan admin: " + payout.Notes
+	case models.PayoutStatusFailed:
+		title = "Pencairan Gagal"
+		detail = "Transfer gagal dan saldo telah dikembalikan ke saldo mitra."
+	default:
+		return nil
+	}
+	subject := fmt.Sprintf("%s - TemenTrip Partner", title)
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px"><h2 style="color:#0284c7">Temen<span style="color:#00c9a7">Trip</span> Partner</h2><h3>%s</h3><p>Halo <strong>%s</strong>, %s</p><p>Jenis: <strong>%s</strong><br>Nominal: <strong>Rp %s</strong></p></div></body></html>`, html.EscapeString(title), html.EscapeString(provider.BusinessName), html.EscapeString(detail), html.EscapeString(payout.Type), formatIDRNumber(payout.Amount))
+	return s.sendMailWithAttachment(provider.Email, subject, body, nil, "")
 }
 
 // SendCancelledEmail sends cancellation confirmation email to Customer with PDF Cancellation receipt attachment
@@ -321,6 +392,55 @@ func (s *EmailService) SendResetPasswordEmail(email string, otp string) error {
 	return s.sendMailWithAttachment(email, subject, htmlBody, nil, "")
 }
 
+// SendTripPlanEventEmail confirms every persisted trip-plan mutation. The
+// detailed message is generated by TripPlanService so email and in-app
+// notification always describe the same event.
+func (s *EmailService) SendTripPlanEventEmail(customer *models.Provider, plan *models.TripPlan, title, message string) error {
+	if customer == nil || plan == nil || strings.TrimSpace(customer.Email) == "" {
+		return nil
+	}
+
+	name := strings.TrimSpace(customer.PicName)
+	if name == "" {
+		name = "Traveler"
+	}
+	plannerURL := strings.TrimRight(s.cfg.FrontendURL, "/") + "/#/rencana-trip"
+	subject := fmt.Sprintf("%s - TemenTrip", title)
+	htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #1e293b;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #0284c7; text-align: center;">Temen<span style="color: #00c9a7;">Trip</span>✨</h2>
+    <h3 style="color: #0f766e;">%s</h3>
+    <p style="font-size: 14px; color: #475569;">Halo <strong>%s</strong>, %s</p>
+    <table style="width: 100%%; font-size: 14px; color: #334155; margin: 20px 0;">
+      <tr><td style="padding: 5px 0; color: #64748b;">Destinasi</td><td style="text-align: right; font-weight: bold;">%s</td></tr>
+      <tr><td style="padding: 5px 0; color: #64748b;">Target berangkat</td><td style="text-align: right; font-weight: bold;">%s</td></tr>
+      <tr><td style="padding: 5px 0; color: #64748b;">Peserta</td><td style="text-align: right; font-weight: bold;">%d orang</td></tr>
+      <tr><td style="padding: 5px 0; color: #64748b;">Target budget</td><td style="text-align: right; font-weight: bold;">Rp %s</td></tr>
+      <tr><td style="padding: 5px 0; color: #64748b;">Tabungan tercatat</td><td style="text-align: right; font-weight: bold; color: #059669;">Rp %s</td></tr>
+    </table>
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="%s" style="background-color: #0284c7; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; display: inline-block;">Buka Rencana Trip</a>
+    </div>
+  </div>
+</body>
+</html>`,
+		html.EscapeString(title),
+		html.EscapeString(name),
+		html.EscapeString(message),
+		html.EscapeString(plan.Destination),
+		html.EscapeString(plan.TargetMonthLabel),
+		plan.Participants,
+		formatIDRNumber(plan.TargetBudget),
+		formatIDRNumber(plan.SavedAmount),
+		html.EscapeString(plannerURL),
+	)
+
+	return s.sendMailWithAttachment(customer.Email, subject, htmlBody, nil, "")
+}
+
 func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfBytes []byte, pdfFilename string) error {
 	smtpUser := s.cfg.SMTPUser
 	smtpPass := s.cfg.SMTPPass
@@ -329,8 +449,7 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 	fromAddr := s.cfg.SMTPFrom
 
 	if smtpUser == "" || smtpPass == "" || smtpHost == "" {
-		log.Printf("[EmailService] SMTP credentials not fully set; email dispatch skipped")
-		return nil
+		return fmt.Errorf("konfigurasi SMTP belum lengkap; email tidak dikirim")
 	}
 
 	auth := smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
@@ -340,7 +459,7 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 
 	bodyBuf.WriteString(fmt.Sprintf("From: TemenTrip <%s>\r\n", fromAddr))
 	bodyBuf.WriteString(fmt.Sprintf("To: %s\r\n", to))
-	bodyBuf.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	bodyBuf.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("UTF-8", subject)))
 	bodyBuf.WriteString("MIME-Version: 1.0\r\n")
 
 	if len(pdfBytes) > 0 && pdfFilename != "" {
@@ -372,7 +491,11 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 	}
 
 	addr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
-	err := smtp.SendMail(addr, auth, fromAddr, []string{to}, bodyBuf.Bytes())
+	mailSender := s.mailSender
+	if mailSender == nil {
+		mailSender = smtp.SendMail
+	}
+	err := mailSender(addr, auth, fromAddr, []string{to}, bodyBuf.Bytes())
 	if err != nil {
 		log.Printf("[EmailService] SMTP dispatch failed: %v\n", err)
 		return err

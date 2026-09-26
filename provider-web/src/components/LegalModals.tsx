@@ -281,7 +281,7 @@ export const GeneralTermsContent: React.FC = () => (
       </p>
       <ul style={{ paddingLeft: '20px', margin: '0 0 8px 0' }}>
         <li>Pembatalan dilakukan <strong>≥ 7 hari sebelum keberangkatan (H-7 atau lebih lama)</strong>: Customer berhak menerima pengembalian dana <strong>100% (Full Refund)</strong>.</li>
-        <li>Pembatalan dilakukan <strong>&lt; 7 hari sebelum keberangkatan (H-6 s/d H-0)</strong>: Dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>). Uang DP/pembayaran diteruskan ke Provider sebagai ganti rugi slot operasional.</li>
+        <li>Pembatalan dilakukan <strong>&lt; 7 hari sebelum keberangkatan (H-6 s/d H-0)</strong>: Dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>). Pembayaran diteruskan ke Provider sebagai ganti rugi slot operasional.</li>
       </ul>
       <p style={{ margin: '0 0 8px 0' }}>
         5.2 <strong>Pembatalan oleh Provider / Cuaca Buruk / Kuota Tidak Terpenuhi:</strong>
@@ -291,7 +291,7 @@ export const GeneralTermsContent: React.FC = () => (
         <li>Penjadwalan ulang (Reschedule) akibat kuota kurang berlaku <strong>maksimal 1 (satu) kali</strong>. Jika pada jadwal pengganti kuota masih tidak terpenuhi di H-3, sistem akan melakukan Full Refund 100% otomatis.</li>
       </ul>
       <p style={{ margin: 0 }}>
-        5.3 <strong>Pengamanan DP 50% (Escrow System):</strong> Pembayaran DP ditahan di sistem TripKita. Uang DP 50% langsung dicairkan ke Provider begitu kuota minimal trip terpenuhi atau saat trip dikonfirmasi di H-3.
+        5.3 <strong>Pembayaran Penuh & Dana Tertahan:</strong> Customer membayar penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari customer. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Provider tersedia untuk diajukan sebagai biaya persiapan dan separuh sisanya baru tersedia setelah trip selesai.
       </p>
     </LegalSection>
   </div>

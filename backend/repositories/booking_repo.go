@@ -38,6 +38,9 @@ func (r *bookingRepository) Create(booking *models.Booking) error {
 	return r.db.Create(booking).Error
 }
 
+// orderParticipants menjaga urutan peserta sesuai isian form checkout.
+func orderParticipants(db *gorm.DB) *gorm.DB { return db.Order("position asc") }
+
 func (r *bookingRepository) FindAll() ([]models.Booking, error) {
 	var bookings []models.Booking
 	threeMonthsAgo := time.Now().AddDate(0, -3, 0)
@@ -50,6 +53,7 @@ func (r *bookingRepository) FindAll() ([]models.Booking, error) {
 func (r *bookingRepository) FindAllByProvider(providerID uint) ([]models.Booking, error) {
 	var bookings []models.Booking
 	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Participants", orderParticipants).
 		Where("provider_id = ?", providerID).
 		Order("id desc").Find(&bookings).Error
 	return bookings, err
@@ -145,6 +149,7 @@ func (r *bookingRepository) FindAllByCustomer(customerID uint) ([]models.Booking
 		Select("bookings.*, providers.whats_app AS provider_whats_app, providers.business_name AS provider_name").
 		Joins("JOIN providers ON providers.id = bookings.provider_id").
 		Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Participants", orderParticipants).
 		Where("bookings.customer_id = ? AND (bookings.created_at >= ? OR bookings.created_at IS NULL)", customerID, threeMonthsAgo).
 		Order("bookings.id desc").Find(&bookings).Error
 	return bookings, err

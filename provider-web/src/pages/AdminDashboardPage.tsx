@@ -189,7 +189,7 @@ export const AdminDashboardPage: React.FC = () => {
       });
       setSuccessMsg(
         result?.status === 'PROCESSING'
-          ? 'Pencairan disetujui dan sedang diproses oleh Xendit.'
+          ? 'Pencairan disetujui dan sedang diproses oleh layanan transfer.'
           : `Berhasil memproses pencairan dana (${result?.status || status}).`
       );
       fetchAdminPayouts();
@@ -1019,7 +1019,7 @@ export const AdminDashboardPage: React.FC = () => {
                                       color: p.status === 'APPROVED' ? '#16a34a' : (p.status === 'REJECTED' || p.status === 'FAILED') ? '#dc2626' : p.status === 'PROCESSING' ? '#0284c7' : '#d97706'
                                     }}
                                   >
-                                    {p.status === 'APPROVED' ? '✓ Transfer Selesai' : p.status === 'PROCESSING' ? '↻ Diproses Xendit' : p.status === 'FAILED' ? '✕ Transfer Gagal' : p.status === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Admin'}
+                                    {p.status === 'APPROVED' ? '✓ Transfer Selesai' : p.status === 'PROCESSING' ? '↻ Transfer Diproses' : p.status === 'FAILED' ? '✕ Transfer Gagal' : p.status === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Admin'}
                                   </span>
                                 </td>
                                 <td>

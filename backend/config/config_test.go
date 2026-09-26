@@ -18,7 +18,8 @@ func validProductionEnv() map[string]string {
 		"GOOGLE_CLIENT_SECRET": "google-secret-value",
 		"GOOGLE_REDIRECT_URI":  "https://api.example.com/api/v1/public/auth/google/callback",
 		"IPAYMU_VA":            "0000000813208875",
-		"IPAYMU_API_KEY":       "SANDBOX443FF47C-1E4B-4880-A955-BFB25F2599CF",
+		"IPAYMU_API_KEY":       "production-secret-443ff47c",
+		"IPAYMU_BASE_URL":      "https://my.ipaymu.com/api/v2",
 		"SMTP_HOST":            "smtp.example.com",
 		"SMTP_PORT":            "587",
 		"SMTP_USER":            "mailer",
@@ -34,7 +35,7 @@ func loadWith(t *testing.T, env map[string]string) (*Config, error) {
 		"DB_NAME", "DB_SSLMODE", "DB_MAX_OPEN_CONNS", "DB_MAX_IDLE_CONNS", "JWT_SECRET",
 		"FRONTEND_URL", "BACKEND_URL", "ALLOWED_ORIGINS", "TRUSTED_PROXIES",
 		"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
-		"IPAYMU_VA", "IPAYMU_API_KEY", "IPAYMU_BASE_URL", "IPAYMU_CALLBACK_URL",
+		"IPAYMU_VA", "IPAYMU_API_KEY", "IPAYMU_BASE_URL", "IPAYMU_CALLBACK_URL", "IPAYMU_RETURN_URL", "IPAYMU_CANCEL_URL",
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM",
 		"RUN_MIGRATIONS", "SEED_DB", "ENABLE_DEV_MOCKS", "ENABLE_BACKGROUND_JOBS",
 		"ENABLE_AUTOMATIC_PAYOUT",
@@ -82,6 +83,8 @@ func TestProductionRejectsUnsafeValues(t *testing.T) {
 		{"origin memakai path", func(e map[string]string) { e["ALLOWED_ORIGINS"] = "https://app.example.com/app" }, "ALLOWED_ORIGINS"},
 		{"smtp from bukan email", func(e map[string]string) { e["SMTP_FROM"] = "Tim TemenTrip" }, "SMTP_FROM"},
 		{"ipaymu api key kosong", func(e map[string]string) { e["IPAYMU_API_KEY"] = "" }, "IPAYMU_API_KEY"},
+		{"ipaymu production memakai sandbox", func(e map[string]string) { e["IPAYMU_BASE_URL"] = "https://sandbox.ipaymu.com/api/v2" }, "IPAYMU_BASE_URL"},
+		{"payout otomatis belum terintegrasi", func(e map[string]string) { e["ENABLE_AUTOMATIC_PAYOUT"] = "true" }, "ENABLE_AUTOMATIC_PAYOUT"},
 		{"pool idle melebihi open", func(e map[string]string) {
 			e["DB_MAX_OPEN_CONNS"] = "5"
 			e["DB_MAX_IDLE_CONNS"] = "10"

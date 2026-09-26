@@ -54,7 +54,9 @@ func SplitBookingEarning(totalCustomerPaid int64) EarningSplit {
 	dpAmount := netEarning / 2
 
 	return EarningSplit{
-		PlatformFee:    packageGross*PlatformCommissionPercent/100 + adminFee,
+		// Sisa pembulatan rupiah masuk ke fee platform agar seluruh komponen
+		// selalu tepat menjumlah ke nilai yang dibayar pelanggan.
+		PlatformFee:    totalCustomerPaid - netEarning,
 		NetEarning:     netEarning,
 		DPAmount:       dpAmount,
 		SettlementHeld: netEarning - dpAmount,

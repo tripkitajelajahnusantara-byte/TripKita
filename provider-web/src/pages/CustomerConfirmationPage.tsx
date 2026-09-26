@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
+import { fetchCheckoutConfig } from '../utils/checkoutConfig';
 import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck } from 'lucide-react';
 import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsContent } from '../components/LegalModals';
 
@@ -17,6 +18,20 @@ export const CustomerConfirmationPage: React.FC = () => {
 
   // Confirmation Modal Popup state (YES / NO)
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Biaya layanan diambil dari backend (sama persis dengan yang ditambahkan server ke total)
+  const [serviceFee, setServiceFee] = useState<number | null>(null);
+  const [checkoutConfigError, setCheckoutConfigError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCheckoutConfig()
+      .then((cfg) => { if (!cancelled) setServiceFee(cfg.serviceFee); })
+      .catch((err: unknown) => {
+        if (!cancelled) setCheckoutConfigError(err instanceof Error && err.message ? err.message : 'Gagal memuat biaya layanan.');
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   if (!selectedPackageForDetail || !bookingFormData) {
     return (
@@ -35,8 +50,9 @@ export const CustomerConfirmationPage: React.FC = () => {
   const selectedAddOns = pkg.selectedAddOns || bookingFormData?.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
   const baseCost = pkg.price * guestsCount;
-  const serviceFee = 5000;
-  const totalCost = baseCost + addOnsTotal + serviceFee;
+  const checkoutConfigLoading = serviceFee === null && !checkoutConfigError;
+  const checkoutReady = serviceFee !== null;
+  const totalCost = baseCost + addOnsTotal + (serviceFee ?? 0);
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -47,6 +63,7 @@ export const CustomerConfirmationPage: React.FC = () => {
   };
 
   const handleOpenConfirmModal = () => {
+    if (!checkoutReady) return;
     if (!isAgreed) {
       setAgreementError('Anda wajib menyetujui Syarat & Ketentuan untuk melanjutkan.');
       return;
@@ -103,9 +120,9 @@ export const CustomerConfirmationPage: React.FC = () => {
           }
         }
 
-        const defaultFuture = new Date();
-        defaultFuture.setDate(defaultFuture.getDate() + 14);
-        return defaultFuture;
+        // Jangan menebak tanggal: pesanan untuk tanggal yang tidak dipilih
+        // pelanggan lebih merugikan daripada menghentikan checkout.
+        throw new Error('Tanggal perjalanan tidak terbaca. Silakan kembali ke detail paket dan pilih tanggal lagi.');
       };
 
       const selectedTripSchedule = bookingFormData?.tripDate || pkg.bookingDate || pkg.schedule || '';
@@ -125,7 +142,17 @@ export const CustomerConfirmationPage: React.FC = () => {
         customerInitial: (pemesan.nama || 'P').charAt(0).toUpperCase(),
         guests: guestsCount || 1,
         tripDate: parsedTripDate.toISOString(),
-        addOnIds: selectedAddOns.map((item: any) => item.id)
+        addOnIds: selectedAddOns.map((item: any) => item.id),
+        participants: peserta.map((p) => {
+          const medical = String(p.riwayatPenyakit || '').trim();
+          return {
+            name: String(p.nama || '').trim(),
+            phone: String(p.hp || '').trim(),
+            gender: p.gender,
+            birthDate: p.tanggalLahir,
+            medicalNotes: (medical === '' || medical === '-' || medical.toLowerCase() === 'tidak ada') ? '' : medical
+          };
+        })
       };
 
       const response = await request('/public/bookings', {
@@ -138,11 +165,11 @@ export const CustomerConfirmationPage: React.FC = () => {
 	  try {
 		parsedPaymentURL = new URL(paymentUrl);
 	  } catch {
-		throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
+		throw new Error('Backend tidak mengembalikan URL checkout iPaymu yang valid');
 	  }
 	  const paymentHost = parsedPaymentURL.hostname.toLowerCase();
-	  if (parsedPaymentURL.protocol !== 'https:' || (paymentHost !== 'xendit.co' && !paymentHost.endsWith('.xendit.co'))) {
-		throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
+	  if (parsedPaymentURL.protocol !== 'https:' || (paymentHost !== 'my.ipaymu.com' && paymentHost !== 'sandbox.ipaymu.com')) {
+		throw new Error('Backend tidak mengembalikan URL checkout iPaymu yang valid');
 	  }
 
 	  const finalBookingCode = response.bookingCode || response.booking_code;
@@ -166,7 +193,7 @@ export const CustomerConfirmationPage: React.FC = () => {
       localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
       sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
-      // Direct external redirect to Xendit Invoice URL (using replace so back button doesn't loop)!
+	  // Redirect langsung ke hosted checkout resmi iPaymu.
 	  window.location.replace(parsedPaymentURL.toString());
 
     } catch (err: any) {
@@ -284,18 +311,26 @@ export const CustomerConfirmationPage: React.FC = () => {
                 </div>
               ))}
 
-              {serviceFee > 0 && (
+              {(serviceFee === null || serviceFee > 0) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Biaya Admin</span>
-                  <span style={{ color: '#0f172a', fontWeight: '600' }}>{formatIDR(serviceFee)}</span>
+                  <span style={{ color: checkoutConfigError ? '#ef4444' : '#0f172a', fontWeight: '600' }}>
+                    {serviceFee !== null ? formatIDR(serviceFee) : (checkoutConfigError ? 'Gagal dimuat' : 'Memuat...')}
+                  </span>
                 </div>
               )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1.5px dashed #cbd5e1' }}>
               <strong style={{ fontSize: '14px', color: '#0f172a' }}>TOTAL PEMBAYARAN</strong>
-              <strong style={{ fontSize: '18px', color: '#0284c7', fontWeight: '800' }}>{formatIDR(totalCost)}</strong>
+              <strong style={{ fontSize: '18px', color: '#0284c7', fontWeight: '800' }}>{checkoutReady ? formatIDR(totalCost) : (checkoutConfigError ? '-' : 'Memuat...')}</strong>
             </div>
+
+            {checkoutConfigError && (
+              <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '700', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <AlertCircle size={14} /> Gagal memuat biaya layanan: {checkoutConfigError} Muat ulang halaman untuk mencoba lagi.
+              </span>
+            )}
           </div>
 
           {/* Cancellation Policy Banner */}
@@ -349,22 +384,22 @@ export const CustomerConfirmationPage: React.FC = () => {
           {/* Action CTA Button */}
           <button
             onClick={handleOpenConfirmModal}
-            disabled={submitting}
+            disabled={submitting || !checkoutReady}
             style={{
               width: '100%',
               padding: '16px',
-              backgroundColor: submitting ? '#94a3b8' : '#0284c7',
+              backgroundColor: (submitting || !checkoutReady) ? '#94a3b8' : '#0284c7',
               color: '#ffffff',
               border: 'none',
               borderRadius: '12px',
               fontSize: '16px',
               fontWeight: '700',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              boxShadow: submitting ? 'none' : '0 4px 14px rgba(2, 132, 199, 0.3)',
+              cursor: (submitting || !checkoutReady) ? 'not-allowed' : 'pointer',
+              boxShadow: (submitting || !checkoutReady) ? 'none' : '0 4px 14px rgba(2, 132, 199, 0.3)',
               transition: 'all 0.2s'
             }}
           >
-            {submitting ? 'Memproses Booking...' : 'Konfirmasi & Bayar Sekarang'}
+            {submitting ? 'Memproses Booking...' : checkoutConfigLoading ? 'Memuat Biaya Layanan...' : 'Konfirmasi & Bayar Sekarang'}
           </button>
 
         </div>
@@ -433,6 +468,7 @@ export const CustomerConfirmationPage: React.FC = () => {
               {/* YES Button */}
               <button
                 onClick={handleFinalConfirmBooking}
+                disabled={!checkoutReady}
                 style={{
                   padding: '12px',
                   backgroundColor: '#0284c7',

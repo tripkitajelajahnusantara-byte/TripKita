@@ -1,9 +1,7 @@
 package controllers
 
 import (
-	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -181,47 +179,4 @@ func (ctrl *PayoutController) AdminProcessPayout(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, payout)
-}
-
-// XenditPayoutWebhook menerima status akhir pencairan dari payment gateway.
-//
-// Token callback dibandingkan constant-time seperti webhook pembayaran, dan
-// respons non-2xx sengaja dikembalikan saat pemrosesan gagal agar gateway
-// mengirim ulang eventnya.
-func (ctrl *PayoutController) IPaymuPayoutWebhook(c *gin.Context) {
-	payoutID := c.PostForm("payout_id")
-	referenceID := c.PostForm("reference_id")
-	status := c.PostForm("status")
-	failureCode := c.PostForm("failure_code")
-
-	if payoutID == "" {
-		var req struct {
-			PayoutID    string `json:"payout_id"`
-			ReferenceID string `json:"reference_id"`
-			Status      string `json:"status"`
-			FailureCode string `json:"failure_code"`
-		}
-		if err := c.ShouldBindJSON(&req); err == nil {
-			payoutID = req.PayoutID
-			referenceID = req.ReferenceID
-			status = req.Status
-			failureCode = req.FailureCode
-		}
-	}
-
-	if strings.TrimSpace(payoutID) == "" || strings.TrimSpace(referenceID) == "" {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-		return
-	}
-
-	if err := ctrl.service.HandlePayoutCallback(payoutID, referenceID, status, failureCode); err != nil {
-		if errors.Is(err, services.ErrUnknownPayoutReference) {
-			log.Printf("[Payout Webhook] Callback dengan reference tidak dikenali diabaikan")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Reference pencairan tidak dikenali"})
-			return
-		}
-		respondInternalError(c, "memproses callback pencairan", err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

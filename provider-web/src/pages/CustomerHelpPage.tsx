@@ -34,14 +34,14 @@ export const CustomerHelpPage: React.FC = () => {
     {
       id: 'faq-2',
       category: 'pembayaran',
-      question: 'Bagaimana skema pembayaran DP 50% & Pelunasan bekerja?',
-      answer: 'Untuk menjamin keamanan transaksi Anda dan kenyamanan mitra provider, pembayaran dilakukan dalam 2 tahap: DP 50% dibayarkan saat memesan awal, dan sisa 50% dilunasi saat perjalanan wisata telah selesai dilaksanakan.'
+      question: 'Bagaimana skema pembayaran di TemenTrip?',
+      answer: 'Pembayaran dilakukan penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari customer. Checkout berlaku 24 jam sejak pesanan dibuat. Buku besar TemenTrip mencatat separuh hak mitra tersedia untuk diajukan setelah pembayaran dan separuh sisanya setelah perjalanan selesai.'
     },
     {
       id: 'faq-3',
       category: 'pembayaran',
       question: 'Metode pembayaran apa saja yang didukung?',
-      answer: 'TemenTrip mendukung pembayaran digital cepat via Xendit QRIS (GoPay, OVO, DANA, ShopeePay, LinkAja) serta Virtual Account Bank resmi (BCA, Mandiri, BNI, BRI).'
+      answer: 'TemenTrip memakai hosted checkout iPaymu. Pilihan QRIS, e-wallet, kartu, atau Virtual Account yang tersedia akan ditampilkan langsung oleh iPaymu sesuai kanal yang aktif pada akun merchant.'
     },
     {
       id: 'faq-4',
@@ -87,14 +87,14 @@ export const CustomerHelpPage: React.FC = () => {
         <div className="container help-hero-container">
           <span className="help-hero-tag">PUSAT BANTUAN TEMENTRIP</span>
           <h1>Ada yang Bisa Kami Bantu?</h1>
-          <p>Temukan jawaban lengkap atas pertanyaan seputar pemesanan paket wisata, skema pembayaran DP 50%, akses grup WA, dan layanan pelanggan TemenTrip.</p>
+          <p>Temukan jawaban lengkap atas pertanyaan seputar pemesanan paket wisata, skema pembayaran, akses grup WA, dan layanan pelanggan TemenTrip.</p>
 
           {/* Search Box */}
           <div className="help-search-box">
             <Search size={20} color="#0284c7" />
             <input 
               type="text" 
-              placeholder="Cari pertanyaan... (contoh: cara bayar, DP 50%, refund, provider)"
+              placeholder="Cari pertanyaan... (contoh: cara bayar, refund, provider)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -118,8 +118,8 @@ export const CustomerHelpPage: React.FC = () => {
             </div>
             <div className={`category-card ${activeCategory === 'pembayaran' ? 'active' : ''}`} onClick={() => setActiveCategory('pembayaran')}>
               <div className="cat-icon bg-purple"><CreditCard size={22} color="#8b5cf6" /></div>
-              <h3>Pembayaran & DP 50%</h3>
-              <p>Xendit QRIS & Bank Transfer</p>
+              <h3>Pembayaran & Refund</h3>
+              <p>iPaymu Hosted Checkout</p>
             </div>
             <div className={`category-card ${activeCategory === 'refund' ? 'active' : ''}`} onClick={() => setActiveCategory('refund')}>
               <div className="cat-icon bg-green"><ShieldCheck size={22} color="#10b981" /></div>

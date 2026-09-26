@@ -5,7 +5,7 @@ import { useNavigation } from '../context/NavigationContext';
 
 export const CustomerPaymentInvoicePage: React.FC = () => {
   const { navigateTo, selectedBookingForInvoice } = useNavigation();
-  const [message, setMessage] = useState('Mengarahkan ke halaman pembayaran aman Xendit...');
+  const [message, setMessage] = useState('Mengarahkan ke halaman pembayaran aman iPaymu...');
 
   useEffect(() => {
     const paymentURL = selectedBookingForInvoice?.paymentUrl;
@@ -17,7 +17,7 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
     try {
       const parsed = new URL(paymentURL);
       const host = parsed.hostname.toLowerCase();
-      if (parsed.protocol !== 'https:' || (host !== 'xendit.co' && !host.endsWith('.xendit.co'))) throw new Error('invalid payment URL');
+      if (parsed.protocol !== 'https:' || (host !== 'my.ipaymu.com' && host !== 'sandbox.ipaymu.com')) throw new Error('invalid payment URL');
       window.location.replace(parsed.toString());
     } catch {
       setMessage('Tautan pembayaran tidak valid. Jangan melanjutkan pembayaran dan hubungi layanan pelanggan.');

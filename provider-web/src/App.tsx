@@ -3,7 +3,7 @@ import { NavigationProvider, useNavigation } from './context/NavigationContext';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from './components/LegalModals';
-import { getProviderToken } from './utils/api';
+import { getCustomerToken, getProviderToken } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Setiap halaman dimuat sebagai chunk terpisah supaya kunjungan pertama tidak
@@ -91,7 +91,15 @@ const AppContent: React.FC = () => {
         }
       }
     }
-  }, [route, loadingProfile, providerProfile]);
+
+    const privateCustomerRoutes = ['riwayat-booking', 'pengaturan', 'rencana-trip'];
+    if (privateCustomerRoutes.includes(route)) {
+      const hasCustomerToken = typeof window !== 'undefined' && getCustomerToken();
+      if (!hasCustomerToken || !customerProfile) {
+        navigateTo('masuk');
+      }
+    }
+  }, [route, loadingProfile, providerProfile, customerProfile, navigateTo]);
 
   if (loadingProfile) {
     return (

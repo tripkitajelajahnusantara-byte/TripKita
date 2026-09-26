@@ -1,148 +1,331 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:customer_mobile/models/package.dart';
+
+import 'package:customer_mobile/config/app_config.dart';
 import 'package:customer_mobile/models/booking.dart';
+import 'package:customer_mobile/models/customer.dart';
+import 'package:customer_mobile/models/package.dart';
+import 'package:customer_mobile/models/notification.dart';
+import 'package:customer_mobile/models/review.dart';
+import 'package:customer_mobile/models/trip_plan.dart';
+import 'package:customer_mobile/services/checkout_config.dart';
 
+/// Galat API yang membawa status HTTP, sama seperti `ApiError` di web.
+class ApiException implements Exception {
+  final String message;
+  final int status;
+
+  const ApiException(this.message, this.status);
+
+  @override
+  String toString() => message;
+}
+
+class AuthResult {
+  final String token;
+  final CustomerProfile profile;
+
+  const AuthResult(this.token, this.profile);
+}
+
+/// Klien HTTP untuk backend TemenTrip. Token sesi dipasok oleh
+/// [AuthSession]; respons 401 untuk token yang masih aktif memicu
+/// [onSessionExpired] agar pengguna diarahkan untuk masuk kembali.
 class ApiService {
-  static const String baseUrl = 'https://tripkita-production.up.railway.app/api/v1';
+  static const Duration _timeout = Duration(seconds: 30);
 
-  // Fetch live packages from Railway backend database
-  static Future<List<TripPackage>> fetchPublicPackages() async {
+  static String? Function() tokenProvider = () => null;
+  static void Function(String rejectedToken) onSessionExpired = (_) {};
+
+  static Future<dynamic> _request(
+    String method,
+    String endpoint, {
+    Object? body,
+    bool withAuth = true,
+    String? tokenOverride,
+  }) async {
+    final token = tokenOverride ?? (withAuth ? tokenProvider() : null);
+    final client = HttpClient()..connectionTimeout = _timeout;
     try {
-      final client = HttpClient();
-      final request = await client.getUrl(Uri.parse('$baseUrl/public/packages'));
-      final response = await request.close().timeout(const Duration(seconds: 10));
+      final request = await client
+          .openUrl(method, Uri.parse('${AppConfig.apiBaseUrl}$endpoint'))
+          .timeout(_timeout);
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      if (token != null && token.isNotEmpty) {
+        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      }
+      if (body != null) {
+        request.headers.contentType = ContentType.json;
+        request.add(utf8.encode(jsonEncode(body)));
+      }
 
-      if (response.statusCode == 200) {
-        final bodyStr = await response.transform(utf8.decoder).join();
-        final List<dynamic> data = jsonDecode(bodyStr);
-        if (data.isNotEmpty) {
-          final packages = data.map((json) => TripPackage.fromJson(json as Map<String, dynamic>)).toList();
-          if (packages.isNotEmpty) {
-            return packages;
-          }
+      final response = await request.close().timeout(_timeout);
+      final text =
+          await response.transform(utf8.decoder).join().timeout(_timeout);
+      dynamic data;
+      if (text.isNotEmpty) {
+        try {
+          data = jsonDecode(text);
+        } catch (_) {
+          data = null;
         }
       }
-    } catch (e) {
-      // Fallback to offline mock packages if network error occurs
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final serverMessage = data is Map && data['error'] is String
+            ? data['error'] as String
+            : null;
+        if (response.statusCode == 401 && token != null && token.isNotEmpty) {
+          onSessionExpired(token);
+          throw ApiException(
+              serverMessage ??
+                  'Sesi Anda telah berakhir. Silakan masuk kembali.',
+              401);
+        }
+        throw ApiException(
+          serverMessage ??
+              'Terjadi gangguan pada server (${response.statusCode}).',
+          response.statusCode,
+        );
+      }
+      return data;
+    } on ApiException {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiException(
+          'Permintaan terlalu lama. Periksa koneksi Anda lalu coba lagi.', 0);
+    } catch (_) {
+      throw const ApiException(
+          'Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.',
+          0);
+    } finally {
+      client.close(force: true);
     }
-    return TripPackage.allPackages;
   }
 
-  // Create booking via Railway Backend & Xendit Invoice Generator
-  static Future<Booking?> createBooking({
+  static Map<String, dynamic> _asMap(dynamic data) =>
+      data is Map<String, dynamic> ? data : <String, dynamic>{};
+  static List<dynamic> _asList(dynamic data) => data is List ? data : const [];
+
+  // ---------------------------------------------------------------- Paket
+
+  static Future<List<TripPackage>> fetchPackages() async {
+    final data = await _request('GET', '/public/packages', withAuth: false);
+    return _asList(data)
+        .whereType<Map<String, dynamic>>()
+        .map(TripPackage.fromJson)
+        .toList();
+  }
+
+  static Future<PublicProvider> fetchProvider(int providerId) async {
+    final data =
+        await _request('GET', '/public/providers/$providerId', withAuth: false);
+    return PublicProvider.fromJson(_asMap(data));
+  }
+
+  static Future<List<PackageReview>> fetchPackageReviews(int packageId) async {
+    final data = await _request('GET', '/public/reviews/package/$packageId',
+        withAuth: false);
+    return _asList(data)
+        .whereType<Map<String, dynamic>>()
+        .map(PackageReview.fromJson)
+        .toList();
+  }
+
+  static Future<bool> isBookingReviewed(int bookingId) async {
+    final data = await _request('GET', '/public/reviews/booking/$bookingId',
+        withAuth: false);
+    return _asMap(data)['reviewed'] == true;
+  }
+
+  // ---------------------------------------------------------- Rencana Trip
+
+  static Future<List<TripPlan>> fetchTripPlans() async {
+    final data = await _request('GET', '/customer/trip-plans');
+    return _asList(data)
+        .whereType<Map<String, dynamic>>()
+        .map(TripPlan.fromJson)
+        .toList();
+  }
+
+  static Future<TripPlan> createTripPlan(TripPlan plan) async {
+    final data =
+        await _request('POST', '/customer/trip-plans', body: plan.toJson());
+    return TripPlan.fromJson(_asMap(data));
+  }
+
+  static Future<TripPlan> updateTripPlan(TripPlan plan) async {
+    final data = await _request(
+        'PUT', '/customer/trip-plans/${Uri.encodeComponent(plan.id)}',
+        body: plan.toJson());
+    return TripPlan.fromJson(_asMap(data));
+  }
+
+  static Future<void> deleteTripPlan(String id) async {
+    await _request('DELETE', '/customer/trip-plans/${Uri.encodeComponent(id)}');
+  }
+
+  // ------------------------------------------------------------- Notifikasi
+
+  static Future<List<AppNotification>> fetchNotifications() async {
+    final data = _asMap(await _request('GET', '/customer/notifications'));
+    return _asList(data['data'])
+        .whereType<Map<String, dynamic>>()
+        .map(AppNotification.fromJson)
+        .toList();
+  }
+
+  static Future<void> markNotificationRead(int id) async {
+    await _request('PUT', '/customer/notifications/$id/read');
+  }
+
+  static Future<void> markAllNotificationsRead() async {
+    await _request('PUT', '/customer/notifications/read-all');
+  }
+
+  // ----------------------------------------------------------------- Auth
+
+  static Future<AuthResult> login(String email, String password) async {
+    final data = _asMap(await _request(
+      'POST',
+      '/public/auth/login',
+      body: {'email': email, 'password': password},
+      withAuth: false,
+    ));
+    final token = data['token'];
+    final provider = data['provider'];
+    if (token is! String ||
+        token.isEmpty ||
+        provider is! Map<String, dynamic>) {
+      throw const ApiException(
+          'Respons login tidak valid. Silakan coba kembali.', 0);
+    }
+    return AuthResult(token, CustomerProfile.fromJson(provider));
+  }
+
+  static Future<AuthResult> registerCustomer({
+    required String name,
+    required String email,
+    required String password,
+    required String whatsapp,
+  }) async {
+    final data = _asMap(await _request(
+      'POST',
+      '/public/auth/register-customer',
+      body: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'whatsapp': whatsapp
+      },
+      withAuth: false,
+    ));
+    final token = data['token'];
+    final profile = data['customer'] ?? data['provider'];
+    if (token is! String || token.isEmpty || profile is! Map<String, dynamic>) {
+      throw const ApiException('Pendaftaran gagal. Silakan coba kembali.', 0);
+    }
+    return AuthResult(token, CustomerProfile.fromJson(profile));
+  }
+
+  static Future<CustomerProfile> fetchProfile({String? token}) async {
+    final data =
+        await _request('GET', '/provider/profile', tokenOverride: token);
+    return CustomerProfile.fromJson(_asMap(data));
+  }
+
+  static Future<CustomerProfile> updateProfile(
+      Map<String, dynamic> fields) async {
+    final data = await _request('PUT', '/provider/profile', body: fields);
+    return CustomerProfile.fromJson(_asMap(data));
+  }
+
+  /// Best effort: logout lokal tetap berhasil walau jaringan terputus.
+  static Future<void> revokeSession(String token) async {
+    try {
+      await _request('POST', '/public/auth/logout', tokenOverride: token);
+    } catch (_) {}
+  }
+
+  // -------------------------------------------------------------- Booking
+
+  static Future<Booking> createBooking({
     required int packageId,
-    required TripPackage packageDetails,
-    required String customerName,
+    required BookerContact booker,
     required int guests,
-    required int totalPrice,
-    required DateTime tripDate,
+    required String tripDateIso,
     required List<Participant> participants,
   }) async {
-    final nowIso = DateTime.now().toIso8601String();
-    final dateStr = nowIso.substring(0, 10).replaceAll('-', '');
-    final randSuffix = (1000 + (DateTime.now().millisecond % 9000)).toString();
-    final randomCode = 'TK-$dateStr-$randSuffix';
-
-    final payload = {
-      'packageId': packageId > 0 ? packageId : 1,
-      'bookingCode': randomCode,
-      'customerName': customerName.isNotEmpty ? customerName : 'Pelanggan TripKita',
-      'customerInitial': customerName.isNotEmpty ? customerName[0].toUpperCase() : 'P',
+    final data = await _request('POST', '/public/bookings', body: {
+      'packageId': packageId,
+      'customerName':
+          booker.name.isNotEmpty ? booker.name : 'Pelanggan TripKita',
+      'customerEmail': booker.email,
+      'customerPhone': booker.whatsapp,
+      'customerInitial':
+          (booker.name.isNotEmpty ? booker.name[0] : 'P').toUpperCase(),
       'guests': guests,
-      'totalPrice': totalPrice,
-      'tripDate': tripDate.toIso8601String(),
-      'paymentMethod': 'Xendit Invoice',
-      'participants': participants.map((p) => {
-        'nama': p.fullName.isNotEmpty ? p.fullName : 'Peserta',
-        'hp': p.whatsappNumber,
-        'gender': p.gender,
-        'tanggalLahir': p.dateOfBirth,
-        'riwayatPenyakit': p.optionalNotes.isNotEmpty ? p.optionalNotes : 'Tidak Ada',
-      }).toList(),
-    };
-
-    try {
-      final client = HttpClient();
-      final request = await client.postUrl(Uri.parse('$baseUrl/public/bookings'));
-      request.headers.set('Content-Type', 'application/json');
-      request.add(utf8.encode(jsonEncode(payload)));
-
-      final response = await request.close().timeout(const Duration(seconds: 12));
-      final bodyStr = await response.transform(utf8.decoder).join();
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final resJson = jsonDecode(bodyStr) as Map<String, dynamic>;
-        final String paymentUrl = resJson['paymentUrl'] ?? resJson['payment_url'] ?? 'https://tripkita-production.up.railway.app/api/v1/public/xendit-mock-checkout/${resJson['id'] ?? 1}';
-        final String bookingCode = resJson['bookingCode'] ?? resJson['booking_code'] ?? randomCode;
-        final int id = (resJson['id'] as num? ?? DateTime.now().millisecondsSinceEpoch).toInt();
-
-        final createdBooking = Booking(
-          id: id,
-          bookingCode: bookingCode,
-          providerId: packageDetails.providerId,
-          packageId: packageId,
-          packageDetails: packageDetails,
-          customerName: customerName,
-          customerInitial: customerName.isNotEmpty ? customerName[0].toUpperCase() : 'P',
-          tripDate: tripDate,
-          guests: guests,
-          totalPrice: totalPrice,
-          dpAmount: 0,
-          paymentMethod: 'Xendit Invoice',
-          status: resJson['status'] as String? ?? 'PENDING_PAYMENT',
-          paymentUrl: paymentUrl,
-          createdAt: DateTime.now(),
-          participants: participants,
-        );
-
-        Booking.mockBookings.insert(0, createdBooking);
-        return createdBooking;
-      }
-    } catch (e) {
-      // Local fallback in case network API is unreachable
-    }
-
-    // Fallback booking object with Xendit simulation URL
-    final fallbackBooking = Booking(
-      id: DateTime.now().millisecondsSinceEpoch,
-      bookingCode: randomCode,
-      providerId: packageDetails.providerId,
-      packageId: packageId,
-      packageDetails: packageDetails,
-      customerName: customerName,
-      customerInitial: customerName.isNotEmpty ? customerName[0].toUpperCase() : 'P',
-      tripDate: tripDate,
-      guests: guests,
-      totalPrice: totalPrice,
-      dpAmount: 0,
-      paymentMethod: 'Xendit Invoice',
-      status: 'PENDING_PAYMENT',
-      paymentUrl: 'https://tripkita-production.up.railway.app/api/v1/public/xendit-mock-checkout/1',
-      createdAt: DateTime.now(),
-      participants: participants,
-    );
-
-    Booking.mockBookings.insert(0, fallbackBooking);
-    return fallbackBooking;
+      'tripDate': '${tripDateIso}T00:00:00.000Z',
+      'addOnIds': <String>[],
+      'participants': [for (final p in participants) p.toApiJson()],
+    });
+    return Booking.fromJson(_asMap(data));
   }
 
-  // Check live status of booking from Railway backend (to verify Xendit Webhook updates)
-  static Future<String?> checkBookingStatus(String bookingCode) async {
-    try {
-      final client = HttpClient();
-      final request = await client.getUrl(Uri.parse('$baseUrl/public/bookings/status/$bookingCode'));
-      final response = await request.close().timeout(const Duration(seconds: 8));
-
-      if (response.statusCode == 200) {
-        final bodyStr = await response.transform(utf8.decoder).join();
-        final resJson = jsonDecode(bodyStr) as Map<String, dynamic>;
-        final String status = resJson['status'] as String? ?? 'PENDING_PAYMENT';
-        return status;
-      }
-    } catch (e) {
-      // Ignore network error
+  static Future<CheckoutConfig> fetchCheckoutConfig() async {
+    final data = _asMap(
+        await _request('GET', '/public/checkout-config', withAuth: false));
+    final fee = data['serviceFee'];
+    final window = data['paymentWindowSeconds'];
+    if (fee is! num || window is! num) {
+      throw const ApiException(
+          'Konfigurasi pembayaran dari server tidak valid.', 0);
     }
-    return null;
+    return CheckoutConfig(
+        serviceFee: fee.toInt(),
+        paymentWindow: Duration(seconds: window.toInt()));
+  }
+
+  static Future<List<Booking>> fetchCustomerBookings() async {
+    final data = await _request('GET', '/customer/bookings');
+    return _asList(data)
+        .whereType<Map<String, dynamic>>()
+        .map(Booking.fromJson)
+        .toList();
+  }
+
+  static Future<Booking> cancelBooking(int bookingId) async {
+    final data = await _request('PUT', '/customer/bookings/$bookingId/cancel',
+        body: <String, dynamic>{});
+    return Booking.fromJson(_asMap(data));
+  }
+
+  static Future<String> respondToReschedule(int bookingId, bool accept) async {
+    final data = _asMap(await _request(
+      'POST',
+      '/customer/bookings/$bookingId/reschedule-response',
+      body: {'accept': accept},
+    ));
+    return data['message'] is String
+        ? data['message'] as String
+        : 'Jawaban Anda telah tersimpan.';
+  }
+
+  static Future<void> submitReview(
+      {required int bookingId,
+      required int rating,
+      required String comment}) async {
+    await _request('POST', '/customer/reviews', body: {
+      'bookingId': bookingId,
+      'rating': rating,
+      'comment': comment,
+    });
+  }
+
+  static Future<Booking> trackBooking(String bookingCode) async {
+    final data = await _request(
+        'GET', '/public/bookings/status/${Uri.encodeComponent(bookingCode)}');
+    return Booking.fromJson(_asMap(data));
   }
 }

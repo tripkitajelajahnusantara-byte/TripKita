@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
+import { fetchCheckoutConfig } from '../utils/checkoutConfig';
 import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, MessageSquare, Star } from 'lucide-react';
 
 interface BookingItem {
@@ -9,7 +10,9 @@ interface BookingItem {
   customerName: string;
   customerInitial: string;
   packageDetails?: {
+    id?: number;
     name: string;
+    tripType?: string;
     category: string;
     destination: string;
     price: number;
@@ -46,13 +49,17 @@ const getTrustedPaymentURL = (value?: string): string | null => {
   try {
     const parsed = new URL(value);
     const host = parsed.hostname.toLowerCase();
-    return parsed.protocol === 'https:' && (host === 'xendit.co' || host.endsWith('.xendit.co')) ? parsed.toString() : null;
+    return parsed.protocol === 'https:' && (host === 'my.ipaymu.com' || host === 'sandbox.ipaymu.com') ? parsed.toString() : null;
   } catch {
     return null;
   }
 };
 
-const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = ({ createdAt, onExpire }) => {
+// Batas waktu pembayaran invoice. Nilai sebenarnya diambil dari /public/checkout-config;
+// konstanta ini hanya dipakai selama konfigurasi belum termuat.
+const DEFAULT_PAYMENT_WINDOW_SECONDS = 24 * 60 * 60;
+
+const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; onExpire?: () => void }> = ({ createdAt, windowSeconds, onExpire }) => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const onExpireRef = useRef(onExpire);
 
@@ -65,7 +72,7 @@ const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = 
     const createdMs = new Date(createdAt).getTime();
     if (!Number.isFinite(createdMs) || createdMs <= 0) return;
 
-    const expireMs = createdMs + 24 * 60 * 60 * 1000;
+    const expireMs = createdMs + windowSeconds * 1000;
 
     const updateTimer = () => {
       const diff = Math.max(0, Math.floor((expireMs - Date.now()) / 1000));
@@ -82,7 +89,7 @@ const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = 
       if (updateTimer()) clearInterval(interval);
     }, 1000);
     return () => clearInterval(interval);
-  }, [createdAt]);
+  }, [createdAt, windowSeconds]);
 
   const hours = String(Math.floor(timeLeft / 3600)).padStart(2, '0');
   const minutes = String(Math.floor((timeLeft % 3600) / 60)).padStart(2, '0');
@@ -97,7 +104,18 @@ const CountdownTimer: React.FC<{ createdAt?: string; onExpire?: () => void }> = 
 };
 
 export const CustomerHistoryPage: React.FC = () => {
-  const { navigateTo, customerProfile } = useNavigation();
+  const { navigateTo, customerProfile, setSelectedPackageForDetail } = useNavigation();
+
+  // Batas waktu pembayaran dari backend (detik)
+  const [paymentWindowSeconds, setPaymentWindowSeconds] = useState<number>(DEFAULT_PAYMENT_WINDOW_SECONDS);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCheckoutConfig()
+      .then((cfg) => { if (!cancelled) setPaymentWindowSeconds(cfg.paymentWindowSeconds); })
+      .catch((err) => console.error('Failed to load checkout config:', err));
+    return () => { cancelled = true; };
+  }, []);
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -167,7 +185,7 @@ export const CustomerHistoryPage: React.FC = () => {
 	};
 
   useEffect(() => {
-    // Handle return from Xendit payment gateway
+	// Parameter redirect iPaymu hanya informasional; webhook tetap sumber status.
     const urlParams = new URLSearchParams(window.location.search);
 	const paymentResult = urlParams.get('payment_result');
 	const bookingId = urlParams.get('booking_id');
@@ -228,7 +246,7 @@ export const CustomerHistoryPage: React.FC = () => {
     if (!createdAt) return false;
     const createdTime = new Date(createdAt).getTime();
     if (isNaN(createdTime)) return false;
-    const expireTime = createdTime + 24 * 60 * 60 * 1000; // 24 Hours Xendit Invoice Limit
+    const expireTime = createdTime + paymentWindowSeconds * 1000; // Batas waktu checkout iPaymu
     return Date.now() > expireTime;
   };
 
@@ -340,8 +358,17 @@ export const CustomerHistoryPage: React.FC = () => {
           bgColor: '#fee2e2',
           icon: <XCircle size={14} color="#ef4444" />
         };
+	  case 'FAILED':
+		return {
+		  label: 'Pembayaran Gagal',
+		  color: '#ef4444',
+		  bgColor: '#fee2e2',
+		  icon: <XCircle size={14} color="#ef4444" />
+		};
       case 'DIBATALKAN':
       case 'CANCELLED':
+	  case 'CANCELLED_BY_CUSTOMER':
+	  case 'CANCELLED_BY_PROVIDER':
         return {
           label: 'Pesanan Dibatalkan',
           color: '#ef4444',
@@ -370,6 +397,13 @@ export const CustomerHistoryPage: React.FC = () => {
           bgColor: '#eff6ff',
           icon: <AlertCircle size={14} color="#3b82f6" />
         };
+	  case 'REFUNDED':
+		return {
+		  label: 'Refund Selesai',
+		  color: '#10b981',
+		  bgColor: '#dcfce7',
+		  icon: <CheckCircle2 size={14} color="#10b981" />
+		};
       default:
         return {
           label: 'Dibatalkan',
@@ -496,7 +530,7 @@ export const CustomerHistoryPage: React.FC = () => {
                           if (trustedURL) {
                             window.location.href = trustedURL;
                           } else {
-                            alert('Tautan pembayaran Xendit tidak ditemukan. Silakan lakukan pemesanan ulang.');
+                            alert('Tautan pembayaran iPaymu tidak ditemukan. Silakan lakukan pemesanan ulang.');
                           }
                         }}
                         style={{
@@ -693,12 +727,20 @@ export const CustomerHistoryPage: React.FC = () => {
                         </div>
                         
                         <p style={{ fontSize: '13px', color: '#7f1d1d', margin: 0, lineHeight: '1.5' }}>
-                          Batas waktu pembayaran 24 jam untuk transaksi ini telah kadaluwarsa. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.
+                          Batas waktu pembayaran {Math.round(paymentWindowSeconds / 3600)} jam untuk transaksi ini telah kadaluwarsa. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.
                         </p>
 
                         <div style={{ marginTop: '4px' }}>
                           <button
-                            onClick={() => navigateTo('beranda')}
+                            onClick={() => {
+                              // Buka detail paket yang sama bila datanya tersedia
+                              if (booking.packageDetails?.id) {
+                                setSelectedPackageForDetail(booking.packageDetails);
+                                navigateTo('paket-detail');
+                              } else {
+                                navigateTo('beranda');
+                              }
+                            }}
                             style={{
                               display: 'inline-block',
                               backgroundColor: '#dc2626',
@@ -720,17 +762,20 @@ export const CustomerHistoryPage: React.FC = () => {
                       /* ACTIVE PENDING PAYMENT BANNER */
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Pembayaran Xendit:</strong>
-                          <CountdownTimer createdAt={booking.createdAt} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
+                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Pembayaran iPaymu:</strong>
+                          <CountdownTimer createdAt={booking.createdAt} windowSeconds={paymentWindowSeconds} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
                         </div>
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
-                          Silakan lakukan pembayaran sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> via Payment Gateway Xendit.
+                          Silakan lakukan pembayaran sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> melalui checkout resmi iPaymu.
                         </span>
                         
                         <div style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
                           <div style={{ fontSize: '13px', color: '#1e293b', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <div><span style={{ color: '#64748b' }}>Tipe Trip:</span> <strong>{booking.packageDetails?.category || 'Open Trip'}</strong></div>
+                            <div><span style={{ color: '#64748b' }}>Tipe Trip:</span> <strong>{booking.packageDetails?.tripType || 'Open Trip'}</strong></div>
+                            {booking.packageDetails?.category && (
+                              <div><span style={{ color: '#64748b' }}>Kategori:</span> <strong>{booking.packageDetails.category}</strong></div>
+                            )}
                             <div><span style={{ color: '#64748b' }}>Tujuan Trip:</span> <strong>{booking.packageDetails?.destination || tripName}</strong></div>
                             <div><span style={{ color: '#64748b' }}>Nama Pemesan:</span> <strong>{booking.customerName || (customerProfile as any)?.name || 'Pelanggan TripKita'}</strong></div>
                           </div>
@@ -759,7 +804,7 @@ export const CustomerHistoryPage: React.FC = () => {
                                 if (trustedURL) {
                                   window.location.href = trustedURL;
                                 } else {
-                                  alert('Tautan pembayaran Xendit tidak ditemukan. Silakan lakukan pemesanan ulang.');
+                                  alert('Tautan pembayaran iPaymu tidak ditemukan. Silakan lakukan pemesanan ulang.');
                                 }
                               }}
                               style={{

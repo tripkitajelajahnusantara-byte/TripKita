@@ -50,6 +50,7 @@ const (
 	NotifTypeRegistration = "REGISTRATION"
 	NotifTypeDeparture    = "DEPARTURE"
 	NotifTypeAccount      = "ACCOUNT"
+	NotifTypeTripPlan     = "TRIP_PLAN"
 	NotifTypeGeneral      = "GENERAL"
 )
 

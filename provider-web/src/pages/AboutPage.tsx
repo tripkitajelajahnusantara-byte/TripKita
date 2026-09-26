@@ -20,7 +20,7 @@ export const AboutPage: React.FC = () => {
 
   const milestones = [
     { year: '2026', title: 'Peluncuran Resmi TemenTrip', desc: 'TemenTrip resmi hadir di Jakarta sebagai platform digital open trip modern bagi wisatawan Indonesia.' },
-    { year: '2026', title: 'Sistem Escrow & DP 50%', desc: 'Penerapan skema transaksi aman dengan DP 50% dan pencairan otomatis untuk melindungi provider dan traveler.' },
+    { year: '2026', title: 'Pembayaran Penuh & Dana Mitra Bertahap', desc: 'Pembayaran penuh di muka melalui iPaymu; buku besar TemenTrip menyediakan separuh hak mitra setelah pembayaran dan separuh sisanya setelah trip selesai.' },
     { year: '2026', title: 'Jaringan Mitra Destinasi Nusantara', desc: 'Mengintegrasikan paket wisata unggulan terverifikasi dari Bromo, Bali, Lombok, hingga Raja Ampat.' },
   ];
 

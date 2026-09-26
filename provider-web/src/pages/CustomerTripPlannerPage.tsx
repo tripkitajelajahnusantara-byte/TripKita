@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
+import { getTripImage } from '../utils/tripImages';
+import { TripImage } from '../components/TripImage';
 import type { TripPlan, TripChecklistItem, TripSavingsLog, PackageItem } from '../types';
 import { 
   Target, Calendar, Users, Wallet, CheckCircle2, Circle, Sparkles, Compass, 
@@ -15,12 +17,52 @@ const getTodayIsoDate = () => {
   return `${year}-${month}-${day}`;
 };
 
+const getDefaultTargetDate = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 30);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const getMaximumTargetDate = () => {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() + 5);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
 const formatDateIndo = (dateStr: string) => {
   if (!dateStr) return 'Pilih tanggal trip';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = year && month && day ? new Date(year, month - 1, day) : new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
   const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+const normalizeTripPlan = (raw: any): TripPlan => {
+  const savingsLogs: TripSavingsLog[] = Array.isArray(raw?.savingsLogs)
+    ? raw.savingsLogs.map((log: any) => ({
+        id: String(log.id),
+        date: /^\d{4}-\d{2}-\d{2}$/.test(String(log.date || '')) ? String(log.date) : getTodayIsoDate(),
+        amount: Number(log.amount) || 0,
+        note: String(log.note || ''),
+      }))
+    : [];
+  return {
+    id: String(raw.id),
+    destination: String(raw.destination || ''),
+    targetMonth: String(raw.targetMonth || ''),
+    targetMonthLabel: String(raw.targetMonthLabel || formatDateIndo(String(raw.targetMonth || ''))),
+    participants: Number(raw.participants) || 1,
+    targetBudget: Number(raw.targetBudget) || 0,
+    savedAmount: savingsLogs.reduce((sum, log) => sum + log.amount, 0),
+    checklist: Array.isArray(raw.checklist)
+      ? raw.checklist.map((item: any) => ({ id: String(item.id), label: String(item.label || ''), completed: item.completed === true }))
+      : [],
+    savingsLogs,
+    status: raw.status === 'DRAFT' ? 'DRAFT' : 'SAVED',
+    createdAt: String(raw.createdAt || new Date().toISOString()),
+    updatedAt: String(raw.updatedAt || new Date().toISOString()),
+  };
 };
 
 const formatRupiah = (val: number) => {
@@ -100,112 +142,15 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
   };
 };
 
-const CATALOG_PACKAGES: PackageItem[] = [
-  {
-    id: 'pkg_palu',
-    name: 'Open Trip Palu & Teluk Tomini 3D2N',
-    destination: 'Palu, Sulawesi Tengah',
-    price: 'Rp 1.450.000',
-    quota: '10 Pax',
-    schedule: 'Tersedia tiap weekend',
-    status: 'Aktif',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600',
-    tripType: 'Open Trip'
-  },
-  {
-    id: 'pkg_rajaampat',
-    name: 'Private Trip Wisata Raja Ampat 4D3N',
-    destination: 'Raja Ampat, Papua Barat',
-    price: 'Rp 3.850.000',
-    quota: '8 Pax',
-    schedule: 'Fleksibel',
-    status: 'Aktif',
-    rating: 5.0,
-    image: 'https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?w=600',
-    tripType: 'Private Trip'
-  },
-  {
-    id: 'pkg_bali',
-    name: 'Honeymoon Romantic Bali Villa 3D2N',
-    destination: 'Denpasar & Ubud, Bali',
-    price: 'Rp 2.950.000',
-    quota: '2 Pax',
-    schedule: 'Fleksibel',
-    status: 'Aktif',
-    rating: 5.0,
-    image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=600',
-    tripType: 'Honeymoon'
-  },
-  {
-    id: 'pkg_bromo',
-    name: 'Open Trip Gunung Bromo Sunrise',
-    destination: 'Probolinggo, Jawa Timur',
-    price: 'Rp 350.000',
-    quota: '15 Pax',
-    schedule: 'Setiap Hari',
-    status: 'Aktif',
-    rating: 4.8,
-    image: 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=600',
-    tripType: 'Open Trip'
-  },
-  {
-    id: 'pkg_tidung',
-    name: 'Open Trip Pulau Tidung Kepulauan Seribu',
-    destination: 'Kepulauan Seribu, Jakarta',
-    price: 'Rp 450.000',
-    quota: '12 Pax',
-    schedule: 'Setiap Sabtu-Minggu',
-    status: 'Aktif',
-    rating: 4.7,
-    image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600',
-    tripType: 'Open Trip'
-  },
-  {
-    id: 'pkg_cilember',
-    name: 'Trip Curug Cilember & Puncak',
-    destination: 'Bogor, Jawa Barat',
-    price: 'Rp 275.000',
-    quota: '10 Pax',
-    schedule: 'Weekend',
-    status: 'Aktif',
-    rating: 4.6,
-    image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=600',
-    tripType: 'Open Trip'
-  },
-  {
-    id: 'pkg_bandung',
-    name: 'Bandung City Tour & Lembang',
-    destination: 'Bandung, Jawa Barat',
-    price: 'Rp 420.000',
-    quota: '15 Pax',
-    schedule: 'Weekend',
-    status: 'Aktif',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=600',
-    tripType: 'Open Trip'
-  },
-  {
-    id: 'pkg_jogja',
-    name: 'Family Vacation Yogyakarta & Borobudur',
-    destination: 'Yogyakarta, DI Yogyakarta',
-    price: 'Rp 850.000',
-    quota: '15 Pax',
-    schedule: 'Fleksibel',
-    status: 'Aktif',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=600',
-    tripType: 'Family'
-  }
-];
+// Rekomendasi paket hanya berasal dari paket aktif di backend; tidak ada
+// katalog contoh yang tidak dapat dipesan.
 
 export const CustomerTripPlannerPage: React.FC = () => {
-  const { customerProfile, navigateTo } = useNavigation();
+  const { customerProfile, navigateTo, setSelectedPackageForDetail } = useNavigation();
 
-  // Storage key linked to customer account
-  const storageKey = customerProfile 
-    ? `tementrip_plans_cust_${customerProfile.id || customerProfile.email}`
-    : 'tementrip_plans_guest';
+  // Local storage is retained only as a one-time migration/cache. The backend
+  // is the source of truth so web and mobile always show the same plans.
+  const storageKey = customerProfile ? `tementrip_plans_cust_${customerProfile.id}` : '';
 
   // Account Plans Array (Max 10 plans)
   const [plans, setPlans] = useState<TripPlan[]>([]);
@@ -217,7 +162,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
 
   // Form input state
   const [destination, setDestination] = useState('');
-  const [targetDate, setTargetDate] = useState(getTodayIsoDate());
+  const [targetDate, setTargetDate] = useState(getDefaultTargetDate());
   const [participants, setParticipants] = useState<number>(2);
   const [targetBudget, setTargetBudget] = useState<string>('');
 
@@ -241,39 +186,108 @@ export const CustomerTripPlannerPage: React.FC = () => {
   // Matching packages
   const [matchingPackages, setMatchingPackages] = useState<PackageItem[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [plannerError, setPlannerError] = useState('');
 
   // Helper for customer identity
-  const currentUserName = (customerProfile as any)?.name || (customerProfile as any)?.fullName || customerProfile?.picName || 'Customer';
-  const currentUserEmail = customerProfile?.email || 'customer@tementrip.com';
-
-  // Load saved plans from localStorage on mount
+  // Load server plans and migrate an older device-only list once.
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        const parsed: TripPlan[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setPlans(parsed);
-          setViewState('LIST');
-        } else {
-          setPlans([]);
-          setViewState('FORM');
-        }
-      } catch (e) {
-        console.error('Failed to parse trip plans', e);
-        setPlans([]);
-        setViewState('FORM');
-      }
-    } else {
-      setPlans([]);
-      setViewState('FORM');
+    let cancelled = false;
+    if (!customerProfile || !storageKey) {
+      setLoadingPlans(false);
+      return;
     }
-  }, [storageKey]);
+    setLoadingPlans(true);
+    setPlannerError('');
+    request('/customer/trip-plans')
+      .then(async (data: any) => {
+        let remote = (Array.isArray(data) ? data : []).map(normalizeTripPlan);
+        const saved = localStorage.getItem(storageKey);
+        if (remote.length === 0 && saved) {
+          try {
+            const legacy = JSON.parse(saved);
+            if (Array.isArray(legacy)) {
+              for (const item of legacy.slice(0, 10)) {
+                const normalized = normalizeTripPlan(item);
+                const created = await request('/customer/trip-plans', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    destination: normalized.destination,
+                    targetMonth: normalized.targetMonth >= getTodayIsoDate() && normalized.targetMonth <= getMaximumTargetDate()
+                      ? normalized.targetMonth
+                      : getDefaultTargetDate(),
+                    participants: Math.min(100, Math.max(1, normalized.participants)),
+                    targetBudget: normalized.targetBudget,
+                    checklist: normalized.checklist,
+                    savingsLogs: normalized.savingsLogs,
+                    status: normalized.status,
+                  }),
+                });
+                remote.push(normalizeTripPlan(created));
+              }
+              localStorage.removeItem(storageKey);
+            }
+          } catch (error) {
+            console.error('Gagal memigrasikan rencana trip lokal', error);
+          }
+        }
+        if (cancelled) return;
+        setPlans(remote);
+        setViewState(remote.length > 0 ? 'LIST' : 'FORM');
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Gagal memuat rencana trip', error);
+        setPlannerError(error instanceof Error ? error.message : 'Rencana trip belum dapat dimuat.');
+        setPlans([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPlans(false);
+      });
+    return () => { cancelled = true; };
+  }, [customerProfile?.id, storageKey]);
 
-  // Helper to persist plans array
-  const savePlansToStorage = (updatedPlans: TripPlan[]) => {
+  const cachePlans = (updatedPlans: TripPlan[]) => {
     setPlans(updatedPlans);
-    localStorage.setItem(storageKey, JSON.stringify(updatedPlans));
+    if (storageKey) localStorage.setItem(storageKey, JSON.stringify(updatedPlans));
+  };
+
+  const persistPlan = async (plan: TripPlan): Promise<TripPlan> => {
+    const isServerPlan = /^\d+$/.test(plan.id);
+    const saved = normalizeTripPlan(await request(
+      isServerPlan ? `/customer/trip-plans/${plan.id}` : '/customer/trip-plans',
+      {
+        method: isServerPlan ? 'PUT' : 'POST',
+        body: JSON.stringify({
+          destination: plan.destination,
+          targetMonth: plan.targetMonth,
+          participants: plan.participants,
+          targetBudget: plan.targetBudget,
+          checklist: plan.checklist,
+          savingsLogs: plan.savingsLogs,
+          status: plan.status || 'SAVED',
+        }),
+      },
+    ));
+    const withoutOldVersion = plans.filter((item) => item.id !== plan.id && item.id !== saved.id);
+    const updated = [saved, ...withoutOldVersion].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    cachePlans(updated);
+    setActivePlan(saved);
+    return saved;
+  };
+
+  const persistPlanChange = async (plan: TripPlan): Promise<boolean> => {
+    if (!/^\d+$/.test(plan.id)) {
+      setActivePlan(plan);
+      return true;
+    }
+    try {
+      await persistPlan(plan);
+      return true;
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Perubahan rencana trip gagal disimpan.');
+      return false;
+    }
   };
 
   // Filter packages matching destination
@@ -294,20 +308,12 @@ export const CustomerTripPlannerPage: React.FC = () => {
       request('/public/packages')
         .then((data: any) => {
           const apiList: PackageItem[] = Array.isArray(data) ? data : (data?.data || []);
-          const combined = [...apiList];
-          CATALOG_PACKAGES.forEach(catPkg => {
-            if (!combined.some(p => p.id === catPkg.id || p.name === catPkg.name)) {
-              combined.push(catPkg);
-            }
-          });
-
-          const filtered = filterMatchingPackages(combined, activePlan.destination);
-          setMatchingPackages(filtered);
+          const active = apiList.filter(p => !p.status || p.status === 'Aktif');
+          setMatchingPackages(filterMatchingPackages(active, activePlan.destination));
         })
         .catch(err => {
           console.error('Error fetching packages:', err);
-          const filtered = filterMatchingPackages(CATALOG_PACKAGES, activePlan.destination);
-          setMatchingPackages(filtered);
+          setMatchingPackages([]);
         })
         .finally(() => setLoadingPackages(false));
     }
@@ -320,7 +326,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
       return;
     }
     setDestination('');
-    setTargetDate(getTodayIsoDate());
+    setTargetDate(getDefaultTargetDate());
     setParticipants(2);
     setTargetBudget('');
     setIsEditingExisting(false);
@@ -332,7 +338,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
   const handleStartEditPlan = (planToEdit: TripPlan) => {
     setActivePlan(planToEdit);
     setDestination(planToEdit.destination);
-    setTargetDate(planToEdit.targetMonth || getTodayIsoDate());
+    setTargetDate(planToEdit.targetMonth || getDefaultTargetDate());
     setParticipants(planToEdit.participants);
     setTargetBudget(planToEdit.targetBudget.toString());
     setIsEditingExisting(true);
@@ -344,6 +350,14 @@ export const CustomerTripPlannerPage: React.FC = () => {
     e.preventDefault();
     if (!destination.trim()) {
       alert('Silakan isi destinasi impian Anda.');
+      return;
+    }
+    if (targetDate < getTodayIsoDate() || targetDate > getMaximumTargetDate()) {
+      alert('Tanggal keberangkatan harus antara hari ini dan maksimal 5 tahun ke depan.');
+      return;
+    }
+    if (!Number.isInteger(participants) || participants < 1 || participants > 100) {
+      alert('Jumlah peserta harus antara 1 dan 100 orang.');
       return;
     }
     const numBudget = parseInt(targetBudget.replace(/\D/g, ''), 10);
@@ -374,8 +388,6 @@ export const CustomerTripPlannerPage: React.FC = () => {
         targetMonthLabel: formattedDateLabel,
         participants: Number(participants) || 1,
         targetBudget: numBudget,
-        userName: currentUserName,
-        userEmail: currentUserEmail,
         updatedAt: new Date().toISOString()
       };
       setActivePlan(updated);
@@ -391,8 +403,6 @@ export const CustomerTripPlannerPage: React.FC = () => {
         checklist: defaultChecklist,
         savingsLogs: [],
         status: 'DRAFT',
-        userName: currentUserName,
-        userEmail: currentUserEmail,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -403,32 +413,24 @@ export const CustomerTripPlannerPage: React.FC = () => {
   };
 
   // Permanently Save Active Plan (Step 2 Bottom Action)
-  const handleSavePlanPermanent = () => {
+  const handleSavePlanPermanent = async () => {
     if (!activePlan) return;
     const finalPlan: TripPlan = {
       ...activePlan,
       status: 'SAVED',
-      userName: currentUserName,
-      userEmail: currentUserEmail,
       updatedAt: new Date().toISOString()
     };
-
-    let updatedList: TripPlan[];
-    const exists = plans.some(p => p.id === finalPlan.id);
-    if (exists) {
-      updatedList = plans.map(p => p.id === finalPlan.id ? finalPlan : p);
-    } else {
-      updatedList = [finalPlan, ...plans];
+    try {
+      const saved = await persistPlan(finalPlan);
+      alert(`Rencana trip ke "${saved.destination}" berhasil disimpan. Email dan notifikasi konfirmasi telah diproses.`);
+      setViewState('LIST');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Rencana trip gagal disimpan.');
     }
-
-    savePlansToStorage(updatedList);
-    setActivePlan(finalPlan);
-    alert(`Rencana trip ke "${finalPlan.destination}" berhasil disimpan!`);
-    setViewState('LIST');
   };
 
   // Batalkan Rencana Trip (Point 4: Confirms and deletes/cancels plan)
-  const handleCancelPlan = () => {
+  const handleCancelPlan = async () => {
     if (!activePlan) {
       if (plans.length > 0) setViewState('LIST');
       else handleStartNewPlan();
@@ -436,13 +438,20 @@ export const CustomerTripPlannerPage: React.FC = () => {
     }
 
     if (window.confirm(`Apakah Anda yakin ingin membatalkan rencana trip ke "${activePlan.destination}"? Tindakan ini akan menghapus semua data yang sudah diisi.`)) {
-      // Remove from plans list if existing
+      try {
+        if (/^\d+$/.test(activePlan.id)) {
+          await request(`/customer/trip-plans/${activePlan.id}`, { method: 'DELETE' });
+        }
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Rencana trip gagal dihapus.');
+        return;
+      }
       const filtered = plans.filter(p => p.id !== activePlan.id);
-      savePlansToStorage(filtered);
+      cachePlans(filtered);
 
       setActivePlan(null);
       setDestination('');
-      setTargetDate(getTodayIsoDate());
+      setTargetDate(getDefaultTargetDate());
       setParticipants(2);
       setTargetBudget('');
 
@@ -455,14 +464,20 @@ export const CustomerTripPlannerPage: React.FC = () => {
   };
 
   // Delete Plan from List
-  const handleDeletePlanFromList = (e: React.MouseEvent, planId: string, destName: string) => {
+  const handleDeletePlanFromList = async (e: React.MouseEvent, planId: string, destName: string) => {
     e.stopPropagation();
     if (!window.confirm(`Apakah Anda yakin ingin menghapus rencana trip ke "${destName}"?`)) {
       return;
     }
 
+    try {
+      if (/^\d+$/.test(planId)) await request(`/customer/trip-plans/${planId}`, { method: 'DELETE' });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Rencana trip gagal dihapus.');
+      return;
+    }
     const filtered = plans.filter(p => p.id !== planId);
-    savePlansToStorage(filtered);
+    cachePlans(filtered);
 
     if (activePlan?.id === planId) {
       setActivePlan(null);
@@ -474,26 +489,38 @@ export const CustomerTripPlannerPage: React.FC = () => {
   };
 
   // Save active plan as DRAFT automatically when navigating to packages
-  const autoSaveDraftAndNavigate = (targetRoute: 'cari-trip' | 'paket-detail') => {
+  const autoSaveDraftAndNavigate = async (targetRoute: 'cari-trip' | 'paket-detail') => {
     if (activePlan) {
       const draftPlan: TripPlan = {
         ...activePlan,
         status: activePlan.status || 'DRAFT',
-        userName: currentUserName,
-        userEmail: currentUserEmail,
         updatedAt: new Date().toISOString()
       };
-
-      let updatedList: TripPlan[];
-      const exists = plans.some(p => p.id === draftPlan.id);
-      if (exists) {
-        updatedList = plans.map(p => p.id === draftPlan.id ? draftPlan : p);
-      } else {
-        updatedList = [draftPlan, ...plans];
+      try {
+        await persistPlan(draftPlan);
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Draft rencana trip gagal disimpan.');
+        return;
       }
-      savePlansToStorage(updatedList);
     }
     navigateTo(targetRoute);
+  };
+
+  const handleBackToPlanList = async () => {
+    if (!activePlan) {
+      setViewState('LIST');
+      return;
+    }
+    try {
+      await persistPlan({
+        ...activePlan,
+        status: /^\d+$/.test(activePlan.id) ? (activePlan.status || 'SAVED') : 'DRAFT',
+        updatedAt: new Date().toISOString(),
+      });
+      setViewState('LIST');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Draft rencana trip gagal disimpan.');
+    }
   };
 
   // Add or Edit Savings Log (Point 3)
@@ -510,7 +537,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
     setShowSavingsModal(true);
   };
 
-  const handleSaveSavings = (e: React.FormEvent) => {
+  const handleSaveSavings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activePlan) return;
     const amount = parseInt(savingsInput.replace(/\D/g, ''), 10);
@@ -527,7 +554,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
     } else {
       const newLog: TripSavingsLog = {
         id: `log_${Date.now()}`,
-        date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+        date: getTodayIsoDate(),
         amount,
         note: savingsNote.trim() || 'Tabungan bulanan'
       };
@@ -543,12 +570,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
       updatedAt: new Date().toISOString()
     };
 
-    setActivePlan(updatedPlan);
-
-    if (plans.some(p => p.id === updatedPlan.id)) {
-      const updatedList = plans.map(p => p.id === updatedPlan.id ? updatedPlan : p);
-      savePlansToStorage(updatedList);
-    }
+    if (!(await persistPlanChange(updatedPlan))) return;
 
     setShowSavingsModal(false);
     setSavingsInput('');
@@ -557,7 +579,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
   };
 
   // Delete Savings Log (Point 3)
-  const handleDeleteSavingsLog = (e: React.MouseEvent, logId: string) => {
+  const handleDeleteSavingsLog = async (e: React.MouseEvent, logId: string) => {
     e.stopPropagation();
     if (!activePlan) return;
     if (!window.confirm('Apakah Anda yakin ingin menghapus catatan tabungan ini?')) return;
@@ -572,16 +594,11 @@ export const CustomerTripPlannerPage: React.FC = () => {
       updatedAt: new Date().toISOString()
     };
 
-    setActivePlan(updatedPlan);
-
-    if (plans.some(p => p.id === updatedPlan.id)) {
-      const updatedList = plans.map(p => p.id === updatedPlan.id ? updatedPlan : p);
-      savePlansToStorage(updatedList);
-    }
+    await persistPlanChange(updatedPlan);
   };
 
   // Toggle Manual Checklist Item (1,2,3,4,5 show automated info modal)
-  const handleToggleChecklist = (id: string) => {
+  const handleToggleChecklist = async (id: string) => {
     if (!activePlan) return;
 
     if (id === '1') {
@@ -609,16 +626,11 @@ export const CustomerTripPlannerPage: React.FC = () => {
       item.id === id ? { ...item, completed: !item.completed } : item
     );
     const updatedPlan: TripPlan = { ...activePlan, checklist: updatedChecklist };
-    setActivePlan(updatedPlan);
-
-    if (plans.some(p => p.id === updatedPlan.id)) {
-      const updatedList = plans.map(p => p.id === updatedPlan.id ? updatedPlan : p);
-      savePlansToStorage(updatedList);
-    }
+    await persistPlanChange(updatedPlan);
   };
 
   // Add Custom Checklist Item
-  const handleAddChecklistItem = (e: React.FormEvent) => {
+  const handleAddChecklistItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activePlan || !newChecklistItem.trim()) return;
     const newItem: TripChecklistItem = {
@@ -630,17 +642,11 @@ export const CustomerTripPlannerPage: React.FC = () => {
       ...activePlan,
       checklist: [...activePlan.checklist, newItem]
     };
-    setActivePlan(updatedPlan);
-
-    if (plans.some(p => p.id === updatedPlan.id)) {
-      const updatedList = plans.map(p => p.id === updatedPlan.id ? updatedPlan : p);
-      savePlansToStorage(updatedList);
-    }
-    setNewChecklistItem('');
+    if (await persistPlanChange(updatedPlan)) setNewChecklistItem('');
   };
 
   // Edit Manual Checklist Item (Point 3)
-  const handleSaveEditChecklist = (e: React.FormEvent) => {
+  const handleSaveEditChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activePlan || !editingChecklistId || !editingChecklistLabel.trim()) return;
 
@@ -648,30 +654,21 @@ export const CustomerTripPlannerPage: React.FC = () => {
       item.id === editingChecklistId ? { ...item, label: editingChecklistLabel.trim() } : item
     );
     const updatedPlan: TripPlan = { ...activePlan, checklist: updatedChecklist };
-    setActivePlan(updatedPlan);
-
-    if (plans.some(p => p.id === updatedPlan.id)) {
-      const updatedList = plans.map(p => p.id === updatedPlan.id ? updatedPlan : p);
-      savePlansToStorage(updatedList);
+    if (await persistPlanChange(updatedPlan)) {
+      setEditingChecklistId(null);
+      setEditingChecklistLabel('');
     }
-    setEditingChecklistId(null);
-    setEditingChecklistLabel('');
   };
 
   // Delete Manual Checklist Item (Point 3)
-  const handleDeleteChecklistItem = (e: React.MouseEvent, itemId: string) => {
+  const handleDeleteChecklistItem = async (e: React.MouseEvent, itemId: string) => {
     e.stopPropagation();
     if (!activePlan) return;
     if (!window.confirm('Apakah Anda yakin ingin menghapus item checklist ini?')) return;
 
     const updatedChecklist = activePlan.checklist.filter(item => item.id !== itemId);
     const updatedPlan: TripPlan = { ...activePlan, checklist: updatedChecklist };
-    setActivePlan(updatedPlan);
-
-    if (plans.some(p => p.id === updatedPlan.id)) {
-      const updatedList = plans.map(p => p.id === updatedPlan.id ? updatedPlan : p);
-      savePlansToStorage(updatedList);
-    }
+    await persistPlanChange(updatedPlan);
   };
 
   // Calculate percentages
@@ -703,10 +700,19 @@ export const CustomerTripPlannerPage: React.FC = () => {
           </p>
         </div>
 
+        {loadingPlans && (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Memuat rencana trip dari akunmu...</div>
+        )}
+        {!loadingPlans && plannerError && (
+          <div style={{ padding: '18px', marginBottom: '20px', borderRadius: '14px', background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
+            {plannerError} Muat ulang halaman untuk mencoba kembali.
+          </div>
+        )}
+
         {/* ========================================================================= */}
         {/* VIEW 1: HOME LIST PAGE (Tampilan Awal Daftar Rencana Trip Saya) */}
         {/* ========================================================================= */}
-        {viewState === 'LIST' && (
+        {!loadingPlans && !plannerError && viewState === 'LIST' && (
           <div>
             {/* Banner Promotional Poster - High Contrast Vibrant Styling (Point 2) */}
             <div 
@@ -945,7 +951,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
         {/* ========================================================================= */}
         {/* VIEW 2: FORM PAGE (Form Buat / Edit Rencana Trip) */}
         {/* ========================================================================= */}
-        {viewState === 'FORM' && (
+        {!loadingPlans && !plannerError && viewState === 'FORM' && (
           <div>
             {/* Banner Promotional Header */}
             <div 
@@ -1062,6 +1068,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       ref={dateInputRef}
                       type="date" 
                       min={getTodayIsoDate()}
+                      max={getMaximumTargetDate()}
                       value={targetDate}
                       onChange={(e) => setTargetDate(e.target.value)}
                       style={{
@@ -1089,7 +1096,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   <input
                     type="number"
                     min={1}
-                    max={50}
+                    max={100}
                     value={participants}
                     onChange={(e) => setParticipants(parseInt(e.target.value, 10) || 1)}
                     style={{
@@ -1184,12 +1191,12 @@ export const CustomerTripPlannerPage: React.FC = () => {
         {/* ========================================================================= */}
         {/* VIEW 3: DETAIL PAGE (Point 5: CLEAN DETAIL DASHBOARD WITHOUT HEADER BUTTONS) */}
         {/* ========================================================================= */}
-        {viewState === 'DETAIL' && activePlan && (
+        {!loadingPlans && !plannerError && viewState === 'DETAIL' && activePlan && (
           <div>
             {/* Navigation Back Link to Home List */}
             <div style={{ marginBottom: '16px' }}>
               <button
-                onClick={() => setViewState('LIST')}
+                onClick={handleBackToPlanList}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -1470,7 +1477,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                         }}
                       >
                         <div>
-                          <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>{log.date}</div>
+                          <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>{formatDateIndo(log.date)}</div>
                           <div style={{ fontSize: '12.5px', color: '#334155', fontWeight: '700' }}>{log.note || 'Tabungan bulanan'}</div>
                         </div>
 
@@ -1527,7 +1534,12 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   {matchingPackages.slice(0, 3).map(pkg => (
                     <div
                       key={pkg.id}
-                      onClick={() => autoSaveDraftAndNavigate('paket-detail')}
+                      onClick={() => {
+                        // Paket yang diklik harus dipilih dulu; tanpa ini halaman
+                        // detail terbuka kosong atau menampilkan paket sebelumnya.
+                        setSelectedPackageForDetail(pkg);
+                        autoSaveDraftAndNavigate('paket-detail');
+                      }}
                       style={{
                         backgroundColor: '#ffffff',
                         borderRadius: '16px',
@@ -1541,7 +1553,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                     >
                       <div style={{ height: '140px', width: '100%', position: 'relative' }}>
-                        <img src={pkg.image || 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600'} alt={pkg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <TripImage src={getTripImage(pkg)} alt={pkg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         <span style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: '#0f8b8d', color: 'white', fontSize: '10px', fontWeight: '800', padding: '3px 8px', borderRadius: '6px' }}>
                           {pkg.tripType || 'Open Trip'}
                         </span>
@@ -1550,8 +1562,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                         <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0', lineHeight: 1.3 }}>{pkg.name}</h4>
                         <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 10px 0' }}>{pkg.destination}</p>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                          <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '800' }}>⭐ {pkg.rating || '5.0'}</span>
-                          <strong style={{ fontSize: '14px', color: '#0f8b8d', fontWeight: '800' }}>{pkg.price}</strong>
+                          <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '800' }}>⭐ {pkg.rating && Number(pkg.rating) > 0 ? Number(pkg.rating).toFixed(1) : 'Baru'}</span>
+                          <strong style={{ fontSize: '14px', color: '#0f8b8d', fontWeight: '800' }}>{typeof pkg.price === 'number' ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(pkg.price) : pkg.price}</strong>
                         </div>
                       </div>
                     </div>

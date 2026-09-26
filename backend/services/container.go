@@ -18,6 +18,7 @@ type Container struct {
 	ReviewRepo      repositories.ReviewRepository
 	DepartureRepo   repositories.DepartureRepository
 	PackageDateRepo repositories.PackageDateRepository
+	TripPlanRepo    repositories.TripPlanRepository
 
 	PDFService       *PDFService
 	EmailService     *EmailService
@@ -32,6 +33,7 @@ type Container struct {
 	PayoutService    PayoutService
 	ReviewService    ReviewService
 	DepartureService DepartureService
+	TripPlanService  TripPlanService
 }
 
 func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
@@ -42,6 +44,7 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 	reviewRepo := repositories.NewReviewRepository(db)
 	departureRepo := repositories.NewDepartureRepository(db)
 	packageDateRepo := repositories.NewPackageDateRepository(db)
+	tripPlanRepo := repositories.NewTripPlanRepository(db)
 
 	pdfService := NewPDFService()
 	emailService := NewEmailService(cfg, pdfService)
@@ -59,6 +62,7 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 		ReviewRepo:      reviewRepo,
 		DepartureRepo:   departureRepo,
 		PackageDateRepo: packageDateRepo,
+		TripPlanRepo:    tripPlanRepo,
 
 		PDFService:       pdfService,
 		EmailService:     emailService,
@@ -73,5 +77,6 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 		PayoutService:    NewPayoutService(payoutRepo, providerRepo, bookingRepo, emailService, notifService, ipaymuService, cfg),
 		ReviewService:    NewReviewService(reviewRepo, bookingRepo, packageRepo),
 		DepartureService: NewDepartureService(db, departureRepo, providerRepo, bookingService, notifService, emailService),
+		TripPlanService:  NewTripPlanService(tripPlanRepo, providerRepo, notifService, emailService),
 	}
 }
