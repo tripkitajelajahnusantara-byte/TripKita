@@ -26,7 +26,7 @@ type Container struct {
 	AuthService      AuthService
 	AdminService     AdminService
 	PackageService   PackageService
-	XenditService    XenditService
+	IPaymuService    IPaymuService
 	BookingService   BookingService
 	DashService      DashboardService
 	PayoutService    PayoutService
@@ -47,9 +47,9 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 	emailService := NewEmailService(cfg, pdfService)
 	excelService := NewExcelService()
 	notifService := NewNotificationService(db)
-	xenditService := NewXenditService(cfg)
+	ipaymuService := NewIPaymuService(cfg)
 
-	bookingService := NewBookingService(bookingRepo, packageRepo, xenditService, emailService, notifService)
+	bookingService := NewBookingService(bookingRepo, packageRepo, ipaymuService, emailService, notifService)
 
 	return &Container{
 		ProviderRepo:    providerRepo,
@@ -64,13 +64,13 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 		EmailService:     emailService,
 		ExcelService:     excelService,
 		NotifService:     notifService,
-		XenditService:    xenditService,
+		IPaymuService:    ipaymuService,
 		AuthService:      NewAuthService(db, providerRepo, cfg, emailService, notifService),
 		AdminService:     NewAdminService(db, providerRepo, notifService),
 		PackageService:   NewPackageService(packageRepo, providerRepo, packageDateRepo),
 		BookingService:   bookingService,
 		DashService:      NewDashboardService(packageRepo, bookingRepo, providerRepo, reviewRepo),
-		PayoutService:    NewPayoutService(payoutRepo, providerRepo, bookingRepo, emailService, notifService, xenditService, cfg),
+		PayoutService:    NewPayoutService(payoutRepo, providerRepo, bookingRepo, emailService, notifService, ipaymuService, cfg),
 		ReviewService:    NewReviewService(reviewRepo, bookingRepo, packageRepo),
 		DepartureService: NewDepartureService(db, departureRepo, providerRepo, bookingService, notifService, emailService),
 	}

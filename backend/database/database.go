@@ -128,6 +128,18 @@ func ConnectDB(cfg *config.Config) {
 		execMigration(`UPDATE packages SET meeting_point = 'Bandara Marinda Waisai, Kabupaten Raja Ampat, Papua Barat' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Raja Ampat%'`)
 		execMigration(`UPDATE packages SET meeting_point = 'Bandara Internasional I Gusti Ngurah Rai (Door Kedatangan Domestik), Badung, Bali' WHERE (meeting_point IS NULL OR meeting_point = '') AND name LIKE '%Bali%'`)
 
+		// Hapus data paket dummy percobaan seperti "Rumah Ayu Ting-Ting" atau "Margo City" dari Supabase DB
+		execMigration(`DELETE FROM bookings WHERE package_id IN (SELECT id FROM packages WHERE LOWER(name) LIKE '%ayu ting%' OR LOWER(name) LIKE '%margo city%');`)
+		execMigration(`DELETE FROM package_dates WHERE package_id IN (SELECT id FROM packages WHERE LOWER(name) LIKE '%ayu ting%' OR LOWER(name) LIKE '%margo city%');`)
+		execMigration(`DELETE FROM packages WHERE LOWER(name) LIKE '%ayu ting%' OR LOWER(name) LIKE '%margo city%';`)
+
+		// Pastikan seluruh paket aktif memiliki periode tanggal di masa depan (dinamis dari hari ini s/d 60 hari ke depan) agar bisa di-test
+		execMigration(`UPDATE packages SET 
+			start_date = TO_CHAR(CURRENT_DATE + INTERVAL '1 day', 'YYYY-MM-DD'),
+			end_date = TO_CHAR(CURRENT_DATE + INTERVAL '60 days', 'YYYY-MM-DD'),
+			schedule = CONCAT(TO_CHAR(CURRENT_DATE + INTERVAL '1 day', 'DD Mon YYYY'), ' - ', TO_CHAR(CURRENT_DATE + INTERVAL '60 days', 'DD Mon YYYY'))
+		WHERE status = 'Aktif' OR status = '' OR status IS NULL;`)
+
 		// Reset hardcoded 5.0 ratings for packages without reviews
 		execMigration(`UPDATE packages SET rating = 0 WHERE NOT EXISTS (SELECT 1 FROM reviews WHERE reviews.package_id = packages.id)`)
 	}
@@ -194,10 +206,12 @@ func SeedDatabase() {
 	fmt.Println("Mengisi data awal database...")
 
 	todayStr := time.Now().Format("2006-01-02")
+	futureStr := time.Now().AddDate(0, 2, 0).Format("2006-01-02")
 	months := []string{"Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"}
 	now := time.Now()
-	sched3 := fmt.Sprintf("%d %s %d - %d %s %d (3 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 2).Day(), months[now.AddDate(0, 0, 2).Month()-1], now.AddDate(0, 0, 2).Year())
-	sched2 := fmt.Sprintf("%d %s %d - %d %s %d (2 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 1).Day(), months[now.AddDate(0, 0, 1).Month()-1], now.AddDate(0, 0, 1).Year())
+	nextMonth := now.AddDate(0, 1, 0)
+	sched3 := fmt.Sprintf("%d %s %d - %d %s %d (3 Hari)", nextMonth.Day(), months[nextMonth.Month()-1], nextMonth.Year(), nextMonth.AddDate(0, 0, 2).Day(), months[nextMonth.AddDate(0, 0, 2).Month()-1], nextMonth.AddDate(0, 0, 2).Year())
+	sched2 := fmt.Sprintf("%d %s %d - %d %s %d (2 Hari)", nextMonth.Day(), months[nextMonth.Month()-1], nextMonth.Year(), nextMonth.AddDate(0, 0, 1).Day(), months[nextMonth.AddDate(0, 0, 1).Month()-1], nextMonth.AddDate(0, 0, 1).Year())
 	sched4 := fmt.Sprintf("%d %s %d - %d %s %d (4 Hari)", now.Day(), months[now.Month()-1], now.Year(), now.AddDate(0, 0, 3).Day(), months[now.AddDate(0, 0, 3).Month()-1], now.AddDate(0, 0, 3).Year())
 	_ = sched4
 	fmt.Println("Mengisi akun admin bawaan...")
@@ -407,7 +421,7 @@ func SeedDatabase() {
 			QuotaUsed:   3,
 			QuotaMax:    15,
 			StartDate:   todayStr,
-			EndDate:     todayStr,
+			EndDate:     futureStr,
 			Schedule:    sched3,
 			Status:      "Aktif",
 			Rating:      4.8,
@@ -424,7 +438,7 @@ func SeedDatabase() {
 			QuotaUsed:   2,
 			QuotaMax:    12,
 			StartDate:   todayStr,
-			EndDate:     todayStr,
+			EndDate:     futureStr,
 			Schedule:    sched3,
 			Status:      "Aktif",
 			Rating:      4.7,
@@ -441,7 +455,7 @@ func SeedDatabase() {
 			QuotaUsed:   3,
 			QuotaMax:    10,
 			StartDate:   todayStr,
-			EndDate:     todayStr,
+			EndDate:     futureStr,
 			Schedule:    sched2,
 			Status:      "Aktif",
 			Rating:      4.6,
@@ -458,7 +472,7 @@ func SeedDatabase() {
 			QuotaUsed:   2,
 			QuotaMax:    10,
 			StartDate:   todayStr,
-			EndDate:     todayStr,
+			EndDate:     futureStr,
 			Schedule:    sched2,
 			Status:      "Aktif",
 			Rating:      4.5,
@@ -475,7 +489,7 @@ func SeedDatabase() {
 			QuotaUsed:   0,
 			QuotaMax:    10,
 			StartDate:   todayStr,
-			EndDate:     todayStr,
+			EndDate:     futureStr,
 			Schedule:    "Fleksibel (Pilihan Customer)",
 			Status:      "Aktif",
 			Rating:      4.9,
@@ -492,7 +506,7 @@ func SeedDatabase() {
 			QuotaUsed:   0,
 			QuotaMax:    8,
 			StartDate:   todayStr,
-			EndDate:     todayStr,
+			EndDate:     futureStr,
 			Schedule:    "Fleksibel (Pilihan Customer)",
 			Status:      "Aktif",
 			Rating:      5.0,
@@ -509,7 +523,7 @@ func SeedDatabase() {
 			QuotaUsed:   0,
 			QuotaMax:    2,
 			StartDate:   todayStr,
-			EndDate:     todayStr,
+			EndDate:     futureStr,
 			Schedule:    "Fleksibel (Pilihan Customer)",
 			Status:      "Aktif",
 			Rating:      5.0,
@@ -526,7 +540,7 @@ func SeedDatabase() {
 			QuotaUsed:   0,
 			QuotaMax:    2,
 			StartDate:   todayStr,
-			EndDate:     todayStr,
+			EndDate:     futureStr,
 			Schedule:    "Fleksibel (Pilihan Customer)",
 			Status:      "Aktif",
 			Rating:      4.8,
@@ -543,7 +557,7 @@ func SeedDatabase() {
 			QuotaUsed:   0,
 			QuotaMax:    15,
 			StartDate:   todayStr,
-			EndDate:     todayStr,
+			EndDate:     futureStr,
 			Schedule:    "Fleksibel (Pilihan Customer)",
 			Status:      "Aktif",
 			Rating:      4.9,
@@ -560,7 +574,7 @@ func SeedDatabase() {
 			QuotaUsed:   0,
 			QuotaMax:    12,
 			StartDate:   todayStr,
-			EndDate:     todayStr,
+			EndDate:     futureStr,
 			Schedule:    "Fleksibel (Pilihan Customer)",
 			Status:      "Aktif",
 			Rating:      4.7,

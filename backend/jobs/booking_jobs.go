@@ -84,34 +84,28 @@ const (
 // checkInvoiceBeforeExpiry memastikan status invoice ke payment gateway sebelum
 // booking dikedaluwarsakan.
 func (r *Runner) checkInvoiceBeforeExpiry(booking models.Booking) invoiceCheckResult {
-	// Tanpa invoice, tidak ada dana yang mungkin sudah diterima.
 	if strings.TrimSpace(booking.XenditInvoiceID) == "" {
 		return invoiceUnpaid
 	}
 
-	invoice, err := r.container.XenditService.GetInvoice(booking.XenditInvoiceID)
+	txStatus, err := r.container.IPaymuService.GetTransactionStatus(booking.XenditInvoiceID)
 	if err != nil {
-		// Gateway tidak dapat dihubungi: booking ditahan supaya pembayaran yang
-		// sah tidak hilang karena gangguan sementara.
 		log.Printf("[Rekonsiliasi] Booking %d tidak dapat diverifikasi ke gateway, ditunda: %v", booking.ID, err)
 		return invoiceUnverified
 	}
 
-	status := strings.ToUpper(invoice.Status)
-	if status != "PAID" && status != "SETTLED" {
+	if txStatus.StatusCode != 1 && strings.ToLower(txStatus.Status) != "berhasil" {
 		return invoiceUnpaid
 	}
 
-	// Jalur penyelesaian sama persis dengan webhook, termasuk verifikasi nominal
-	// dan penjagaan idempotensi.
 	if err := r.container.BookingService.UpdateStatusByWebhook(
-		invoice.ID, invoice.ExternalID, invoice.Status,
-		invoice.PaymentMethod, invoice.Amount, invoice.Currency,
+		fmt.Sprintf("%d", txStatus.TransactionID), txStatus.ReferenceID, "PAID",
+		txStatus.PaymentMethod, txStatus.Amount, "IDR",
 	); err != nil {
 		log.Printf("[Rekonsiliasi] Booking %d terbayar di gateway tetapi gagal diselesaikan: %v", booking.ID, err)
 		return invoiceUnverified
 	}
-	log.Printf("[Rekonsiliasi] Booking %d diselesaikan dari status invoice gateway (webhook tidak diterima).", booking.ID)
+	log.Printf("[Rekonsiliasi] Booking %d diselesaikan dari status tagihan gateway (webhook tidak diterima).", booking.ID)
 	return invoiceSettled
 }
 

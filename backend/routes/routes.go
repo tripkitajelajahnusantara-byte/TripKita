@@ -78,8 +78,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			// derived from a valid token and never accepted from the request body.
 			public.POST("/bookings", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.CreateBooking)
 			public.GET("/bookings/status/:code", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.GetPublicStatus)
-			public.POST("/webhooks/xendit", middleware.RateLimit(120, time.Minute), bookingCtrl.XenditWebhook)
-			public.POST("/webhooks/xendit/payout", middleware.RateLimit(120, time.Minute), payoutCtrl.XenditPayoutWebhook)
+			public.POST("/webhooks/ipaymu", middleware.RateLimit(120, time.Minute), bookingCtrl.IPaymuWebhook)
+			public.POST("/webhooks/ipaymu/payout", middleware.RateLimit(120, time.Minute), payoutCtrl.IPaymuPayoutWebhook)
+			public.POST("/webhooks/xendit", middleware.RateLimit(120, time.Minute), bookingCtrl.IPaymuWebhook)
 
 			if cfg.EnableDevMocks {
 				public.GET("/xendit-mock-checkout/:id", bookingCtrl.RenderMockCheckout)

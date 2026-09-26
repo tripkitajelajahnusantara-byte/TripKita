@@ -38,7 +38,7 @@ type BookingService interface {
 type bookingService struct {
 	repo          repositories.BookingRepository
 	packageRepo   repositories.PackageRepository
-	xenditService XenditService
+	ipaymuService IPaymuService
 	emailService  *EmailService
 	notifService  *NotificationService
 }
@@ -51,11 +51,11 @@ type BookingGatewayError struct{ Message string }
 
 func (e *BookingGatewayError) Error() string { return e.Message }
 
-func NewBookingService(repo repositories.BookingRepository, packageRepo repositories.PackageRepository, xenditService XenditService, emailService *EmailService, notifService *NotificationService) BookingService {
+func NewBookingService(repo repositories.BookingRepository, packageRepo repositories.PackageRepository, ipaymuService IPaymuService, emailService *EmailService, notifService *NotificationService) BookingService {
 	return &bookingService{
 		repo:          repo,
 		packageRepo:   packageRepo,
-		xenditService: xenditService,
+		ipaymuService: ipaymuService,
 		emailService:  emailService,
 		notifService:  notifService,
 	}
@@ -406,10 +406,11 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 			return &BookingInputError{Message: "jumlah peserta tidak valid"}
 		}
 		tripDay := booking.TripDate.Format("2006-01-02")
-		if pkg.StartDate != "" && tripDay < pkg.StartDate {
+		todayStr := time.Now().Format("2006-01-02")
+		if pkg.StartDate != "" && pkg.StartDate >= todayStr && tripDay < pkg.StartDate {
 			return &BookingInputError{Message: "tanggal perjalanan berada sebelum periode paket"}
 		}
-		if pkg.EndDate != "" && tripDay > pkg.EndDate {
+		if pkg.EndDate != "" && pkg.EndDate >= todayStr && tripDay > pkg.EndDate {
 			return &BookingInputError{Message: "tanggal perjalanan berada setelah periode paket"}
 		}
 		if pkg.QuotaMax > 0 && pkg.QuotaUsed+booking.Guests > pkg.QuotaMax {
@@ -457,7 +458,7 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		return err
 	}
 
-	invoiceID, paymentURL, err := s.xenditService.CreateInvoice(booking, pkg.Name)
+	payResp, err := s.ipaymuService.CreatePayment(booking, pkg.Name)
 	if err != nil {
 		_ = database.DB.Transaction(func(tx *gorm.DB) error {
 			if updateErr := tx.Model(&models.Booking{}).Where("id = ? AND status = ?", booking.ID, "PENDING_PAYMENT").Update("status", "PAYMENT_INIT_FAILED").Error; updateErr != nil {
@@ -465,18 +466,19 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 			}
 			return tx.Model(&models.Package{}).Where("id = ?", booking.PackageID).UpdateColumn("quota_used", gorm.Expr("GREATEST(quota_used - ?, 0)", booking.Guests)).Error
 		})
-		return &BookingGatewayError{Message: "gagal membuat invoice pembayaran"}
+		return &BookingGatewayError{Message: fmt.Sprintf("gagal membuat tagihan pembayaran iPaymu: %v", err)}
 	}
+	invoiceID := fmt.Sprintf("%d", payResp.TransactionID)
 	booking.XenditInvoiceID = invoiceID
-	booking.PaymentURL = paymentURL
+	booking.PaymentURL = payResp.PaymentURL
 	result := database.DB.Model(&models.Booking{}).
 		Where("id = ? AND status = ?", booking.ID, "PENDING_PAYMENT").
-		Updates(map[string]interface{}{"xendit_invoice_id": invoiceID, "payment_url": paymentURL, "updated_at": time.Now()})
+		Updates(map[string]interface{}{"xendit_invoice_id": invoiceID, "payment_url": payResp.PaymentURL, "updated_at": time.Now()})
 	if result.Error != nil {
-		return fmt.Errorf("invoice dibuat tetapi gagal disimpan; hubungi administrator dengan booking ID %d", booking.ID)
+		return fmt.Errorf("tagihan dibuat tetapi gagal disimpan; hubungi administrator dengan booking ID %d", booking.ID)
 	}
 	if result.RowsAffected != 1 {
-		return fmt.Errorf("status booking berubah sebelum invoice tersimpan")
+		return fmt.Errorf("status booking berubah sebelum tagihan tersimpan")
 	}
 	return nil
 }
@@ -657,10 +659,18 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID stri
 		query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Package")
 		findErr := query.Where("xendit_invoice_id = ?", invoiceID).First(&booking).Error
 		if findErr != nil && externalID != "" {
+			findErr = query.Where("booking_code = ?", externalID).First(&booking).Error
+		}
+		if findErr != nil && externalID != "" {
 			parts := strings.Split(externalID, "_")
 			if len(parts) == 3 && parts[0] == "booking" {
 				if idVal, parseErr := strconv.ParseUint(parts[1], 10, 32); parseErr == nil {
-					findErr = query.Where("id = ? AND xendit_invoice_id = ''", uint(idVal)).First(&booking).Error
+					findErr = query.Where("id = ?", uint(idVal)).First(&booking).Error
+				}
+			} else if strings.HasPrefix(externalID, "TK-BOOK-") {
+				idStr := strings.TrimPrefix(externalID, "TK-BOOK-")
+				if idVal, parseErr := strconv.ParseUint(idStr, 10, 32); parseErr == nil {
+					findErr = query.Where("id = ?", uint(idVal)).First(&booking).Error
 				}
 			}
 		}
