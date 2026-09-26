@@ -169,116 +169,110 @@ class _HighlightPill extends StatelessWidget {
   }
 }
 
-/// Kartu paket berukuran grid pada beranda (`trip-card` di web).
+/// Kartu paket ringkas untuk grid 2 kolom di beranda. Tinggi setiap bagian
+/// dibuat tetap supaya kartu dalam satu baris selalu sama tinggi.
 class TripGridCard extends StatelessWidget {
   final TripPackage pkg;
   final VoidCallback onTap;
-  final double width;
 
-  const TripGridCard({super.key, required this.pkg, required this.onTap, this.width = 236});
+  const TripGridCard({super.key, required this.pkg, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final tone = TripCardTone.forPackage(pkg);
-    return SizedBox(
-      width: width,
-      child: Material(
-        color: Colors.white,
+    final highlights = highlightsFor(pkg).take(2).toList();
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  height: 150,
-                  width: double.infinity,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      NetworkPhoto(coverImageFor(pkg)),
-                      Positioned(
-                        top: 10,
-                        right: 10,
-                        child: Row(children: [
-                          if (pkg.isOpenTrip || pkg.tripType == 'Private Trip' || pkg.tripType == 'Honeymoon') ...[
-                            ShareButton(pkg),
-                            const SizedBox(width: 6),
-                          ],
-                          FavoriteButton(pkg),
-                        ]),
-                      ),
-                      Positioned(
-                        left: 10,
-                        bottom: 10,
-                        right: 10,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(color: tone.badge, borderRadius: BorderRadius.circular(6)),
-                            child: Text(tripBadgeLabel(pkg),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        height: 36,
-                        child: Text(pkg.name,
-                            maxLines: 2,
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 4 / 3,
+                child: Stack(fit: StackFit.expand, children: [
+                  NetworkPhoto(coverImageFor(pkg)),
+                  Positioned(top: 8, right: 8, child: FavoriteButton(pkg)),
+                  Positioned(
+                    left: 8,
+                    bottom: 8,
+                    right: 8,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(color: tone.badge, borderRadius: BorderRadius.circular(6)),
+                        child: Text(pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark, height: 1.3)),
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
                       ),
-                      const SizedBox(height: 4),
-                      Row(children: [
-                        const Icon(Icons.location_on_outlined, size: 12, color: AppColors.textLight),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(pkg.destination,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                        ),
-                      ]),
-                      const SizedBox(height: 8),
-                      for (final hl in highlightsFor(pkg).take(3))
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: _HighlightPill(hl, tone.pillText, tone.pillBg),
-                        ),
-                      const Divider(height: 16),
-                      Row(children: [
-                        const Icon(Icons.star, size: 13, color: AppColors.warning),
-                        const SizedBox(width: 4),
-                        Text(ratingLabel(pkg),
-                            style: const TextStyle(fontSize: 11, color: AppColors.warning, fontWeight: FontWeight.w700)),
-                        const Spacer(),
-                        Text(formatIDR(pkg.price),
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
-                      ]),
-                    ],
+                    ),
                   ),
+                ]),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      height: 34,
+                      child: Text(pkg.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark, height: 1.3)),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      const Icon(Icons.location_on_outlined, size: 12, color: AppColors.textLight),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(pkg.destination,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                      ),
+                    ]),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 50,
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        for (var i = 0; i < highlights.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 4),
+                          _HighlightPill(highlights[i], tone.pillText, tone.pillBg),
+                        ],
+                      ]),
+                    ),
+                    const Divider(height: 12),
+                    Row(children: [
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(formatIDR(pkg.price),
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.star, size: 12, color: AppColors.warning),
+                      const SizedBox(width: 2),
+                      Text(ratingLabel(pkg),
+                          style: const TextStyle(fontSize: 11, color: AppColors.warning, fontWeight: FontWeight.w700)),
+                    ]),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

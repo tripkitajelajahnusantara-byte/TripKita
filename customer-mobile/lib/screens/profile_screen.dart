@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:customer_mobile/models/package.dart';
 import 'package:customer_mobile/screens/auth_screen.dart';
 import 'package:customer_mobile/screens/trip_detail_screen.dart';
+import 'package:customer_mobile/screens/trip_planner_screen.dart';
 import 'package:customer_mobile/services/auth_session.dart';
 import 'package:customer_mobile/services/wishlist_store.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
@@ -74,8 +75,35 @@ class _GuestAccountTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
+        const _PlannerMenu(),
+        const SizedBox(height: 16),
         _LegalLinks(),
       ],
+    );
+  }
+}
+
+/// Pintasan ke fitur Rencana Trip (padanan menu "Rencana Trip" di web).
+class _PlannerMenu extends StatelessWidget {
+  const _PlannerMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      padding: EdgeInsets.zero,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(12)),
+          child: const Icon(Icons.savings_outlined, color: AppColors.primary),
+        ),
+        title: const Text('Rencanakan Perjalananmu', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
+        subtitle: const Text('Target budget, tabungan & checklist trip', style: TextStyle(fontSize: 12)),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TripPlannerScreen())),
+      ),
     );
   }
 }
@@ -208,6 +236,8 @@ class _AccountTabState extends State<_AccountTab> {
             ),
           ]),
         ),
+        const SizedBox(height: 16),
+        const _PlannerMenu(),
         const SizedBox(height: 16),
         SectionCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

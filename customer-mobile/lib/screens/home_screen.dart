@@ -5,6 +5,7 @@ import 'package:customer_mobile/models/package.dart';
 import 'package:customer_mobile/screens/auth_screen.dart';
 import 'package:customer_mobile/screens/trip_detail_screen.dart';
 import 'package:customer_mobile/screens/trip_list_screen.dart';
+import 'package:customer_mobile/screens/trip_planner_screen.dart';
 import 'package:customer_mobile/services/auth_session.dart';
 import 'package:customer_mobile/services/package_catalog.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
@@ -14,7 +15,19 @@ import 'package:customer_mobile/widgets/bottom_navigation.dart';
 import 'package:customer_mobile/widgets/common.dart';
 import 'package:customer_mobile/widgets/trip_card_widget.dart';
 
-/// Beranda customer, padanan `CustomerLandingPage` di web.
+const _categoryIcons = <String, IconData>{
+  'City Tour': Icons.location_city_outlined,
+  'Diving & Snorkeling': Icons.scuba_diving_outlined,
+  'Wisata Budaya & Sejarah': Icons.account_balance_outlined,
+  'Pantai': Icons.beach_access_outlined,
+  'Gunung': Icons.landscape_outlined,
+  'Curug': Icons.water_outlined,
+  'Keluarga Santai': Icons.family_restroom_outlined,
+};
+
+/// Beranda customer, padanan `CustomerLandingPage` di web, dengan tata letak
+/// yang dipadatkan untuk layar ponsel: pencarian ringkas, pintasan kategori,
+/// dan grid paket dua kolom.
 class HomeScreen extends StatefulWidget {
   final ValueChanged<TripSearchParams> onSearch;
 
@@ -25,21 +38,11 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _scrollController = ScrollController();
-  final _tripsKey = GlobalKey();
-
   late Future<List<TripPackage>> _packages = PackageCatalog.load();
 
   String _destination = '';
   DateTime _date = dateOnly(DateTime.now());
-  String _type = 'Open Trip';
-  String _category = allCategoriesLabel;
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
+  String _type = allTripTypesLabel;
 
   Future<void> _refresh() async {
     final future = PackageCatalog.load(force: true);
@@ -54,18 +57,22 @@ class _HomeScreenState extends State<HomeScreen> {
       initialDate: _date.isBefore(today) ? today : _date,
       firstDate: today,
       lastDate: today.add(const Duration(days: 365 * 2)),
-      helpText: 'Pilih tanggal',
+      helpText: 'Tanggal berangkat',
     );
     if (picked != null) setState(() => _date = picked);
   }
 
+  Future<void> _pickDestination() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _DestinationSheet(current: _destination),
+    );
+    if (picked != null) setState(() => _destination = picked);
+  }
+
   void _submitSearch() {
-    widget.onSearch(TripSearchParams(
-      destination: _destination,
-      date: toIsoDate(_date),
-      type: _type,
-      category: _category,
-    ));
+    widget.onSearch(TripSearchParams(destination: _destination, date: toIsoDate(_date), type: _type));
   }
 
   void _openPackage(TripPackage pkg) {
@@ -74,9 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
     ));
   }
 
-  void _scrollToTrips() {
-    final ctx = _tripsKey.currentContext;
-    if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
+  void _openPlanner() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TripPlannerScreen()));
   }
 
   @override
@@ -84,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
-        title: const BrandLogo(),
+        title: const BrandLogo(height: 30),
         actions: [
           ListenableBuilder(
             listenable: AuthSession.instance,
@@ -122,13 +128,18 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
-          controller: _scrollController,
           padding: EdgeInsets.zero,
           children: [
-            _buildHero(),
-            Transform.translate(offset: const Offset(0, -30), child: _buildSearchWidget()),
+            Stack(clipBehavior: Clip.none, children: [
+              _buildHero(),
+              Padding(padding: const EdgeInsets.only(top: 132), child: _buildSearchCard()),
+            ]),
+            const SizedBox(height: 20),
+            _buildCategoryChips(),
+            const SizedBox(height: 18),
+            _buildPlannerBanner(),
+            const SizedBox(height: 24),
             FutureBuilder<List<TripPackage>>(
-              key: _tripsKey,
               future: _packages,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
@@ -152,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: EmptyState(
                       icon: Icons.travel_explore,
                       title: 'Paket Wisata Tidak Ditemukan',
-                      message: 'Coba pilih tanggal lain atau gunakan filter destinasi yang berbeda.',
+                      message: 'Belum ada paket wisata aktif saat ini. Coba lagi nanti.',
                     ),
                   );
                 }
@@ -161,23 +172,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Trip Populer (Open Trip)',
                     marker: '✦',
                     markerColor: AppColors.accent,
-                    subtitle: 'Paket wisata gabungan hemat & seru dengan jadwal teratur',
+                    subtitle: 'Paket gabungan hemat & seru dengan jadwal teratur',
                     items: packages.where((p) => p.isOpenTrip).take(4).toList(),
                     seeAllTypes: const ['Open Trip'],
                   ),
                   _buildSection(
-                    title: 'Private Trip & Honeymoon Spesial',
+                    title: 'Private Trip & Honeymoon',
                     marker: '🌹',
                     markerColor: AppColors.honeymoon,
-                    subtitle: 'Jadwal bebas pilih customer (Min 2 Orang) • Fasilitas eksklusif & privat',
+                    subtitle: 'Jadwal bebas pilih • Fasilitas eksklusif & privat',
                     items: packages.where((p) => p.tripType == 'Private Trip' || p.tripType == 'Honeymoon').take(4).toList(),
                     seeAllTypes: const ['Private Trip', 'Honeymoon'],
                   ),
                   _buildSection(
-                    title: 'Family & Corporate Gathering',
+                    title: 'Family & Corporate',
                     marker: '🏢',
                     markerColor: AppColors.corporate,
-                    subtitle: 'Family (Min 3 orang) • Corporate Gathering (Min 10 orang) • Tanggal Bebas Pilih',
+                    subtitle: 'Liburan keluarga & gathering kantor • Tanggal bebas pilih',
                     items: packages.where((p) => p.tripType == 'Family' || p.tripType == 'Corporate').take(4).toList(),
                     seeAllTypes: const ['Family', 'Corporate'],
                   ),
@@ -198,157 +209,194 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHero() {
     return Container(
-      height: 300,
+      height: 190,
       decoration: const BoxDecoration(
         image: DecorationImage(
           image: AssetImage('assets/images/hero.jpg'),
           fit: BoxFit.cover,
-          alignment: Alignment(0, -0.4),
+          alignment: Alignment(0, -0.35),
         ),
       ),
       child: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xBF0F172A), Color(0x730F172A), Color(0x1A0F172A)],
-            stops: [0, 0.45, 0.8],
+            colors: [Color(0xCC0F172A), Color(0x800F172A), Color(0x260F172A)],
+            stops: [0, 0.5, 0.9],
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 56),
-        alignment: Alignment.centerLeft,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Cari Open Trip\nIndonesia dengan Mudah',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
-                height: 1.2,
-                shadows: const [Shadow(color: Color(0x66000000), blurRadius: 10, offset: Offset(0, 2))],
-              ),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        alignment: Alignment.topLeft,
+        child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+            'Cari Open Trip\nIndonesia dengan Mudah',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
+              shadows: [Shadow(color: Color(0x66000000), blurRadius: 10, offset: Offset(0, 2))],
             ),
-            const SizedBox(height: 12),
-            const Text(
-              'Temukan berbagai open trip seru dan tour guide terpercaya di seluruh Indonesia.',
-              style: TextStyle(
-                color: Color(0xFFF1F5F9),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                height: 1.5,
-                shadows: [Shadow(color: Color(0x80000000), blurRadius: 6, offset: Offset(0, 1))],
-              ),
-            ),
-            const SizedBox(height: 18),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: _scrollToTrips,
-              child: const Text('Explore Trip'),
-            ),
-          ],
-        ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Open trip seru & tour guide terpercaya di seluruh Indonesia.',
+            style: TextStyle(color: Color(0xFFF1F5F9), fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+        ]),
       ),
     );
   }
 
-  Widget _buildSearchWidget() {
-    InputDecoration deco() => const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12));
-
-    Widget label(IconData icon, String text, {bool required = false}) => Padding(
-          padding: const EdgeInsets.only(bottom: 7),
-          child: Row(children: [
-            Icon(icon, size: 16, color: AppColors.accent),
-            const SizedBox(width: 6),
-            Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMedium)),
-            if (required) const Text(' *', style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700)),
-          ]),
-        );
+  Widget _buildSearchCard() {
+    Widget field({required IconData icon, required String label, required String value, required VoidCallback onTap}) {
+      return Material(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(children: [
+              Icon(icon, size: 18, color: AppColors.accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 1),
+                  Text(value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14, color: AppColors.textDark, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
-          boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 36, offset: Offset(0, 12))],
+          boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 24, offset: Offset(0, 8))],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            label(Icons.location_on_outlined, 'Destination'),
-            DropdownButtonFormField<String>(
-              value: _destination,
-              isExpanded: true,
-              decoration: deco(),
-              items: [
-                const DropdownMenuItem(value: '', child: Text('Pilih destinasi')),
-                for (final p in indonesiaProvinces) DropdownMenuItem(value: p, child: Text(p)),
-              ],
-              onChanged: (v) => setState(() => _destination = v ?? ''),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          field(
+            icon: Icons.location_on_outlined,
+            label: 'Mau ke mana?',
+            value: _destination.isEmpty ? 'Semua destinasi' : _destination,
+            onTap: _pickDestination,
+          ),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+              child: field(
+                icon: Icons.calendar_today_outlined,
+                label: 'Berangkat',
+                value: formatDateShort(_date),
+                onTap: _pickDate,
+              ),
             ),
-            const SizedBox(height: 14),
-            label(Icons.calendar_today_outlined, 'Tanggal', required: true),
-            InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: _pickDate,
-              child: InputDecorator(
-                decoration: deco().copyWith(
-                  suffixIcon: const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.accent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: PopupMenuButton<String>(
+                initialValue: _type,
+                onSelected: (v) => setState(() => _type = v),
+                itemBuilder: (_) => [
+                  for (final t in [allTripTypesLabel, ...officialTripTypes]) PopupMenuItem(value: t, child: Text(t)),
+                ],
+                child: IgnorePointer(
+                  child: field(icon: Icons.groups_outlined, label: 'Tipe Trip', value: _type, onTap: () {}),
                 ),
-                child: Text(formatDateLong(_date),
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark)),
               ),
             ),
-            const SizedBox(height: 14),
-            Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  label(Icons.groups_outlined, 'Type Trip'),
-                  DropdownButtonFormField<String>(
-                    value: _type,
-                    isExpanded: true,
-                    decoration: deco(),
-                    items: [
-                      for (final t in [allTripTypesLabel, ...officialTripTypes])
-                        DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis)),
-                    ],
-                    onChanged: (v) => setState(() => _type = v ?? allTripTypesLabel),
-                  ),
+          ]),
+          const SizedBox(height: 10),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: _submitSearch,
+            icon: const Icon(Icons.search, size: 18),
+            label: const Text('Cari Trip'),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChips() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: Text('Jelajahi Kategori', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+      ),
+      const SizedBox(height: 10),
+      SizedBox(
+        height: 40,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: officialCategories.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, i) {
+            final category = officialCategories[i];
+            return ActionChip(
+              avatar: Icon(_categoryIcons[category] ?? Icons.explore_outlined, size: 16, color: AppColors.primary),
+              label: Text(category),
+              labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textBody),
+              backgroundColor: Colors.white,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              onPressed: () => widget.onSearch(TripSearchParams(category: category)),
+            );
+          },
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildPlannerBanner() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Material(
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _openPlanner,
+          child: Ink(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(colors: [AppColors.primary, AppColors.accent]),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.savings_outlined, color: Colors.white),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Rencanakan Perjalananmu',
+                      style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+                  SizedBox(height: 2),
+                  Text('Atur target budget, catat tabungan, dan checklist persiapan trip.',
+                      style: TextStyle(color: Color(0xE6FFFFFF), fontSize: 12)),
                 ]),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  label(Icons.grid_view_outlined, 'Kategori'),
-                  DropdownButtonFormField<String>(
-                    value: _category,
-                    isExpanded: true,
-                    decoration: deco(),
-                    items: [
-                      for (final c in [allCategoriesLabel, ...officialCategories])
-                        DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis)),
-                    ],
-                    onChanged: (v) => setState(() => _category = v ?? allCategoriesLabel),
-                  ),
-                ]),
-              ),
+              const Icon(Icons.chevron_right, color: Colors.white),
             ]),
-            const SizedBox(height: 18),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: _submitSearch,
-              icon: const Icon(Icons.search, size: 18),
-              label: const Text('Cari Trip'),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -364,53 +412,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     if (items.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(bottom: 28),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 26),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text.rich(TextSpan(
-                      text: '$title ',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark),
-                      children: [TextSpan(text: marker, style: TextStyle(color: markerColor))],
-                    )),
-                    const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                  ]),
-                ),
-                TextButton(
-                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
-                  onPressed: () => widget.onSearch(seeAllTypes.length == 1
-                      ? TripSearchParams(type: seeAllTypes.first)
-                      : TripSearchParams(typeGroup: seeAllTypes)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text('Lihat semua', style: TextStyle(fontSize: 13)),
-                    Icon(Icons.chevron_right, size: 16),
-                  ]),
-                ),
-              ],
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text.rich(TextSpan(
+                  text: '$title ',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                  children: [TextSpan(text: marker, style: TextStyle(color: markerColor))],
+                )),
+                const SizedBox(height: 2),
+                Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              ]),
             ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 372,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 14),
-              itemBuilder: (context, i) => Align(
-                alignment: Alignment.topCenter,
-                child: TripGridCard(pkg: items[i], onTap: () => _openPackage(items[i])),
+            TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.only(left: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
+              onPressed: () => widget.onSearch(seeAllTypes.length == 1
+                  ? TripSearchParams(type: seeAllTypes.first)
+                  : TripSearchParams(typeGroup: seeAllTypes)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('Lihat semua', style: TextStyle(fontSize: 13)),
+                Icon(Icons.chevron_right, size: 16),
+              ]),
             ),
-          ),
+          ]),
+          const SizedBox(height: 12),
+          // Dua kartu per baris, lebarnya mengikuti layar agar tidak ada
+          // kartu yang terpotong di tepi.
+          LayoutBuilder(builder: (context, constraints) {
+            const gap = 12.0;
+            final width = (constraints.maxWidth - gap) / 2;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final pkg in items)
+                  SizedBox(width: width, child: TripGridCard(pkg: pkg, onTap: () => _openPackage(pkg))),
+              ],
+            );
+          }),
         ],
       ),
     );
@@ -418,40 +465,104 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildFeatureRibbon() {
     const features = [
-      (Icons.verified_user_outlined, 'Aman & Terpercaya', 'Provider terverifikasi dan berpengalaman'),
-      (Icons.headset_mic_outlined, 'Layanan 24/7', 'Customer service siap membantu kapan saja'),
-      (Icons.credit_card_outlined, 'Pembayaran Mudah', 'Transfer & QR Code praktis dan aman'),
-      (Icons.thumb_up_alt_outlined, 'Banyak Pilihan', 'Beragam destinasi menarik sesuai keinginanmu'),
+      (Icons.verified_user_outlined, 'Aman & Terpercaya', 'Provider terverifikasi'),
+      (Icons.headset_mic_outlined, 'Layanan 24/7', 'CS siap membantu'),
+      (Icons.credit_card_outlined, 'Pembayaran Mudah', 'Transfer & QR Code'),
+      (Icons.thumb_up_alt_outlined, 'Banyak Pilihan', 'Beragam destinasi'),
     ];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: SectionCard(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
-        child: GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 18,
-          crossAxisSpacing: 8,
-          childAspectRatio: 1.15,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        child: Wrap(
+          runSpacing: 14,
           children: [
             for (final f in features)
-              Column(children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: const BoxDecoration(color: AppColors.accentLight, shape: BoxShape.circle),
-                  child: Icon(f.$1, color: AppColors.primary, size: 24),
-                ),
-                const SizedBox(height: 8),
-                Text(f.$2,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                const SizedBox(height: 4),
-                Text(f.$3,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.4)),
-              ]),
+              FractionallySizedBox(
+                widthFactor: 0.5,
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(color: AppColors.accentLight, shape: BoxShape.circle),
+                    child: Icon(f.$1, color: AppColors.primary, size: 18),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(f.$2, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                      Text(f.$3, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    ]),
+                  ),
+                ]),
+              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Pemilih destinasi dengan kolom pencarian, menggantikan dropdown panjang
+/// 38 provinsi.
+class _DestinationSheet extends StatefulWidget {
+  final String current;
+
+  const _DestinationSheet({required this.current});
+
+  @override
+  State<_DestinationSheet> createState() => _DestinationSheetState();
+}
+
+class _DestinationSheetState extends State<_DestinationSheet> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _query.toLowerCase();
+    final results = indonesiaProvinces.where((p) => p.toLowerCase().contains(q)).toList();
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.75,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Column(children: [
+            const SizedBox(height: 16),
+            const Text('Pilih Destinasi', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: TextField(
+                autofocus: true,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: const InputDecoration(
+                  hintText: 'Cari provinsi, mis. Bali',
+                  prefixIcon: Icon(Icons.search, size: 20),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(children: [
+                if (q.isEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.public, color: AppColors.primary),
+                    title: const Text('Semua destinasi'),
+                    trailing: widget.current.isEmpty ? const Icon(Icons.check, color: AppColors.accent) : null,
+                    onTap: () => Navigator.pop(context, ''),
+                  ),
+                for (final p in results)
+                  ListTile(
+                    leading: const Icon(Icons.location_on_outlined, color: AppColors.textLight),
+                    title: Text(p),
+                    trailing: widget.current == p ? const Icon(Icons.check, color: AppColors.accent) : null,
+                    onTap: () => Navigator.pop(context, p),
+                  ),
+                if (results.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('Provinsi tidak ditemukan.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted)),
+                  ),
+              ]),
+            ),
+          ]),
         ),
       ),
     );

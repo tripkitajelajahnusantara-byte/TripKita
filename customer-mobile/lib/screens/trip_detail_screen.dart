@@ -143,11 +143,14 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       _isOutsidePeriod || (_isOpenTrip && _departure == null);
 
   String get _ctaLabel {
-    if (_availableSeats <= 0) return 'Kuota Habis (Tidak Bisa Dipesan)';
-    if (_guests > _availableSeats) return 'Peserta Melebihi Kuota';
-    if (_isRangeBooked) return 'Tanggal Terbooking (Tidak Tersedia)';
-    if (_isOpenTrip && _departure == null) return 'Jadwal Belum Tersedia';
-    if (_isOutsidePeriod) return 'Tanggal di Luar Periode Paket';
+    // Satu-satunya tombol pesan ada di bar bawah, jadi labelnya harus
+    // menjelaskan sendiri kenapa tombol nonaktif.
+    if (_availableSeats <= 0) return 'Kuota Habis';
+    if (_guests > _availableSeats) return 'Melebihi Kuota';
+    if (_isRangeBooked) return 'Tanggal Penuh';
+    if (_isOpenTrip && _departure == null) return 'Jadwal Belum Ada';
+    if (_isOutsidePeriod) return 'Ganti Tanggal';
+    if (_isSelectedDateClosed) return 'Ganti Tanggal';
     return 'Pesan Sekarang';
   }
 
@@ -423,8 +426,6 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         PriceRow('Paket (${_guests}x)', formatIDR(_total)),
         const Divider(height: 14),
         PriceRow('Total Estimasi', formatIDR(_total), valueColor: AppColors.accent, emphasize: true),
-        const SizedBox(height: 14),
-        PrimaryButton(label: _ctaLabel, onPressed: _bookingBlocked ? null : _bookNow),
       ]),
     );
   }
@@ -960,7 +961,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
               onPressed: _bookingBlocked ? null : _bookNow,
-              child: Text(_availableSeats <= 0 ? 'Kuota Habis' : 'Pesan Sekarang'),
+              child: Text(_ctaLabel),
             ),
           ]),
         ),
