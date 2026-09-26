@@ -31,6 +31,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-tripkita_local_password}
       DB_NAME: ${POSTGRES_DB:-tripkita}
       DB_SSLMODE: disable
+      UPLOAD_DIR: /app/uploads
       JWT_SECRET: ${JWT_SECRET:-local-development-jwt-secret-change-me-2026}
       FRONTEND_URL: http://localhost:${WEB_PORT:-8081}
       BACKEND_URL: http://localhost:${API_PORT:-8080}

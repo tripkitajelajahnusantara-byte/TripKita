@@ -58,7 +58,7 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 	if req.KtpPath == "" {
 		return nil, &AuthInputError{Message: "dokumen KTP wajib diunggah"}
 	}
-	if err := validateManagedDocumentPaths(req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
+	if err := validateManagedDocumentPaths(s.cfg.DocumentUploadDir(), req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
 		return nil, &AuthInputError{Message: err.Error()}
 	}
 	hashedPassword, err := authn.HashPassword(req.Password)
@@ -426,7 +426,7 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 		err = s.repo.Update(provider)
 		return provider, err
 	}
-	if err := validateManagedDocumentPaths(req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
+	if err := validateManagedDocumentPaths(s.cfg.DocumentUploadDir(), req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
 		return nil, err
 	}
 
@@ -578,7 +578,7 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 	return provider, nil
 }
 
-func validateManagedDocumentPaths(paths ...string) error {
+func validateManagedDocumentPaths(uploadDir string, paths ...string) error {
 	for _, documentPath := range paths {
 		if documentPath == "" {
 			continue
@@ -596,7 +596,7 @@ func validateManagedDocumentPaths(paths ...string) error {
 		if !strings.HasPrefix(filename, "doc_") || err != nil || len(decoded) != 16 {
 			return errors.New("identitas dokumen tidak valid")
 		}
-		if _, err := os.Stat(filepath.Join("uploads", filename)); err != nil {
+		if _, err := os.Stat(filepath.Join(uploadDir, filename)); err != nil {
 			return errors.New("dokumen yang diunggah tidak ditemukan")
 		}
 	}
