@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { request } from '../utils/api';
+import { useActionLock } from '../utils/useActionLock';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
-import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin } from 'lucide-react';
+import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin, LoaderCircle } from 'lucide-react';
 import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
 import { isValidIndonesianMobilePhone } from '../utils/phone';
 
@@ -13,7 +14,9 @@ export const CustomerSettingsPage: React.FC = () => {
   const { showAlert } = useCustomAlert();
 
   const [activeTab, setActiveTab] = useState<'akun' | 'favorit' | 'review'>('akun');
-  const [submitting, setSubmitting] = useState(false);
+  // Kunci berbasis ref agar klik/enter ganda tidak mengirim dua PUT profil.
+  const { pending, isBusy, run } = useActionLock();
+  const submitting = pending === 'save-profile';
 
   // Profile Form State
   const [namaLengkap, setNamaLengkap] = useState('');
@@ -71,6 +74,7 @@ export const CustomerSettingsPage: React.FC = () => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isBusy) return;
     if (!namaLengkap.trim()) {
       showAlert({ type: 'error', message: 'Nama Lengkap wajib diisi.' });
       return;
@@ -80,61 +84,54 @@ export const CustomerSettingsPage: React.FC = () => {
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const payload = {
-        picName: namaLengkap,
-        name: namaLengkap,
-        whatsapp: whatsapp,
-        gender: gender,
-        birthDate: birthDate
-      };
+    await run('save-profile', async () => {
+      try {
+        const payload = {
+          picName: namaLengkap,
+          name: namaLengkap,
+          whatsapp: whatsapp,
+          gender: gender,
+          birthDate: birthDate
+        };
 
-      const updated = await request('/provider/profile', {
-        method: 'PUT',
-        body: JSON.stringify(payload)
-      });
+        const updated = await request('/provider/profile', {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
 
-      const updatedProfile = {
-        ...(customerProfile || {}),
-        ...updated,
-        picName: namaLengkap,
-        whatsapp: whatsapp,
-        gender: gender,
-        birthDate: birthDate
-      };
+        const updatedProfile = {
+          ...(customerProfile || {}),
+          ...updated,
+          picName: namaLengkap,
+          whatsapp: whatsapp,
+          gender: gender,
+          birthDate: birthDate
+        };
 
-      setCustomerProfile(updatedProfile as any);
-      localStorage.setItem('tementrip_customer', JSON.stringify(updatedProfile));
-      localStorage.setItem('tripkita_customer', JSON.stringify(updatedProfile));
+        setCustomerProfile(updatedProfile as any);
+        localStorage.setItem('tementrip_customer', JSON.stringify(updatedProfile));
+        localStorage.setItem('tripkita_customer', JSON.stringify(updatedProfile));
 
-      showAlert({
-        type: 'success',
-        title: 'Profil Berhasil Diperbarui',
-        message: 'Data akun Anda telah berhasil disimpan di database.'
-      });
-    } catch (err: any) {
-      console.error(err);
-      // Fallback local update if offline
-      const updatedProfile = {
-        ...(customerProfile || {}),
-        picName: namaLengkap,
-        whatsapp: whatsapp,
-        gender: gender,
-        birthDate: birthDate
-      };
-      setCustomerProfile(updatedProfile as any);
-      localStorage.setItem('tementrip_customer', JSON.stringify(updatedProfile));
-      localStorage.setItem('tripkita_customer', JSON.stringify(updatedProfile));
-
-      showAlert({
-        type: 'success',
-        title: 'Profil Berhasil Disimpan',
-        message: 'Data akun Anda telah tersimpan.'
-      });
-    } finally {
-      setSubmitting(false);
-    }
+        showAlert({
+          type: 'success',
+          title: 'Profil Berhasil Diperbarui',
+          message: 'Data akun Anda telah berhasil disimpan di database.'
+        });
+      } catch (err: any) {
+        console.error(err);
+        // Profil tidak ditulis ke state/localStorage saat server menolak atau
+        // tidak terjangkau; sebelumnya kegagalan ditampilkan sebagai sukses
+        // sehingga data di perangkat berbeda dengan data akun sebenarnya.
+        // Isian form tetap dibiarkan agar pengguna bisa langsung mencoba lagi.
+        showAlert({
+          type: 'error',
+          title: 'Profil Gagal Disimpan',
+          message: err instanceof Error && err.message
+            ? err.message
+            : 'Perubahan profil belum tersimpan. Periksa koneksi Anda lalu coba lagi.'
+        });
+      }
+    });
   };
 
   const handleRemoveWishlist = (id: number | string) => {
@@ -370,7 +367,8 @@ export const CustomerSettingsPage: React.FC = () => {
                   <div style={{ marginTop: '12px', paddingTop: '20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
                     <button
                       type="submit"
-                      disabled={submitting}
+                      disabled={isBusy}
+                      aria-busy={submitting}
                       style={{
                         padding: '12px 28px',
                         backgroundColor: '#0284c7',
@@ -386,7 +384,9 @@ export const CustomerSettingsPage: React.FC = () => {
                         boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
                       }}
                     >
-                      <Save size={16} /> {submitting ? 'Memproses...' : 'Simpan Perubahan'}
+                      {submitting
+                        ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
+                        : <><Save size={16} /> Simpan Perubahan</>}
                     </button>
                   </div>
                 </form>

@@ -1,13 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { fetchCheckoutConfig } from '../utils/checkoutConfig';
-import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck } from 'lucide-react';
+import { useActionLock } from '../utils/useActionLock';
+import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck, LoaderCircle } from 'lucide-react';
 import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsContent } from '../components/LegalModals';
 
 export const CustomerConfirmationPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, bookingFormData } = useNavigation();
-  const [submitting, setSubmitting] = useState(false);
+  // POST /public/bookings membuat pesanan baru; kunci berbasis ref mencegah
+  // klik ganda di tick yang sama membuat dua booking dan dua tagihan.
+  const { pending, isBusy, run } = useActionLock();
+  // Setelah booking berhasil, halaman masih terlihat sampai redirect ke iPaymu
+  // selesai. Kunci aksi sudah dilepas di finally, jadi status ini menjaga
+  // tombol tetap nonaktif selama perpindahan halaman berlangsung.
+  const redirectingRef = useRef(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const submitting = pending === 'create-booking' || redirecting;
   
   // Agreement Checkbox state
   const [isAgreed, setIsAgreed] = useState(false);
@@ -69,7 +78,7 @@ export const CustomerConfirmationPage: React.FC = () => {
   };
 
   const handleOpenConfirmModal = () => {
-    if (!checkoutReady) return;
+    if (isBusy || redirectingRef.current || !checkoutReady) return;
     if (!isAgreed) {
       setAgreementError('Anda wajib menyetujui Syarat & Ketentuan untuk melanjutkan.');
       return;
@@ -92,9 +101,10 @@ export const CustomerConfirmationPage: React.FC = () => {
   };
 
   const handleFinalConfirmBooking = async () => {
-    setShowConfirmModal(false);
-    setSubmitting(true);
-
+    if (isBusy || redirectingRef.current || !checkoutReady) return;
+    // Modal tetap terbuka selama permintaan berjalan agar tombol "Ya, Bayar"
+    // menampilkan indikator dan tidak bisa ditekan ulang.
+    await run('create-booking', async () => {
 	const nowIso = new Date().toISOString();
 
     try {
@@ -200,13 +210,16 @@ export const CustomerConfirmationPage: React.FC = () => {
       sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
 	  // Redirect langsung ke hosted checkout resmi iPaymu.
+	  redirectingRef.current = true;
+	  setRedirecting(true);
 	  window.location.replace(parsedPaymentURL.toString());
 
     } catch (err: any) {
       console.error('[Booking Error]', err);
+      setShowConfirmModal(false);
       alert(`Gagal membuat tagihan pembayaran: ${err?.message || 'Terjadi kesalahan sistem'}`);
-      setSubmitting(false);
     }
+    });
   };
 
   return (
@@ -391,6 +404,7 @@ export const CustomerConfirmationPage: React.FC = () => {
           <button
             onClick={handleOpenConfirmModal}
             disabled={submitting || !checkoutReady}
+            aria-busy={submitting}
             style={{
               width: '100%',
               padding: '16px',
@@ -402,10 +416,14 @@ export const CustomerConfirmationPage: React.FC = () => {
               fontWeight: '700',
               cursor: (submitting || !checkoutReady) ? 'not-allowed' : 'pointer',
               boxShadow: (submitting || !checkoutReady) ? 'none' : '0 4px 14px rgba(2, 132, 199, 0.3)',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
             }}
           >
-            {submitting ? 'Memproses Booking...' : checkoutConfigLoading ? 'Memuat Biaya Layanan...' : 'Konfirmasi & Bayar Sekarang'}
+            {submitting ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses Booking...</> : checkoutConfigLoading ? 'Memuat Biaya Layanan...' : 'Konfirmasi & Bayar Sekarang'}
           </button>
 
         </div>
@@ -457,6 +475,9 @@ export const CustomerConfirmationPage: React.FC = () => {
               {/* NO Button */}
               <button
                 onClick={() => setShowConfirmModal(false)}
+                // Menutup modal tidak membatalkan POST yang sudah terkirim, jadi
+                // tombol ini ikut dikunci agar pengguna tidak mengira batal.
+                disabled={submitting}
                 style={{
                   padding: '12px',
                   backgroundColor: '#ffffff',
@@ -465,7 +486,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                   borderRadius: '12px',
                   fontSize: '14px',
                   fontWeight: '700',
-                  cursor: 'pointer'
+                  cursor: submitting ? 'not-allowed' : 'pointer'
                 }}
               >
                 Batal (No)
@@ -474,20 +495,25 @@ export const CustomerConfirmationPage: React.FC = () => {
               {/* YES Button */}
               <button
                 onClick={handleFinalConfirmBooking}
-                disabled={!checkoutReady}
+                disabled={submitting || !checkoutReady}
+                aria-busy={submitting}
                 style={{
                   padding: '12px',
-                  backgroundColor: '#0284c7',
+                  backgroundColor: submitting ? '#94a3b8' : '#0284c7',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '12px',
                   fontSize: '14px',
                   fontWeight: '700',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 10px rgba(2, 132, 199, 0.3)'
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  boxShadow: submitting ? 'none' : '0 4px 10px rgba(2, 132, 199, 0.3)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
                 }}
               >
-                Ya, Bayar Sekarang
+                {submitting ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses Booking...</> : 'Ya, Bayar Sekarang'}
               </button>
             </div>
 

@@ -7,6 +7,7 @@ import {
   CloudSun,
   Droplets,
   Info,
+  LoaderCircle,
   RefreshCw,
   ThermometerSun,
   Users,
@@ -14,6 +15,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { request } from '../utils/api';
+import { useActionLock } from '../utils/useActionLock';
 
 interface DepartureBooking {
   id: number;
@@ -62,10 +64,14 @@ const formatDate = (iso: string) =>
 const weatherMetric = (value: number | undefined, suffix: string) =>
   Number.isFinite(value) ? `${value}${suffix}` : '—';
 
+// Dibentuk dari komponen tanggal lokal; toISOString mengonversi ke UTC sehingga
+// pada dini hari WIB hasilnya masih tanggal hari ini.
 function tomorrowISO(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 const decisionCause = (departure: TripDeparture) => {
@@ -77,7 +83,9 @@ const decisionCause = (departure: TripDeparture) => {
 export const TripDepartureAlert: React.FC = () => {
   const [departures, setDepartures] = useState<TripDeparture[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submittingId, setSubmittingId] = useState<number | null>(null);
+  // Kunci berformat `idKeberangkatan:aksi` agar indikator tampil hanya pada
+  // tombol keputusan yang diklik, sementara seluruh tombol lain ikut terkunci.
+  const { pending: pendingAction, isBusy, run } = useActionLock();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [rescheduleFor, setRescheduleFor] = useState<number | null>(null);
@@ -100,6 +108,7 @@ export const TripDepartureAlert: React.FC = () => {
   }, [load]);
 
   const submitDecision = async (departure: TripDeparture, action: DecisionAction) => {
+    if (isBusy) return;
     if (action === 'RESCHEDULE' && !proposedDate) {
       setError('Tanggal pengganti wajib diisi sebelum mengirim penjadwalan ulang.');
       return;
@@ -114,29 +123,28 @@ export const TripDepartureAlert: React.FC = () => {
         : `Tawarkan tanggal pengganti ${proposedDate} kepada pelanggan? Pelanggan yang menolak akan masuk proses pengembalian dana.`;
     if (!window.confirm(confirmText)) return;
 
-    setSubmittingId(departure.id);
     setError('');
     setSuccess('');
-    try {
-      await request(`/provider/departures/${departure.id}/decision`, {
-        method: 'POST',
-        body: JSON.stringify({ action, proposedDate: action === 'RESCHEDULE' ? proposedDate : '', notes: '' }),
-      });
-      setSuccess(action === 'CONTINUE'
-        ? isWeather
-          ? 'Trip tetap berjalan. Status booking dan ketentuan payout tidak berubah.'
-          : 'Keberangkatan dikonfirmasi tetap jalan. Pelanggan telah diberi tahu.'
-        : action === 'CANCEL'
-          ? 'Trip dibatalkan. Admin menerima permintaan pengembalian dana.'
-          : 'Tawaran jadwal pengganti telah dikirim kepada pelanggan melalui notifikasi dan email.');
-      setRescheduleFor(null);
-      setProposedDate('');
-      await load();
-    } catch (err: any) {
-      setError(err?.message || 'Keputusan gagal disimpan.');
-    } finally {
-      setSubmittingId(null);
-    }
+    await run(`${departure.id}:${action}`, async () => {
+      try {
+        await request(`/provider/departures/${departure.id}/decision`, {
+          method: 'POST',
+          body: JSON.stringify({ action, proposedDate: action === 'RESCHEDULE' ? proposedDate : '', notes: '' }),
+        });
+        setSuccess(action === 'CONTINUE'
+          ? isWeather
+            ? 'Trip tetap berjalan. Status booking dan ketentuan payout tidak berubah.'
+            : 'Keberangkatan dikonfirmasi tetap jalan. Pelanggan telah diberi tahu.'
+          : action === 'CANCEL'
+            ? 'Trip dibatalkan. Admin menerima permintaan pengembalian dana.'
+            : 'Tawaran jadwal pengganti telah dikirim kepada pelanggan melalui notifikasi dan email.');
+        setRescheduleFor(null);
+        setProposedDate('');
+        await load();
+      } catch (err: any) {
+        setError(err?.message || 'Keputusan gagal disimpan.');
+      }
+    });
   };
 
   const pending = departures.filter((item) => item.status === 'AWAITING_PROVIDER');
@@ -152,7 +160,11 @@ export const TripDepartureAlert: React.FC = () => {
         const isWeather = departure.reason === 'WEATHER_FORECAST';
         const isAdverse = Boolean(departure.weatherIsAdverse);
         const packageName = departure.packageDetails?.name || 'Paket Wisata';
-        const isSubmitting = submittingId === departure.id;
+        // Semua baris dikunci selama ada keputusan yang sedang dikirim, karena
+        // kunci aksi bersifat tunggal untuk seluruh daftar.
+        const isSubmitting = isBusy;
+        const isPendingAction = (action: DecisionAction) => pendingAction === `${departure.id}:${action}`;
+        const spinner = <LoaderCircle size={15} className="btn-spinner" aria-hidden="true" />;
 
         return (
           <article key={departure.id} className={`departure-card ${isWeather ? (isAdverse ? 'weather-adverse' : 'weather-clear') : 'quota-alert'}`}>
@@ -200,22 +212,28 @@ export const TripDepartureAlert: React.FC = () => {
             {rescheduleFor === departure.id && (
               <div className="reschedule-box">
                 <label htmlFor={`reschedule-${departure.id}`}>Tanggal pengganti yang ditawarkan</label>
-                <input id={`reschedule-${departure.id}`} type="date" value={proposedDate} min={tomorrowISO()} max={departure.packageDetails?.endDate || undefined} onChange={(event) => setProposedDate(event.target.value)} />
+                <input id={`reschedule-${departure.id}`} type="date" value={proposedDate} min={tomorrowISO()} max={departure.packageDetails?.endDate || undefined} disabled={isSubmitting} onChange={(event) => setProposedDate(event.target.value)} />
                 <p>Pelanggan menerima notifikasi dan email untuk menerima atau menolak. Penolakan diteruskan ke proses refund.</p>
               </div>
             )}
 
             <div className="decision-actions">
-              <button type="button" className="decision-button continue" disabled={isSubmitting} onClick={() => submitDecision(departure, 'CONTINUE')}><CheckCircle2 size={15} /> Tetap Berangkat</button>
+              <button type="button" className="decision-button continue" disabled={isSubmitting} aria-busy={isPendingAction('CONTINUE')} onClick={() => submitDecision(departure, 'CONTINUE')}>
+                {isPendingAction('CONTINUE') ? <>{spinner} Memproses...</> : <><CheckCircle2 size={15} /> Tetap Berangkat</>}
+              </button>
               {rescheduleFor === departure.id ? (
                 <>
-                  <button type="button" className="decision-button reschedule" disabled={isSubmitting} onClick={() => submitDecision(departure, 'RESCHEDULE')}><CalendarClock size={15} /> Kirim Jadwal</button>
+                  <button type="button" className="decision-button reschedule" disabled={isSubmitting} aria-busy={isPendingAction('RESCHEDULE')} onClick={() => submitDecision(departure, 'RESCHEDULE')}>
+                    {isPendingAction('RESCHEDULE') ? <>{spinner} Mengirim...</> : <><CalendarClock size={15} /> Kirim Jadwal</>}
+                  </button>
                   <button type="button" className="decision-button neutral" disabled={isSubmitting} onClick={() => { setRescheduleFor(null); setProposedDate(''); }}>Tutup</button>
                 </>
               ) : (
                 <button type="button" className="decision-button reschedule" disabled={isSubmitting} onClick={() => { setRescheduleFor(departure.id); setProposedDate(''); setError(''); }}><CalendarClock size={15} /> Reschedule</button>
               )}
-              <button type="button" className="decision-button cancel" disabled={isSubmitting} onClick={() => submitDecision(departure, 'CANCEL')}><XCircle size={15} /> Batalkan &amp; Refund</button>
+              <button type="button" className="decision-button cancel" disabled={isSubmitting} aria-busy={isPendingAction('CANCEL')} onClick={() => submitDecision(departure, 'CANCEL')}>
+                {isPendingAction('CANCEL') ? <>{spinner} Memproses...</> : <><XCircle size={15} /> Batalkan &amp; Refund</>}
+              </button>
             </div>
           </article>
         );

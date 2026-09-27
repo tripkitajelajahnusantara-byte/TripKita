@@ -1632,6 +1632,28 @@ button {
   to { transform: rotate(360deg); }
 }
 
+/* Indikator tombol yang sedang memproses permintaan (lihat useActionLock). */
+.btn-spinner {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: -2px;
+  margin-right: 6px;
+  animation: spin 0.8s linear infinite;
+}
+
+button[aria-busy="true"] {
+  cursor: progress;
+}
+
+/* Tombol keputusan admin lain ikut dikunci selama satu aksi berjalan. */
+.drawer-actions-row .action-btn:disabled:not([aria-busy="true"]),
+.doc-verification-actions button:disabled:not([aria-busy="true"]),
+.legal-verification-actions button:disabled:not([aria-busy="true"]),
+.payout-actions button:disabled:not([aria-busy="true"]) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .hero-title {
   font-size: 48px;
   font-weight: 800;

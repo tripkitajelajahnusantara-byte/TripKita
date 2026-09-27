@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Lock, Save } from 'lucide-react';
+import { CalendarDays, LoaderCircle, Lock, Save } from 'lucide-react';
 import { request } from '../utils/api';
+import { useActionLock } from '../utils/useActionLock';
 
 interface PackageDate {
   id: number;
@@ -40,7 +41,9 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
   const [latest, setLatest] = useState('');
   const [monthOffset, setMonthOffset] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  // Kunci berbasis ref mencegah klik ganda mengirim dua PUT sebelum state
+  // `saving` sempat ter-render ulang.
+  const { isBusy: saving, run } = useActionLock();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -73,7 +76,8 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
   }, []);
 
   const toggle = (iso: string) => {
-    if (booked.has(iso)) return;
+    // Pilihan dikunci selama penyimpanan agar yang tersimpan sama dengan yang terlihat.
+    if (saving || booked.has(iso)) return;
     setSuccess('');
     setSelected((prev) => {
       const next = new Set(prev);
@@ -84,21 +88,21 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setError('');
-    setSuccess('');
-    try {
-      const result = await request(`/provider/packages/${packageId}/dates`, {
-        method: 'PUT',
-        body: JSON.stringify({ dates: Array.from(selected).sort() }),
-      });
-      setSuccess(result?.message || 'Tanggal keberangkatan tersimpan.');
-      await load();
-    } catch (err) {
-      setError((err as Error)?.message || 'Tanggal keberangkatan gagal disimpan.');
-    } finally {
-      setSaving(false);
-    }
+    if (saving) return;
+    await run('save', async () => {
+      setError('');
+      setSuccess('');
+      try {
+        const result = await request(`/provider/packages/${packageId}/dates`, {
+          method: 'PUT',
+          body: JSON.stringify({ dates: Array.from(selected).sort() }),
+        });
+        setSuccess(result?.message || 'Tanggal keberangkatan tersimpan.');
+        await load();
+      } catch (err) {
+        setError((err as Error)?.message || 'Tanggal keberangkatan gagal disimpan.');
+      }
+    });
   };
 
   if (loading) return null;
@@ -181,7 +185,7 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
               key={iso}
               type="button"
               onClick={() => toggle(iso)}
-              disabled={!!outOfWindow || isBooked}
+              disabled={!!outOfWindow || isBooked || saving}
               title={isBooked ? 'Sudah dipesan pelanggan; tidak dapat ditutup' : outOfWindow ? 'Di luar jangkauan enam bulan' : undefined}
               style={{
                 aspectRatio: '1',
@@ -191,8 +195,8 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
                 borderRadius: '8px',
                 fontSize: '12px',
                 fontWeight: isOpen || isBooked ? 700 : 500,
-                cursor: outOfWindow || isBooked ? 'not-allowed' : 'pointer',
-                opacity: outOfWindow ? 0.4 : 1,
+                cursor: outOfWindow || isBooked || saving ? 'not-allowed' : 'pointer',
+                opacity: outOfWindow ? 0.4 : saving ? 0.7 : 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -225,6 +229,7 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
         type="button"
         onClick={handleSave}
         disabled={saving}
+        aria-busy={saving}
         style={{
           backgroundColor: '#0284c7',
           color: '#ffffff',
@@ -233,13 +238,16 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
           borderRadius: '10px',
           fontSize: '13px',
           fontWeight: 700,
-          cursor: saving ? 'wait' : 'pointer',
+          cursor: saving ? 'not-allowed' : 'pointer',
+          opacity: saving ? 0.75 : 1,
           display: 'inline-flex',
           alignItems: 'center',
           gap: '8px',
         }}
       >
-        <Save size={15} /> {saving ? 'Menyimpan...' : 'Simpan Tanggal'}
+        {saving
+          ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
+          : <><Save size={15} /> Simpan Tanggal</>}
       </button>
     </div>
   );

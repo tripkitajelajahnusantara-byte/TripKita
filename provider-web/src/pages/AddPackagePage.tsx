@@ -12,13 +12,15 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  UploadCloud
+  UploadCloud,
+  LoaderCircle
 } from 'lucide-react';
 
 import { request, API_BASE_URL } from '../utils/api';
 import { PackageDateManager } from '../components/PackageDateManager';
 import { PROVINCES } from '../utils/locationData';
 import { OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
+import { useActionLock } from '../utils/useActionLock';
 
 /** Open Trip berangkat bersama pada jadwal tetap; tipe lain eksklusif per tanggal. */
 function isOpenTripType(tripType: string): boolean {
@@ -83,7 +85,9 @@ export const AddPackagePage: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [schedule, setSchedule] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Unggah foto dan simpan paket berbagi satu kunci: paket tidak boleh disimpan
+  // selagi foto masih diunggah (foto baru belum masuk payload), dan sebaliknya.
+  const { pending, isBusy, run } = useActionLock();
 
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
@@ -140,7 +144,7 @@ export const AddPackagePage: React.FC = () => {
     'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80',
     'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=400&q=80'
   ]);
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const isUploadingPhoto = pending === 'photos';
 
   const steps = [
     { id: 'info', label: 'Info Dasar' },
@@ -244,6 +248,7 @@ export const AddPackagePage: React.FC = () => {
 
   // Photos helper actions
   const triggerPhotoUpload = () => {
+    if (isBusy) return;
     if (packagePhotos.length >= 20) {
       alert('⚠️ Jumlah foto paket telah mencapai batas maksimal 20 foto.');
       return;
@@ -258,52 +263,56 @@ export const AddPackagePage: React.FC = () => {
     const maxFileSize = 2 * 1024 * 1024; // 2 MB
     const allowedExtensions = ['jpg', 'jpeg', 'png'];
     const newPhotos: string[] = [];
+    const input = e.target;
 
-    setIsUploadingPhoto(true);
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+    await run('photos', async () => {
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
 
-        if (packagePhotos.length + newPhotos.length >= 20) {
-          alert('⚠️ Jumlah foto paket telah mencapai batas maksimal 20 foto.');
-          break;
+          if (packagePhotos.length + newPhotos.length >= 20) {
+            alert('⚠️ Jumlah foto paket telah mencapai batas maksimal 20 foto.');
+            break;
+          }
+
+          const ext = file.name.split('.').pop()?.toLowerCase();
+          if (!ext || !allowedExtensions.includes(ext)) {
+            alert(`⚠️ Format file "${file.name}" tidak didukung. Hanya format JPG, JPEG, dan PNG yang diperbolehkan.`);
+            continue;
+          }
+
+          if (file.size > maxFileSize) {
+            alert(`⚠️ Ukuran foto "${file.name}" melebihi 2 MB (Ukuran: ${(file.size / (1024 * 1024)).toFixed(2)} MB). Harap unggah foto maksimal 2 MB.`);
+            continue;
+          }
+
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await request('/provider/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          if (res && res.documentPath) {
+            const baseUrl = API_BASE_URL.replace('/api/v1', '');
+            const fullPhotoUrl = res.documentPath.startsWith('http') 
+              ? res.documentPath 
+              : `${baseUrl}${res.documentPath}`;
+            newPhotos.push(fullPhotoUrl);
+          }
         }
-
-        const ext = file.name.split('.').pop()?.toLowerCase();
-        if (!ext || !allowedExtensions.includes(ext)) {
-          alert(`⚠️ Format file "${file.name}" tidak didukung. Hanya format JPG, JPEG, dan PNG yang diperbolehkan.`);
-          continue;
+      } catch (err: any) {
+        alert(newPhotos.length > 0
+          ? `${err.message || 'Gagal mengunggah foto'}. ${newPhotos.length} foto yang sudah terunggah tetap disimpan.`
+          : (err.message || 'Gagal mengunggah foto'));
+      } finally {
+        // Foto yang sudah berhasil diunggah sebelum terjadi kegagalan tetap
+        // ditambahkan, supaya provider tidak perlu mengunggah ulang semuanya.
+        if (newPhotos.length > 0) {
+          setPackagePhotos(prev => [...prev, ...newPhotos]);
         }
-
-        if (file.size > maxFileSize) {
-          alert(`⚠️ Ukuran foto "${file.name}" melebihi 2 MB (Ukuran: ${(file.size / (1024 * 1024)).toFixed(2)} MB). Harap unggah foto maksimal 2 MB.`);
-          continue;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await request('/provider/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        if (res && res.documentPath) {
-          const baseUrl = API_BASE_URL.replace('/api/v1', '');
-          const fullPhotoUrl = res.documentPath.startsWith('http') 
-            ? res.documentPath 
-            : `${baseUrl}${res.documentPath}`;
-          newPhotos.push(fullPhotoUrl);
-        }
+        input.value = '';
       }
-
-      if (newPhotos.length > 0) {
-        setPackagePhotos(prev => [...prev, ...newPhotos]);
-      }
-    } catch (err: any) {
-      alert(err.message || 'Gagal mengunggah foto');
-    } finally {
-      setIsUploadingPhoto(false);
-      if (e.target) e.target.value = '';
-    }
+    });
   };
 
   const handleDeletePhoto = (idx: number) => {
@@ -311,7 +320,7 @@ export const AddPackagePage: React.FC = () => {
   };
 
   const handleSubmit = async (status: 'draft' | 'publish') => {
-    if (isSubmitting) return;
+    if (isBusy) return;
 
     const qMin = parseInt(quotaMin, 10);
     const qMax = parseInt(quotaMax, 10);
@@ -379,56 +388,55 @@ export const AddPackagePage: React.FC = () => {
       }
     }
 
-    setIsSubmitting(true);
-    try {
-      const dbStatus = status === 'draft' ? 'Draft' : 'Aktif';
-      const finalSchedule = schedule.trim() || (startDate && endDate ? `${startDate} s/d ${endDate} (${duration} Hari)` : 'Jadwal Fleksibel');
+    await run(status, async () => {
+      try {
+        const dbStatus = status === 'draft' ? 'Draft' : 'Aktif';
+        const finalSchedule = schedule.trim() || (startDate && endDate ? `${startDate} s/d ${endDate} (${duration} Hari)` : 'Jadwal Fleksibel');
 
-      const payload = {
-        name: packageName,
-        destination: location,
-        meetingPoint: meetPoint,
-        category: category,
-        tripType: tripType,
-        price: parseInt(price, 10) || 0,
-        quotaMin: Number.isFinite(qMin) ? qMin : 0,
-        quotaMax: Number.isFinite(qMax) ? qMax : 0,
-        startDate: startDate,
-        endDate: endDate,
-        schedule: finalSchedule,
-        duration: parseInt(duration, 10) || 1,
-        minGuests: Number.isFinite(minG) ? minG : 0,
-        maxGuests: Number.isFinite(maxG) ? maxG : 0,
-        minAge: parseInt(minAge, 10) || 0,
-        maxAge: parseInt(maxAge, 10) || 0,
-        status: dbStatus,
-        description: description,
-        includedFacilities: includedFacilities.join('\n'),
-        excludedFacilities: excludedFacilities.join('\n'),
-        itinerary: JSON.stringify(itineraries),
-        image: packagePhotos[0] || '',
-        images: packagePhotos.join(','),
-      };
+        const payload = {
+          name: packageName,
+          destination: location,
+          meetingPoint: meetPoint,
+          category: category,
+          tripType: tripType,
+          price: parseInt(price, 10) || 0,
+          quotaMin: Number.isFinite(qMin) ? qMin : 0,
+          quotaMax: Number.isFinite(qMax) ? qMax : 0,
+          startDate: startDate,
+          endDate: endDate,
+          schedule: finalSchedule,
+          duration: parseInt(duration, 10) || 1,
+          minGuests: Number.isFinite(minG) ? minG : 0,
+          maxGuests: Number.isFinite(maxG) ? maxG : 0,
+          minAge: parseInt(minAge, 10) || 0,
+          maxAge: parseInt(maxAge, 10) || 0,
+          status: dbStatus,
+          description: description,
+          includedFacilities: includedFacilities.join('\n'),
+          excludedFacilities: excludedFacilities.join('\n'),
+          itinerary: JSON.stringify(itineraries),
+          image: packagePhotos[0] || '',
+          images: packagePhotos.join(','),
+        };
 
-      if (editingPackageId) {
-        await request(`/provider/packages/${editingPackageId}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
-        alert(status === 'draft' ? `Draf paket "${packageName}" berhasil diperbarui.` : `Paket "${packageName}" berhasil dipublikasikan.`);
-      } else {
-        await request('/provider/packages', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-        alert(status === 'draft' ? `Draf paket "${packageName}" berhasil dibuat.` : `Paket "${packageName}" berhasil dipublikasikan.`);
+        if (editingPackageId) {
+          await request(`/provider/packages/${editingPackageId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          });
+          alert(status === 'draft' ? `Draf paket "${packageName}" berhasil diperbarui.` : `Paket "${packageName}" berhasil dipublikasikan.`);
+        } else {
+          await request('/provider/packages', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          alert(status === 'draft' ? `Draf paket "${packageName}" berhasil dibuat.` : `Paket "${packageName}" berhasil dipublikasikan.`);
+        }
+        navigateTo('kelola-paket');
+      } catch (err: any) {
+        alert(err.message || 'Gagal menyimpan paket wisata');
       }
-      navigateTo('kelola-paket');
-    } catch (err: any) {
-      alert(err.message || 'Gagal menyimpan paket wisata');
-    } finally {
-      setIsSubmitting(false);
-    }
+    });
   };
 
   return (
@@ -443,16 +451,34 @@ export const AddPackagePage: React.FC = () => {
               <ArrowLeft size={18} />
             </button>
             <div className="header-welcome">
-              <h1>Tambah Paket Wisata</h1>
-              <p>Lengkapi semua informasi paket dengan detail</p>
+              <h1>{editingPackageId ? 'Edit Paket Wisata' : 'Tambah Paket Wisata'}</h1>
+              <p>{editingPackageId ? 'Perbarui informasi paket wisata Anda' : 'Lengkapi semua informasi paket dengan detail'}</p>
             </div>
           </div>
           <div className="header-actions-row">
-            <button className="action-outline-btn" onClick={() => handleSubmit('draft')} disabled={isSubmitting}>
-              <Save size={14} /> {isSubmitting ? 'Menyimpan...' : 'Simpan Draft'}
+            {/* Kedua tombol terkunci selama ada proses (simpan maupun unggah foto);
+                indikator hanya tampil pada tombol yang diklik. */}
+            <button
+              className="action-outline-btn"
+              onClick={() => handleSubmit('draft')}
+              disabled={isBusy}
+              aria-busy={pending === 'draft'}
+              title={isUploadingPhoto ? 'Tunggu hingga unggah foto selesai' : undefined}
+            >
+              {pending === 'draft'
+                ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
+                : <><Save size={14} /> Simpan Draft</>}
             </button>
-            <button className="action-solid-btn" onClick={() => handleSubmit('publish')} disabled={isSubmitting}>
-              <Send size={14} /> {isSubmitting ? 'Memproses...' : 'Publikasikan'}
+            <button
+              className="action-solid-btn"
+              onClick={() => handleSubmit('publish')}
+              disabled={isBusy}
+              aria-busy={pending === 'publish'}
+              title={isUploadingPhoto ? 'Tunggu hingga unggah foto selesai' : undefined}
+            >
+              {pending === 'publish'
+                ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</>
+                : <><Send size={14} /> Publikasikan</>}
             </button>
           </div>
         </header>
@@ -927,9 +953,12 @@ export const AddPackagePage: React.FC = () => {
                   <div 
                     className="photos-upload-dropzone"
                     onClick={triggerPhotoUpload}
-                    style={{ borderColor: packagePhotos.length < 3 ? '#fecaca' : undefined }}
+                    aria-busy={isUploadingPhoto}
+                    style={{ borderColor: packagePhotos.length < 3 ? '#fecaca' : undefined, cursor: isBusy ? 'not-allowed' : undefined, opacity: isBusy && !isUploadingPhoto ? 0.6 : undefined }}
                   >
-                    <UploadCloud size={32} color="var(--color-accent)" />
+                    {isUploadingPhoto
+                      ? <LoaderCircle size={32} color="var(--color-accent)" className="btn-spinner" aria-hidden="true" />
+                      : <UploadCloud size={32} color="var(--color-accent)" />}
                     <div>
                       <strong>{isUploadingPhoto ? 'Mengunggah...' : 'Klik untuk Unggah Foto'}</strong>
                       <p>Format JPG, JPEG, PNG. Maksimal 2MB per foto (Batas: {packagePhotos.length}/20 foto).</p>

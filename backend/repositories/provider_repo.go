@@ -73,8 +73,12 @@ func (r *providerRepository) FindPublicByID(id uint) (*models.PublicProviderProf
 	return &profile, nil
 }
 
+// Update menyimpan data profil. Status akun, verifikasi, dan potongan platform
+// hanya boleh diubah admin melalui update terarah, jadi kolom tersebut tidak
+// ikut disimpan: salinan lama yang dibaca sebelum admin menyetujui tidak boleh
+// mengembalikan akun ke PENDING.
 func (r *providerRepository) Update(provider *models.Provider) error {
-	return r.db.Save(provider).Error
+	return r.db.Omit("status", "is_verified", "verification_notes", "platform_fee_percent").Save(provider).Error
 }
 
 func (r *providerRepository) FindAllProviders() ([]models.Provider, error) {

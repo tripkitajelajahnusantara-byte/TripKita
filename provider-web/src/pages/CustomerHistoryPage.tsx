@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { fetchCheckoutConfig } from '../utils/checkoutConfig';
-import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, MessageSquare, Star } from 'lucide-react';
+import { useActionLock } from '../utils/useActionLock';
+import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, MessageSquare, Star, LoaderCircle } from 'lucide-react';
 
 interface BookingItem {
   id: number;
@@ -135,15 +136,35 @@ export const CustomerHistoryPage: React.FC = () => {
 
   // Cancellation Modal state
   const [cancelConfirmBooking, setCancelConfirmBooking] = useState<any | null>(null);
-  const [cancellingLoading, setCancellingLoading] = useState(false);
+
+  // Satu kunci untuk semua aksi yang mengubah pesanan (batal, ulasan, jawaban
+  // jadwal ulang). Kunci berbasis ref menahan klik ganda di tick yang sama,
+  // yang masih lolos bila hanya mengandalkan state loading.
+  const { pending, isBusy, run } = useActionLock();
+  const cancellingLoading = pending === 'cancel-booking';
+
+  const canCancelBooking = () => !!customerProfile && customerProfile.role === 'CUSTOMER';
+  const guestCancelMessage = 'Pembatalan booking tamu harus dilakukan melalui layanan pelanggan untuk verifikasi identitas.';
+
+  // Hak batal dicek sebelum modal dibuka; sebelumnya tamu baru ditolak setelah
+  // menekan "Ya, Batalkan" di modal konfirmasi.
+  const handleOpenCancel = (booking: any) => {
+    if (isBusy) return;
+    if (!canCancelBooking()) {
+      alert(guestCancelMessage);
+      return;
+    }
+    setCancelConfirmBooking(booking);
+  };
 
   const handleConfirmCancel = async (bookingToCancel: any) => {
-	if (!bookingToCancel) return;
-	if (!customerProfile || customerProfile.role !== 'CUSTOMER') {
-	  alert('Pembatalan booking tamu harus dilakukan melalui layanan pelanggan untuk verifikasi identitas.');
+	if (isBusy || !bookingToCancel) return;
+	if (!canCancelBooking()) {
+	  alert(guestCancelMessage);
+	  setCancelConfirmBooking(null);
 	  return;
 	}
-	setCancellingLoading(true);
+	await run('cancel-booking', async () => {
 	try {
 	  const cancelledBooking = await request(`/customer/bookings/${bookingToCancel.id}/cancel`, {
 		method: 'PUT',
@@ -175,9 +196,8 @@ export const CustomerHistoryPage: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to cancel booking:', err);
       alert('Gagal membatalkan pesanan: ' + (err.message || 'Terjadi kesalahan sistem'));
-    } finally {
-      setCancellingLoading(false);
     }
+	});
   };
 
 	const handleExpireBooking = (_bId: string | number) => {
@@ -272,8 +292,12 @@ export const CustomerHistoryPage: React.FC = () => {
     }
   }, [bookings]);
 
+  const sendingReview = pending === 'send-review';
+
   const handleSendReview = async () => {
-    if (!selectedReviewBooking) return;
+    // Tanpa kunci, klik ganda mengirim dua POST ulasan untuk booking yang sama.
+    if (isBusy || !selectedReviewBooking) return;
+    await run('send-review', async () => {
     try {
       await request('/customer/reviews', {
         method: 'POST',
@@ -297,19 +321,19 @@ export const CustomerHistoryPage: React.FC = () => {
         isError: true
       });
     }
+    });
   };
 
   // Jawaban pelanggan atas tanggal pengganti yang ditawarkan penyelenggara saat
   // kuota minimal open trip tidak terpenuhi pada H-3.
-  const [rescheduleSubmitting, setRescheduleSubmitting] = useState<number | null>(null);
-
   const handleRescheduleResponse = async (bookingId: number, accept: boolean) => {
+    if (isBusy) return;
     const confirmText = accept
       ? 'Terima tanggal pengganti ini? Jadwal trip Anda akan diperbarui.'
       : 'Tolak tanggal pengganti ini? Pesanan Anda akan diteruskan ke proses pengembalian dana penuh.';
     if (!window.confirm(confirmText)) return;
 
-    setRescheduleSubmitting(bookingId);
+    await run(`reschedule-${bookingId}-${accept ? 'accept' : 'reject'}`, async () => {
     try {
       const result = await request(`/customer/bookings/${bookingId}/reschedule-response`, {
         method: 'POST',
@@ -318,7 +342,9 @@ export const CustomerHistoryPage: React.FC = () => {
       setModalNotice({
         title: accept ? 'Jadwal Pengganti Diterima' : 'Jadwal Pengganti Ditolak',
         message: result?.message || 'Jawaban Anda telah tersimpan.',
-        isError: !accept,
+        // Menolak jadwal pengganti adalah pilihan yang sah (diteruskan ke
+        // refund), bukan kegagalan, jadi ditampilkan sebagai konfirmasi biasa.
+        isError: false,
       });
       await fetchHistory();
     } catch (err: any) {
@@ -327,9 +353,8 @@ export const CustomerHistoryPage: React.FC = () => {
         message: err?.message || 'Jawaban Anda tidak dapat disimpan. Silakan coba lagi.',
         isError: true,
       });
-    } finally {
-      setRescheduleSubmitting(null);
     }
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -697,19 +722,21 @@ export const CustomerHistoryPage: React.FC = () => {
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                         <button
                           type="button"
-                          disabled={rescheduleSubmitting === booking.id}
+                          disabled={isBusy}
+                          aria-busy={pending === `reschedule-${booking.id}-accept`}
                           onClick={() => handleRescheduleResponse(booking.id, true)}
-                          style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: rescheduleSubmitting === booking.id ? 'wait' : 'pointer' }}
+                          style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: isBusy ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                         >
-                          Terima Jadwal Pengganti
+                          {pending === `reschedule-${booking.id}-accept` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Mengirim...</> : 'Terima Jadwal Pengganti'}
                         </button>
                         <button
                           type="button"
-                          disabled={rescheduleSubmitting === booking.id}
+                          disabled={isBusy}
+                          aria-busy={pending === `reschedule-${booking.id}-reject`}
                           onClick={() => handleRescheduleResponse(booking.id, false)}
-                          style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1.5px solid #fca5a5', padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: rescheduleSubmitting === booking.id ? 'wait' : 'pointer' }}
+                          style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1.5px solid #fca5a5', padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: isBusy ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                         >
-                          Tolak & Minta Refund
+                          {pending === `reschedule-${booking.id}-reject` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Mengirim...</> : 'Tolak & Minta Refund'}
                         </button>
                       </div>
                     </div>
@@ -782,7 +809,8 @@ export const CustomerHistoryPage: React.FC = () => {
 
                           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                             <button
-                              onClick={() => setCancelConfirmBooking(booking)}
+                              onClick={() => handleOpenCancel(booking)}
+                              disabled={isBusy}
                               style={{
                                 padding: '10px 18px',
                                 backgroundColor: '#fee2e2',
@@ -985,6 +1013,7 @@ export const CustomerHistoryPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedReviewBooking(null)}
+                  disabled={sendingReview}
                   style={{ padding: '10px 18px', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
                 >
                   Batal
@@ -992,9 +1021,11 @@ export const CustomerHistoryPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleSendReview}
-                  style={{ padding: '10px 20px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
+                  disabled={isBusy}
+                  aria-busy={sendingReview}
+                  style={{ padding: '10px 20px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: sendingReview ? 'not-allowed' : 'pointer', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
-                  Kirim Ulasan
+                  {sendingReview ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Mengirim...</> : 'Kirim Ulasan'}
                 </button>
               </div>
             </div>
@@ -1124,7 +1155,8 @@ export const CustomerHistoryPage: React.FC = () => {
 
                 <button
                   onClick={() => handleConfirmCancel(cancelConfirmBooking)}
-                  disabled={cancellingLoading}
+                  disabled={isBusy}
+                  aria-busy={cancellingLoading}
                   style={{
                     padding: '12px',
                     backgroundColor: '#dc2626',
@@ -1134,10 +1166,14 @@ export const CustomerHistoryPage: React.FC = () => {
                     fontSize: '14px',
                     fontWeight: '700',
                     cursor: cancellingLoading ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
+                    boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
                   }}
                 >
-                  {cancellingLoading ? 'Membatalkan...' : 'Ya, Batalkan'}
+                  {cancellingLoading ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Membatalkan...</> : 'Ya, Batalkan'}
                 </button>
               </div>
             </div>

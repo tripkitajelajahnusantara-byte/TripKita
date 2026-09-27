@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
+import { useActionLock } from '../utils/useActionLock';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
 import type { TripPlan, TripChecklistItem, TripSavingsLog, PackageItem } from '../types';
 import { 
   Target, Calendar, Users, Wallet, CheckCircle2, Circle, Sparkles, Compass, 
-  Trash2, Save, Info, Plus, ArrowLeft, HeartHandshake, ShieldCheck, Edit3
+  Trash2, Save, Info, Plus, ArrowLeft, HeartHandshake, ShieldCheck, Edit3, LoaderCircle
 } from 'lucide-react';
 
 const getTodayIsoDate = () => {
@@ -189,6 +190,19 @@ export const CustomerTripPlannerPage: React.FC = () => {
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [plannerError, setPlannerError] = useState('');
 
+  // Satu kunci aksi untuk seluruh halaman: setiap perubahan mengirim PUT
+  // rencana utuh, jadi dua aksi paralel bisa saling menimpa. Dengan kunci ini
+  // aksi berikutnya baru jalan setelah state hasil aksi sebelumnya dirender.
+  const { pending, isBusy, run } = useActionLock();
+
+  // Penyimpanan per rencana yang sedang berjalan. Rencana baru masih ber-id
+  // lokal `plan_*` sehingga disimpan lewat POST; tanpa antrean ini dua
+  // panggilan berdekatan akan membuat dua rencana ganda di server.
+  const inFlightSavesRef = useRef(new Map<string, Promise<TripPlan>>());
+  // Setelah POST berhasil, id lokal dipetakan ke id server agar panggilan yang
+  // masih memegang objek lama (closure basi) melakukan PUT, bukan POST lagi.
+  const serverIdByLocalIdRef = useRef(new Map<string, string>());
+
   // Helper for customer identity
   // Load server plans and migrate an older device-only list once.
   useEffect(() => {
@@ -201,13 +215,25 @@ export const CustomerTripPlannerPage: React.FC = () => {
     setPlannerError('');
     request('/customer/trip-plans')
       .then(async (data: any) => {
+        // Effect yang sudah dibatalkan (unmount / StrictMode) tidak boleh ikut
+        // migrasi, karena effect penggantinya akan melakukannya sendiri.
+        if (cancelled) return;
         const remote = (Array.isArray(data) ? data : []).map(normalizeTripPlan);
         const saved = localStorage.getItem(storageKey);
         if (remote.length === 0 && saved) {
+          // Kunci dihapus sebelum POST pertama (sinkron dengan getItem di atas)
+          // sehingga effect lain yang berjalan bersamaan tidak memigrasikan
+          // data yang sama untuk kedua kalinya.
+          localStorage.removeItem(storageKey);
+          let pendingLegacy: any[] = [];
           try {
             const legacy = JSON.parse(saved);
             if (Array.isArray(legacy)) {
-              for (const item of legacy.slice(0, 10)) {
+              // Id numerik berarti data itu sudah berasal dari server; hanya
+              // rencana lokal lama yang perlu dibuat ulang.
+              pendingLegacy = legacy.slice(0, 10).filter((item) => !/^\d+$/.test(String(item?.id ?? '')));
+              while (pendingLegacy.length > 0) {
+                const item = pendingLegacy[0];
                 const normalized = normalizeTripPlan(item);
                 const created = await request('/customer/trip-plans', {
                   method: 'POST',
@@ -224,11 +250,16 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   }),
                 });
                 remote.push(normalizeTripPlan(created));
+                pendingLegacy = pendingLegacy.slice(1);
               }
-              localStorage.removeItem(storageKey);
             }
           } catch (error) {
             console.error('Gagal memigrasikan rencana trip lokal', error);
+            // Sisa rencana yang belum terkirim dikembalikan agar bisa dicoba
+            // lagi pada kunjungan berikutnya tanpa menduplikasi yang sudah masuk.
+            if (pendingLegacy.length > 0) {
+              localStorage.setItem(storageKey, JSON.stringify(pendingLegacy));
+            }
           }
         }
         if (cancelled) return;
@@ -247,12 +278,29 @@ export const CustomerTripPlannerPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [customerProfile?.id, storageKey]);
 
+  // Daftar rencana tidak lagi ditulis ke localStorage: kunci yang sama dibaca
+  // sebagai sumber migrasi, sehingga cache lama bisa "menghidupkan" kembali
+  // rencana yang sudah dihapus di perangkat lain dan membuatnya ganda.
   const cachePlans = (updatedPlans: TripPlan[]) => {
     setPlans(updatedPlans);
-    if (storageKey) localStorage.setItem(storageKey, JSON.stringify(updatedPlans));
   };
 
-  const persistPlan = async (plan: TripPlan): Promise<TripPlan> => {
+  const persistPlan = (plan: TripPlan): Promise<TripPlan> => {
+    const key = serverIdByLocalIdRef.current.get(plan.id) ?? plan.id;
+    // Penyimpanan untuk rencana yang sama diantrikan: panggilan kedua menunggu
+    // yang pertama selesai lalu memakai id server hasil POST tersebut.
+    const previous = inFlightSavesRef.current.get(key);
+    const next = (previous ? previous.catch(() => undefined) : Promise.resolve(undefined))
+      .then(() => sendPlan({ ...plan, id: serverIdByLocalIdRef.current.get(plan.id) ?? plan.id }));
+    inFlightSavesRef.current.set(key, next);
+    const cleanup = () => {
+      if (inFlightSavesRef.current.get(key) === next) inFlightSavesRef.current.delete(key);
+    };
+    next.then(cleanup, cleanup);
+    return next;
+  };
+
+  const sendPlan = async (plan: TripPlan): Promise<TripPlan> => {
     const isServerPlan = /^\d+$/.test(plan.id);
     const saved = normalizeTripPlan(await request(
       isServerPlan ? `/customer/trip-plans/${plan.id}` : '/customer/trip-plans',
@@ -269,9 +317,13 @@ export const CustomerTripPlannerPage: React.FC = () => {
         }),
       },
     ));
-    const withoutOldVersion = plans.filter((item) => item.id !== plan.id && item.id !== saved.id);
-    const updated = [saved, ...withoutOldVersion].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    cachePlans(updated);
+    if (!isServerPlan) serverIdByLocalIdRef.current.set(plan.id, saved.id);
+    // Updater fungsional agar hasil dua penyimpanan berurutan tidak saling
+    // menimpa daftar dari closure yang sudah basi.
+    setPlans((current) => {
+      const withoutOldVersion = current.filter((item) => item.id !== plan.id && item.id !== saved.id);
+      return [saved, ...withoutOldVersion].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    });
     setActivePlan(saved);
     return saved;
   };
@@ -414,39 +466,48 @@ export const CustomerTripPlannerPage: React.FC = () => {
 
   // Permanently Save Active Plan (Step 2 Bottom Action)
   const handleSavePlanPermanent = async () => {
-    if (!activePlan) return;
+    if (isBusy || !activePlan) return;
     const finalPlan: TripPlan = {
       ...activePlan,
       status: 'SAVED',
       updatedAt: new Date().toISOString()
     };
-    try {
-      const saved = await persistPlan(finalPlan);
-      alert(`Rencana trip ke "${saved.destination}" berhasil disimpan. Email dan notifikasi konfirmasi telah diproses.`);
-      setViewState('LIST');
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Rencana trip gagal disimpan.');
-    }
+    await run('save-plan', async () => {
+      try {
+        const saved = await persistPlan(finalPlan);
+        alert(`Rencana trip ke "${saved.destination}" berhasil disimpan. Email dan notifikasi konfirmasi telah diproses.`);
+        setViewState('LIST');
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Rencana trip gagal disimpan.');
+      }
+    });
   };
 
   // Batalkan Rencana Trip (Point 4: Confirms and deletes/cancels plan)
   const handleCancelPlan = async () => {
+    // Dicek sebelum confirm agar dialog tidak muncul saat penyimpanan lain
+    // masih berjalan (hasilnya bisa membuat ulang rencana yang dihapus).
+    if (isBusy) return;
     if (!activePlan) {
       if (plans.length > 0) setViewState('LIST');
       else handleStartNewPlan();
       return;
     }
 
-    if (window.confirm(`Apakah Anda yakin ingin membatalkan rencana trip ke "${activePlan.destination}"? Tindakan ini akan menghapus semua data yang sudah diisi.`)) {
+    if (!window.confirm(`Apakah Anda yakin ingin membatalkan rencana trip ke "${activePlan.destination}"? Tindakan ini akan menghapus semua data yang sudah diisi.`)) {
+      return;
+    }
+    const planToCancel = activePlan;
+    await run('cancel-plan', async () => {
       try {
-        if (/^\d+$/.test(activePlan.id)) {
-          await request(`/customer/trip-plans/${activePlan.id}`, { method: 'DELETE' });
+        if (/^\d+$/.test(planToCancel.id)) {
+          await request(`/customer/trip-plans/${planToCancel.id}`, { method: 'DELETE' });
         }
       } catch (error) {
         alert(error instanceof Error ? error.message : 'Rencana trip gagal dihapus.');
         return;
       }
-      const filtered = plans.filter(p => p.id !== activePlan.id);
+      const filtered = plans.filter(p => p.id !== planToCancel.id);
       cachePlans(filtered);
 
       setActivePlan(null);
@@ -460,67 +521,77 @@ export const CustomerTripPlannerPage: React.FC = () => {
       } else {
         handleStartNewPlan();
       }
-    }
+    });
   };
 
   // Delete Plan from List
   const handleDeletePlanFromList = async (e: React.MouseEvent, planId: string, destName: string) => {
     e.stopPropagation();
+    if (isBusy) return;
     if (!window.confirm(`Apakah Anda yakin ingin menghapus rencana trip ke "${destName}"?`)) {
       return;
     }
 
-    try {
-      if (/^\d+$/.test(planId)) await request(`/customer/trip-plans/${planId}`, { method: 'DELETE' });
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Rencana trip gagal dihapus.');
-      return;
-    }
-    const filtered = plans.filter(p => p.id !== planId);
-    cachePlans(filtered);
+    await run(`delete-plan-${planId}`, async () => {
+      try {
+        if (/^\d+$/.test(planId)) await request(`/customer/trip-plans/${planId}`, { method: 'DELETE' });
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Rencana trip gagal dihapus.');
+        return;
+      }
+      const filtered = plans.filter(p => p.id !== planId);
+      cachePlans(filtered);
 
-    if (activePlan?.id === planId) {
-      setActivePlan(null);
-    }
+      if (activePlan?.id === planId) {
+        setActivePlan(null);
+      }
 
-    if (filtered.length === 0) {
-      handleStartNewPlan();
-    }
+      if (filtered.length === 0) {
+        handleStartNewPlan();
+      }
+    });
   };
 
   // Save active plan as DRAFT automatically when navigating to packages
   const autoSaveDraftAndNavigate = async (targetRoute: 'cari-trip' | 'paket-detail') => {
-    if (activePlan) {
-      const draftPlan: TripPlan = {
-        ...activePlan,
-        status: activePlan.status || 'DRAFT',
-        updatedAt: new Date().toISOString()
-      };
-      try {
-        await persistPlan(draftPlan);
-      } catch (error) {
-        alert(error instanceof Error ? error.message : 'Draft rencana trip gagal disimpan.');
-        return;
+    if (isBusy) return;
+    await run('navigate', async () => {
+      if (activePlan) {
+        const draftPlan: TripPlan = {
+          ...activePlan,
+          status: activePlan.status || 'DRAFT',
+          updatedAt: new Date().toISOString()
+        };
+        try {
+          await persistPlan(draftPlan);
+        } catch (error) {
+          alert(error instanceof Error ? error.message : 'Draft rencana trip gagal disimpan.');
+          return;
+        }
       }
-    }
-    navigateTo(targetRoute);
+      navigateTo(targetRoute);
+    });
   };
 
   const handleBackToPlanList = async () => {
+    if (isBusy) return;
     if (!activePlan) {
       setViewState('LIST');
       return;
     }
-    try {
-      await persistPlan({
-        ...activePlan,
-        status: /^\d+$/.test(activePlan.id) ? (activePlan.status || 'SAVED') : 'DRAFT',
-        updatedAt: new Date().toISOString(),
-      });
-      setViewState('LIST');
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Draft rencana trip gagal disimpan.');
-    }
+    const planToSave = activePlan;
+    await run('back-to-list', async () => {
+      try {
+        await persistPlan({
+          ...planToSave,
+          status: /^\d+$/.test(planToSave.id) ? (planToSave.status || 'SAVED') : 'DRAFT',
+          updatedAt: new Date().toISOString(),
+        });
+        setViewState('LIST');
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Draft rencana trip gagal disimpan.');
+      }
+    });
   };
 
   // Add or Edit Savings Log (Point 3)
@@ -539,7 +610,9 @@ export const CustomerTripPlannerPage: React.FC = () => {
 
   const handleSaveSavings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activePlan) return;
+    // Setiap perubahan mengirim PUT rencana utuh; submit kedua saat yang pertama
+    // belum selesai akan menimpa hasilnya atau mencatat tabungan dua kali.
+    if (isBusy || !activePlan) return;
     const amount = parseInt(savingsInput.replace(/\D/g, ''), 10);
     if (isNaN(amount) || amount <= 0) {
       alert('Masukkan nominal tabungan yang valid.');
@@ -570,18 +643,20 @@ export const CustomerTripPlannerPage: React.FC = () => {
       updatedAt: new Date().toISOString()
     };
 
-    if (!(await persistPlanChange(updatedPlan))) return;
+    await run('save-savings', async () => {
+      if (!(await persistPlanChange(updatedPlan))) return;
 
-    setShowSavingsModal(false);
-    setSavingsInput('');
-    setSavingsNote('');
-    setEditingLogId(null);
+      setShowSavingsModal(false);
+      setSavingsInput('');
+      setSavingsNote('');
+      setEditingLogId(null);
+    });
   };
 
   // Delete Savings Log (Point 3)
   const handleDeleteSavingsLog = async (e: React.MouseEvent, logId: string) => {
     e.stopPropagation();
-    if (!activePlan) return;
+    if (isBusy || !activePlan) return;
     if (!window.confirm('Apakah Anda yakin ingin menghapus catatan tabungan ini?')) return;
 
     const updatedLogs = activePlan.savingsLogs.filter(l => l.id !== logId);
@@ -594,7 +669,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
       updatedAt: new Date().toISOString()
     };
 
-    await persistPlanChange(updatedPlan);
+    await run(`delete-log-${logId}`, () => persistPlanChange(updatedPlan));
   };
 
   // Toggle Manual Checklist Item (1,2,3,4,5 show automated info modal)
@@ -622,17 +697,20 @@ export const CustomerTripPlannerPage: React.FC = () => {
       return;
     }
 
+    // Info item otomatis di atas tetap boleh dibuka; hanya perubahan data yang
+    // menunggu aksi sebelumnya selesai.
+    if (isBusy) return;
     const updatedChecklist = activePlan.checklist.map(item =>
       item.id === id ? { ...item, completed: !item.completed } : item
     );
     const updatedPlan: TripPlan = { ...activePlan, checklist: updatedChecklist };
-    await persistPlanChange(updatedPlan);
+    await run(`toggle-checklist-${id}`, () => persistPlanChange(updatedPlan));
   };
 
   // Add Custom Checklist Item
   const handleAddChecklistItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activePlan || !newChecklistItem.trim()) return;
+    if (isBusy || !activePlan || !newChecklistItem.trim()) return;
     const newItem: TripChecklistItem = {
       id: `chk_${Date.now()}`,
       label: newChecklistItem.trim(),
@@ -642,33 +720,37 @@ export const CustomerTripPlannerPage: React.FC = () => {
       ...activePlan,
       checklist: [...activePlan.checklist, newItem]
     };
-    if (await persistPlanChange(updatedPlan)) setNewChecklistItem('');
+    await run('add-checklist', async () => {
+      if (await persistPlanChange(updatedPlan)) setNewChecklistItem('');
+    });
   };
 
   // Edit Manual Checklist Item (Point 3)
   const handleSaveEditChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activePlan || !editingChecklistId || !editingChecklistLabel.trim()) return;
+    if (isBusy || !activePlan || !editingChecklistId || !editingChecklistLabel.trim()) return;
 
     const updatedChecklist = activePlan.checklist.map(item =>
       item.id === editingChecklistId ? { ...item, label: editingChecklistLabel.trim() } : item
     );
     const updatedPlan: TripPlan = { ...activePlan, checklist: updatedChecklist };
-    if (await persistPlanChange(updatedPlan)) {
-      setEditingChecklistId(null);
-      setEditingChecklistLabel('');
-    }
+    await run('edit-checklist', async () => {
+      if (await persistPlanChange(updatedPlan)) {
+        setEditingChecklistId(null);
+        setEditingChecklistLabel('');
+      }
+    });
   };
 
   // Delete Manual Checklist Item (Point 3)
   const handleDeleteChecklistItem = async (e: React.MouseEvent, itemId: string) => {
     e.stopPropagation();
-    if (!activePlan) return;
+    if (isBusy || !activePlan) return;
     if (!window.confirm('Apakah Anda yakin ingin menghapus item checklist ini?')) return;
 
     const updatedChecklist = activePlan.checklist.filter(item => item.id !== itemId);
     const updatedPlan: TripPlan = { ...activePlan, checklist: updatedChecklist };
-    await persistPlanChange(updatedPlan);
+    await run(`delete-checklist-${itemId}`, () => persistPlanChange(updatedPlan));
   };
 
   // Calculate percentages
@@ -897,6 +979,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                             <button
                               onClick={(e) => handleDeletePlanFromList(e, p.id, p.destination)}
                               title="Hapus Rencana"
+                              disabled={isBusy}
+                              aria-busy={pending === `delete-plan-${p.id}`}
                               style={{
                                 backgroundColor: '#fef2f2',
                                 border: '1px solid #fecaca',
@@ -910,7 +994,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                                 gap: '4px'
                               }}
                             >
-                              <Trash2 size={15} color="#ef4444" />
+                              {pending === `delete-plan-${p.id}` ? <LoaderCircle size={15} className="btn-spinner" aria-hidden="true" /> : <Trash2 size={15} color="#ef4444" />}
                             </button>
                           </div>
                         </div>
@@ -1197,6 +1281,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
             <div style={{ marginBottom: '16px' }}>
               <button
                 onClick={handleBackToPlanList}
+                disabled={isBusy}
+                aria-busy={pending === 'back-to-list'}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -1209,7 +1295,9 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   gap: '6px'
                 }}
               >
-                <ArrowLeft size={16} /> &larr; Kembali ke Daftar Rencana Trip Saya
+                {pending === 'back-to-list'
+                  ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
+                  : <><ArrowLeft size={16} /> &larr; Kembali ke Daftar Rencana Trip Saya</>}
               </button>
             </div>
 
@@ -1404,6 +1492,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                             </button>
                             <button
                               onClick={(e) => handleDeleteChecklistItem(e, item.id)}
+                              disabled={isBusy}
+                              aria-busy={pending === `delete-checklist-${item.id}`}
                               title="Hapus item"
                               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#ef4444' }}
                             >
@@ -1434,6 +1524,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   />
                   <button
                     type="submit"
+                    disabled={isBusy}
+                    aria-busy={pending === 'add-checklist'}
                     style={{
                       backgroundColor: '#0f8b8d',
                       color: 'white',
@@ -1445,7 +1537,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       cursor: 'pointer'
                     }}
                   >
-                    Tambah
+                    {pending === 'add-checklist' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Tambah'}
                   </button>
                 </form>
               </div>
@@ -1496,6 +1588,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                           </button>
                           <button
                             onClick={(e) => handleDeleteSavingsLog(e, log.id)}
+                            disabled={isBusy}
+                            aria-busy={pending === `delete-log-${log.id}`}
                             title="Hapus Catatan"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#ef4444' }}
                           >
@@ -1517,9 +1611,11 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 </h3>
                 <button
                   onClick={() => autoSaveDraftAndNavigate('cari-trip')}
+                  disabled={isBusy}
+                  aria-busy={pending === 'navigate'}
                   style={{ background: 'none', border: 'none', color: '#0f8b8d', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}
                 >
-                  Lihat Semua Paket &gt;
+                  {pending === 'navigate' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : <>Lihat Semua Paket &gt;</>}
                 </button>
               </div>
 
@@ -1599,6 +1695,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <button
                   onClick={handleCancelPlan}
+                  disabled={isBusy}
+                  aria-busy={pending === 'cancel-plan'}
                   style={{
                     padding: '12px 20px',
                     borderRadius: '12px',
@@ -1610,11 +1708,13 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  Batalkan Rencana Trip
+                  {pending === 'cancel-plan' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Batalkan Rencana Trip'}
                 </button>
 
                 <button
                   onClick={handleSavePlanPermanent}
+                  disabled={isBusy}
+                  aria-busy={pending === 'save-plan'}
                   style={{
                     padding: '12px 24px',
                     borderRadius: '12px',
@@ -1630,7 +1730,9 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     gap: '8px'
                   }}
                 >
-                  <Save size={16} /> Simpan Rencana Trip
+                  {pending === 'save-plan'
+                    ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
+                    : <><Save size={16} /> Simpan Rencana Trip</>}
                 </button>
               </div>
             </div>
@@ -1706,6 +1808,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       setShowSavingsModal(false);
                       setEditingLogId(null);
                     }}
+                    disabled={pending === 'save-savings'}
                     style={{
                       padding: '10px 18px',
                       borderRadius: '12px',
@@ -1721,6 +1824,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   </button>
                   <button
                     type="submit"
+                    disabled={isBusy}
+                    aria-busy={pending === 'save-savings'}
                     style={{
                       padding: '10px 20px',
                       borderRadius: '12px',
@@ -1730,10 +1835,13 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       fontSize: '13px',
                       fontWeight: '800',
                       cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
                       boxShadow: '0 4px 12px rgba(15,139,141,0.25)'
                     }}
                   >
-                    Simpan Tabungan
+                    {pending === 'save-savings' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Simpan Tabungan'}
                   </button>
                 </div>
               </form>
@@ -1775,6 +1883,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setEditingChecklistId(null)}
+                    disabled={pending === 'edit-checklist'}
                     style={{
                       padding: '10px 18px',
                       borderRadius: '12px',
@@ -1790,6 +1899,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   </button>
                   <button
                     type="submit"
+                    disabled={isBusy}
+                    aria-busy={pending === 'edit-checklist'}
                     style={{
                       padding: '10px 20px',
                       borderRadius: '12px',
@@ -1798,10 +1909,13 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       color: '#ffffff',
                       fontSize: '13px',
                       fontWeight: '800',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px'
                     }}
                   >
-                    Simpan Perubahan
+                    {pending === 'edit-checklist' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Simpan Perubahan'}
                   </button>
                 </div>
               </form>

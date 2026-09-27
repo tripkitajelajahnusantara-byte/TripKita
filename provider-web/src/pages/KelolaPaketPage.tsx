@@ -10,13 +10,23 @@ import {
   XCircle, 
   Package, 
   Edit3, 
-  Eye, 
-  MoreHorizontal
+  Eye,
+  MoreHorizontal,
+  LoaderCircle
 } from 'lucide-react';
 import type { PackageItem } from '../types';
 import { request } from '../utils/api';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
+import { useActionLock } from '../utils/useActionLock';
+
+// Pilihan status di menu aksi. Status yang sedang berlaku disembunyikan agar
+// provider tidak mengirim perubahan yang tidak mengubah apa pun.
+const STATUS_OPTIONS: { value: 'Aktif' | 'Nonaktif' | 'Draft'; label: string; color: string }[] = [
+  { value: 'Aktif', label: 'Set Aktif', color: '#10b981' },
+  { value: 'Nonaktif', label: 'Set Nonaktif', color: '#64748b' },
+  { value: 'Draft', label: 'Set Draft', color: '#f59e0b' },
+];
 
 
 export const KelolaPaketPage: React.FC = () => {
@@ -27,6 +37,10 @@ export const KelolaPaketPage: React.FC = () => {
   const [packages, setPackages] = useState<PackageItem[]>([]);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
+  // Kunci aksi berformat `aksi:idPaket` sehingga baris yang sedang diproses
+  // bisa menampilkan indikator sendiri, sementara aksi lain tetap terkunci.
+  const { pending, isBusy, run } = useActionLock();
+  const pendingPackageId = pending ? pending.split(':')[1] : null;
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -71,15 +85,35 @@ export const KelolaPaketPage: React.FC = () => {
     loadPackages();
   }, [providerProfile]);
 
+  const handleStatusChange = async (id: string, status: string) => {
+    if (isBusy) return;
+    await run(`status-${status}:${id}`, async () => {
+      try {
+        await request(`/provider/packages/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ status })
+        });
+        await loadPackages();
+        setActiveMenuId(null);
+      } catch (err: any) {
+        alert(err.message || 'Gagal mengubah status');
+      }
+    });
+  };
+
   const handleAction = async (type: string, id: string) => {
     if (type === 'delete') {
+      if (isBusy) return;
       if (confirm('Apakah Anda yakin ingin menghapus paket ini?')) {
-        try {
-          await request(`/provider/packages/${id}`, { method: 'DELETE' });
-          loadPackages();
-        } catch (err: any) {
-          alert(err.message || 'Gagal menghapus paket');
-        }
+        await run(`delete:${id}`, async () => {
+          try {
+            await request(`/provider/packages/${id}`, { method: 'DELETE' });
+            await loadPackages();
+            setActiveMenuId(null);
+          } catch (err: any) {
+            alert(err.message || 'Gagal menghapus paket');
+          }
+        });
       }
     } else if (type === 'edit') {
       setEditingPackageId(id);
@@ -264,20 +298,27 @@ export const KelolaPaketPage: React.FC = () => {
                           <button className="action-btn" onClick={() => handleAction('view', pkg.id)} title="Lihat">
                             <Eye size={14} />
                           </button>
-                          <button 
-                            className={`action-btn ${activeMenuId === pkg.id ? 'active' : ''}`} 
+                          <button
+                            className={`action-btn ${activeMenuId === pkg.id ? 'active' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               setActiveMenuId(activeMenuId === pkg.id ? null : pkg.id);
                             }}
-                            title="Menu Aksi"
+                            title={pendingPackageId === pkg.id ? 'Sedang diproses...' : 'Menu Aksi'}
+                            aria-busy={pendingPackageId === pkg.id}
                           >
-                            <MoreHorizontal size={14} />
+                            {/* Indikator tetap terlihat di baris ini walau menu sudah tertutup. */}
+                            {pendingPackageId === pkg.id
+                              ? <LoaderCircle size={14} className="btn-spinner" aria-hidden="true" />
+                              : <MoreHorizontal size={14} />}
                           </button>
                           
                           {activeMenuId === pkg.id && (
-                            <div 
+                            <div
                               className="action-dropdown-menu animate-fade-in"
+                              // Klik di dalam menu tidak boleh diteruskan ke listener window
+                              // yang menutup menu, agar indikator proses tetap terlihat.
+                              onClick={(e) => e.stopPropagation()}
                               style={{
                                 position: 'absolute',
                                 right: '16px',
@@ -293,66 +334,29 @@ export const KelolaPaketPage: React.FC = () => {
                                 padding: '4px 0'
                               }}
                             >
-                              <button 
-                                onClick={async () => {
-                                  try {
-                                    await request(`/provider/packages/${pkg.id}`, {
-                                      method: 'PUT',
-                                      body: JSON.stringify({ status: 'Aktif' })
-                                    });
-                                    loadPackages();
-                                    setActiveMenuId(null);
-                                  } catch (err: any) {
-                                    alert(err.message || 'Gagal mengubah status');
-                                  }
-                                }}
-                                style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textAlign: 'left', color: '#10b981', background: 'transparent', border: 0, cursor: 'pointer' }}
-                              >
-                                Set Aktif
-                              </button>
-                              <button 
-                                onClick={async () => {
-                                  try {
-                                    await request(`/provider/packages/${pkg.id}`, {
-                                      method: 'PUT',
-                                      body: JSON.stringify({ status: 'Nonaktif' })
-                                    });
-                                    loadPackages();
-                                    setActiveMenuId(null);
-                                  } catch (err: any) {
-                                    alert(err.message || 'Gagal mengubah status');
-                                  }
-                                }}
-                                style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textAlign: 'left', color: '#64748b', background: 'transparent', border: 0, cursor: 'pointer' }}
-                              >
-                                Set Nonaktif
-                              </button>
-                              <button 
-                                onClick={async () => {
-                                  try {
-                                    await request(`/provider/packages/${pkg.id}`, {
-                                      method: 'PUT',
-                                      body: JSON.stringify({ status: 'Draft' })
-                                    });
-                                    loadPackages();
-                                    setActiveMenuId(null);
-                                  } catch (err: any) {
-                                    alert(err.message || 'Gagal mengubah status');
-                                  }
-                                }}
-                                style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textAlign: 'left', color: '#f59e0b', background: 'transparent', border: 0, cursor: 'pointer' }}
-                              >
-                                Set Draft
-                              </button>
+                              {STATUS_OPTIONS.filter(opt => opt.value !== pkg.status).map(opt => (
+                                <button
+                                  key={opt.value}
+                                  onClick={() => handleStatusChange(pkg.id, opt.value)}
+                                  disabled={isBusy}
+                                  aria-busy={pending === `status-${opt.value}:${pkg.id}`}
+                                  style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textAlign: 'left', color: opt.color, background: 'transparent', border: 0, cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                  {pending === `status-${opt.value}:${pkg.id}`
+                                    ? <><LoaderCircle size={12} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
+                                    : opt.label}
+                                </button>
+                              ))}
                               <hr style={{ border: 0, borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-                              <button 
-                                onClick={() => {
-                                  handleAction('delete', pkg.id);
-                                  setActiveMenuId(null);
-                                }}
-                                style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textAlign: 'left', color: '#ef4444', background: 'transparent', border: 0, cursor: 'pointer' }}
+                              <button
+                                onClick={() => handleAction('delete', pkg.id)}
+                                disabled={isBusy}
+                                aria-busy={pending === `delete:${pkg.id}`}
+                                style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textAlign: 'left', color: '#ef4444', background: 'transparent', border: 0, cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                               >
-                                Hapus
+                                {pending === `delete:${pkg.id}`
+                                  ? <><LoaderCircle size={12} className="btn-spinner" aria-hidden="true" /> Menghapus...</>
+                                  : 'Hapus'}
                               </button>
                             </div>
                           )}

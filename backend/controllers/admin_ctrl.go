@@ -1,10 +1,12 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"tripkita-provider/models"
 	"tripkita-provider/services"
@@ -43,7 +45,17 @@ func (ctrl *AdminController) UpdateProviderStatus(c *gin.Context) {
 	}
 
 	err = ctrl.service.UpdateProviderStatus(uint(id), req.Status, req.VerificationNotes)
-	if err != nil {
+	switch {
+	case errors.Is(err, services.ErrProviderStatusUnchanged):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	case errors.Is(err, services.ErrProviderRejectionReasonRequired):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "Provider tidak ditemukan"})
+		return
+	case err != nil:
 		respondInternalError(c, "memperbarui status provider", err)
 		return
 	}
@@ -128,8 +140,7 @@ func (ctrl *AdminController) VerifyProviderLegal(c *gin.Context) {
 	}
 
 	err = ctrl.service.VerifyProviderLegal(uint(id), req.Action, req.Reason)
-	if err != nil {
-		respondInternalError(c, "memverifikasi data legal provider", err)
+	if respondVerificationError(c, "memverifikasi data legal provider", err) {
 		return
 	}
 
@@ -157,10 +168,28 @@ func (ctrl *AdminController) VerifyProviderDocument(c *gin.Context) {
 	}
 
 	err = ctrl.service.VerifyProviderDocument(uint(id), req.DocType, req.Action, req.Reason)
-	if err != nil {
-		respondInternalError(c, "memverifikasi dokumen provider", err)
+	if respondVerificationError(c, "memverifikasi dokumen provider", err) {
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Provider document verification processed"})
+}
+
+// respondVerificationError memetakan penolakan bisnis verifikasi ke status 4xx
+// agar klik kedua atau data yang sudah berubah tampil sebagai pesan jelas,
+// bukan gangguan server. Mengembalikan true bila respons sudah dikirim.
+func respondVerificationError(c *gin.Context, operation string, err error) bool {
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, services.ErrNothingToVerify):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, services.ErrProviderRejectionReasonRequired):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "Provider tidak ditemukan"})
+	default:
+		respondInternalError(c, operation, err)
+	}
+	return true
 }

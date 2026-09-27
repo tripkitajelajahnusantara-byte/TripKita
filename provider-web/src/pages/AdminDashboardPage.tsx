@@ -17,11 +17,13 @@ import {
   Clock,
   ArrowRight,
   DollarSign,
-  Wallet
+  Wallet,
+  LoaderCircle
 } from 'lucide-react';
 import { getProtectedDocumentURL, request } from '../utils/api';
 import { NotificationCenter, type NotificationItem } from '../components/NotificationCenter';
 import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
+import { useActionLock } from '../utils/useActionLock';
 
 
 interface ProviderAdminData {
@@ -167,6 +169,11 @@ export const AdminDashboardPage: React.FC = () => {
   const [adminPayouts, setAdminPayouts] = useState<any[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(false);
 
+  // Satu kunci untuk semua aksi admin yang mengubah data (status provider,
+  // verifikasi, payout, nonaktifkan) agar klik berulang tidak mengirim
+  // permintaan ganda dan tombol lain tidak bisa dipakai selama proses berjalan.
+  const { pending: pendingAction, isBusy: actionBusy, run: runAction } = useActionLock();
+
   const fetchAdminPayouts = async () => {
     setPayoutLoading(true);
     try {
@@ -180,25 +187,35 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const handleProcessPayout = async (payoutId: number, status: 'APPROVED' | 'REJECTED') => {
+    if (actionBusy) return;
     const notesPrompt = window.prompt(`Masukkan catatan transfer/alasan (${status}):`, status === 'APPROVED' ? 'Pencairan disetujui' : 'Pengajuan ditolak');
     if (notesPrompt === null) return;
 
+    // Bukti dipilih sebelum kunci diambil: dialog file yang ditutup tanpa
+    // memilih tidak selalu memicu event, sehingga tidak boleh menahan kunci.
+    let proofFile: File | null = null;
+    if (status === 'APPROVED') {
+      proofFile = await new Promise<File | null>((resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/pdf,image/jpeg,image/png';
+        input.onchange = () => resolve(input.files?.[0] || null);
+        input.oncancel = () => resolve(null);
+        input.click();
+      });
+      if (!proofFile) {
+        setSuccessMsg('');
+        setError('Bukti transfer wajib dipilih sebelum payout disetujui.');
+        return;
+      }
+    }
+
+    await runAction(`payout-${payoutId}-${status}`, async () => {
     try {
       setError('');
       setSuccessMsg('');
       let proofPath = '';
-      if (status === 'APPROVED') {
-        const proofFile = await new Promise<File | null>((resolve) => {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = 'application/pdf,image/jpeg,image/png';
-          input.onchange = () => resolve(input.files?.[0] || null);
-          input.click();
-        });
-        if (!proofFile) {
-          setError('Bukti transfer wajib dipilih sebelum payout disetujui.');
-          return;
-        }
+      if (proofFile) {
         const formData = new FormData();
         formData.append('file', proofFile);
         const upload = await request('/admin/upload', { method: 'POST', body: formData });
@@ -214,10 +231,12 @@ export const AdminDashboardPage: React.FC = () => {
           ? 'Pencairan disetujui dan sedang diproses oleh layanan transfer.'
           : `Berhasil memproses pencairan dana (${result?.status || status}).`
       );
-      fetchAdminPayouts();
+      await fetchAdminPayouts();
     } catch (err: any) {
       setError(err.message || 'Gagal memproses pencairan.');
+      fetchAdminPayouts();
     }
+    });
   };
 
   // Notifikasi admin memakai navigasi internal dashboard, bukan route global.
@@ -295,7 +314,7 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const handleSubmitRefund = async () => {
-    if (!refundTarget) return;
+    if (!refundTarget || actionBusy) return;
     const amount = Number(refundForm.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       setRefundError('Nominal yang dikembalikan wajib diisi.');
@@ -310,6 +329,7 @@ export const AdminDashboardPage: React.FC = () => {
       return;
     }
 
+    await runAction(`refund-${refundTarget.id}`, async () => {
     setRefundSubmitting(true);
     try {
       setRefundError('');
@@ -329,9 +349,12 @@ export const AdminDashboardPage: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to complete refund:', err);
       setRefundError(err.message || 'Gagal memproses refund.');
+      // Refund mungkin sudah selesai oleh proses lain; tampilkan status terbaru.
+      fetchRefunds();
     } finally {
       setRefundSubmitting(false);
     }
+    });
   };
 
   const openRefundForm = (refund: any) => {
@@ -404,12 +427,33 @@ export const AdminDashboardPage: React.FC = () => {
 
     // Alasan penolakan dikirim ke mitra sebagai notifikasi dan tersimpan di
     // riwayat status, jadi penolakan tanpa penjelasan tidak diterima.
+    if (actionBusy) return;
     if (status === 'REJECTED' && notesToSubmit.trim().length < 10) {
       setSuccessMsg('');
       setError('Isi "Catatan Admin" minimal 10 karakter sebagai alasan penolakan sebelum menolak provider.');
       return;
     }
 
+    const target = providers.find((p) => p.id === id) || selectedProvider;
+    if (status === 'APPROVED') {
+      const hasPendingReview = !!target && (
+        !!target.pendingKtpPath || !!target.pendingNibPath || !!target.pendingDocumentPath ||
+        !!target.pendingNpwpPath || !!target.pendingAktaPath || !!target.pendingSertifikatPath ||
+        target.legalVerificationStatus === 'PENDING'
+      );
+      const warning = hasPendingReview
+        ? '\n\nPerhatian: masih ada dokumen atau data legal/rekening yang menunggu verifikasi.'
+        : '';
+      if (!window.confirm(`Setujui ${target?.businessName || 'provider ini'}? Mitra akan menerima notifikasi dan dapat langsung beroperasi.${warning}`)) {
+        return;
+      }
+    } else if (status === 'PENDING') {
+      if (!window.confirm(`Nonaktifkan sementara ${target?.businessName || 'provider ini'}? Seluruh sesi login mitra diakhiri dan akses operasional ditutup sampai disetujui kembali.`)) {
+        return;
+      }
+    }
+
+    await runAction(`status-${status}`, async () => {
     try {
       setError('');
       setSuccessMsg('');
@@ -417,27 +461,31 @@ export const AdminDashboardPage: React.FC = () => {
         method: 'PUT',
         body: JSON.stringify({ status, verificationNotes: notesToSubmit }),
       });
-      setSuccessMsg(`Berhasil memperbarui status provider.`);
+      setSuccessMsg(
+        status === 'APPROVED' ? 'Provider berhasil disetujui.'
+          : status === 'REJECTED' ? 'Provider ditolak dan alasan telah dikirim ke mitra.'
+          : 'Provider dinonaktifkan sementara dan dikembalikan ke peninjauan.'
+      );
       
       // Refresh provider data
       const updatedProviders = await request('/admin/providers');
       setProviders(updatedProviders);
       
-      // Update selected provider details
+      // Perbarui detail hanya bila drawer provider ini masih terbuka.
       const found = updatedProviders.find((p: any) => p.id === id);
-      if (found) {
-        setSelectedProvider(found);
-      } else {
-        setSelectedProvider(null);
-      }
+      setSelectedProvider((current) => (current && current.id === id ? found || null : current));
     } catch (err: any) {
       console.error('Failed to update provider status:', err);
       setError(err.message || 'Gagal memperbarui status provider.');
+      // Status di server bisa sudah berubah (mis. 409 dari admin lain); muat
+      // ulang supaya tombol yang tampil sesuai status terbaru.
+      fetchProviders();
     }
+    });
   };
 
   const handleUpdatePlatformFee = async () => {
-    if (!selectedProvider) return;
+    if (!selectedProvider || savingPlatformFee) return;
 
     const numericPercent = Number(platformFeePercent);
     if (!/^\d{1,3}$/.test(platformFeePercent) || !Number.isInteger(numericPercent) || numericPercent < 1 || numericPercent > 100) {
@@ -468,10 +516,12 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const handleDeleteProvider = async (id: number) => {
+    if (actionBusy) return;
     if (!window.confirm('Nonaktifkan provider ini? Seluruh paket akan dinonaktifkan, sedangkan booking dan data keuangan tetap disimpan untuk audit.')) {
       return;
     }
 
+    await runAction('delete', async () => {
     try {
       setError('');
       setSuccessMsg('');
@@ -485,9 +535,11 @@ export const AdminDashboardPage: React.FC = () => {
       console.error('Failed to delete provider:', err);
       setError(err.message || 'Gagal menghapus provider.');
     }
+    });
   };
 
   const handleVerifyLegal = async (id: number, action: 'APPROVE' | 'REJECT') => {
+    if (actionBusy) return;
     let reason = '';
     if (action === 'REJECT') {
       const inputReason = window.prompt('Masukkan alasan penolakan data legal/rekening:');
@@ -503,6 +555,7 @@ export const AdminDashboardPage: React.FC = () => {
       }
     }
 
+    await runAction(`legal-${action}`, async () => {
     try {
       setError('');
       setSuccessMsg('');
@@ -516,14 +569,16 @@ export const AdminDashboardPage: React.FC = () => {
       const updatedProviders = await request('/admin/providers');
       setProviders(updatedProviders);
       const found = updatedProviders.find((p: any) => p.id === id);
-      if (found) setSelectedProvider(found);
+      if (found) setSelectedProvider((current) => (current && current.id === id ? found : current));
     } catch (err: any) {
       console.error('Failed to verify legal details:', err);
       setError(err.message || 'Gagal memproses verifikasi data legal.');
     }
+    });
   };
 
   const handleVerifyDocument = async (id: number, docType: string, action: 'APPROVE' | 'REJECT') => {
+    if (actionBusy) return;
     let reason = '';
     if (action === 'REJECT') {
       const inputReason = window.prompt(`Masukkan alasan penolakan dokumen ${docType.toUpperCase()}:`);
@@ -539,6 +594,7 @@ export const AdminDashboardPage: React.FC = () => {
       }
     }
 
+    await runAction(`doc-${docType}-${action}`, async () => {
     try {
       setError('');
       setSuccessMsg('');
@@ -552,11 +608,12 @@ export const AdminDashboardPage: React.FC = () => {
       const updatedProviders = await request('/admin/providers');
       setProviders(updatedProviders);
       const found = updatedProviders.find((p: any) => p.id === id);
-      if (found) setSelectedProvider(found);
+      if (found) setSelectedProvider((current) => (current && current.id === id ? found : current));
     } catch (err: any) {
       console.error('Failed to verify document:', err);
       setError(err.message || 'Gagal memproses verifikasi dokumen.');
     }
+    });
   };
 
   const renderAdminDocRow = (
@@ -628,15 +685,19 @@ export const AdminDashboardPage: React.FC = () => {
                 type="button"
                 style={{ flex: 1, padding: '5px', fontSize: '10px', fontWeight: 700, color: 'white', backgroundColor: '#10b981', border: 0, borderRadius: '4px', cursor: 'pointer' }}
                 onClick={() => handleVerifyDocument(selectedProvider!.id, docType, 'APPROVE')}
+                disabled={actionBusy}
+                aria-busy={pendingAction === `doc-${docType}-APPROVE`}
               >
-                Setujui
+                {pendingAction === `doc-${docType}-APPROVE` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Setujui'}
               </button>
               <button 
                 type="button"
                 style={{ flex: 1, padding: '5px', fontSize: '10px', fontWeight: 700, color: 'white', backgroundColor: '#ef4444', border: 0, borderRadius: '4px', cursor: 'pointer' }}
                 onClick={() => handleVerifyDocument(selectedProvider!.id, docType, 'REJECT')}
+                disabled={actionBusy}
+                aria-busy={pendingAction === `doc-${docType}-REJECT`}
               >
-                Tolak
+                {pendingAction === `doc-${docType}-REJECT` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Tolak'}
               </button>
             </div>
           </div>
@@ -932,7 +993,7 @@ export const AdminDashboardPage: React.FC = () => {
                           disabled={refundSubmitting}
                           style={{ width: 'auto', padding: '10px 18px', backgroundColor: '#0d9488' }}
                         >
-                          {refundSubmitting ? 'Menyimpan...' : 'Simpan Catatan Refund'}
+                          {refundSubmitting ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Simpan Catatan Refund'}
                         </button>
                       </div>
                     </div>
@@ -1082,19 +1143,23 @@ export const AdminDashboardPage: React.FC = () => {
                                 </td>
                                 <td>
                                   {isPending ? (
-                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                    <div className="payout-actions" style={{ display: 'flex', gap: '6px' }}>
                                       <button 
                                         className="approve-action-btn"
                                         onClick={() => handleProcessPayout(p.id, 'APPROVED')}
+                                        disabled={actionBusy}
+                                        aria-busy={pendingAction === `payout-${p.id}-APPROVED`}
                                         style={{ padding: '6px 10px', fontSize: '12px', width: 'auto', backgroundColor: '#0284c7' }}
                                       >
-                                        Setujui & Transfer
+                                        {pendingAction === `payout-${p.id}-APPROVED` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Setujui & Transfer'}
                                       </button>
                                       <button 
                                         onClick={() => handleProcessPayout(p.id, 'REJECTED')}
+                                        disabled={actionBusy}
+                                        aria-busy={pendingAction === `payout-${p.id}-REJECTED`}
                                         style={{ padding: '6px 10px', fontSize: '12px', width: 'auto', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '700' }}
                                       >
-                                        Tolak
+                                        {pendingAction === `payout-${p.id}-REJECTED` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Tolak'}
                                       </button>
                                     </div>
                                   ) : (
@@ -1423,7 +1488,7 @@ export const AdminDashboardPage: React.FC = () => {
                       onClick={handleUpdatePlatformFee}
                       disabled={savingPlatformFee || Number(platformFeePercent) === (selectedProvider.platformFeePercent || 15)}
                     >
-                      {savingPlatformFee ? 'Menyimpan...' : 'Simpan Potongan'}
+                      {savingPlatformFee ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Simpan Potongan'}
                     </button>
                   </div>
                 </div>
@@ -1492,16 +1557,20 @@ export const AdminDashboardPage: React.FC = () => {
                           className="action-btn approve-btn" 
                           style={{ padding: '6px 12px', fontSize: '11px', flex: 1, backgroundColor: '#10b981', color: 'white', border: 0, borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                           onClick={() => handleVerifyLegal(selectedProvider.id, 'APPROVE')}
+                          disabled={actionBusy}
+                          aria-busy={pendingAction === 'legal-APPROVE'}
                         >
-                          Setujui
+                          {pendingAction === 'legal-APPROVE' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Setujui'}
                         </button>
                         <button 
                           type="button"
                           className="action-btn reject-btn" 
                           style={{ padding: '6px 12px', fontSize: '11px', flex: 1, backgroundColor: '#ef4444', color: 'white', border: 0, borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                           onClick={() => handleVerifyLegal(selectedProvider.id, 'REJECT')}
+                          disabled={actionBusy}
+                          aria-busy={pendingAction === 'legal-REJECT'}
                         >
-                          Tolak
+                          {pendingAction === 'legal-REJECT' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Tolak'}
                         </button>
                       </div>
                     </div>
@@ -1620,24 +1689,24 @@ export const AdminDashboardPage: React.FC = () => {
                 <div className="drawer-actions-row">
                   {selectedProvider.status === 'PENDING' ? (
                     <>
-                      <button className="action-btn approve-btn" onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED')}>
-                        Approve Provider
+                      <button className="action-btn approve-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-APPROVED'} onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED')}>
+                        {pendingAction === 'status-APPROVED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyetujui...</> : 'Approve Provider'}
                       </button>
-                      <button className="action-btn reject-btn" onClick={() => handleUpdateStatus(selectedProvider.id, 'REJECTED')}>
-                        Reject Provider
+                      <button className="action-btn reject-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-REJECTED'} onClick={() => handleUpdateStatus(selectedProvider.id, 'REJECTED')}>
+                        {pendingAction === 'status-REJECTED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menolak...</> : 'Reject Provider'}
                       </button>
                     </>
                   ) : selectedProvider.status === 'APPROVED' ? (
-                    <button className="action-btn disable-btn" onClick={() => handleUpdateStatus(selectedProvider.id, 'PENDING', 'Verifikasi ditangguhkan oleh Administrator.')}>
-                      Disable Provider
+                    <button className="action-btn disable-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-PENDING'} onClick={() => handleUpdateStatus(selectedProvider.id, 'PENDING', 'Verifikasi ditangguhkan oleh Administrator.')}>
+                      {pendingAction === 'status-PENDING' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menonaktifkan...</> : 'Disable Provider'}
                     </button>
                   ) : (
-                    <button className="action-btn approve-btn" onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED', 'Mitra diaktifkan kembali oleh Administrator.')}>
-                      Approve Provider
+                    <button className="action-btn approve-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-APPROVED'} onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED', 'Mitra diaktifkan kembali oleh Administrator.')}>
+                      {pendingAction === 'status-APPROVED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyetujui...</> : 'Approve Provider'}
                     </button>
                   )}
-                  <button className="action-btn delete-btn" onClick={() => handleDeleteProvider(selectedProvider.id)}>
-                    Delete Provider
+                  <button className="action-btn delete-btn" disabled={actionBusy} aria-busy={pendingAction === 'delete'} onClick={() => handleDeleteProvider(selectedProvider.id)}>
+                    {pendingAction === 'delete' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menonaktifkan...</> : 'Delete Provider'}
                   </button>
                 </div>
 

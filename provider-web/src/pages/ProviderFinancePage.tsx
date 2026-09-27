@@ -14,8 +14,10 @@ import {
   TrendingUp,
   Lock,
   Download,
-  FileText
+  FileText,
+  LoaderCircle
 } from 'lucide-react';
+import { useActionLock } from '../utils/useActionLock';
 
 interface PayoutItem {
   id: number;
@@ -50,7 +52,9 @@ export const ProviderFinancePage: React.FC = () => {
   const { showAlert } = useCustomAlert();
   const [summary, setSummary] = useState<PayoutSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  // Pengajuan pencairan menyangkut uang: kunci berbasis ref mencegah klik ganda
+  // cepat membuat dua pengajuan sebelum state sempat ter-render ulang.
+  const { isBusy: submitting, run } = useActionLock();
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestType, setRequestType] = useState<'DP_50' | 'PELUNASAN_50'>('DP_50');
   const [modalNotice, setModalNotice] = useState<{ title: string; message: string; isError?: boolean } | null>(null);
@@ -113,7 +117,7 @@ export const ProviderFinancePage: React.FC = () => {
   const bankAccountName = providerProfile?.bankAccountName || '';
 
   const handleCreatePayoutRequest = async () => {
-    if (!summary) return;
+    if (submitting || !summary) return;
 
     if (!isBankConfigured) {
       setModalNotice({
@@ -137,32 +141,31 @@ export const ProviderFinancePage: React.FC = () => {
       return;
     }
 
-    setSubmitting(true);
-    try {
-      await request('/provider/payouts/request', {
-        method: 'POST',
-        body: JSON.stringify({
-          amount: reqAmount,
-          type: requestType
-        })
-      });
+    await run('payout', async () => {
+      try {
+        await request('/provider/payouts/request', {
+          method: 'POST',
+          body: JSON.stringify({
+            amount: reqAmount,
+            type: requestType
+          })
+        });
 
-      setShowRequestModal(false);
-      setModalNotice({
-        title: 'Pengajuan Berhasil Dikirim!',
-		message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan Akhir 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim. Setelah disetujui admin, transfer diproses ke rekening Mitra yang terdaftar.`
-      });
-      fetchSummary();
-    } catch (err: any) {
-      console.error(err);
-      setModalNotice({
-        title: 'Gagal Mengirim Pengajuan',
-        message: err.message || 'Terjadi kesalahan saat membuat pengajuan pencairan.',
-        isError: true
-      });
-    } finally {
-      setSubmitting(false);
-    }
+        setShowRequestModal(false);
+        setModalNotice({
+          title: 'Pengajuan Berhasil Dikirim!',
+          message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan Akhir 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim. Setelah disetujui admin, transfer diproses ke rekening Mitra yang terdaftar.`
+        });
+        fetchSummary();
+      } catch (err: any) {
+        console.error(err);
+        setModalNotice({
+          title: 'Gagal Mengirim Pengajuan',
+          message: err.message || 'Terjadi kesalahan saat membuat pengajuan pencairan.',
+          isError: true
+        });
+      }
+    });
   };
 
   return (
@@ -518,16 +521,19 @@ export const ProviderFinancePage: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <button
                 onClick={() => setShowRequestModal(false)}
-                style={{ padding: '12px', backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}
+                // Modal tidak boleh ditutup saat pengajuan masih diproses agar hasilnya tetap terlihat.
+                disabled={submitting}
+                style={{ padding: '12px', backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1 }}
               >
                 Batal
               </button>
               <button
                 onClick={handleCreatePayoutRequest}
                 disabled={submitting}
-                style={{ padding: '12px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)' }}
+                aria-busy={submitting}
+                style={{ padding: '12px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.75 : 1, boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
-                {submitting ? 'Mengirim...' : 'Ya, Ajukan Pencairan'}
+                {submitting ? (<><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Mengirim...</>) : 'Ya, Ajukan Pencairan'}
               </button>
             </div>
 

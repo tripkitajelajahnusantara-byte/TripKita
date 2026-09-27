@@ -14,9 +14,11 @@ import {
   AlertTriangle,
   FileCheck,
   Upload,
-  Clock
+  Clock,
+  LoaderCircle
 } from 'lucide-react';
 import { openProtectedDocument, request } from '../utils/api';
+import { useActionLock } from '../utils/useActionLock';
 
 interface DashboardStats {
   totalPackages: number;
@@ -44,6 +46,11 @@ export const ProfileProviderPage: React.FC = () => {
   const [reviews, setReviews] = useState<ProviderReview[]>([]);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  // Simpan profil dan unggah dokumen sama-sama memanggil updateProfile, jadi
+  // keduanya berbagi satu kunci agar tidak saling menimpa data profil.
+  const { pending, isBusy, run } = useActionLock();
+  const isSaving = pending === 'save';
+  const isUploading = pending === 'upload';
   const [activeModalTab, setActiveModalTab] = useState<'bisnis' | 'kontak' | 'legal'>('bisnis');
   const [editFields, setEditFields] = useState({
     businessName: '',
@@ -99,13 +106,16 @@ export const ProfileProviderPage: React.FC = () => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await updateProfile(editFields);
-      setIsEditModalOpen(false);
-      alert('Profil berhasil diperbarui!');
-    } catch (err: any) {
-      alert(err.message || 'Gagal memperbarui profil');
-    }
+    if (isBusy) return;
+    await run('save', async () => {
+      try {
+        await updateProfile(editFields);
+        setIsEditModalOpen(false);
+        alert('Profil berhasil diperbarui!');
+      } catch (err: any) {
+        alert(err.message || 'Gagal memperbarui profil');
+      }
+    });
   };
 
   const providerName = providerProfile?.businessName || 'Mitra TemenTrip';
@@ -138,9 +148,11 @@ export const ProfileProviderPage: React.FC = () => {
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [activeUploadField, setActiveUploadField] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
 
   const triggerUpload = (fieldName: string) => {
+    // Jangan membuka pemilih berkas baru selama unggahan lain masih berjalan,
+    // karena activeUploadField akan tertimpa dan dokumen masuk ke kolom yang salah.
+    if (isBusy) return;
     setActiveUploadField(fieldName);
     setTimeout(() => {
       fileInputRef.current?.click();
@@ -151,30 +163,32 @@ export const ProfileProviderPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const input = e.target;
     if (file.size > 5 * 1024 * 1024) {
       alert("Ukuran file melebihi batas maksimum 5MB");
+      // Reset agar memilih berkas yang sama lagi tetap memicu onChange.
+      input.value = '';
       return;
     }
 
     const formData = new FormData();
     formData.append('file', file);
 
-    setIsUploading(true);
-    try {
-      const res = await request('/provider/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (res && res.documentPath) {
-        await updateProfile({ [fieldName]: res.documentPath });
-        alert("Dokumen berhasil diunggah!");
+    await run('upload', async () => {
+      try {
+        const res = await request('/provider/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (res && res.documentPath) {
+          await updateProfile({ [fieldName]: res.documentPath });
+          alert("Dokumen berhasil diunggah!");
+        }
+      } catch (err: any) {
+        alert(err.message || "Gagal mengunggah dokumen");
       }
-    } catch (err: any) {
-      alert(err.message || "Gagal mengunggah dokumen");
-    } finally {
-      setIsUploading(false);
-      if (e.target) e.target.value = '';
-    }
+    });
+    input.value = '';
   };
 
   const formatDate = (date: Date) => {
@@ -192,14 +206,31 @@ export const ProfileProviderPage: React.FC = () => {
     const isApproved = status === 'APPROVED' || (!pendingPath && activePath && providerProfile?.status === 'APPROVED');
     const isPending = !!pendingPath || status === 'PENDING';
     const isRejected = status === 'REJECTED';
+    const isUploadingThis = isUploading && activeUploadField === fieldName;
+    // Tautan "Ganti" dinonaktifkan secara visual selama ada proses lain berjalan.
+    const replaceLinkStyle: React.CSSProperties = {
+      color: 'var(--color-text-medium)',
+      fontWeight: 600,
+      fontSize: '9px',
+      cursor: isBusy ? 'not-allowed' : 'pointer',
+      opacity: isBusy && !isUploadingThis ? 0.5 : 1,
+    };
+    const replaceLinkLabel = isUploadingThis ? 'Mengunggah...' : 'Ganti';
 
     if (!activePath && !pendingPath) {
       return (
-        <div className="doc-status-box upload-doc" onClick={() => triggerUpload(fieldName)}>
-          <Upload size={18} color="#94a3b8" />
+        <div
+          className="doc-status-box upload-doc"
+          onClick={() => triggerUpload(fieldName)}
+          aria-busy={isUploadingThis}
+          style={{ cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy && !isUploadingThis ? 0.6 : 1 }}
+        >
+          {isUploadingThis
+            ? <LoaderCircle size={18} color="#94a3b8" className="btn-spinner" aria-hidden="true" />
+            : <Upload size={18} color="#94a3b8" />}
           <div>
             <strong>{label}</strong>
-            <span style={{ color: '#94a3b8' }}>{isUploading && activeUploadField === fieldName ? 'Mengunggah...' : 'Belum Upload'}</span>
+            <span style={{ color: '#94a3b8' }}>{isUploadingThis ? 'Mengunggah...' : 'Belum Upload'}</span>
           </div>
         </div>
       );
@@ -215,7 +246,7 @@ export const ProfileProviderPage: React.FC = () => {
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
             <button type="button" disabled={!activePath} onClick={() => openProtectedDocument('provider', activePath || '').catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
-            <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
+            <span onClick={() => triggerUpload(fieldName)} aria-disabled={isBusy} style={replaceLinkStyle}>{replaceLinkLabel}</span>
           </div>
         </div>
       );
@@ -235,7 +266,7 @@ export const ProfileProviderPage: React.FC = () => {
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
             <button type="button" onClick={() => openProtectedDocument('provider', pendingPath || activePath || '').catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
             {activePath && (
-              <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
+              <span onClick={() => triggerUpload(fieldName)} aria-disabled={isBusy} style={replaceLinkStyle}>{replaceLinkLabel}</span>
             )}
           </div>
         </div>
@@ -259,7 +290,7 @@ export const ProfileProviderPage: React.FC = () => {
             {activePath && (
               <button type="button" onClick={() => openProtectedDocument('provider', activePath).catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
             )}
-            <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
+            <span onClick={() => triggerUpload(fieldName)} aria-disabled={isBusy} style={replaceLinkStyle}>{replaceLinkLabel}</span>
           </div>
         </div>
       );
@@ -640,7 +671,8 @@ export const ProfileProviderPage: React.FC = () => {
           <div className="modal-content animate-fade-in" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div className="modal-header" style={{ flexShrink: 0, marginBottom: '16px' }}>
               <h2>Edit Profil Provider</h2>
-              <button className="modal-close-btn" style={{ background: 'transparent', border: 0 }} onClick={() => setIsEditModalOpen(false)}>×</button>
+              {/* Modal tetap terbuka selama penyimpanan agar hasilnya tidak hilang. */}
+              <button className="modal-close-btn" style={{ background: 'transparent', border: 0, cursor: isSaving ? 'not-allowed' : 'pointer' }} onClick={() => setIsEditModalOpen(false)} disabled={isSaving}>×</button>
             </div>
             
             {/* Modal Tabs Header */}
@@ -905,8 +937,16 @@ export const ProfileProviderPage: React.FC = () => {
               )}
 
               <div className="modal-footer" style={{ flexShrink: 0, marginTop: '20px' }}>
-                <button type="button" className="cancel-btn" onClick={() => setIsEditModalOpen(false)}>Batal</button>
-                <button type="submit" className="save-btn">Simpan Perubahan</button>
+                <button type="button" className="cancel-btn" onClick={() => setIsEditModalOpen(false)} disabled={isSaving}>Batal</button>
+                <button
+                  type="submit"
+                  className="save-btn"
+                  disabled={isBusy}
+                  aria-busy={isSaving}
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy ? 0.75 : 1 }}
+                >
+                  {isSaving ? (<><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>) : 'Simpan Perubahan'}
+                </button>
               </div>
             </form>
           </div>

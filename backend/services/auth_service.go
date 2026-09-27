@@ -497,19 +497,25 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 	}
 
 	// 2. Data Legal & Rekening updates (Pending approval workflow)
-	legalChanged := false
-	if req.NPWP != "" && (req.NPWP != provider.NPWP || req.NPWP != provider.PendingNPWP || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
-		legalChanged = true
+	// Nilai dibandingkan dengan data yang sedang berlaku bagi mitra: pengajuan
+	// pending bila ada, selain itu data aktif. Membandingkan dengan keduanya
+	// sekaligus membuat setiap simpan profil mengembalikan verifikasi rekening
+	// yang sudah disetujui ke PENDING walau datanya tidak berubah.
+	legalNeedsReview := provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED"
+	legalFieldChanged := func(requested, pending, current string) bool {
+		if requested == "" {
+			return false
+		}
+		effective := current
+		if pending != "" {
+			effective = pending
+		}
+		return requested != effective || legalNeedsReview
 	}
-	if req.BankName != "" && (req.BankName != provider.BankName || req.BankName != provider.PendingBankName || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
-		legalChanged = true
-	}
-	if req.BankAccount != "" && (req.BankAccount != provider.BankAccount || req.BankAccount != provider.PendingBankAccount || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
-		legalChanged = true
-	}
-	if req.BankAccountName != "" && (req.BankAccountName != provider.BankAccountName || req.BankAccountName != provider.PendingBankAccountName || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
-		legalChanged = true
-	}
+	legalChanged := legalFieldChanged(req.NPWP, provider.PendingNPWP, provider.NPWP) ||
+		legalFieldChanged(req.BankName, provider.PendingBankName, provider.BankName) ||
+		legalFieldChanged(req.BankAccount, provider.PendingBankAccount, provider.BankAccount) ||
+		legalFieldChanged(req.BankAccountName, provider.PendingBankAccountName, provider.BankAccountName)
 
 	if legalChanged {
 		if req.NPWP != "" {

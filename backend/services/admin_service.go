@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"tripkita-provider/authn"
 	"tripkita-provider/models"
@@ -45,19 +46,27 @@ func (s *adminService) UpdateProviderPlatformFee(id uint, platformFeePercent int
 		return errors.New("potongan platform harus berupa angka bulat antara 1% dan 100%")
 	}
 
-	provider, err := s.repo.FindByID(id)
-	if err != nil {
-		return err
-	}
-	if provider.Role != "PROVIDER" {
-		return errors.New("potongan platform hanya dapat diatur untuk provider")
-	}
-	if provider.PlatformFeePercent == platformFeePercent {
+	// Update bersyarat di bawah kunci baris: permintaan kedua dengan nilai sama
+	// tidak mengubah apa pun sehingga notifikasi dan email tidak terkirim ganda.
+	var provider models.Provider
+	changed := false
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&provider, id).Error; err != nil {
+			return err
+		}
+		if provider.Role != "PROVIDER" {
+			return errors.New("potongan platform hanya dapat diatur untuk provider")
+		}
+		if provider.PlatformFeePercent == platformFeePercent {
+			return nil
+		}
+		if err := tx.Model(&provider).Update("platform_fee_percent", platformFeePercent).Error; err != nil {
+			return err
+		}
+		changed = true
 		return nil
-	}
-
-	provider.PlatformFeePercent = platformFeePercent
-	if err := s.repo.Update(provider); err != nil {
+	})
+	if err != nil || !changed {
 		return err
 	}
 
@@ -69,42 +78,28 @@ func (s *adminService) UpdateProviderPlatformFee(id uint, platformFeePercent int
 		}
 	}
 	if s.emailService != nil {
-		if err := s.emailService.SendProviderPlatformFeeChangedEmail(provider, platformFeePercent); err != nil {
+		if err := s.emailService.SendProviderPlatformFeeChangedEmail(&provider, platformFeePercent); err != nil {
 			log.Printf("[Email] Gagal memberi tahu provider %d tentang perubahan potongan: %v", provider.ID, err)
 		}
 	}
 	return nil
 }
 
+// ErrProviderStatusUnchanged dikembalikan ketika admin menyetel status yang
+// sudah berlaku, misalnya klik "Setujui" berulang kali. Menolaknya mencegah
+// riwayat dan notifikasi ganda untuk keputusan yang sama.
+var ErrProviderStatusUnchanged = errors.New("status provider sudah sesuai; tidak ada perubahan yang diproses")
+
+// ErrProviderRejectionReasonRequired memastikan mitra yang ditolak selalu tahu
+// apa yang harus diperbaiki tanpa membuat akun baru.
+var ErrProviderRejectionReasonRequired = errors.New("alasan penolakan wajib diisi")
+
 func (s *adminService) UpdateProviderStatus(id uint, status string, notes string) error {
-	provider, err := s.repo.FindByID(id)
-	if err != nil {
-		return err
+	notes = strings.TrimSpace(notes)
+	if status == "REJECTED" && notes == "" {
+		return ErrProviderRejectionReasonRequired
 	}
 
-	if provider.Role != "PROVIDER" {
-		return errors.New("cannot change status of non-provider account")
-	}
-
-	provider.Status = status
-	provider.VerificationNotes = notes
-	if status == "APPROVED" {
-		provider.IsVerified = true
-	} else {
-		provider.IsVerified = false
-	}
-
-	err = s.repo.Update(provider)
-	if err != nil {
-		return err
-	}
-	if status != "APPROVED" {
-		if err := authn.RevokeAllProviderSessions(context.Background(), s.db, id); err != nil {
-			return err
-		}
-	}
-
-	// Log status history transition
 	historyNotes := notes
 	if historyNotes == "" {
 		switch status {
@@ -117,21 +112,53 @@ func (s *adminService) UpdateProviderStatus(id uint, status string, notes string
 		}
 	}
 
-	history := &models.ProviderStatusHistory{
-		ProviderID: provider.ID,
-		Status:     status,
-		Notes:      historyNotes,
-		CreatedAt:  time.Now(),
+	// Baris provider dikunci agar dua permintaan bersamaan tidak sama-sama
+	// lolos pemeriksaan status lalu masing-masing mencatat riwayat dan notifikasi.
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var provider models.Provider
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&provider, id).Error; err != nil {
+			return err
+		}
+		if provider.Role != "PROVIDER" {
+			return errors.New("cannot change status of non-provider account")
+		}
+		isVerified := status == "APPROVED"
+		if provider.Status == status && provider.IsVerified == isVerified {
+			return ErrProviderStatusUnchanged
+		}
+
+		if err := tx.Model(&provider).Updates(map[string]interface{}{
+			"status":             status,
+			"verification_notes": notes,
+			"is_verified":        isVerified,
+		}).Error; err != nil {
+			return err
+		}
+		// Sesi dicabut dalam transaksi yang sama: bila gagal, status ikut batal
+		// sehingga admin dapat mengulang tanpa terbentur "status sudah sesuai".
+		if !isVerified {
+			if err := authn.RevokeAllProviderSessions(context.Background(), tx, id); err != nil {
+				return err
+			}
+		}
+		return tx.Create(&models.ProviderStatusHistory{
+			ProviderID: provider.ID,
+			Status:     status,
+			Notes:      historyNotes,
+			CreatedAt:  time.Now(),
+		}).Error
+	})
+	if err != nil {
+		return err
 	}
-	_ = s.repo.CreateStatusHistory(history)
 
 	// Keputusan admin harus sampai ke mitra. Tanpa ini, mitra yang ditolak atau
 	// disetujui hanya bisa mengetahuinya dengan mencoba login berulang kali.
 	if s.notifService != nil {
 		title, message := providerStatusNotification(status, historyNotes)
 		if title != "" {
-			if err := s.notifService.CreateNotification(provider.ID, "PROVIDER", title, message, NotifTypeAccount, "/provider/profil"); err != nil {
-				log.Printf("[Notifikasi] Gagal memberi tahu provider %d tentang status %s: %v", provider.ID, status, err)
+			if err := s.notifService.CreateNotification(id, "PROVIDER", title, message, NotifTypeAccount, "/provider/profil"); err != nil {
+				log.Printf("[Notifikasi] Gagal memberi tahu provider %d tentang status %s: %v", id, status, err)
 			}
 		}
 	}
@@ -172,113 +199,118 @@ func (s *adminService) GetProviderStatusHistory(providerID uint) ([]models.Provi
 	return s.repo.GetStatusHistory(providerID)
 }
 
+// ErrNothingToVerify dikembalikan bila tidak ada pengajuan yang menunggu
+// keputusan, misalnya klik "Setujui" kedua setelah pengajuan pertama selesai.
+var ErrNothingToVerify = errors.New("tidak ada pengajuan yang menunggu verifikasi; muat ulang data provider")
+
+func isApproveAction(action string) bool { return action == "APPROVED" || action == "APPROVE" }
+func isRejectAction(action string) bool  { return action == "REJECTED" || action == "REJECT" }
+
+// saveVerifiedProvider menyimpan hasil verifikasi pada baris yang sudah dikunci
+// tanpa menyentuh status akun yang dikelola UpdateProviderStatus.
+func saveVerifiedProvider(tx *gorm.DB, provider *models.Provider) error {
+	return tx.Omit("status", "is_verified", "verification_notes", "platform_fee_percent").Save(provider).Error
+}
+
 func (s *adminService) VerifyProviderLegal(id uint, action string, reason string) error {
-	provider, err := s.repo.FindByID(id)
-	if err != nil {
-		return err
+	reason = strings.TrimSpace(reason)
+	if isRejectAction(action) && reason == "" {
+		return ErrProviderRejectionReasonRequired
 	}
 
-	if action == "APPROVED" || action == "APPROVE" {
-		if provider.PendingNPWP != "" {
-			provider.NPWP = provider.PendingNPWP
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var provider models.Provider
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&provider, id).Error; err != nil {
+			return err
 		}
-		if provider.PendingBankName != "" {
-			provider.BankName = provider.PendingBankName
+		if provider.LegalVerificationStatus != "PENDING" {
+			return ErrNothingToVerify
 		}
-		if provider.PendingBankAccount != "" {
-			provider.BankAccount = provider.PendingBankAccount
-		}
-		if provider.PendingBankAccountName != "" {
-			provider.BankAccountName = provider.PendingBankAccountName
-		}
-		provider.LegalVerificationStatus = "APPROVED"
-		provider.LegalRejectionReason = ""
-		// Clear pending fields
-		provider.PendingNPWP = ""
-		provider.PendingBankName = ""
-		provider.PendingBankAccount = ""
-		provider.PendingBankAccountName = ""
-	} else if action == "REJECTED" || action == "REJECT" {
-		provider.LegalVerificationStatus = "REJECTED"
-		provider.LegalRejectionReason = reason
-	}
 
-	return s.repo.Update(provider)
+		if isApproveAction(action) {
+			if provider.PendingNPWP != "" {
+				provider.NPWP = provider.PendingNPWP
+			}
+			if provider.PendingBankName != "" {
+				provider.BankName = provider.PendingBankName
+			}
+			if provider.PendingBankAccount != "" {
+				provider.BankAccount = provider.PendingBankAccount
+			}
+			if provider.PendingBankAccountName != "" {
+				provider.BankAccountName = provider.PendingBankAccountName
+			}
+			provider.LegalVerificationStatus = "APPROVED"
+			provider.LegalRejectionReason = ""
+			provider.PendingNPWP = ""
+			provider.PendingBankName = ""
+			provider.PendingBankAccount = ""
+			provider.PendingBankAccountName = ""
+		} else if isRejectAction(action) {
+			provider.LegalVerificationStatus = "REJECTED"
+			provider.LegalRejectionReason = reason
+		}
+
+		return saveVerifiedProvider(tx, &provider)
+	})
+}
+
+// providerDocumentFields menunjuk kolom milik satu jenis dokumen sehingga
+// persetujuan dan penolakan memakai aturan yang sama untuk semua dokumen.
+func providerDocumentFields(p *models.Provider, docType string) (active, pending, status, rejection *string, ok bool) {
+	switch docType {
+	case "ktp":
+		return &p.KtpPath, &p.PendingKtpPath, &p.KtpStatus, &p.KtpRejectionReason, true
+	case "nib":
+		return &p.NibPath, &p.PendingNibPath, &p.NibStatus, &p.NibRejectionReason, true
+	case "siup":
+		return &p.DocumentPath, &p.PendingDocumentPath, &p.SiupStatus, &p.SiupRejectionReason, true
+	case "npwp":
+		return &p.NpwpPath, &p.PendingNpwpPath, &p.NpwpDocStatus, &p.NpwpDocRejectionReason, true
+	case "akta":
+		return &p.AktaPath, &p.PendingAktaPath, &p.AktaStatus, &p.AktaRejectionReason, true
+	case "sertifikat":
+		return &p.SertifikatPath, &p.PendingSertifikatPath, &p.SertifikatStatus, &p.SertifikatRejectionReason, true
+	}
+	return nil, nil, nil, nil, false
 }
 
 func (s *adminService) VerifyProviderDocument(id uint, docType string, action string, reason string) error {
-	provider, err := s.repo.FindByID(id)
-	if err != nil {
-		return err
+	reason = strings.TrimSpace(reason)
+	if isRejectAction(action) && reason == "" {
+		return ErrProviderRejectionReasonRequired
 	}
 
-	if action == "APPROVED" || action == "APPROVE" {
-		switch docType {
-		case "ktp":
-			if provider.PendingKtpPath != "" {
-				provider.KtpPath = provider.PendingKtpPath
-			}
-			provider.KtpStatus = "APPROVED"
-			provider.PendingKtpPath = ""
-			provider.KtpRejectionReason = ""
-		case "nib":
-			if provider.PendingNibPath != "" {
-				provider.NibPath = provider.PendingNibPath
-			}
-			provider.NibStatus = "APPROVED"
-			provider.PendingNibPath = ""
-			provider.NibRejectionReason = ""
-		case "siup":
-			if provider.PendingDocumentPath != "" {
-				provider.DocumentPath = provider.PendingDocumentPath
-			}
-			provider.SiupStatus = "APPROVED"
-			provider.PendingDocumentPath = ""
-			provider.SiupRejectionReason = ""
-		case "npwp":
-			if provider.PendingNpwpPath != "" {
-				provider.NpwpPath = provider.PendingNpwpPath
-			}
-			provider.NpwpDocStatus = "APPROVED"
-			provider.PendingNpwpPath = ""
-			provider.NpwpDocRejectionReason = ""
-		case "akta":
-			if provider.PendingAktaPath != "" {
-				provider.AktaPath = provider.PendingAktaPath
-			}
-			provider.AktaStatus = "APPROVED"
-			provider.PendingAktaPath = ""
-			provider.AktaRejectionReason = ""
-		case "sertifikat":
-			if provider.PendingSertifikatPath != "" {
-				provider.SertifikatPath = provider.PendingSertifikatPath
-			}
-			provider.SertifikatStatus = "APPROVED"
-			provider.PendingSertifikatPath = ""
-			provider.SertifikatRejectionReason = ""
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var provider models.Provider
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&provider, id).Error; err != nil {
+			return err
 		}
-	} else if action == "REJECTED" || action == "REJECT" {
-		switch docType {
-		case "ktp":
-			provider.KtpStatus = "REJECTED"
-			provider.KtpRejectionReason = reason
-		case "nib":
-			provider.NibStatus = "REJECTED"
-			provider.NibRejectionReason = reason
-		case "siup":
-			provider.SiupStatus = "REJECTED"
-			provider.SiupRejectionReason = reason
-		case "npwp":
-			provider.NpwpDocStatus = "REJECTED"
-			provider.NpwpDocRejectionReason = reason
-		case "akta":
-			provider.AktaStatus = "REJECTED"
-			provider.AktaRejectionReason = reason
-		case "sertifikat":
-			provider.SertifikatStatus = "REJECTED"
-			provider.SertifikatRejectionReason = reason
+		active, pending, status, rejection, ok := providerDocumentFields(&provider, docType)
+		if !ok {
+			return fmt.Errorf("jenis dokumen %q tidak dikenal", docType)
 		}
-	}
+		if *pending == "" && *status != "PENDING" {
+			return ErrNothingToVerify
+		}
 
-	return s.repo.Update(provider)
+		if isApproveAction(action) {
+			if *pending != "" {
+				*active = *pending
+			}
+			if *active == "" {
+				return ErrNothingToVerify
+			}
+			*status = "APPROVED"
+			*pending = ""
+			*rejection = ""
+		} else if isRejectAction(action) {
+			*status = "REJECTED"
+			*rejection = reason
+			// Berkas yang ditolak tidak lagi menunggu keputusan; mitra mengunggah ulang.
+			*pending = ""
+		}
+
+		return saveVerifiedProvider(tx, &provider)
+	})
 }
