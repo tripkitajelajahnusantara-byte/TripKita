@@ -32,6 +32,7 @@ interface PayoutItem {
 
 interface PayoutSummary {
   platformFeePercent: number;
+  serviceFee: number;
   totalEarnings: number;
   platformFee: number;
   netEarnings: number;
@@ -40,6 +41,7 @@ interface PayoutSummary {
   heldSettlement: number;
   totalPaidOut: number;
   pendingPayout: number;
+  providerDebt: number;
   payouts: PayoutItem[];
 }
 
@@ -224,7 +226,7 @@ export const ProviderFinancePage: React.FC = () => {
               {formatIDR(summary?.netEarnings || 0)}
             </strong>
             <span style={{ fontSize: '11.5px', color: '#16a34a', fontWeight: '600' }}>
-              Tarif booking baru {summary?.platformFeePercent || providerProfile?.platformFeePercent || 15}% + biaya layanan Rp5 ribu; transaksi lama mengikuti tarif saat dibuat
+              Tarif booking baru {summary?.platformFeePercent ?? providerProfile?.platformFeePercent ?? 0}% + biaya layanan {formatIDR(summary?.serviceFee ?? 0)}; transaksi lama mengikuti tarif saat dibuat
             </span>
           </div>
 
@@ -277,6 +279,18 @@ export const ProviderFinancePage: React.FC = () => {
           </div>
 
         </div>
+
+        {(summary?.providerDebt || 0) > 0 && (
+          <div style={{ backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: '14px', padding: '16px 18px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+            <AlertCircle size={20} color="#c2410c" style={{ flexShrink: 0, marginTop: '1px' }} />
+            <div>
+              <strong style={{ color: '#9a3412', display: 'block', marginBottom: '3px' }}>Penyesuaian saldo refund: {formatIDR(summary?.providerDebt || 0)}</strong>
+              <span style={{ color: '#7c2d12', fontSize: '13px', lineHeight: 1.5 }}>
+                Dana booking yang sebelumnya sudah dicairkan kemudian wajib direfund. Pendapatan berikutnya otomatis menutup penyesuaian ini sebelum saldo baru dapat diajukan.
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Action Banner: Request Payout & Destination Bank Info */}
         <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>

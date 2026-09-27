@@ -216,7 +216,7 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 	now := time.Now()
 
 	for _, b := range bookings {
-		if b.Status == "CONFIRMED" || b.Status == "PAID" || b.Status == "COMPLETED" {
+		if bookingGeneratesProviderEarning(b) {
 			split := models.SplitBookingEarning(b.TotalPrice, b.PlatformFeePercent)
 
 			grossOmset += b.TotalPrice
@@ -228,7 +228,7 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 
 			// Pelunasan hanya tersedia setelah waktu akhir perjalanan, bukan
 			// setelah 24 jam dari waktu mulai.
-			isFinished := tripHasEnded(b, now)
+			isFinished := settlementCanBePaid(b, now)
 			if isFinished {
 				pelunasanEligible += settlementAmount
 			} else {
@@ -237,8 +237,10 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 		}
 	}
 
-	var dpPaidOut int64
-	var pelunasanPaidOut int64
+	var dpReserved int64
+	var pelunasanReserved int64
+	var dpApproved int64
+	var pelunasanApproved int64
 	var totalPaidOut int64
 	var pendingPayout int64
 
@@ -246,6 +248,11 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 		switch p.Status {
 		case models.PayoutStatusApproved:
 			totalPaidOut += p.Amount
+			if p.Type == "DP_50" {
+				dpApproved += p.Amount
+			} else {
+				pelunasanApproved += p.Amount
+			}
 		case models.PayoutStatusPending, models.PayoutStatusProcessing:
 			// Dana sudah dipesan meski belum sampai ke rekening mitra.
 			pendingPayout += p.Amount
@@ -254,31 +261,34 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 			continue
 		}
 		if p.Type == "DP_50" {
-			dpPaidOut += p.Amount
+			dpReserved += p.Amount
 		} else {
-			pelunasanPaidOut += p.Amount
+			pelunasanReserved += p.Amount
 		}
 	}
 
-	availableDP := dpEligible - dpPaidOut
-	if availableDP < 0 {
-		availableDP = 0
-	}
-
-	availablePelunasan := pelunasanEligible - pelunasanPaidOut
-	if availablePelunasan < 0 {
-		availablePelunasan = 0
-	}
+	availableDP, availablePelunasan := calculatePayoutAvailability(
+		dpEligible, pelunasanEligible, dpReserved, pelunasanReserved,
+	)
 
 	ledger, err := GetLedgerBalance(database.DB, providerID)
 	if err != nil {
 		return nil, err
 	}
-	// Pengajuan PENDING sudah dipotong dari hak cair tetapi belum dari buku besar.
-	expectedAvailable := availableDP + availablePelunasan + pendingPayout
+	// Hanya payout APPROVED yang sudah benar-benar mengurangi buku besar.
+	// PENDING/PROCESSING memang mengurangi angka "bisa diajukan", tetapi belum
+	// mengurangi saldo atau menciptakan piutang provider.
+	expectedNetAvailable := dpEligible + pelunasanEligible - dpApproved - pelunasanApproved
+	expectedAvailable := expectedNetAvailable
+	expectedDebt := int64(0)
+	if expectedNetAvailable < 0 {
+		expectedAvailable = 0
+		expectedDebt = -expectedNetAvailable
+	}
 
 	return &models.PayoutSummary{
 		PlatformFeePercent: models.NormalizePlatformFeePercent(provider.PlatformFeePercent),
+		ServiceFee:         models.BookingServiceFee,
 		TotalEarnings:      grossOmset,
 		PlatformFee:        totalPlatformFee,
 		NetEarnings:        totalNetEarnings,
@@ -290,8 +300,49 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 		Payouts:            payouts,
 		LedgerAvailable:    ledger.Available,
 		LedgerHeld:         ledger.Held,
-		LedgerConsistent:   ledger.Available == expectedAvailable && ledger.Held == heldSettlement,
+		ProviderDebt:       ledger.Debt,
+		LedgerConsistent:   ledger.Available == expectedAvailable && ledger.Held == heldSettlement && ledger.Debt == expectedDebt,
 	}, nil
+}
+
+func bookingGeneratesProviderEarning(booking models.Booking) bool {
+	if booking.Status == models.StatusPaid || booking.Status == models.StatusConfirmed || booking.Status == models.StatusCompleted {
+		return true
+	}
+	// Pembatalan customer di bawah H-7 tidak memiliki refund. Seluruh hak
+	// provider tetap menjadi kompensasi dan harus tetap dapat dicairkan.
+	return booking.Status == models.StatusCancelledByCustomer && booking.RefundAmount == 0 && booking.PaidAt != nil
+}
+
+func settlementCanBePaid(booking models.Booking, now time.Time) bool {
+	if booking.Status == models.StatusCancelledByCustomer && booking.RefundAmount == 0 && booking.PaidAt != nil {
+		return true
+	}
+	return tripHasEnded(booking, now)
+}
+
+// calculatePayoutAvailability mengimbangi kekurangan satu tahap dengan hak
+// tahap lainnya. Ini penting ketika payout lama sudah dicairkan lalu booking
+// direfund: pendapatan baru tidak boleh terlihat dapat dicairkan sebelum piutang
+// provider dari transaksi lama tertutup.
+func calculatePayoutAvailability(dpEligible, settlementEligible, dpReserved, settlementReserved int64) (int64, int64) {
+	dp := dpEligible - dpReserved
+	settlement := settlementEligible - settlementReserved
+	if dp < 0 {
+		settlement += dp
+		dp = 0
+	}
+	if settlement < 0 {
+		dp += settlement
+		settlement = 0
+	}
+	if dp < 0 {
+		dp = 0
+	}
+	if settlement < 0 {
+		settlement = 0
+	}
+	return dp, settlement
 }
 
 func (s *payoutService) GetAllPayouts() ([]models.Payout, error) {
@@ -308,6 +359,10 @@ func (s *payoutService) ProcessPayout(payoutID uint, status string, notes string
 	automatic := s.cfg != nil && s.cfg.EnableAutoPayout && status == models.PayoutStatusApproved
 	if automatic {
 		return nil, errors.New("payout otomatis iPaymu belum boleh digunakan: API redirect/split payment tidak membuktikan transfer bank dua tahap; gunakan verifikasi dan bukti transfer admin")
+	}
+	proofPath = strings.TrimSpace(proofPath)
+	if status == models.PayoutStatusApproved && proofPath == "" {
+		return nil, errors.New("bukti transfer wajib diunggah sebelum payout dapat disetujui")
 	}
 
 	var payout models.Payout
@@ -521,32 +576,41 @@ func truncateText(value string, max int) string {
 
 func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error) {
 	var bookings []models.Booking
-	if err := tx.Where("provider_id = ? AND status IN ?", current.ProviderID, []string{"PAID", "CONFIRMED", "COMPLETED"}).Find(&bookings).Error; err != nil {
+	if err := tx.Where("provider_id = ?", current.ProviderID).Find(&bookings).Error; err != nil {
 		return 0, err
 	}
 
-	var eligible int64
+	var dpEligible, settlementEligible int64
 	now := time.Now()
 	for _, booking := range bookings {
+		if !bookingGeneratesProviderEarning(booking) {
+			continue
+		}
 		split := models.SplitBookingEarning(booking.TotalPrice, booking.PlatformFeePercent)
-		if current.Type == "DP_50" {
-			eligible += split.DPAmount
-		} else if tripHasEnded(booking, now) {
-			eligible += split.SettlementHeld
+		dpEligible += split.DPAmount
+		if settlementCanBePaid(booking, now) {
+			settlementEligible += split.SettlementHeld
 		}
 	}
 
-	var reserved int64
-	if err := tx.Model(&models.Payout{}).
-		Where("provider_id = ? AND type = ? AND id <> ? AND status IN ?", current.ProviderID, current.Type, current.ID, models.PayoutReservedStatuses).
-		Select("COALESCE(SUM(amount), 0)").Scan(&reserved).Error; err != nil {
+	var reserved []models.Payout
+	if err := tx.Where("provider_id = ? AND id <> ? AND status IN ?", current.ProviderID, current.ID, models.PayoutReservedStatuses).
+		Find(&reserved).Error; err != nil {
 		return 0, err
 	}
-	available := eligible - reserved
-	if available < 0 {
-		return 0, nil
+	var dpReserved, settlementReserved int64
+	for _, payout := range reserved {
+		if payout.Type == "DP_50" {
+			dpReserved += payout.Amount
+		} else {
+			settlementReserved += payout.Amount
+		}
 	}
-	return available, nil
+	dpAvailable, settlementAvailable := calculatePayoutAvailability(dpEligible, settlementEligible, dpReserved, settlementReserved)
+	if current.Type == "DP_50" {
+		return dpAvailable, nil
+	}
+	return settlementAvailable, nil
 }
 
 // debitProviderBalanceTx mengurangi saldo tersedia provider saat pencairan
@@ -572,6 +636,7 @@ func debitProviderBalanceTx(tx *gorm.DB, providerID uint, amount int64) error {
 type LedgerBalance struct {
 	Available int64
 	Held      int64
+	Debt      int64
 	Earned    int64
 }
 
@@ -589,6 +654,7 @@ func GetLedgerBalance(db *gorm.DB, providerID uint) (LedgerBalance, error) {
 	return LedgerBalance{
 		Available: balance.AvailableBalance,
 		Held:      balance.HeldBalance,
+		Debt:      balance.DebtBalance,
 		Earned:    balance.TotalEarned,
 	}, nil
 }
@@ -596,17 +662,5 @@ func GetLedgerBalance(db *gorm.DB, providerID uint) (LedgerBalance, error) {
 // creditProviderBalanceTx mengembalikan dana ke saldo tersedia provider saat
 // pencairan gagal di payment gateway.
 func creditProviderBalanceTx(tx *gorm.DB, providerID uint, amount int64) error {
-	result := tx.Model(&models.ProviderBalance{}).
-		Where("provider_id = ?", providerID).
-		Updates(map[string]interface{}{
-			"available_balance": gorm.Expr("available_balance + ?", amount),
-			"updated_at":        time.Now(),
-		})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected != 1 {
-		return fmt.Errorf("saldo provider %d tidak ditemukan saat pengembalian dana", providerID)
-	}
-	return nil
+	return creditAvailableBalanceTx(tx, providerID, amount, 0)
 }

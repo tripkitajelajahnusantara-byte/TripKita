@@ -5,12 +5,16 @@ import (
 )
 
 type ProviderBalance struct {
-	ID               uint      `gorm:"primaryKey" json:"id"`
-	ProviderID       uint      `gorm:"not null;uniqueIndex" json:"providerId"`
-	AvailableBalance int64     `gorm:"default:0" json:"availableBalance"`
-	HeldBalance      int64     `gorm:"default:0" json:"heldBalance"`
-	TotalEarned      int64     `gorm:"default:0" json:"totalEarned"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	ID               uint  `gorm:"primaryKey" json:"id"`
+	ProviderID       uint  `gorm:"not null;uniqueIndex" json:"providerId"`
+	AvailableBalance int64 `gorm:"default:0" json:"availableBalance"`
+	HeldBalance      int64 `gorm:"default:0" json:"heldBalance"`
+	// DebtBalance mencatat dana provider yang sudah telanjur dicairkan ketika
+	// sebuah booking kemudian wajib direfund penuh. Pendapatan berikutnya akan
+	// melunasi saldo ini lebih dahulu sebelum dapat dicairkan kembali.
+	DebtBalance int64     `gorm:"default:0" json:"debtBalance"`
+	TotalEarned int64     `gorm:"default:0" json:"totalEarned"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type HeldSettlement struct {

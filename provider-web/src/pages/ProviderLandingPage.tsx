@@ -160,7 +160,7 @@ export const ProviderLandingPage: React.FC = () => {
               </div>
               <h3>Pembayaran Terjamin</h3>
               <p>
-                Sistem escrow aman dan pencairan otomatis. Dana Anda terlindungi dengan jaminan pembayaran 100% setelah trip selesai.
+                Sistem escrow dengan pencairan terverifikasi. Dana dicatat dan diproses sesuai tahap perjalanan serta status transaksi.
               </p>
             </div>
             <div className="benefit-card">

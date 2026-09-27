@@ -233,8 +233,9 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 // dengan perhitungan backend, agar ringkasan pembayaran tidak menebak sendiri.
 func (ctrl *BookingController) GetCheckoutConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"serviceFee":           models.BookingServiceFee,
-		"paymentWindowSeconds": int(models.PaymentWindow.Seconds()),
+		"serviceFee":             models.BookingServiceFee,
+		"paymentWindowSeconds":   int(models.PaymentWindow.Seconds()),
+		"cancellationRefundDays": int(models.CancellationFullRefundWindow.Hours() / 24),
 	})
 }
 

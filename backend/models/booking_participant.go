@@ -6,6 +6,10 @@ import "time"
 // Setelah lewat, booking yang belum dibayar dikedaluwarsakan oleh job.
 const PaymentWindow = 24 * time.Hour
 
+// CancellationFullRefundWindow adalah batas minimal pembatalan customer untuk
+// memperoleh refund penuh. Dipakai backend sebagai sumber kebenaran kebijakan.
+const CancellationFullRefundWindow = 7 * 24 * time.Hour
+
 // BookingParticipant menyimpan data setiap peserta pada satu booking. Data
 // ini dipakai mitra untuk pendaftaran dan asuransi perjalanan, sehingga hanya
 // dimuat untuk mitra pemilik paket dan customer pemilik booking.

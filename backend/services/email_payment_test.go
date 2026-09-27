@@ -81,6 +81,21 @@ func TestEveryCustomerTransactionOutcomeBuildsAnEmail(t *testing.T) {
 	}
 }
 
+func TestRefundReceiptUsesRefundEntitlementNotOrderTotal(t *testing.T) {
+	booking := &models.Booking{
+		BookingCode: "TK-REFUND-AMOUNT", CustomerName: "Pelanggan Uji",
+		CustomerEmail: "customer@example.com", TotalPrice: 250_000, RefundAmount: 100_000,
+	}
+	pdf, _, err := NewPDFService().GenerateRefundReceiptPDF(booking)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(pdf)
+	if !strings.Contains(text, "Rp 100.000") || strings.Contains(text, "Rp 250.000") {
+		t.Fatal("bukti refund harus memakai nominal refund yang benar, bukan total pesanan")
+	}
+}
+
 func TestProviderPlatformFeeChangeBuildsAnEmail(t *testing.T) {
 	provider := &models.Provider{BusinessName: "Mitra Uji", Email: "provider@example.com"}
 	email := NewEmailService(&config.Config{SMTPHost: "smtp.example.test", SMTPPort: "587", SMTPUser: "user", SMTPPass: "pass", SMTPFrom: "no-reply@example.test"}, NewPDFService())

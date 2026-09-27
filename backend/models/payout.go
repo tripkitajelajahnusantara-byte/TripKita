@@ -51,6 +51,7 @@ type CreatePayoutRequest struct {
 
 type PayoutSummary struct {
 	PlatformFeePercent int64    `json:"platformFeePercent"`
+	ServiceFee         int64    `json:"serviceFee"`
 	TotalEarnings      int64    `json:"totalEarnings"`
 	PlatformFee        int64    `json:"platformFee"`
 	NetEarnings        int64    `json:"netEarnings"`
@@ -65,5 +66,6 @@ type PayoutSummary struct {
 	// dihitung dari booking terlihat langsung, bukan hanya di log server.
 	LedgerAvailable  int64 `json:"ledgerAvailable"`
 	LedgerHeld       int64 `json:"ledgerHeld"`
+	ProviderDebt     int64 `json:"providerDebt"`
 	LedgerConsistent bool  `json:"ledgerConsistent"`
 }

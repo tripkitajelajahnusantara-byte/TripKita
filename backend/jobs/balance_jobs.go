@@ -42,15 +42,11 @@ func (r *Runner) ReconcileProviderBalances(ctx context.Context) {
 		}
 		checked++
 
-		// Pengajuan yang masih PENDING sudah dipotong dari hak cair, tetapi belum
-		// dipotong dari buku besar (pemotongan terjadi saat disetujui).
-		expectedAvailable := summary.AvailableDP + summary.AvailablePelunasan + summary.PendingPayout
-
-		if ledger.Available != expectedAvailable || ledger.Held != summary.HeldSettlement {
+		if !summary.LedgerConsistent {
 			mismatched++
 			log.Printf(
-				"[Rekonsiliasi Saldo] SELISIH provider=%d buku_besar_tersedia=%d diharapkan=%d buku_besar_ditahan=%d diharapkan=%d",
-				provider.ID, ledger.Available, expectedAvailable, ledger.Held, summary.HeldSettlement,
+				"[Rekonsiliasi Saldo] SELISIH provider=%d buku_besar_tersedia=%d buku_besar_ditahan=%d diharapkan_ditahan=%d piutang_provider=%d",
+				provider.ID, ledger.Available, ledger.Held, summary.HeldSettlement, ledger.Debt,
 			)
 		}
 	}

@@ -186,9 +186,28 @@ export const AdminDashboardPage: React.FC = () => {
     try {
       setError('');
       setSuccessMsg('');
+      let proofPath = '';
+      if (status === 'APPROVED') {
+        const proofFile = await new Promise<File | null>((resolve) => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'application/pdf,image/jpeg,image/png';
+          input.onchange = () => resolve(input.files?.[0] || null);
+          input.click();
+        });
+        if (!proofFile) {
+          setError('Bukti transfer wajib dipilih sebelum payout disetujui.');
+          return;
+        }
+        const formData = new FormData();
+        formData.append('file', proofFile);
+        const upload = await request('/admin/upload', { method: 'POST', body: formData });
+        proofPath = upload?.documentPath || '';
+        if (!proofPath) throw new Error('Bukti transfer gagal disimpan.');
+      }
       const result = await request(`/admin/payouts/${payoutId}/process`, {
         method: 'PUT',
-        body: JSON.stringify({ status, notes: notesPrompt })
+        body: JSON.stringify({ status, notes: notesPrompt, proofPath })
       });
       setSuccessMsg(
         result?.status === 'PROCESSING'
@@ -282,8 +301,8 @@ export const AdminDashboardPage: React.FC = () => {
       setRefundError('Nominal yang dikembalikan wajib diisi.');
       return;
     }
-    if (amount > (refundTarget.refundAmount || 0)) {
-      setRefundError('Nominal melebihi hak refund pelanggan.');
+    if (amount !== (refundTarget.refundAmount || 0)) {
+      setRefundError('Nominal wajib sama dengan hak refund pelanggan.');
       return;
     }
     if (refundForm.reference.trim().length < 4) {
@@ -865,8 +884,9 @@ export const AdminDashboardPage: React.FC = () => {
                       <input
                         type="number"
                         value={refundForm.amount}
-                        onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })}
-                        style={{ width: '100%', padding: '10px', marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }}
+                        readOnly
+                        aria-readonly="true"
+                        style={{ width: '100%', padding: '10px', marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', backgroundColor: '#f8fafc' }}
                       />
 
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Metode pengembalian</label>

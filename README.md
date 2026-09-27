@@ -149,15 +149,17 @@ itu dipaksakan.
 
 ## Pencairan dana mitra
 
-Pencairan ke mitra berjalan manual secara default (admin mentransfer lalu mencatat bukti) dan
-dapat dialihkan ke Xendit Payouts API lewat `ENABLE_AUTOMATIC_PAYOUT`. Refund selalu manual,
-tetapi wajib dicatat beserta nominal, metode, referensi transfer, dan admin pemrosesnya.
+Pencairan ke mitra berjalan manual: admin mentransfer dana lalu wajib mengunggah bukti sebelum
+menyetujui payout. `ENABLE_AUTOMATIC_PAYOUT` harus tetap `false` karena integrasi pembayaran
+massal belum didukung oleh konfigurasi runtime. Refund juga manual dan wajib dicatat beserta
+nominal, metode, referensi transfer, dan admin pemrosesnya.
 
 Langkah menguji pencairan DP dan pelunasan secara lokal, beserta daftar periksanya,
 ada di [`PANDUAN_UJI_PENCAIRAN.md`](PANDUAN_UJI_PENCAIRAN.md).
 
-Untuk menguji pencairan otomatis, pakai [`backend/.env.staging.example`](backend/.env.staging.example)
-dan jalankan [`backend/scripts/test_staging_payout.sh`](backend/scripts/test_staging_payout.sh)
+Contoh konfigurasi staging tersedia di
+[`backend/.env.staging.example`](backend/.env.staging.example). Jangan menyalakan pencairan
+otomatis sebelum integrasi money-out khusus iPaymu tersedia dan telah diuji terpisah.
 terhadap Xendit test mode. Rinciannya ada di [`PRODUCTION_RELEASE.md`](PRODUCTION_RELEASE.md).
 
 ## Endpoint operasional
@@ -184,4 +186,5 @@ Prakiraan cuaca H-3 untuk booking selain Open Trip memakai WeatherAPI.com. Isi
 `WEATHER_API_KEY`, gunakan `WEATHER_API_BASE_URL=https://api.weatherapi.com/v1`, dan
 pastikan `ENABLE_BACKGROUND_JOBS=true`. Tanpa API key, backend tetap berjalan tetapi
 job prakiraan dilewati; booking dan payout tidak diubah. Pada production, jalankan juga
-`backend/database/migrations/012_weather_advisories.sql` sebelum deploy backend baru.
+`backend/database/migrations/014_weather_advisories.sql` dan
+`backend/database/migrations/015_provider_balance_debt.sql` sebelum deploy backend baru.

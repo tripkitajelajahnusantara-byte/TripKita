@@ -93,7 +93,7 @@ func (s *bookingService) checkAutoExpire(booking *models.Booking) {
 	if booking == nil || database.DB == nil {
 		return
 	}
-	if booking.Status != "PENDING_PAYMENT" || booking.CreatedAt.IsZero() || time.Since(booking.CreatedAt) <= 24*time.Hour {
+	if booking.Status != "PENDING_PAYMENT" || booking.CreatedAt.IsZero() || time.Since(booking.CreatedAt) <= models.PaymentWindow {
 		return
 	}
 
@@ -103,7 +103,7 @@ func (s *bookingService) checkAutoExpire(booking *models.Booking) {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&expired, booking.ID).Error; err != nil {
 			return err
 		}
-		if expired.Status != "PENDING_PAYMENT" || expired.CreatedAt.IsZero() || time.Since(expired.CreatedAt) <= 24*time.Hour {
+		if expired.Status != "PENDING_PAYMENT" || expired.CreatedAt.IsZero() || time.Since(expired.CreatedAt) <= models.PaymentWindow {
 			return nil
 		}
 		expired.Status = "EXPIRED"
@@ -177,7 +177,7 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 				booking.Status = "CANCELLED_BY_CUSTOMER"
 				booking.RefundAmount = 0
 				booking.CancellationReason = "Dibatalkan oleh pelanggan sebelum pembayaran"
-			} else if time.Until(booking.TripDate) >= 7*24*time.Hour {
+			} else if time.Until(booking.TripDate) >= models.CancellationFullRefundWindow {
 				booking.Status = "REFUND_REQUIRED"
 				booking.RefundAmount = booking.TotalPrice
 				booking.CancellationReason = "Dibatalkan oleh pelanggan (minimal 7 hari sebelum trip - refund 100%)"
@@ -244,11 +244,7 @@ func releaseHeldSettlementTx(tx *gorm.DB, booking *models.Booking) error {
 	if err := tx.Save(&settlement).Error; err != nil {
 		return err
 	}
-	return tx.Model(&models.ProviderBalance{}).Where("provider_id = ?", booking.ProviderID).Updates(map[string]interface{}{
-		"available_balance": gorm.Expr("available_balance + ?", settlement.Amount),
-		"held_balance":      gorm.Expr("GREATEST(held_balance - ?, 0)", settlement.Amount),
-		"updated_at":        time.Now(),
-	}).Error
+	return creditAvailableBalanceTx(tx, booking.ProviderID, settlement.Amount, settlement.Amount)
 }
 
 func reverseProviderFinanceTx(tx *gorm.DB, booking *models.Booking) error {
@@ -272,16 +268,63 @@ func reverseProviderFinanceTx(tx *gorm.DB, booking *models.Booking) error {
 		heldReduction = settlement.Amount
 		availableReduction = providerNet - settlement.Amount
 	}
-	settlement.Status = "CANCELLED"
-	if err := tx.Save(&settlement).Error; err != nil {
+	var balance models.ProviderBalance
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("provider_id = ?", booking.ProviderID).First(&balance).Error; err != nil {
+		return fmt.Errorf("saldo provider tidak ditemukan saat pembalikan booking: %w", err)
+	}
+	if balance.HeldBalance < heldReduction {
+		return fmt.Errorf("saldo tertahan provider tidak konsisten untuk booking %s", booking.BookingCode)
+	}
+
+	// Dana yang masih tersedia ditarik kembali. Bila DP sudah benar-benar
+	// dicairkan, selisihnya menjadi piutang provider dan otomatis dipotong dari
+	// pendapatan berikutnya. Dengan demikian refund customer tidak bergantung
+	// pada apakah provider sempat melakukan payout lebih dahulu.
+	shortfall := int64(0)
+	if balance.AvailableBalance >= availableReduction {
+		balance.AvailableBalance -= availableReduction
+	} else {
+		shortfall = availableReduction - balance.AvailableBalance
+		balance.AvailableBalance = 0
+	}
+	balance.HeldBalance -= heldReduction
+	balance.DebtBalance += shortfall
+	if balance.TotalEarned >= providerNet {
+		balance.TotalEarned -= providerNet
+	} else {
+		balance.TotalEarned = 0
+	}
+	balance.UpdatedAt = time.Now()
+	if err := tx.Save(&balance).Error; err != nil {
 		return err
 	}
-	return tx.Model(&models.ProviderBalance{}).Where("provider_id = ?", booking.ProviderID).Updates(map[string]interface{}{
-		"available_balance": gorm.Expr("GREATEST(available_balance - ?, 0)", availableReduction),
-		"held_balance":      gorm.Expr("GREATEST(held_balance - ?, 0)", heldReduction),
-		"total_earned":      gorm.Expr("GREATEST(total_earned - ?, 0)", providerNet),
-		"updated_at":        time.Now(),
-	}).Error
+
+	settlement.Status = "CANCELLED"
+	return tx.Save(&settlement).Error
+}
+
+// creditAvailableBalanceTx memindahkan dana menjadi saldo tersedia sambil
+// melunasi piutang provider terlebih dahulu. heldReduction bernilai nol untuk
+// kredit biasa dan sebesar settlement ketika dana tertahan dilepas.
+func creditAvailableBalanceTx(tx *gorm.DB, providerID uint, amount, heldReduction int64) error {
+	if amount < 0 || heldReduction < 0 {
+		return fmt.Errorf("nominal kredit saldo tidak valid")
+	}
+	result := tx.Model(&models.ProviderBalance{}).
+		Where("provider_id = ? AND held_balance >= ?", providerID, heldReduction).
+		Updates(map[string]interface{}{
+			"available_balance": gorm.Expr("available_balance + GREATEST(? - debt_balance, 0)", amount),
+			"debt_balance":      gorm.Expr("GREATEST(debt_balance - ?, 0)", amount),
+			"held_balance":      gorm.Expr("held_balance - ?", heldReduction),
+			"updated_at":        time.Now(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return fmt.Errorf("saldo provider %d tidak konsisten", providerID)
+	}
+	return nil
 }
 
 func validateProviderStatusTransition(current, next string, tripEndDate time.Time, now time.Time) error {
@@ -346,8 +389,11 @@ func (s *bookingService) ProviderReschedule(id uint, providerID uint, newDate st
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Package").Where("id = ? AND provider_id = ?", id, providerID).First(&booking).Error; err != nil {
 			return fmt.Errorf("booking tidak ditemukan")
 		}
-		if booking.Status != "RESCHEDULE_OFFERED" || booking.RescheduleCount >= 1 {
-			return fmt.Errorf("booking tidak berada pada proses penjadwalan ulang")
+		if booking.RescheduleCount >= 1 {
+			return fmt.Errorf("penjadwalan ulang hanya diperbolehkan maksimal 1 kali")
+		}
+		if booking.Status != models.StatusPaid && booking.Status != models.StatusConfirmed && booking.Status != models.StatusRescheduleOffered {
+			return fmt.Errorf("hanya booking terbayar yang dapat dijadwalkan ulang")
 		}
 		// Tawaran yang berasal dari peninjauan kuota H-3 wajib melewati
 		// persetujuan pelanggan. Tanpa penjagaan ini, jalur lama dapat memaksa
@@ -355,6 +401,16 @@ func (s *bookingService) ProviderReschedule(id uint, providerID uint, newDate st
 		if booking.TripDepartureID != nil {
 			return fmt.Errorf("penjadwalan ulang keberangkatan open trip menunggu jawaban pelanggan dan tidak dapat diubah dari sini")
 		}
+		if models.IsOpenTrip(booking.Package.TripType) {
+			return fmt.Errorf("jadwal Open Trip harus diubah melalui keputusan keberangkatan agar seluruh pelanggan menerima tawaran yang sama")
+		}
+		// Kunci paket yang sama dengan jalur pembuatan booking agar dua transaksi
+		// tidak dapat meloloskan jadwal eksklusif yang bertabrakan secara bersamaan.
+		var lockedPackage models.Package
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&lockedPackage, booking.PackageID).Error; err != nil {
+			return fmt.Errorf("paket tidak ditemukan")
+		}
+		booking.Package = lockedPackage
 		newTripDay := parsedDate.Format("2006-01-02")
 		if booking.Package.StartDate != "" && newTripDay < booking.Package.StartDate {
 			return fmt.Errorf("tanggal pengganti berada sebelum periode paket")
@@ -368,10 +424,14 @@ func (s *bookingService) ProviderReschedule(id uint, providerID uint, newDate st
 			tripDuration = time.Duration(normalizedTripDuration(booking.Package.Duration)) * 24 * time.Hour
 		}
 		parsedDate = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), original.Hour(), original.Minute(), original.Second(), original.Nanosecond(), original.Location())
+		newTripEnd := parsedDate.Add(tripDuration)
+		if err := ensureExclusiveDateTx(tx, &booking.Package, parsedDate, newTripEnd, booking.ID); err != nil {
+			return err
+		}
 		booking.OriginalTripDate = &original
 		booking.RescheduleDate = &parsedDate
 		booking.TripDate = parsedDate
-		booking.TripEndDate = parsedDate.Add(tripDuration)
+		booking.TripEndDate = newTripEnd
 		booking.RescheduleCount++
 		booking.Status = "CONFIRMED"
 		if err := tx.Save(&booking).Error; err != nil {
@@ -637,8 +697,8 @@ func (s *bookingService) CompleteRefund(bookingID uint, adminID uint, req *model
 		if booking.Status != models.StatusRefundRequired {
 			return &BookingInputError{Message: "hanya refund yang masih menunggu proses yang dapat diselesaikan"}
 		}
-		if req.Amount > booking.RefundAmount {
-			return &BookingInputError{Message: fmt.Sprintf("nominal refund melebihi hak pelanggan sebesar %d", booking.RefundAmount)}
+		if req.Amount != booking.RefundAmount {
+			return &BookingInputError{Message: fmt.Sprintf("nominal refund wajib sama dengan hak pelanggan sebesar %d", booking.RefundAmount)}
 		}
 
 		record = models.RefundRecord{
@@ -829,7 +889,12 @@ func recordFinanceOnPaymentTx(tx *gorm.DB, booking *models.Booking) error {
 	} else if err != nil {
 		return err
 	}
-	balance.AvailableBalance += availableAmount
+	debtPayment := availableAmount
+	if debtPayment > balance.DebtBalance {
+		debtPayment = balance.DebtBalance
+	}
+	balance.DebtBalance -= debtPayment
+	balance.AvailableBalance += availableAmount - debtPayment
 	balance.HeldBalance += heldAmount
 	balance.TotalEarned += split.NetEarning
 	balance.UpdatedAt = time.Now()

@@ -655,16 +655,25 @@ func (s *departureService) acceptReschedule(booking *models.Booking) (*models.Bo
 		if locked.Status != models.StatusRescheduleOffered {
 			return &DepartureInputError{Message: "tawaran jadwal pengganti sudah tidak berlaku"}
 		}
+		var lockedPackage models.Package
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&lockedPackage, locked.PackageID).Error; err != nil {
+			return err
+		}
+		locked.Package = lockedPackage
 
 		tripDuration := locked.TripEndDate.Sub(locked.TripDate)
 		if tripDuration <= 0 {
 			tripDuration = time.Duration(normalizedTripDuration(locked.Package.Duration)) * 24 * time.Hour
 		}
 		original := locked.TripDate
+		newTripEnd := proposed.Add(tripDuration)
+		if err := ensureExclusiveDateTx(tx, &locked.Package, proposed, newTripEnd, locked.ID); err != nil {
+			return err
+		}
 
 		locked.OriginalTripDate = &original
 		locked.TripDate = proposed
-		locked.TripEndDate = proposed.Add(tripDuration)
+		locked.TripEndDate = newTripEnd
 		locked.RescheduleCount++
 		locked.Status = models.StatusConfirmed
 		locked.CancellationReason = ""

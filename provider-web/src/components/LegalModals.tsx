@@ -219,7 +219,11 @@ const LegalSection: React.FC<{ number: string; title: string; children: React.Re
   </div>
 );
 
-export const GeneralTermsContent: React.FC = () => (
+interface RefundPolicyProps {
+  cancellationRefundDays?: number;
+}
+
+export const GeneralTermsContent: React.FC<RefundPolicyProps> = ({ cancellationRefundDays = 7 }) => (
   <div>
     {/* Intro Banner */}
     <div
@@ -277,11 +281,11 @@ export const GeneralTermsContent: React.FC = () => (
 
     <LegalSection number="5" title="PEMBATALAN, REFUND & RESCHEDULE">
       <p style={{ margin: '0 0 8px 0' }}>
-        5.1 <strong>Pembatalan oleh Customer (Strict H-7 Policy):</strong>
+        5.1 <strong>Pembatalan oleh Customer (H-{cancellationRefundDays} Policy):</strong>
       </p>
       <ul style={{ paddingLeft: '20px', margin: '0 0 8px 0' }}>
-        <li>Pembatalan dilakukan <strong>≥ 7 hari sebelum keberangkatan (H-7 atau lebih lama)</strong>: Customer berhak menerima pengembalian dana <strong>100% (Full Refund)</strong>.</li>
-        <li>Pembatalan dilakukan <strong>&lt; 7 hari sebelum keberangkatan (H-6 s/d H-0)</strong>: Dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>). Pembayaran diteruskan ke Provider sebagai ganti rugi slot operasional.</li>
+        <li>Pembatalan dilakukan <strong>≥ {cancellationRefundDays} hari sebelum keberangkatan</strong>: Customer berhak menerima pengembalian dana <strong>100% (Full Refund)</strong>.</li>
+        <li>Pembatalan dilakukan <strong>&lt; {cancellationRefundDays} hari sebelum keberangkatan</strong>: Dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>). Pembayaran diteruskan ke Provider sebagai ganti rugi slot operasional.</li>
       </ul>
       <p style={{ margin: '0 0 8px 0' }}>
         5.2 <strong>Pembatalan oleh Provider / Cuaca Buruk / Kuota Tidak Terpenuhi:</strong>
@@ -339,7 +343,7 @@ export const PrivacyPolicyContent: React.FC = () => (
   </div>
 );
 
-export const CustomerRegistrationTermsContent: React.FC = () => (
+export const CustomerRegistrationTermsContent: React.FC<RefundPolicyProps> = ({ cancellationRefundDays = 7 }) => (
   <div>
     <div
       style={{
@@ -374,9 +378,9 @@ export const CustomerRegistrationTermsContent: React.FC = () => (
       <p style={{ margin: 0 }}>2.2 Customer wajib menjaga kerahasiaan kata sandi dan keamanan akun masing-masing.</p>
     </LegalSection>
 
-    <LegalSection number="3" title="Kebijakan Pembatalan & Refund (Strict H-7)">
-      <p style={{ margin: '0 0 6px 0' }}>3.1 Pembatalan oleh Pemesan ≥ 7 hari sebelum keberangkatan berhak atas <strong>100% Full Refund</strong>.</p>
-      <p style={{ margin: '0 0 6px 0' }}>3.2 Pembatalan oleh Pemesan &lt; 7 hari (H-6 s/d H-0) berstatus <strong>0% Refund (Uang Hangus)</strong>.</p>
+    <LegalSection number="3" title={`Kebijakan Pembatalan & Refund (H-${cancellationRefundDays})`}>
+      <p style={{ margin: '0 0 6px 0' }}>3.1 Pembatalan oleh Pemesan ≥ {cancellationRefundDays} hari sebelum keberangkatan berhak atas <strong>100% Full Refund</strong>.</p>
+      <p style={{ margin: '0 0 6px 0' }}>3.2 Pembatalan oleh Pemesan &lt; {cancellationRefundDays} hari berstatus <strong>0% Refund (Uang Hangus)</strong>.</p>
       <p style={{ margin: 0 }}>3.3 Jika trip dibatalkan oleh Provider/Cuaca/Kuota Kurang, Pemesan berhak atas <strong>100% Refund</strong> atau <strong>Reschedule Maks 1x</strong>.</p>
     </LegalSection>
 

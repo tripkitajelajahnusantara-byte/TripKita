@@ -93,7 +93,13 @@ func (r *Runner) checkInvoiceBeforeExpiry(booking models.Booking) invoiceCheckRe
 		}
 	}
 	if transactionID == "" {
-		return invoiceUnpaid
+		// Redirect payment lazimnya hanya mengembalikan SessionID. Tanpa
+		// transaction ID, gateway belum dapat ditanya secara meyakinkan. Jangan
+		// pernah menganggap kondisi "tidak dapat diverifikasi" sebagai belum
+		// dibayar karena callback yang hilang dapat membuat pembayaran sah ikut
+		// kedaluwarsa dan kursinya dijual kembali.
+		log.Printf("[Rekonsiliasi] Booking %d belum memiliki transaction ID; kedaluwarsa ditunda untuk pemeriksaan callback/operator.", booking.ID)
+		return invoiceUnverified
 	}
 
 	txStatus, err := r.container.IPaymuService.GetTransactionStatus(transactionID)
@@ -152,7 +158,8 @@ func (r *Runner) AutoCompleteFinishedBookings(ctx context.Context) {
 				result := tx.Model(&models.ProviderBalance{}).
 					Where("provider_id = ? AND held_balance >= ?", booking.ProviderID, settlement.Amount).
 					Updates(map[string]interface{}{
-						"available_balance": gorm.Expr("available_balance + ?", settlement.Amount),
+						"available_balance": gorm.Expr("available_balance + GREATEST(? - debt_balance, 0)", settlement.Amount),
+						"debt_balance":      gorm.Expr("GREATEST(debt_balance - ?, 0)", settlement.Amount),
 						"held_balance":      gorm.Expr("held_balance - ?", settlement.Amount),
 						"updated_at":        time.Now(),
 					})

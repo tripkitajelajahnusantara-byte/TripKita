@@ -142,7 +142,7 @@ func (s *EmailService) SendRefundEmail(b *models.Booking) error {
   </div>
 </body>
 </html>
-`, html.EscapeString(b.CustomerName), formatIDRNumber(b.TotalPrice), html.EscapeString(b.BookingCode), html.EscapeString(packageName))
+`, html.EscapeString(b.CustomerName), formatIDRNumber(b.RefundAmount), html.EscapeString(b.BookingCode), html.EscapeString(packageName))
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
 }

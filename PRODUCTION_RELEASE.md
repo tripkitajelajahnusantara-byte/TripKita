@@ -80,86 +80,25 @@ DB_SSLMODE=require
 
 Gunakan `/readyz` sebagai health check load balancer (bukan `/healthz`) supaya trafik tidak diarahkan ke instance yang belum dapat menghubungi database. Beri waktu shutdown minimal 30 detik pada orchestrator; proses menyelesaikan permintaan yang berjalan, menghentikan job latar belakang, lalu menutup koneksi database.
 
-### Pencairan otomatis (opsional, default mati)
+### Pencairan provider
 
-`ENABLE_AUTOMATIC_PAYOUT` menentukan cara dana mitra dikirim:
+Gunakan `ENABLE_AUTOMATIC_PAYOUT="false"` di staging dan production. Payout otomatis belum
+didukung oleh integrasi iPaymu yang aktif dan aplikasi sengaja menolak startup bila flag ini
+dinyalakan. Admin harus menyelesaikan transfer melalui bank, lalu mengunggah bukti transfer
+sebelum pengajuan dapat ditandai `APPROVED`. Status tersebut langsung mengurangi buku besar,
+jadi jangan menekan persetujuan sebelum mutasi bank benar-benar berhasil.
 
-- **`false` (default)** — admin menyetujui pengajuan, lalu mentransfer sendiri lewat bank dan
-  mencatat buktinya. Ini perilaku yang sudah berjalan selama ini.
-- **`true`** — persetujuan admin langsung mengirim instruksi ke Xendit Payouts API v3. Pengajuan
-  berhenti di status `PROCESSING` sampai callback menyatakan dana sampai (`APPROVED`) atau gagal
-  (`FAILED`, saldo otomatis dikembalikan ke mitra).
-
-#### Uji di staging lebih dulu
-
-Gunakan `backend/.env.staging.example` sebagai dasar konfigurasi staging. Berkas itu sudah
-menyalakan `ENABLE_AUTOMATIC_PAYOUT` dan **wajib** memakai Development API Key Xendit
-(`xnd_development_...`); dengan kunci tersebut permintaan tidak pernah menyentuh jaringan bank.
-
-Jalankan skrip uji integrasi:
-
-```bash
-export API_BASE_URL="https://staging-api.example.com/api/v1"
-export DATABASE_URL="postgres://user:pass@host:5432/tripkita_staging?sslmode=require"
-export ADMIN_EMAIL="admin@tementrip.id"
-export ADMIN_PASSWORD="..."
-bash backend/scripts/test_staging_payout.sh
-```
-
-Skrip menjalankan lima skenario Xendit test mode (satu sukses, empat ragam kegagalan) dan
-memeriksa status pengajuan **serta saldo buku besar** setelah tiap skenario. Yang dibuktikan
-bukan sekadar API tidak error, melainkan bahwa dana yang gagal dikirim benar-benar kembali ke
-saldo mitra. Skrip keluar dengan kode 1 bila ada satu saja skenario gagal.
-
-Bila pencairan lama menggantung di `PROCESSING`, periksa delivery log callback Xendit dan log
-`[Payout Rekonsiliasi]`; job akan menanyakan ulang status gateway selama background jobs aktif.
-
-#### Sebelum menyalakan di production
-
-1. Skrip uji staging lulus seluruhnya (5 dari 5).
-2. Aktifkan produk Payouts dan izin API key **MONEY-OUT** di dashboard Xendit, lalu siapkan **saldo mengendap** yang cukup —
-   pencairan ditarik dari saldo Xendit, bukan dari kas bank Anda. Tetapkan siapa yang memantau
-   dan mengisi ulang saldo, serta ambang peringatannya.
-3. Arahkan callback payout Xendit production ke `/api/v1/public/webhooks/xendit/payout` dan isi
-   `XENDIT_PAYOUT_WEBHOOK_TOKEN` dengan token production (berbeda dari staging).
-4. Pastikan `[Rekonsiliasi Saldo]` melaporkan seluruh provider konsisten. Selisih apa pun harus
-   dituntaskan lebih dulu; pencairan otomatis akan memindahkan uang berdasarkan angka ini.
-5. Periksa data rekening seluruh mitra aktif. **Test mode tidak memvalidasi nomor rekening ke
-   bank sungguhan**, sehingga kesalahan ketik hanya akan terlihat di production. Selama Bank
-   Account Validation API belum dipasang, verifikasi manual adalah satu-satunya pengaman.
-6. Pastikan nama bank seluruh mitra dikenali oleh `backend/services/bank_channel.go` dan routing
-   SWIFT/BIC-nya cocok dengan Dynamic Schema Xendit untuk akun production. Nama yang tidak
-   terpetakan akan menolak pencairan otomatis, bukan menebak. Query pemeriksaan:
-
-   ```sql
-   SELECT DISTINCT bank_name FROM providers
-   WHERE role = 'PROVIDER' AND status = 'APPROVED' AND bank_name <> '';
-   ```
-
-7. Pastikan `ENABLE_BACKGROUND_JOBS="true"`; job ini merekonsiliasi payout `PROCESSING` ketika
-   respons API atau callback tidak sampai.
-8. Baru setelah semuanya terpenuhi, set `ENABLE_AUTOMATIC_PAYOUT="true"` pada environment
-   production. Default di kode maupun di `.env.example` sengaja dibiarkan `false`, sehingga
-   pencairan otomatis tidak pernah menyala hanya karena deploy.
-9. Lakukan satu pencairan nyata bernilai kecil ke rekening yang Anda kuasai, lalu cocokkan mutasi
-   bank dengan status pengajuan di aplikasi sebelum melayani mitra sungguhan.
-
-#### Bila perlu dimatikan kembali
-
-Set `ENABLE_AUTOMATIC_PAYOUT="false"` lalu deploy ulang. Pengajuan yang masih `PROCESSING` tetap
-menunggu callback dan akan selesai sendiri; pengajuan baru kembali ke jalur transfer manual.
-Tidak ada data yang hilang, dan saldo tidak perlu disesuaikan.
-
-Nama bank mitra diterjemahkan ke routing SWIFT/BIC Xendit v3 oleh `backend/services/bank_channel.go`.
-Nama yang tidak dikenali **menolak** pencairan otomatis alih-alih menebak, jadi tambahkan
-pemetaannya atau proses pengajuan tersebut secara manual.
+Sebelum melayani pencairan, pastikan data rekening mitra telah diverifikasi dan
+`[Rekonsiliasi Saldo]` tidak melaporkan selisih. Jika booking wajib direfund setelah DP sudah
+dicairkan, selisih dicatat sebagai penyesuaian saldo provider dan otomatis dipotong dari
+pendapatan berikutnya.
 
 ### Refund
 
 Refund masih dikirim manual, tetapi kini **wajib dicatat**. Admin harus mengisi nominal yang
 benar-benar dikembalikan, metodenya, dan nomor referensi transfer; sistem mencatat email admin
-pemroses beserta waktunya, dan satu booking hanya dapat dicatat sekali. Nominal tidak boleh
-melebihi hak refund pelanggan.
+pemroses beserta waktunya, dan satu booking hanya dapat dicatat sekali. Nominal wajib sama
+dengan hak refund pelanggan; refund parsial tidak menutup status booking.
 
 Otomatisasi refund hanya mungkin sebagian. `POST /refunds` di Xendit menerima `invoice_id`, yang
 sudah tersimpan pada setiap booking, sehingga kanal kartu, e-wallet, dan QRIS dapat dikembalikan
@@ -185,7 +124,7 @@ Sebelum mengedaluwarsakan booking yang belum dibayar, job memastikan dulu status
 - Penyelesaian refund menolak permintaan tanpa nominal, metode, dan nomor referensi transfer; catatan yang tersimpan memuat email admin pemroses.
 - Payout kedua yang melebihi saldo ditolak.
 - Setelah satu pencairan disetujui, `availableBalance` pada ringkasan keuangan mitra ikut berkurang, dan `ledgerConsistent` bernilai `true`.
-- Bila pencairan otomatis aktif: pengajuan yang disetujui masuk status `PROCESSING`, lalu berubah menjadi `APPROVED` setelah callback Xendit tiba. Pengajuan yang menetap di `PROCESSING` lebih dari beberapa menit menandakan callback tidak sampai.
+- Pencairan production saat ini wajib manual. Pengajuan hanya dapat disetujui setelah admin mengunggah bukti transfer; jangan menyalakan `ENABLE_AUTOMATIC_PAYOUT`.
 - Pastikan checkout tidak menawarkan add-on; fitur ini sengaja dinonaktifkan sampai katalog dan harga add-on disimpan di database.
 - Setiap respons membawa header `X-Request-ID`. Cocokkan nilai yang dilaporkan pengguna dengan baris `[HTTP] request_id=...` di log server saat menelusuri gangguan.
 - Muat ulang halaman web setelah deploy dan pastikan aset yang diambil adalah versi baru; `index.html` disajikan dengan `Cache-Control: no-cache` sedangkan berkas di `/assets/` bersifat immutable.

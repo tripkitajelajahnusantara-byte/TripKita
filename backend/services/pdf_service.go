@@ -143,7 +143,7 @@ Terima kasih atas pengertian Anda. Semoga kita dapat bertemu di perjalanan berik
 		b.CustomerPhone,
 		b.CustomerEmail,
 		packageName,
-		formatIDRNumber(b.TotalPrice),
+		formatIDRNumber(b.RefundAmount),
 	)
 
 	pdfBuf := createSimplePDFDocument("BUKTI REFUND TEMENTRIP", pdfContent)

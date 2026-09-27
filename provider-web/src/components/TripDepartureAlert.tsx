@@ -59,6 +59,9 @@ type DecisionAction = 'CONTINUE' | 'CANCEL' | 'RESCHEDULE';
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
+const weatherMetric = (value: number | undefined, suffix: string) =>
+  Number.isFinite(value) ? `${value}${suffix}` : '—';
+
 function tomorrowISO(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -171,10 +174,10 @@ export const TripDepartureAlert: React.FC = () => {
               <>
                 <div className="weather-summary">
                   <div className="weather-condition"><span>Kondisi diperkirakan</span><strong>{departure.weatherCondition || 'Tidak tersedia'}</strong></div>
-                  <div className="weather-metric"><ThermometerSun size={17} /><span><small>Suhu</small><strong>{departure.weatherMinTempC ?? 0}–{departure.weatherMaxTempC ?? 0}°C</strong></span></div>
-                  <div className="weather-metric"><Droplets size={17} /><span><small>Peluang hujan</small><strong>{departure.weatherRainChance ?? 0}%</strong></span></div>
-                  <div className="weather-metric"><CloudRain size={17} /><span><small>Curah hujan</small><strong>{departure.weatherPrecipMm ?? 0} mm</strong></span></div>
-                  <div className="weather-metric"><Wind size={17} /><span><small>Angin maks.</small><strong>{departure.weatherMaxWindKph ?? 0} km/jam</strong></span></div>
+                  <div className="weather-metric"><ThermometerSun size={17} /><span><small>Suhu</small><strong>{Number.isFinite(departure.weatherMinTempC) && Number.isFinite(departure.weatherMaxTempC) ? `${departure.weatherMinTempC}–${departure.weatherMaxTempC}°C` : '—'}</strong></span></div>
+                  <div className="weather-metric"><Droplets size={17} /><span><small>Peluang hujan</small><strong>{weatherMetric(departure.weatherRainChance, '%')}</strong></span></div>
+                  <div className="weather-metric"><CloudRain size={17} /><span><small>Curah hujan</small><strong>{weatherMetric(departure.weatherPrecipMm, ' mm')}</strong></span></div>
+                  <div className="weather-metric"><Wind size={17} /><span><small>Angin maks.</small><strong>{weatherMetric(departure.weatherMaxWindKph, ' km/jam')}</strong></span></div>
                 </div>
                 <div className="weather-disclaimer">
                   <Info size={17} />

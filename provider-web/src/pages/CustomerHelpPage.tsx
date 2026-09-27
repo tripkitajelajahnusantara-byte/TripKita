@@ -35,7 +35,7 @@ export const CustomerHelpPage: React.FC = () => {
       id: 'faq-2',
       category: 'pembayaran',
       question: 'Bagaimana skema pembayaran di TemenTrip?',
-      answer: 'Pembayaran dilakukan penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari customer. Checkout berlaku 24 jam sejak pesanan dibuat. Buku besar TemenTrip mencatat separuh hak mitra tersedia untuk diajukan setelah pembayaran dan separuh sisanya setelah perjalanan selesai.'
+      answer: 'Pembayaran dilakukan penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari customer. Batas pembayaran selalu mengikuti penghitung waktu pada invoice. Buku besar TemenTrip mencatat separuh hak mitra tersedia untuk diajukan setelah pembayaran dan separuh sisanya setelah perjalanan selesai.'
     },
     {
       id: 'faq-3',
@@ -174,7 +174,7 @@ export const CustomerHelpPage: React.FC = () => {
             <div className="contact-info-left">
               <span className="contact-badge">KONTAK BANTUAN TRIPKITA</span>
               <h2>Butuh Bantuan Lebih Lanjut?</h2>
-              <p>Tim Customer Support TripKita siap membantu Anda 24 jam setiap hari untuk memastikan liburan Anda berjalan lancar tanpa kendala.</p>
+              <p>Tim Customer Support TripKita siap membantu melalui kanal dukungan yang tersedia untuk memastikan perjalanan Anda berjalan lancar.</p>
 
               <div className="contact-methods-list">
                 <div className="contact-method-item">

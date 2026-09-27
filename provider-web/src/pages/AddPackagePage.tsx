@@ -17,6 +17,8 @@ import {
 
 import { request, API_BASE_URL } from '../utils/api';
 import { PackageDateManager } from '../components/PackageDateManager';
+import { PROVINCES } from '../utils/locationData';
+import { OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
 
 /** Open Trip berangkat bersama pada jadwal tetap; tipe lain eksklusif per tanggal. */
 function isOpenTripType(tripType: string): boolean {
@@ -52,20 +54,6 @@ function LocationPicker({ position, setPosition, setMeetPoint }: any) {
   return position === null ? null : <Marker position={position} icon={customIcon} />;
 }
 
-export const INDONESIA_PROVINCES = [
-  "Aceh", "Sumatera Utara", "Sumatera Barat", "Riau", "Kepulauan Riau", 
-  "Jambi", "Sumatera Selatan", "Bangka Belitung", "Bengkulu", "Lampung",
-  "DKI Jakarta", "Jawa Barat", "Banten", "Jawa Tengah", "DI Yogyakarta", "Jawa Timur",
-  "Bali", "Nusa Tenggara Barat (NTB)", "Nusa Tenggara Timur (NTT)",
-  "Kalimantan Barat", "Kalimantan Tengah", "Kalimantan Selatan", "Kalimantan Timur", "Kalimantan Utara",
-  "Sulawesi Utara", "Gorontalo", "Sulawesi Tengah", "Sulawesi Barat", "Sulawesi Selatan", "Sulawesi Tenggara",
-  "Maluku", "Maluku Utara",
-  "Papua", "Papua Barat", "Papua Barat Daya", "Papua Tengah", "Papua Pegunungan", "Papua Selatan"
-];
-
-import { OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
-
-
 export const CATEGORIES = OFFICIAL_CATEGORIES;
 export const TRIP_TYPES = OFFICIAL_TRIP_TYPES;
 
@@ -77,21 +65,21 @@ export const AddPackagePage: React.FC = () => {
   const [packageName, setPackageName] = useState('');
   const [category, setCategory] = useState('');
   const [tripType, setTripType] = useState('');
-  const [duration, setDuration] = useState('5');
-  const [location, setLocation] = useState('DKI Jakarta');
+  const [duration, setDuration] = useState('');
+  const [location, setLocation] = useState('');
   const [meetPoint, setMeetPoint] = useState('');
   const [mapPosition, setMapPosition] = useState<any>(null);
   const [description, setDescription] = useState('');
-  const [minGuests, setMinGuests] = useState('2');
-  const [maxGuests, setMaxGuests] = useState('12');
-  const [minAge, setMinAge] = useState('10');
-  const [maxAge, setMaxAge] = useState('65');
+  const [minGuests, setMinGuests] = useState('');
+  const [maxGuests, setMaxGuests] = useState('');
+  const [minAge, setMinAge] = useState('');
+  const [maxAge, setMaxAge] = useState('');
 
   // New fields mapping to backend
   const todayStr = new Date().toISOString().split('T')[0];
   const [price, setPrice] = useState('');
-  const [quotaMin, setQuotaMin] = useState('14');
-  const [quotaMax, setQuotaMax] = useState('15');
+  const [quotaMin, setQuotaMin] = useState('');
+  const [quotaMax, setQuotaMax] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [schedule, setSchedule] = useState('');
@@ -343,6 +331,10 @@ export const AddPackagePage: React.FC = () => {
         alert('⚠️ Harga per orang harus berupa angka lebih dari 0!');
         return;
       }
+      if (!duration || parseInt(duration, 10) < 1) {
+        alert('⚠️ Durasi paket wajib diisi dan minimal 1 hari!');
+        return;
+      }
       if (isNaN(qMin) || qMin < 1) {
         alert('⚠️ Kuota minimal harus diisi dan minimal 1 peserta!');
         return;
@@ -399,16 +391,16 @@ export const AddPackagePage: React.FC = () => {
         category: category,
         tripType: tripType,
         price: parseInt(price, 10) || 0,
-        quotaMin: qMin,
-        quotaMax: qMax,
+        quotaMin: Number.isFinite(qMin) ? qMin : 0,
+        quotaMax: Number.isFinite(qMax) ? qMax : 0,
         startDate: startDate,
         endDate: endDate,
         schedule: finalSchedule,
         duration: parseInt(duration, 10) || 1,
-        minGuests: minG,
-        maxGuests: maxG,
+        minGuests: Number.isFinite(minG) ? minG : 0,
+        maxGuests: Number.isFinite(maxG) ? maxG : 0,
         minAge: parseInt(minAge, 10) || 0,
-        maxAge: parseInt(maxAge, 10) || 100,
+        maxAge: parseInt(maxAge, 10) || 0,
         status: dbStatus,
         description: description,
         includedFacilities: includedFacilities.join('\n'),
@@ -551,7 +543,7 @@ export const AddPackagePage: React.FC = () => {
                         type="number" 
                         value={duration} 
                         onChange={(e) => setDuration(e.target.value)} 
-                        placeholder="5"
+                        placeholder="Contoh: 3"
                       />
                       <span className="input-suffix">Hari</span>
                     </div>
@@ -567,7 +559,8 @@ export const AddPackagePage: React.FC = () => {
                       onChange={(e) => setLocation(e.target.value)}
                       className="input-indent"
                     >
-                      {INDONESIA_PROVINCES.map(prov => (
+                      <option value="" disabled>Pilih provinsi destinasi</option>
+                      {PROVINCES.map(prov => (
                         <option key={prov} value={prov}>{prov}</option>
                       ))}
                     </select>

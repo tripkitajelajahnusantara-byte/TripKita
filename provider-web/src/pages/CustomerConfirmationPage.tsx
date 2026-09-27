@@ -21,12 +21,18 @@ export const CustomerConfirmationPage: React.FC = () => {
 
   // Biaya layanan diambil dari backend (sama persis dengan yang ditambahkan server ke total)
   const [serviceFee, setServiceFee] = useState<number | null>(null);
+  const [cancellationRefundDays, setCancellationRefundDays] = useState<number | null>(null);
   const [checkoutConfigError, setCheckoutConfigError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     fetchCheckoutConfig()
-      .then((cfg) => { if (!cancelled) setServiceFee(cfg.serviceFee); })
+      .then((cfg) => {
+        if (!cancelled) {
+          setServiceFee(cfg.serviceFee);
+          setCancellationRefundDays(cfg.cancellationRefundDays);
+        }
+      })
       .catch((err: unknown) => {
         if (!cancelled) setCheckoutConfigError(err instanceof Error && err.message ? err.message : 'Gagal memuat biaya layanan.');
       });
@@ -50,8 +56,8 @@ export const CustomerConfirmationPage: React.FC = () => {
   const selectedAddOns = pkg.selectedAddOns || bookingFormData?.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
   const baseCost = pkg.price * guestsCount;
-  const checkoutConfigLoading = serviceFee === null && !checkoutConfigError;
-  const checkoutReady = serviceFee !== null;
+  const checkoutConfigLoading = (serviceFee === null || cancellationRefundDays === null) && !checkoutConfigError;
+  const checkoutReady = serviceFee !== null && cancellationRefundDays !== null;
   const totalCost = baseCost + addOnsTotal + (serviceFee ?? 0);
 
   const formatIDR = (price: number) => {
@@ -336,11 +342,11 @@ export const CustomerConfirmationPage: React.FC = () => {
           {/* Cancellation Policy Banner */}
           <div style={{ backgroundColor: '#f0f9ff', borderRadius: '16px', padding: '16px 20px', border: '1px solid #bae6fd', marginBottom: '16px' }}>
             <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '800', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ShieldCheck size={16} color="#0369a1" /> Kebijakan Pembatalan Strict H-7 TripKita
+              <ShieldCheck size={16} color="#0369a1" /> Kebijakan Pembatalan H-{cancellationRefundDays ?? '—'} TripKita
             </h4>
             <p style={{ margin: 0, fontSize: '12px', color: '#0c4a6e', lineHeight: '1.5' }}>
-              • Pembatalan <strong>≥ 7 hari sebelum trip</strong> berhak pengembalian dana <strong>100% Full Refund</strong>.<br/>
-              • Pembatalan <strong>&lt; 7 hari sebelum trip (H-6 s/d Hari H)</strong> dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>).<br/>
+              • Pembatalan <strong>≥ {cancellationRefundDays ?? '—'} hari sebelum trip</strong> berhak pengembalian dana <strong>100% Full Refund</strong>.<br/>
+              • Pembatalan <strong>&lt; {cancellationRefundDays ?? '—'} hari sebelum trip</strong> dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>).<br/>
               • Jika trip dibatalkan oleh Provider/Cuaca/Kuota Kurang, Pemesan berhak atas <strong>100% Refund</strong> atau <strong>Reschedule Maks 1x</strong>.
             </p>
           </div>
@@ -369,7 +375,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveLegalModal('cancellation'); }}
                   style={{ background: 'none', border: 'none', padding: 0, color: '#0284c7', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
                 >
-                  Kebijakan Pembatalan Strict H-7 TripKita
+                  Kebijakan Pembatalan H-{cancellationRefundDays ?? '—'} TripKita
                 </button>
                 . Seluruh data peserta yang diisikan adalah benar.
               </span>
@@ -495,16 +501,16 @@ export const CustomerConfirmationPage: React.FC = () => {
         onClose={() => setActiveLegalModal(null)}
         title="Syarat & Ketentuan Customer TemenTrip"
       >
-        <GeneralTermsContent />
+        <GeneralTermsContent cancellationRefundDays={cancellationRefundDays ?? undefined} />
       </LegalModalContainer>
 
       {/* Kebijakan Pembatalan Strict H-7 Modal */}
       <LegalModalContainer
         isOpen={activeLegalModal === 'cancellation'}
         onClose={() => setActiveLegalModal(null)}
-        title="Kebijakan Pembatalan Strict H-7 TripKita"
+        title={`Kebijakan Pembatalan H-${cancellationRefundDays ?? '—'} TripKita`}
       >
-        <CustomerRegistrationTermsContent />
+        <CustomerRegistrationTermsContent cancellationRefundDays={cancellationRefundDays ?? undefined} />
       </LegalModalContainer>
     </div>
   );
