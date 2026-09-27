@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { PackageItem } from '../types';
 import { request } from '../utils/api';
+import { SkeletonTableRows } from '../components/Skeleton';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
 import { useActionLock } from '../utils/useActionLock';
@@ -35,6 +36,7 @@ export const KelolaPaketPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'Semua' | 'Aktif' | 'Draft' | 'Nonaktif'>('Semua');
 
   const [packages, setPackages] = useState<PackageItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
   // Kunci aksi berformat `aksi:idPaket` sehingga baris yang sedang diproses
@@ -78,6 +80,8 @@ export const KelolaPaketPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to load packages:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -231,6 +235,9 @@ export const KelolaPaketPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
+                {/* Shimmer hanya saat daftar belum pernah dimuat; muat ulang
+                    setelah aksi tetap menampilkan data lama. */}
+                {isLoading && packages.length === 0 && <SkeletonTableRows rows={5} columns={8} />}
                 {paginatedPackages.map((pkg) => {
                   const [currentQuota, maxQuota] = pkg.quota.split('/').map(Number);
                   const quotaPercent = maxQuota > 0 ? (currentQuota / maxQuota) * 100 : 0;

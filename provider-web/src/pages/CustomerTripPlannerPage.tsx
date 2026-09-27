@@ -4,6 +4,7 @@ import { request } from '../utils/api';
 import { useActionLock } from '../utils/useActionLock';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
+import { SkeletonCards } from '../components/Skeleton';
 import type { TripPlan, TripChecklistItem, TripSavingsLog, PackageItem } from '../types';
 import { 
   Target, Calendar, Users, Wallet, CheckCircle2, Circle, Sparkles, Compass, 
@@ -783,7 +784,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
         </div>
 
         {loadingPlans && (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Memuat rencana trip dari akunmu...</div>
+          <SkeletonCards count={3} minWidth={290} label="Memuat rencana trip" />
         )}
         {!loadingPlans && plannerError && (
           <div style={{ padding: '18px', marginBottom: '20px', borderRadius: '14px', background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
@@ -1620,7 +1621,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
               </div>
 
               {loadingPackages ? (
-                <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>Memuat rekomendasi paket...</div>
+                <SkeletonCards count={3} minWidth={260} label="Memuat rekomendasi paket" />
               ) : matchingPackages.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '32px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '13.5px' }}>
                   Belum ada paket trip spesifik untuk lokasi <strong>{activePlan.destination}</strong>. Silakan cek halaman cari trip untuk pilihan destinasi populer lainnya.

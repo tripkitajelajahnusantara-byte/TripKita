@@ -5,6 +5,7 @@ import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, Chev
 import { API_BASE_URL, request } from '../utils/api';
 import { TravelokaCalendarModal } from '../components/TravelokaCalendarModal';
 import { TripImage, PhotoPlaceholder } from '../components/TripImage';
+import { Skeleton } from '../components/Skeleton';
 
 // Format tanggal lokal ke YYYY-MM-DD (tanpa pergeseran zona waktu UTC)
 const toLocalIsoDate = (d: Date) =>
@@ -284,8 +285,30 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   if (!selectedPackageForDetail) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
-        <p>Sedang memuat detail paket wisata...</p>
+      <div className="container" style={{ maxWidth: '1120px', margin: '0 auto', padding: '20px', textAlign: 'center' }}>
+        <span className="sr-only" role="status" aria-live="polite">Memuat detail paket wisata</span>
+        {/* Kerangka halaman detail: judul, galeri foto, konten utama + kartu pemesanan */}
+        <div aria-hidden="true" style={{ textAlign: 'left' }}>
+          <Skeleton width="45%" height={28} radius={8} style={{ marginBottom: '10px' }} />
+          <Skeleton width="30%" style={{ marginBottom: '20px' }} />
+          <Skeleton height={378} radius={16} style={{ marginBottom: '24px' }} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px', alignItems: 'flex-start' }}>
+            <div style={{ flex: '1 1 420px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <Skeleton width="35%" height={20} />
+              <Skeleton />
+              <Skeleton width="92%" />
+              <Skeleton width="80%" />
+              <Skeleton width="30%" height={20} style={{ marginTop: '16px' }} />
+              <Skeleton height={120} radius={12} />
+            </div>
+            <div style={{ flex: '1 1 300px', maxWidth: '380px', backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <Skeleton width="50%" height={24} />
+              <Skeleton height={44} radius={10} />
+              <Skeleton height={44} radius={10} />
+              <Skeleton height={46} radius={10} />
+            </div>
+          </div>
+        </div>
         <button onClick={() => navigateTo('beranda')} style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
           Kembali ke Beranda
         </button>

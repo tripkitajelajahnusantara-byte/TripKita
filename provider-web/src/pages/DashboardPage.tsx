@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { Booking } from '../types';
 import { request } from '../utils/api';
+import { SkeletonTableRows } from '../components/Skeleton';
 import { TripDepartureAlert } from '../components/TripDepartureAlert';
 
 interface DashboardStats {
@@ -247,22 +248,7 @@ export const DashboardPage: React.FC = () => {
                 </thead>
                 <tbody>
                   {isLoading ? (
-                    [1, 2, 3].map((n) => (
-                      <tr key={n} style={{ opacity: 0.6 }}>
-                        <td><span style={{ display: 'inline-block', width: '80px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                        <td>
-                          <div className="customer-cell">
-                            <span className="customer-avatar" style={{ backgroundColor: '#cbd5e1' }}>...</span>
-                            <span style={{ display: 'inline-block', width: '90px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span>
-                          </div>
-                        </td>
-                        <td><span style={{ display: 'inline-block', width: '120px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                        <td><span style={{ display: 'inline-block', width: '70px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                        <td><span style={{ display: 'inline-block', width: '30px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                        <td><span style={{ display: 'inline-block', width: '80px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                        <td><span style={{ display: 'inline-block', width: '90px', height: '22px', backgroundColor: '#e2e8f0', borderRadius: '12px' }}></span></td>
-                      </tr>
-                    ))
+                    <SkeletonTableRows rows={5} columns={7} />
                   ) : filteredBookings.length > 0 ? (
                     filteredBookings.map((b) => (
                       <tr key={b.id}>

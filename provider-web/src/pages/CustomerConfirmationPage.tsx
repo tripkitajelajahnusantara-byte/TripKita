@@ -5,6 +5,7 @@ import { fetchCheckoutConfig } from '../utils/checkoutConfig';
 import { useActionLock } from '../utils/useActionLock';
 import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck, LoaderCircle } from 'lucide-react';
 import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsContent } from '../components/LegalModals';
+import { Skeleton } from '../components/Skeleton';
 
 export const CustomerConfirmationPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, bookingFormData } = useNavigation();
@@ -334,7 +335,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Biaya Admin</span>
                   <span style={{ color: checkoutConfigError ? '#ef4444' : '#0f172a', fontWeight: '600' }}>
-                    {serviceFee !== null ? formatIDR(serviceFee) : (checkoutConfigError ? 'Gagal dimuat' : 'Memuat...')}
+                    {serviceFee !== null ? formatIDR(serviceFee) : (checkoutConfigError ? 'Gagal dimuat' : <Skeleton width={90} height={16} style={{ display: 'inline-block', verticalAlign: 'middle' }} />)}
                   </span>
                 </div>
               )}
@@ -342,7 +343,7 @@ export const CustomerConfirmationPage: React.FC = () => {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1.5px dashed #cbd5e1' }}>
               <strong style={{ fontSize: '14px', color: '#0f172a' }}>TOTAL PEMBAYARAN</strong>
-              <strong style={{ fontSize: '18px', color: '#0284c7', fontWeight: '800' }}>{checkoutReady ? formatIDR(totalCost) : (checkoutConfigError ? '-' : 'Memuat...')}</strong>
+              <strong style={{ fontSize: '18px', color: '#0284c7', fontWeight: '800' }}>{checkoutReady ? formatIDR(totalCost) : (checkoutConfigError ? '-' : <Skeleton width={90} height={16} style={{ display: 'inline-block', verticalAlign: 'middle' }} />)}</strong>
             </div>
 
             {checkoutConfigError && (

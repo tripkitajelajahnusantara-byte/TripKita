@@ -18,6 +18,7 @@ import {
   LoaderCircle
 } from 'lucide-react';
 import { useActionLock } from '../utils/useActionLock';
+import { SkeletonTable } from '../components/Skeleton';
 
 interface PayoutItem {
   id: number;
@@ -385,9 +386,7 @@ export const ProviderFinancePage: React.FC = () => {
           </h2>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
-              Sedang memuat riwayat pencairan...
-            </div>
+            <SkeletonTable rows={4} columns={5} label="Memuat riwayat pencairan" />
           ) : !summary?.payouts || summary.payouts.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
               Belum ada riwayat pengajuan pencairan dana. Klik tombol di atas untuk mengajukan pencairan DP 50%.

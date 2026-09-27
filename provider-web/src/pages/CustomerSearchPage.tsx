@@ -6,6 +6,7 @@ import { Star, MapPin, Calendar, ChevronRight, ArrowLeft, Heart, Share2 } from '
 import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 import { ShareModal } from '../components/ShareModal';
 import { TripImage } from '../components/TripImage';
+import { Skeleton } from '../components/Skeleton';
 
 interface TripPackage {
   id: number;
@@ -252,8 +253,26 @@ export const CustomerSearchPage: React.FC = () => {
         />
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
-            <p>Memuat daftar paket wisata...</p>
+          <div role="status" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <span className="sr-only">Memuat daftar paket wisata</span>
+            {/* Meniru kartu hasil pencarian: foto di kiri, info paket di kanan */}
+            {Array.from({ length: 4 }, (_, i) => (
+              <div
+                key={i}
+                aria-hidden="true"
+                className="search-card-skeleton"
+                style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '270px 1fr', gap: '24px', alignItems: 'center' }}
+              >
+                <Skeleton height={180} radius={12} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <Skeleton width={90} height={20} radius={999} />
+                  <Skeleton width="70%" height={20} />
+                  <Skeleton width="45%" />
+                  <Skeleton width="85%" />
+                  <Skeleton width={150} height={22} />
+                </div>
+              </div>
+            ))}
           </div>
         ) : loadError ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #fecaca', color: '#64748b' }}>
@@ -501,7 +520,8 @@ export const CustomerSearchPage: React.FC = () => {
           border-color: #007bff !important;
         }
         @media (max-width: 768px) {
-          .search-card-item {
+          .search-card-item,
+          .search-card-skeleton {
             grid-template-columns: 1fr !important;
           }
         }

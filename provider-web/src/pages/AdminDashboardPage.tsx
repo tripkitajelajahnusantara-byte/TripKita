@@ -24,6 +24,7 @@ import { getProtectedDocumentURL, request } from '../utils/api';
 import { NotificationCenter, type NotificationItem } from '../components/NotificationCenter';
 import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
 import { useActionLock } from '../utils/useActionLock';
+import { Skeleton, SkeletonTable } from '../components/Skeleton';
 
 
 interface ProviderAdminData {
@@ -886,7 +887,7 @@ export const AdminDashboardPage: React.FC = () => {
               <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
                 <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
                   {bookingsLoading ? (
-                    <div className="loading-state">Memuat data booking...</div>
+                    <SkeletonTable rows={6} columns={6} label="Memuat data booking" />
                   ) : (
                     <table className="admin-providers-table">
                       <thead>
@@ -1007,7 +1008,7 @@ export const AdminDashboardPage: React.FC = () => {
                 
                 <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
                   {refundLoading ? (
-                    <div className="loading-state">Memuat data refund...</div>
+                    <SkeletonTable rows={6} columns={8} label="Memuat data refund" />
                   ) : (
                     <table className="admin-providers-table">
                       <thead>
@@ -1087,7 +1088,7 @@ export const AdminDashboardPage: React.FC = () => {
               <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
                 <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
                   {payoutLoading ? (
-                    <div className="loading-state">Memuat data pengajuan pencairan...</div>
+                    <SkeletonTable rows={6} columns={8} label="Memuat data pengajuan pencairan" />
                   ) : (
                     <table className="admin-providers-table">
                       <thead>
@@ -1297,7 +1298,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {/* Main Providers Table */}
                   <div className="providers-table-wrapper">
                     {loading ? (
-                      <div className="loading-state">Memuat data mitra...</div>
+                      <SkeletonTable rows={6} columns={8} label="Memuat data mitra" />
                     ) : (
                       <table className="admin-providers-table">
                         <thead>
@@ -1637,7 +1638,7 @@ export const AdminDashboardPage: React.FC = () => {
                           </div>
                         </div>
                       ) : !previewObjectUrl ? (
-                        <div style={{ padding: '24px', color: '#64748b' }}>Memuat dokumen...</div>
+                        <div style={{ padding: '16px', width: '100%' }} role="status"><span className="sr-only">Memuat dokumen</span><Skeleton height={420} radius={10} /></div>
                       ) : previewDocName.toLowerCase().includes('.pdf') ? (
                         <iframe 
                           src={previewObjectUrl}

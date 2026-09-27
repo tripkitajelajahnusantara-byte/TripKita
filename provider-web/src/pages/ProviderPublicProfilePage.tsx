@@ -3,6 +3,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
+import { Skeleton, SkeletonCards } from '../components/Skeleton';
 import { ArrowLeft, MapPin, Star, Package, MessageSquare, Award } from 'lucide-react';
 
 interface TripPackage {
@@ -120,8 +121,20 @@ export const ProviderPublicProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
-        <p>Memuat profil mitra provider...</p>
+      <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '80px' }}>
+        {/* Kerangka banner, kartu profil provider, lalu grid paket */}
+        <Skeleton height={240} radius={0} />
+        <div className="container" style={{ maxWidth: '1080px', margin: '-60px auto 0 auto', padding: '0 20px', position: 'relative', zIndex: 10 }}>
+          <div aria-hidden="true" style={{ backgroundColor: '#ffffff', borderRadius: '20px', padding: '28px', border: '1px solid #e2e8f0', marginBottom: '30px', display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <Skeleton width={88} height={88} radius={20} />
+            <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <Skeleton width="45%" height={24} />
+              <Skeleton width="30%" />
+              <Skeleton width="80%" />
+            </div>
+          </div>
+          <SkeletonCards count={6} minWidth={240} label="Memuat profil mitra provider" />
+        </div>
       </div>
     );
   }

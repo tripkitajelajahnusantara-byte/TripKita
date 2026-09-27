@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, startTransition, useCallback, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Route } from '../types';
 import { request, setProviderToken, getProviderToken, removeProviderToken, setCustomerToken, getCustomerToken, removeCustomerToken, revokeSessionToken } from '../utils/api';
@@ -225,10 +225,19 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
   const [customerProfile, setCustomerProfile] = useState<ProviderProfile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
+  // Hanya pemuatan profil pertama yang menahan tampilan; bila ada token, layar
+  // awal langsung memakai kerangka shimmer alih-alih sempat merender halaman
+  // tamu lalu berganti.
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(() => !!(getProviderToken() || getCustomerToken()));
   // Menandai permintaan profil aktif agar respons dari sesi lama tidak dapat
   // menimpa state atau menghapus token sesi yang baru dibuat saat login.
   const profileRequestSequence = useRef(0);
+  // Salinan profil untuk fetchSessionProfile yang sengaja tidak bergantung
+  // pada state profil agar referensinya stabil.
+  const providerProfileRef = useRef<ProviderProfile | null>(null);
+  const customerProfileRef = useRef<ProviderProfile | null>(null);
+  useEffect(() => { providerProfileRef.current = providerProfile; }, [providerProfile]);
+  useEffect(() => { customerProfileRef.current = customerProfile; }, [customerProfile]);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
   const [selectedPackageForDetail, setSelectedPackageForDetail] = useState<any>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<number | null>(null);
@@ -302,7 +311,9 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Sync hash changes with internal route state
   const navigateTo = useCallback((newRoute: Route) => {
-    setRoute(newRoute);
+    // Transisi membuat halaman lama tetap tampil sampai chunk halaman baru
+    // siap, sehingga fallback Suspense tidak menutup layar tiap pindah menu.
+    startTransition(() => setRoute(newRoute));
     const targetHash = getHashFromRoute(newRoute);
     if (window.location.hash !== targetHash) {
       window.location.hash = targetHash;
@@ -313,7 +324,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   useEffect(() => {
     const handleHashChange = () => {
       const targetRoute = getRouteFromHash();
-      setRoute(targetRoute);
+      startTransition(() => setRoute(targetRoute));
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -321,11 +332,17 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
 
   const fetchSessionProfile = useCallback(async (targetRoute: Route) => {
     const requestSequence = ++profileRequestSequence.current;
-    setLoadingProfile(true);
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
     const isProviderRoute = hash.includes('/provider') || hash.includes('/admin') ||
       ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard'].includes(targetRoute);
     let tokenUsed: string | null = null;
+
+    // Profil divalidasi ulang setiap pindah route agar perubahan status dari
+    // admin cepat terbaca. Bila profil area ini sudah ada, validasi berjalan di
+    // latar belakang; layar hanya ditahan saat profil belum pernah dimuat.
+    const knownProfile = isProviderRoute ? providerProfileRef.current : customerProfileRef.current;
+    const areaToken = isProviderRoute ? getProviderToken() : getCustomerToken();
+    setLoadingProfile(!knownProfile && !!areaToken);
 
     const requestIsCurrent = () => {
       if (requestSequence !== profileRequestSequence.current) return false;
@@ -414,7 +431,8 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
 
       if (roleMayOpenDestination) {
         window.location.hash = returnHash;
-        setRoute(getRouteFromHash());
+        const destination = getRouteFromHash();
+        startTransition(() => setRoute(destination));
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }

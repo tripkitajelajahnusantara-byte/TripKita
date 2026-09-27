@@ -5,47 +5,93 @@ import { Footer } from './components/Footer';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from './components/LegalModals';
 import { getCustomerToken, getProviderToken } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
-
-const AppLoadingIndicator: React.FC<{ label: string; fullScreen?: boolean }> = ({ label, fullScreen = false }) => (
-  <div className={`app-loading-state ${fullScreen ? 'is-fullscreen' : ''}`} role="status" aria-live="polite">
-    <div className="app-loading-card">
-      <img src="/tementrip_official_logo.png" alt="" className="app-loading-logo" aria-hidden="true" />
-      <span className="app-loading-spinner" aria-hidden="true" />
-      <span className="app-loading-label">{label}</span>
-    </div>
-  </div>
-);
+import { PageSkeleton } from './components/Skeleton';
 
 // Setiap halaman dimuat sebagai chunk terpisah supaya kunjungan pertama tidak
-// perlu mengunduh seluruh aplikasi sekaligus.
-const AboutPage = React.lazy(() => import('./pages/AboutPage').then((m) => ({ default: m.AboutPage })));
-const CustomerHelpPage = React.lazy(() => import('./pages/CustomerHelpPage').then((m) => ({ default: m.CustomerHelpPage })));
-const RegisterPage = React.lazy(() => import('./pages/RegisterPage').then((m) => ({ default: m.RegisterPage })));
-const LoginPage = React.lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
-const DashboardPage = React.lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
-const KelolaPaketPage = React.lazy(() => import('./pages/KelolaPaketPage').then((m) => ({ default: m.KelolaPaketPage })));
-const ManageBookingPage = React.lazy(() => import('./pages/ManageBookingPage').then((m) => ({ default: m.ManageBookingPage })));
-const ProfileProviderPage = React.lazy(() => import('./pages/ProfileProviderPage').then((m) => ({ default: m.ProfileProviderPage })));
-const AddPackagePage = React.lazy(() => import('./pages/AddPackagePage').then((m) => ({ default: m.AddPackagePage })));
-const AdminDashboardPage = React.lazy(() => import('./pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })));
-const CustomerLandingPage = React.lazy(() => import('./pages/CustomerLandingPage').then((m) => ({ default: m.CustomerLandingPage })));
-const CustomerPackageDetailPage = React.lazy(() => import('./pages/CustomerPackageDetailPage').then((m) => ({ default: m.CustomerPackageDetailPage })));
-const CustomerBookingPage = React.lazy(() => import('./pages/CustomerBookingPage').then((m) => ({ default: m.CustomerBookingPage })));
-const CustomerHistoryPage = React.lazy(() => import('./pages/CustomerHistoryPage').then((m) => ({ default: m.CustomerHistoryPage })));
-const CustomerRegisterPage = React.lazy(() => import('./pages/CustomerRegisterPage').then((m) => ({ default: m.CustomerRegisterPage })));
-const CustomerLoginPage = React.lazy(() => import('./pages/CustomerLoginPage').then((m) => ({ default: m.CustomerLoginPage })));
-const ProviderLandingPage = React.lazy(() => import('./pages/ProviderLandingPage').then((m) => ({ default: m.ProviderLandingPage })));
-const CustomerSearchPage = React.lazy(() => import('./pages/CustomerSearchPage').then((m) => ({ default: m.CustomerSearchPage })));
-const CustomerConfirmationPage = React.lazy(() => import('./pages/CustomerConfirmationPage').then((m) => ({ default: m.CustomerConfirmationPage })));
-const CustomerPaymentInvoicePage = React.lazy(() => import('./pages/CustomerPaymentInvoicePage').then((m) => ({ default: m.CustomerPaymentInvoicePage })));
-const ProviderFinancePage = React.lazy(() => import('./pages/ProviderFinancePage').then((m) => ({ default: m.ProviderFinancePage })));
-const ProviderPublicProfilePage = React.lazy(() => import('./pages/ProviderPublicProfilePage').then((m) => ({ default: m.ProviderPublicProfilePage })));
-const CustomerSettingsPage = React.lazy(() => import('./pages/CustomerSettingsPage').then((m) => ({ default: m.CustomerSettingsPage })));
-const CustomerTripPlannerPage = React.lazy(() => import('./pages/CustomerTripPlannerPage').then((m) => ({ default: m.CustomerTripPlannerPage })));
+// perlu mengunduh seluruh aplikasi sekaligus. Loader disimpan terpisah agar
+// chunk dapat diunduh lebih dulu saat browser senggang (lihat usePrefetchPages).
+const pageLoaders = {
+  AboutPage: () => import('./pages/AboutPage').then((m) => ({ default: m.AboutPage })),
+  CustomerHelpPage: () => import('./pages/CustomerHelpPage').then((m) => ({ default: m.CustomerHelpPage })),
+  RegisterPage: () => import('./pages/RegisterPage').then((m) => ({ default: m.RegisterPage })),
+  LoginPage: () => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })),
+  DashboardPage: () => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+  KelolaPaketPage: () => import('./pages/KelolaPaketPage').then((m) => ({ default: m.KelolaPaketPage })),
+  ManageBookingPage: () => import('./pages/ManageBookingPage').then((m) => ({ default: m.ManageBookingPage })),
+  ProfileProviderPage: () => import('./pages/ProfileProviderPage').then((m) => ({ default: m.ProfileProviderPage })),
+  AddPackagePage: () => import('./pages/AddPackagePage').then((m) => ({ default: m.AddPackagePage })),
+  AdminDashboardPage: () => import('./pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })),
+  CustomerLandingPage: () => import('./pages/CustomerLandingPage').then((m) => ({ default: m.CustomerLandingPage })),
+  CustomerPackageDetailPage: () => import('./pages/CustomerPackageDetailPage').then((m) => ({ default: m.CustomerPackageDetailPage })),
+  CustomerBookingPage: () => import('./pages/CustomerBookingPage').then((m) => ({ default: m.CustomerBookingPage })),
+  CustomerHistoryPage: () => import('./pages/CustomerHistoryPage').then((m) => ({ default: m.CustomerHistoryPage })),
+  CustomerRegisterPage: () => import('./pages/CustomerRegisterPage').then((m) => ({ default: m.CustomerRegisterPage })),
+  CustomerLoginPage: () => import('./pages/CustomerLoginPage').then((m) => ({ default: m.CustomerLoginPage })),
+  ProviderLandingPage: () => import('./pages/ProviderLandingPage').then((m) => ({ default: m.ProviderLandingPage })),
+  CustomerSearchPage: () => import('./pages/CustomerSearchPage').then((m) => ({ default: m.CustomerSearchPage })),
+  CustomerConfirmationPage: () => import('./pages/CustomerConfirmationPage').then((m) => ({ default: m.CustomerConfirmationPage })),
+  CustomerPaymentInvoicePage: () => import('./pages/CustomerPaymentInvoicePage').then((m) => ({ default: m.CustomerPaymentInvoicePage })),
+  ProviderFinancePage: () => import('./pages/ProviderFinancePage').then((m) => ({ default: m.ProviderFinancePage })),
+  ProviderPublicProfilePage: () => import('./pages/ProviderPublicProfilePage').then((m) => ({ default: m.ProviderPublicProfilePage })),
+  CustomerSettingsPage: () => import('./pages/CustomerSettingsPage').then((m) => ({ default: m.CustomerSettingsPage })),
+  CustomerTripPlannerPage: () => import('./pages/CustomerTripPlannerPage').then((m) => ({ default: m.CustomerTripPlannerPage })),
+} satisfies Record<string, () => Promise<{ default: React.ComponentType }>>;
+
+type PageName = keyof typeof pageLoaders;
+const DASHBOARD_PAGES: PageName[] = ['DashboardPage', 'KelolaPaketPage', 'ManageBookingPage', 'ProfileProviderPage', 'AddPackagePage', 'AdminDashboardPage', 'ProviderFinancePage'];
+const CUSTOMER_PAGES = (Object.keys(pageLoaders) as PageName[]).filter((name) => !DASHBOARD_PAGES.includes(name));
+
+// Mengunduh chunk halaman di area yang sedang dipakai ketika browser senggang,
+// sehingga klik menu berikutnya langsung terbuka tanpa menunggu jaringan.
+function usePrefetchPages(isDashboardArea: boolean) {
+  React.useEffect(() => {
+    const names = isDashboardArea ? DASHBOARD_PAGES : CUSTOMER_PAGES;
+    let cancelled = false;
+    const run = async () => {
+      for (const name of names) {
+        if (cancelled) return;
+        // Kegagalan prefetch diabaikan; halaman tetap dimuat normal saat dibuka.
+        await pageLoaders[name]().catch(() => undefined);
+      }
+    };
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200));
+    const cancelIdle = window.cancelIdleCallback ?? window.clearTimeout;
+    const handle = idle(() => { void run(); });
+    return () => {
+      cancelled = true;
+      cancelIdle(handle);
+    };
+  }, [isDashboardArea]);
+}
+const AboutPage = React.lazy(pageLoaders.AboutPage);
+const CustomerHelpPage = React.lazy(pageLoaders.CustomerHelpPage);
+const RegisterPage = React.lazy(pageLoaders.RegisterPage);
+const LoginPage = React.lazy(pageLoaders.LoginPage);
+const DashboardPage = React.lazy(pageLoaders.DashboardPage);
+const KelolaPaketPage = React.lazy(pageLoaders.KelolaPaketPage);
+const ManageBookingPage = React.lazy(pageLoaders.ManageBookingPage);
+const ProfileProviderPage = React.lazy(pageLoaders.ProfileProviderPage);
+const AddPackagePage = React.lazy(pageLoaders.AddPackagePage);
+const AdminDashboardPage = React.lazy(pageLoaders.AdminDashboardPage);
+const CustomerLandingPage = React.lazy(pageLoaders.CustomerLandingPage);
+const CustomerPackageDetailPage = React.lazy(pageLoaders.CustomerPackageDetailPage);
+const CustomerBookingPage = React.lazy(pageLoaders.CustomerBookingPage);
+const CustomerHistoryPage = React.lazy(pageLoaders.CustomerHistoryPage);
+const CustomerRegisterPage = React.lazy(pageLoaders.CustomerRegisterPage);
+const CustomerLoginPage = React.lazy(pageLoaders.CustomerLoginPage);
+const ProviderLandingPage = React.lazy(pageLoaders.ProviderLandingPage);
+const CustomerSearchPage = React.lazy(pageLoaders.CustomerSearchPage);
+const CustomerConfirmationPage = React.lazy(pageLoaders.CustomerConfirmationPage);
+const CustomerPaymentInvoicePage = React.lazy(pageLoaders.CustomerPaymentInvoicePage);
+const ProviderFinancePage = React.lazy(pageLoaders.ProviderFinancePage);
+const ProviderPublicProfilePage = React.lazy(pageLoaders.ProviderPublicProfilePage);
+const CustomerSettingsPage = React.lazy(pageLoaders.CustomerSettingsPage);
+const CustomerTripPlannerPage = React.lazy(pageLoaders.CustomerTripPlannerPage);
 
 const AppContent: React.FC = () => {
   const { route, loadingProfile, providerProfile, customerProfile, navigateTo } = useNavigation();
   const [showGlobalCustomerTerms, setShowGlobalCustomerTerms] = React.useState(false);
+  usePrefetchPages(!!providerProfile || ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard'].includes(route));
 
   React.useEffect(() => {
     if (customerProfile && customerProfile.role === 'CUSTOMER') {
@@ -112,7 +158,7 @@ const AppContent: React.FC = () => {
   }, [route, loadingProfile, providerProfile, customerProfile, navigateTo]);
 
   if (loadingProfile) {
-    return <AppLoadingIndicator label="Menyiapkan profil Anda..." fullScreen />;
+    return <PageSkeleton fullScreen />;
   }
 
   // Mandatory Terms Modal Overlay for Google OAuth / First Time Customer Login
@@ -299,9 +345,9 @@ const AppContent: React.FC = () => {
 
 import { CustomAlertProvider } from './components/CustomAlertModal';
 
-const PageLoadingFallback: React.FC = () => (
-  <AppLoadingIndicator label="Menyiapkan halaman..." />
-);
+// Fallback hanya terlihat pada pemuatan pertama; perpindahan menu memakai
+// transisi (NavigationContext) sehingga halaman lama tetap tampil.
+const PageLoadingFallback: React.FC = () => <PageSkeleton fullScreen />;
 
 function App() {
   return (

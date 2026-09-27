@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, X, CreditCard, RefreshCw, Calendar, Wallet, Info, UserPlus, ShieldCheck, CheckCheck, Target, CloudSun } from 'lucide-react';
 import { request } from '../utils/api';
+import { SkeletonList } from './Skeleton';
 import { useNavigation } from '../context/NavigationContext';
 
 export type NotificationType =
@@ -329,8 +330,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
             )}
 
             {loading && notifications.length === 0 ? (
-              <div style={{ padding: '30px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-                Memuat notifikasi...
+              <div style={{ padding: '8px 6px' }}>
+                <SkeletonList rows={3} label="Memuat notifikasi" />
               </div>
             ) : notifications.length === 0 ? (
               <div style={{ padding: '30px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>

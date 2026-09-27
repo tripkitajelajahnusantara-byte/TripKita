@@ -4,6 +4,7 @@ import { request } from '../utils/api';
 import { fetchCheckoutConfig } from '../utils/checkoutConfig';
 import { useActionLock } from '../utils/useActionLock';
 import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, MessageSquare, Star, LoaderCircle } from 'lucide-react';
+import { Skeleton } from '../components/Skeleton';
 
 interface BookingItem {
   id: number;
@@ -608,8 +609,27 @@ export const CustomerHistoryPage: React.FC = () => {
         </h1>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
-            <p>Sedang memuat riwayat pesanan...</p>
+          <div role="status" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <span className="sr-only">Memuat riwayat pesanan</span>
+            {/* Kerangka kartu pesanan: judul + status, detail jadwal, lalu baris harga */}
+            {Array.from({ length: 3 }, (_, i) => (
+              <div
+                key={i}
+                aria-hidden="true"
+                style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                  <Skeleton width="55%" height={18} />
+                  <Skeleton width={96} height={22} radius={999} />
+                </div>
+                <Skeleton width="38%" />
+                <Skeleton width="62%" />
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                  <Skeleton width={140} height={18} />
+                  <Skeleton width={120} height={34} radius={10} />
+                </div>
+              </div>
+            ))}
           </div>
         ) : bookings.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '50px 24px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#64748b' }}>

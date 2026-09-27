@@ -6,6 +6,7 @@ import { Search, ShieldCheck, CreditCard, Headset, ThumbsUp, Star, MapPin, Calen
 import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 import { ShareModal } from '../components/ShareModal';
 import { TripImage } from '../components/TripImage';
+import { SkeletonCards } from '../components/Skeleton';
 
 import heroImage from '../assets/hero.jpg';
 
@@ -441,9 +442,7 @@ export const CustomerLandingPage: React.FC = () => {
       <div id="main-trips-section" className="container" style={{ marginTop: '45px', maxWidth: '1120px', margin: '45px auto 0 auto', padding: '0 20px' }}>
         
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
-            <p>Sedang memuat paket wisata terbaik...</p>
-          </div>
+          <SkeletonCards count={8} minWidth={235} label="Memuat paket wisata" />
         ) : loadError ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '16px', color: '#64748b', border: '1px solid #fecaca' }}>
             <h3 style={{ color: '#0f172a', fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>Gagal Memuat Paket Wisata</h3>
