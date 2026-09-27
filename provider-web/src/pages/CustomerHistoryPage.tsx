@@ -212,6 +212,19 @@ export const CustomerHistoryPage: React.FC = () => {
 	const bookingId = urlParams.get('booking_id');
 
 	if (paymentResult && bookingId) {
+	  if (paymentResult.toLowerCase() === 'failed') {
+		setModalNotice({
+		  title: 'Pembayaran Belum Berhasil',
+		  message: 'Pembayaran iPaymu dibatalkan atau gagal diproses. Pesanan tidak dianggap lunas dan tidak ada dana yang kami catat. Anda dapat memeriksa status pesanan atau membuat pemesanan kembali.',
+		  isError: true,
+		});
+	  } else if (paymentResult.toLowerCase() === 'success') {
+		setModalNotice({
+		  title: 'Pembayaran Sedang Diverifikasi',
+		  message: 'Anda telah kembali dari iPaymu. Status lunas hanya akan tampil setelah pembayaran dikonfirmasi melalui callback resmi iPaymu.',
+		  isError: false,
+		});
+	  }
 	  // Redirect parameters are informational only. Payment status is accepted
 	  // exclusively from the verified backend webhook.
 	  if (window.history.replaceState) {

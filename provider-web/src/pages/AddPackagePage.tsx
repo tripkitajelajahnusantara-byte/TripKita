@@ -21,6 +21,14 @@ import { PackageDateManager } from '../components/PackageDateManager';
 import { PROVINCES } from '../utils/locationData';
 import { OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
 import { useActionLock } from '../utils/useActionLock';
+import { useCustomAlert } from '../components/CustomAlertModal';
+import {
+  formatMeetingPointCoordinates,
+  getMeetingPointCoordinates,
+  meetingPointPinIcon,
+  MeetingPointMapViewport,
+  type MeetingPointCoordinates,
+} from '../components/MeetingPointMap';
 
 /** Open Trip berangkat bersama pada jadwal tetap; tipe lain eksklusif per tanggal. */
 function isOpenTripType(tripType: string): boolean {
@@ -28,32 +36,17 @@ function isOpenTripType(tripType: string): boolean {
 }
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 
-const customIcon = new L.Icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
-
-function LocationPicker({ position, setPosition, setMeetPoint }: any) {
+function LocationPicker({ position, onSelect }: {
+  position: MeetingPointCoordinates | null;
+  onSelect: (position: MeetingPointCoordinates) => void;
+}) {
   useMapEvents({
     click(e) {
-      setPosition(e.latlng);
-      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`)
-        .then(res => res.json())
-        .then(data => {
-            if (data && data.display_name) {
-                setMeetPoint(data.display_name);
-            }
-        }).catch(() => {
-            setMeetPoint(`Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`);
-        });
+      onSelect({ lat: e.latlng.lat, lng: e.latlng.lng });
     },
   });
-  return position === null ? null : <Marker position={position} icon={customIcon} />;
+  return position === null ? null : <Marker position={[position.lat, position.lng]} icon={meetingPointPinIcon} />;
 }
 
 export const CATEGORIES = OFFICIAL_CATEGORIES;
@@ -61,16 +54,19 @@ export const TRIP_TYPES = OFFICIAL_TRIP_TYPES;
 
 export const AddPackagePage: React.FC = () => {
   const { navigateTo, editingPackageId } = useNavigation();
+  const { showAlert } = useCustomAlert();
   const [activeStep, setActiveStep] = useState<'info' | 'itinerary' | 'facilities' | 'pricing' | 'photos'>('info');
 
   // Form states
   const [packageName, setPackageName] = useState('');
-  const [category, setCategory] = useState('');
-  const [tripType, setTripType] = useState('');
+  // Select menampilkan opsi pertama walau value React masih kosong. Beri nilai
+  // awal nyata agar menyimpan tanpa menyentuh dropdown tidak mengirim string kosong.
+  const [category, setCategory] = useState(CATEGORIES[0] || '');
+  const [tripType, setTripType] = useState(TRIP_TYPES[0] || '');
   const [duration, setDuration] = useState('');
   const [location, setLocation] = useState('');
   const [meetPoint, setMeetPoint] = useState('');
-  const [mapPosition, setMapPosition] = useState<any>(null);
+  const [mapPosition, setMapPosition] = useState<MeetingPointCoordinates | null>(null);
   const [description, setDescription] = useState('');
   const [minGuests, setMinGuests] = useState('');
   const [maxGuests, setMaxGuests] = useState('');
@@ -88,6 +84,29 @@ export const AddPackagePage: React.FC = () => {
   // Unggah foto dan simpan paket berbagi satu kunci: paket tidak boleh disimpan
   // selagi foto masih diunggah (foto baru belum masuk payload), dan sebaliknya.
   const { pending, isBusy, run } = useActionLock();
+
+  const showValidation = (message: string, step?: typeof activeStep) => {
+    if (step) setActiveStep(step);
+    showAlert({
+      title: 'Periksa Data Paket',
+      message,
+      type: 'warning',
+      confirmText: 'Perbaiki Data',
+    });
+  };
+
+  const handleDigitsOnlyInput = (
+    value: string,
+    setter: React.Dispatch<React.SetStateAction<string>>,
+    fieldLabel: string,
+    step: typeof activeStep,
+  ) => {
+    if (/^\d*$/.test(value)) {
+      setter(value);
+      return;
+    }
+    showValidation(`${fieldLabel} hanya boleh diisi angka bulat tanpa huruf, tanda minus, atau desimal.`, step);
+  };
 
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
@@ -162,6 +181,11 @@ export const AddPackagePage: React.FC = () => {
           setPackageName(pkg.name || '');
           setLocation(pkg.destination || '');
           setMeetPoint(pkg.meetingPoint || '');
+          const savedCoordinates = getMeetingPointCoordinates(pkg);
+          if (savedCoordinates) {
+            setMapPosition(savedCoordinates);
+            setMeetPoint(formatMeetingPointCoordinates(savedCoordinates));
+          }
           setPrice(pkg.price ? String(pkg.price) : '');
           if (pkg.quotaMin) setQuotaMin(String(pkg.quotaMin));
           setQuotaMax(pkg.quotaMax ? String(pkg.quotaMax) : '');
@@ -250,7 +274,7 @@ export const AddPackagePage: React.FC = () => {
   const triggerPhotoUpload = () => {
     if (isBusy) return;
     if (packagePhotos.length >= 20) {
-      alert('⚠️ Jumlah foto paket telah mencapai batas maksimal 20 foto.');
+      showAlert({ title: 'Batas Foto Tercapai', message: 'Jumlah foto paket telah mencapai batas maksimal 20 foto.', type: 'warning' });
       return;
     }
     document.getElementById('photo-file-input')?.click();
@@ -271,18 +295,18 @@ export const AddPackagePage: React.FC = () => {
           const file = files[i];
 
           if (packagePhotos.length + newPhotos.length >= 20) {
-            alert('⚠️ Jumlah foto paket telah mencapai batas maksimal 20 foto.');
+            showAlert({ title: 'Batas Foto Tercapai', message: 'Jumlah foto paket telah mencapai batas maksimal 20 foto.', type: 'warning' });
             break;
           }
 
           const ext = file.name.split('.').pop()?.toLowerCase();
           if (!ext || !allowedExtensions.includes(ext)) {
-            alert(`⚠️ Format file "${file.name}" tidak didukung. Hanya format JPG, JPEG, dan PNG yang diperbolehkan.`);
+            showAlert({ title: 'Format Foto Tidak Didukung', message: `File “${file.name}” harus menggunakan format JPG, JPEG, atau PNG.`, type: 'warning' });
             continue;
           }
 
           if (file.size > maxFileSize) {
-            alert(`⚠️ Ukuran foto "${file.name}" melebihi 2 MB (Ukuran: ${(file.size / (1024 * 1024)).toFixed(2)} MB). Harap unggah foto maksimal 2 MB.`);
+            showAlert({ title: 'Ukuran Foto Terlalu Besar', message: `Ukuran “${file.name}” adalah ${(file.size / (1024 * 1024)).toFixed(2)} MB. Maksimal ukuran setiap foto adalah 2 MB.`, type: 'warning' });
             continue;
           }
 
@@ -301,9 +325,13 @@ export const AddPackagePage: React.FC = () => {
           }
         }
       } catch (err: any) {
-        alert(newPhotos.length > 0
-          ? `${err.message || 'Gagal mengunggah foto'}. ${newPhotos.length} foto yang sudah terunggah tetap disimpan.`
-          : (err.message || 'Gagal mengunggah foto'));
+		showAlert({
+		  title: 'Unggah Foto Belum Selesai',
+		  message: newPhotos.length > 0
+			? `${err.message || 'Gagal mengunggah foto'}. ${newPhotos.length} foto yang sudah terunggah tetap disimpan.`
+			: (err.message || 'Gagal mengunggah foto'),
+		  type: 'error',
+		});
       } finally {
         // Foto yang sudah berhasil diunggah sebelum terjadi kegagalan tetap
         // ditambahkan, supaya provider tidak perlu mengunggah ulang semuanya.
@@ -322,68 +350,123 @@ export const AddPackagePage: React.FC = () => {
   const handleSubmit = async (status: 'draft' | 'publish') => {
     if (isBusy) return;
 
-    const qMin = parseInt(quotaMin, 10);
-    const qMax = parseInt(quotaMax, 10);
-    const minG = parseInt(minGuests, 10);
-    const maxG = parseInt(maxGuests, 10);
+	const priceValue = price === '' ? Number.NaN : Number(price);
+	const qMin = quotaMin === '' ? Number.NaN : Number(quotaMin);
+	const qMax = quotaMax === '' ? Number.NaN : Number(quotaMax);
+	const minG = minGuests === '' ? Number.NaN : Number(minGuests);
+	const maxG = maxGuests === '' ? Number.NaN : Number(maxGuests);
+	const durationValue = Number(duration);
+	const minAgeValue = minAge === '' ? 0 : Number(minAge);
+	const maxAgeValue = maxAge === '' ? 0 : Number(maxAge);
+
+	// Validasi ini berlaku juga saat menyimpan draf: draf boleh belum lengkap,
+	// tetapi nilai yang sudah diisi tidak boleh rusak atau negatif.
+	if (duration !== '' && (!Number.isInteger(durationValue) || durationValue < 1)) {
+	  showValidation('Durasi harus berupa bilangan bulat minimal 1 hari dan tidak boleh bernilai minus.', 'info');
+	  return;
+	}
+	if ((minAge !== '' && (!Number.isInteger(minAgeValue) || minAgeValue < 0)) ||
+	    (maxAge !== '' && (!Number.isInteger(maxAgeValue) || maxAgeValue < 0))) {
+	  showValidation('Batas umur harus berupa bilangan bulat 0 atau lebih. Nilai umur tidak boleh minus.', 'pricing');
+	  return;
+	}
+	if (maxAge !== '' && minAgeValue > maxAgeValue) {
+	  showValidation(`Umur maksimal (${maxAgeValue}) tidak boleh lebih kecil dari umur minimal (${minAgeValue}).`, 'pricing');
+	  return;
+	}
+	const enteredPricingValues = [
+	  ['Harga', price, priceValue],
+	  ['Kuota minimal', quotaMin, qMin],
+	  ['Kuota maksimal', quotaMax, qMax],
+	  ['Minimum peserta', minGuests, minG],
+	  ['Maksimum peserta', maxGuests, maxG],
+	] as const;
+	const invalidPricing = enteredPricingValues.find(([, raw, value]) => raw !== '' && (!Number.isFinite(value) || !Number.isInteger(value) || value < 0));
+	if (invalidPricing) {
+	  showValidation(`${invalidPricing[0]} harus berupa bilangan bulat dan tidak boleh bernilai minus.`, 'pricing');
+	  return;
+	}
+	if (priceValue > 1_000_000_000_000 || qMax > 10_000) {
+	  showValidation('Harga atau kuota paket melebihi batas yang diizinkan.', 'pricing');
+	  return;
+	}
+	if (startDate && endDate && endDate < startDate) {
+	  showValidation('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.', 'pricing');
+	  return;
+	}
 
     if (status === 'publish') {
       if (!packageName.trim()) {
-        alert('⚠️ Nama paket wisata harus diisi!');
+		showValidation('Nama paket wisata wajib diisi sebelum paket dipublikasikan.', 'info');
         return;
       }
+	  if (!category || !tripType) {
+		showValidation('Kategori dan tipe trip wajib dipilih sebelum paket dipublikasikan.', 'info');
+		return;
+	  }
       if (!location.trim()) {
-        alert('⚠️ Lokasi destinasi harus diisi!');
+		showValidation('Lokasi destinasi wajib dipilih sebelum paket dipublikasikan.', 'info');
         return;
       }
-      if (!price || parseInt(price, 10) <= 0) {
-        alert('⚠️ Harga per orang harus berupa angka lebih dari 0!');
+	  if (!meetPoint.trim()) {
+		showValidation('Pin titik kumpul wajib dipilih pada peta.', 'info');
+		return;
+	  }
+	  if (!mapPosition) {
+		showValidation('Klik peta untuk menentukan koordinat latitude dan longitude titik kumpul.', 'info');
+		return;
+	  }
+	  if (!description.trim()) {
+		showValidation('Deskripsi paket wajib diisi sebelum paket dipublikasikan.', 'info');
+		return;
+	  }
+      if (!price || priceValue <= 0) {
+		showValidation('Harga per orang harus berupa angka lebih dari 0.', 'pricing');
         return;
       }
-      if (!duration || parseInt(duration, 10) < 1) {
-        alert('⚠️ Durasi paket wajib diisi dan minimal 1 hari!');
+      if (!duration || durationValue < 1) {
+		showValidation('Durasi paket wajib diisi dan minimal 1 hari.', 'info');
         return;
       }
       if (isNaN(qMin) || qMin < 1) {
-        alert('⚠️ Kuota minimal harus diisi dan minimal 1 peserta!');
+		showValidation('Kuota minimal wajib diisi dan minimal 1 peserta.', 'pricing');
         return;
       }
       if (isNaN(qMax) || qMax <= 0) {
-        alert('⚠️ Kuota maksimal harus lebih besar dari 0 (contoh: 15)!');
+		showValidation('Kuota maksimal harus lebih besar dari 0, misalnya 15.', 'pricing');
         return;
       }
       if (qMax < qMin) {
-        alert(`⚠️ Kuota maksimal (${qMax}) tidak boleh lebih kecil dari kuota minimal (${qMin})! Silakan naikkan kuota maksimal atau sesuaikan kuota minimal.`);
+		showValidation(`Kuota maksimal (${qMax}) tidak boleh lebih kecil dari kuota minimal (${qMin}).`, 'pricing');
         return;
       }
       if (isNaN(minG) || minG < 1) {
-        alert('⚠️ Minimum peserta per pemesanan minimal 1 orang!');
+		showValidation('Minimum peserta per pemesanan minimal 1 orang.', 'pricing');
         return;
       }
       if (isNaN(maxG) || maxG < minG) {
-        alert(`⚠️ Maksimum peserta per pemesanan (${maxG}) tidak boleh lebih kecil dari minimum peserta (${minG})!`);
+		showValidation(`Maksimum peserta per pemesanan (${maxG}) tidak boleh lebih kecil dari minimum peserta (${minG}).`, 'pricing');
         return;
       }
       if (maxG > qMax) {
-        alert(`⚠️ Maksimum peserta per pemesanan (${maxG}) tidak boleh melebihi kuota maksimal paket (${qMax})!`);
+		showValidation(`Maksimum peserta per pemesanan (${maxG}) tidak boleh melebihi kuota maksimal paket (${qMax}).`, 'pricing');
         return;
       }
       if (!startDate || !endDate) {
-        alert('⚠️ Jadwal tanggal mulai dan tanggal selesai keberangkatan harus diisi!');
+		showValidation('Tanggal mulai dan tanggal selesai keberangkatan wajib diisi.', 'pricing');
         return;
       }
       if (startDate < todayStr) {
-        alert('⚠️ Tanggal mulai keberangkatan tidak boleh memilih tanggal yang sudah lewat dari hari ini!');
+		showValidation('Tanggal mulai keberangkatan tidak boleh menggunakan tanggal yang sudah lewat.', 'pricing');
         return;
       }
       if (packagePhotos.length < 3) {
-        alert(`⚠️ Foto masih kurang! Minimal 3 foto wajib diunggah (Saat ini baru ada ${packagePhotos.length} foto).`);
-        setActiveStep('photos');
+		showValidation(`Minimal 3 foto wajib diunggah. Saat ini baru ada ${packagePhotos.length} foto.`, 'photos');
         return;
       }
     } else {
       if (!packageName.trim()) {
-        alert('⚠️ Nama paket harus diisi untuk menyimpan draf');
+		showValidation('Nama paket harus diisi untuk menyimpan draf.', 'info');
         return;
       }
     }
@@ -397,19 +480,21 @@ export const AddPackagePage: React.FC = () => {
           name: packageName,
           destination: location,
           meetingPoint: meetPoint,
+          meetingPointLatitude: mapPosition?.lat ?? null,
+          meetingPointLongitude: mapPosition?.lng ?? null,
           category: category,
           tripType: tripType,
-          price: parseInt(price, 10) || 0,
+		  price: Number.isFinite(priceValue) ? priceValue : 0,
           quotaMin: Number.isFinite(qMin) ? qMin : 0,
           quotaMax: Number.isFinite(qMax) ? qMax : 0,
           startDate: startDate,
           endDate: endDate,
           schedule: finalSchedule,
-          duration: parseInt(duration, 10) || 1,
+		  duration: duration === '' ? 1 : durationValue,
           minGuests: Number.isFinite(minG) ? minG : 0,
           maxGuests: Number.isFinite(maxG) ? maxG : 0,
-          minAge: parseInt(minAge, 10) || 0,
-          maxAge: parseInt(maxAge, 10) || 0,
+		  minAge: minAgeValue,
+		  maxAge: maxAgeValue,
           status: dbStatus,
           description: description,
           includedFacilities: includedFacilities.join('\n'),
@@ -419,22 +504,49 @@ export const AddPackagePage: React.FC = () => {
           images: packagePhotos.join(','),
         };
 
+		let savedPackage;
         if (editingPackageId) {
-          await request(`/provider/packages/${editingPackageId}`, {
+          savedPackage = await request(`/provider/packages/${editingPackageId}`, {
             method: 'PUT',
             body: JSON.stringify(payload),
           });
-          alert(status === 'draft' ? `Draf paket "${packageName}" berhasil diperbarui.` : `Paket "${packageName}" berhasil dipublikasikan.`);
         } else {
-          await request('/provider/packages', {
+		  savedPackage = await request('/provider/packages', {
             method: 'POST',
             body: JSON.stringify(payload),
           });
-          alert(status === 'draft' ? `Draf paket "${packageName}" berhasil dibuat.` : `Paket "${packageName}" berhasil dipublikasikan.`);
         }
-        navigateTo('kelola-paket');
+
+		// Jangan tampilkan sukses bila server mengabaikan nilai update. PKG-02
+		// mengharuskan hasil tersimpan sama dengan payload yang dinyatakan sukses.
+		if (!savedPackage?.id || savedPackage.status !== dbStatus || savedPackage.name !== payload.name ||
+		    savedPackage.category !== payload.category || savedPackage.tripType !== payload.tripType ||
+		    Number(savedPackage.duration) !== payload.duration ||
+		    (mapPosition && (
+		      !Number.isFinite(Number(savedPackage.meetingPointLatitude)) ||
+		      !Number.isFinite(Number(savedPackage.meetingPointLongitude)) ||
+		      Math.abs(Number(savedPackage.meetingPointLatitude) - mapPosition.lat) > 0.0000001 ||
+		      Math.abs(Number(savedPackage.meetingPointLongitude) - mapPosition.lng) > 0.0000001
+		    ))) {
+		  throw new Error('Server belum menyimpan seluruh perubahan paket. Muat ulang data lalu coba kembali.');
+		}
+
+		showAlert({
+		  title: status === 'draft' ? 'Draf Tersimpan' : 'Paket Berhasil Dipublikasikan',
+		  message: status === 'draft'
+		    ? `Draf paket “${packageName}” berhasil ${editingPackageId ? 'diperbarui' : 'dibuat'}.`
+		    : `Paket “${packageName}” sudah aktif dan dapat dilihat pelanggan.`,
+		  type: 'success',
+		  confirmText: 'Lihat Daftar Paket',
+		  onConfirm: () => navigateTo('kelola-paket'),
+		});
       } catch (err: any) {
-        alert(err.message || 'Gagal menyimpan paket wisata');
+		showAlert({
+		  title: 'Paket Belum Tersimpan',
+		  message: err.message || 'Gagal menyimpan paket wisata. Periksa kembali data yang diisi.',
+		  type: 'error',
+		  confirmText: 'Periksa Kembali',
+		});
       }
     });
   };
@@ -566,9 +678,11 @@ export const AddPackagePage: React.FC = () => {
                     <label>Durasi *</label>
                     <div className="input-suffix-wrapper">
                       <input 
-                        type="number" 
+						type="text"
+						inputMode="numeric"
+						pattern="[0-9]*"
                         value={duration} 
-                        onChange={(e) => setDuration(e.target.value)} 
+                        onChange={(e) => handleDigitsOnlyInput(e.target.value, setDuration, 'Durasi', 'info')}
                         placeholder="Contoh: 3"
                       />
                       <span className="input-suffix">Hari</span>
@@ -594,21 +708,30 @@ export const AddPackagePage: React.FC = () => {
                 </div>
 
                 <div className="input-group">
-                  <label>Titik Kumpul *</label>
-                  <p style={{fontSize: '12.5px', color: '#64748b', marginBottom: '8px', marginTop: '-4px'}}>Pilih lokasi di peta atau ketik langsung nama titik kumpulnya.</p>
+                  <label>Koordinat Titik Kumpul *</label>
+                  <p style={{fontSize: '12.5px', color: '#64748b', marginBottom: '8px', marginTop: '-4px'}}>Klik posisi tepat di peta. Sistem menyimpan latitude dan longitude agar pin tidak berubah atau hilang.</p>
                   <div style={{ height: '250px', width: '100%', marginBottom: '12px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', zIndex: 1 }}>
-                    <MapContainer center={[-0.7893, 113.9213]} zoom={4} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+                    <MapContainer center={mapPosition ? [mapPosition.lat, mapPosition.lng] : [-0.7893, 113.9213]} zoom={mapPosition ? 16 : 4} style={{ height: '100%', width: '100%', zIndex: 1 }}>
                       <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       />
-                      <LocationPicker position={mapPosition} setPosition={setMapPosition} setMeetPoint={setMeetPoint} />
+                      {mapPosition && <MeetingPointMapViewport position={mapPosition} zoom={16} />}
+                      <LocationPicker
+                        position={mapPosition}
+                        onSelect={(coordinates) => {
+                          setMapPosition(coordinates);
+                          setMeetPoint(formatMeetingPointCoordinates(coordinates));
+                        }}
+                      />
                     </MapContainer>
                   </div>
                   <input 
                     type="text" 
                     value={meetPoint} 
-                    onChange={(e) => setMeetPoint(e.target.value)}
-                    placeholder="Contoh: Bandara Marinda, Raja Ampat"
+                    readOnly
+                    placeholder="Klik peta untuk memilih koordinat"
+                    aria-label="Latitude dan longitude titik kumpul"
                   />
                 </div>
 
@@ -765,10 +888,11 @@ export const AddPackagePage: React.FC = () => {
                   <div className="input-group">
                     <label>Harga per Orang *</label>
                     <input 
-                      type="number" 
-                      min="1"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={price} 
-                      onChange={(e) => setPrice(e.target.value)}
+                      onChange={(e) => handleDigitsOnlyInput(e.target.value, setPrice, 'Harga per orang', 'pricing')}
                       placeholder="Contoh: 1200000"
                     />
                   </div>
@@ -915,6 +1039,8 @@ export const AddPackagePage: React.FC = () => {
                   <div className="input-range-row">
                     <input 
                       type="number" 
+					  min="0"
+					  step="1"
                       value={minAge} 
                       onChange={(e) => setMinAge(e.target.value)} 
                       placeholder="10"
@@ -922,12 +1048,24 @@ export const AddPackagePage: React.FC = () => {
                     <span>s/d</span>
                     <input 
                       type="number" 
+					  min="0"
+					  step="1"
                       value={maxAge} 
                       onChange={(e) => setMaxAge(e.target.value)} 
                       placeholder="65"
                     />
                     <span className="range-suffix">tahun</span>
                   </div>
+				  {(Number(minAge) < 0 || Number(maxAge) < 0) && (
+					<span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+					  Umur tidak boleh bernilai minus.
+					</span>
+				  )}
+				  {minAge !== '' && maxAge !== '' && Number(minAge) > Number(maxAge) && (
+					<span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+					  Umur maksimal tidak boleh lebih kecil dari umur minimal.
+					</span>
+				  )}
                 </div>
               </div>
             )}

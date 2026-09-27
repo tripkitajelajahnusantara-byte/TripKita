@@ -70,30 +70,21 @@ export const ProfileProviderPage: React.FC = () => {
     bankAccountName: '',
   });
 
-  const lastContactUpdate = providerProfile?.contactLastUpdatedAt ? new Date(providerProfile.contactLastUpdatedAt) : null;
-  const isContactLocked = lastContactUpdate 
-    ? (new Date().getTime() - lastContactUpdate.getTime()) < 7 * 24 * 60 * 60 * 1000 
-    : false;
-
-  const getNextContactUpdateDate = () => {
-    if (!lastContactUpdate) return null;
-    return new Date(lastContactUpdate.getTime() + 7 * 24 * 60 * 60 * 1000);
-  };
-
   const openEditModal = () => {
     if (providerProfile) {
+      const usePendingProfile = providerProfile.profileVerificationStatus === 'PENDING' || providerProfile.profileVerificationStatus === 'REJECTED';
       setEditFields({
-        businessName: providerProfile.businessName,
-        businessCategory: providerProfile.businessCategory,
-        operationalProvince: providerProfile.operationalProvince || '',
-        operationalCity: providerProfile.operationalCity,
-        description: providerProfile.description || '',
-        picName: providerProfile.picName,
-        whatsapp: providerProfile.whatsapp,
-        email: providerProfile.email,
-        website: providerProfile.website || '',
-        instagram: providerProfile.instagram || '',
-        tiktok: providerProfile.tiktok || '',
+        businessName: usePendingProfile ? providerProfile.pendingBusinessName || providerProfile.businessName : providerProfile.businessName,
+        businessCategory: usePendingProfile ? providerProfile.pendingBusinessCategory || providerProfile.businessCategory : providerProfile.businessCategory,
+        operationalProvince: usePendingProfile ? providerProfile.pendingOperationalProvince || providerProfile.operationalProvince : providerProfile.operationalProvince || '',
+        operationalCity: usePendingProfile ? providerProfile.pendingOperationalCity || providerProfile.operationalCity : providerProfile.operationalCity,
+        description: usePendingProfile ? providerProfile.pendingDescription ?? providerProfile.description ?? '' : providerProfile.description || '',
+        picName: usePendingProfile ? providerProfile.pendingPicName || providerProfile.picName : providerProfile.picName,
+        whatsapp: usePendingProfile ? providerProfile.pendingWhatsapp || providerProfile.whatsapp : providerProfile.whatsapp,
+        email: usePendingProfile ? providerProfile.pendingEmail || providerProfile.email : providerProfile.email,
+        website: usePendingProfile ? providerProfile.pendingWebsite ?? providerProfile.website ?? '' : providerProfile.website || '',
+        instagram: usePendingProfile ? providerProfile.pendingInstagram ?? providerProfile.instagram ?? '' : providerProfile.instagram || '',
+        tiktok: usePendingProfile ? providerProfile.pendingTiktok ?? providerProfile.tiktok ?? '' : providerProfile.tiktok || '',
         npwp: providerProfile.pendingNpwp || providerProfile.npwp || '',
         bankName: providerProfile.pendingBankName || providerProfile.bankName || '',
         bankAccount: providerProfile.pendingBankAccount || providerProfile.bankAccount || '',
@@ -111,7 +102,7 @@ export const ProfileProviderPage: React.FC = () => {
       try {
         await updateProfile(editFields);
         setIsEditModalOpen(false);
-        alert('Profil berhasil diperbarui!');
+        alert('Perubahan berhasil diajukan dan menunggu persetujuan Admin. Data aktif tetap digunakan sampai disetujui.');
       } catch (err: any) {
         alert(err.message || 'Gagal memperbarui profil');
       }
@@ -564,10 +555,16 @@ export const ProfileProviderPage: React.FC = () => {
                   <span>{providerProfile?.tiktok || '—'}</span>
                 </div>
               </div>
-              {isContactLocked && lastContactUpdate && (
-                <div className="caution-box-banner" style={{ marginTop: '20px', backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}>
-                  <AlertTriangle size={16} className="caution-icon" color="#3b82f6" />
-                  <p>Kontak & Media Sosial terakhir diperbarui pada <strong>{formatDate(lastContactUpdate)}</strong>. Perubahan berikutnya baru dapat dilakukan pada <strong>{formatDate(getNextContactUpdateDate()!)}</strong>.</p>
+              {providerProfile?.profileVerificationStatus === 'PENDING' && (
+                <div className="caution-box-banner" style={{ marginTop: '20px', backgroundColor: '#fffbeb', borderColor: '#fde68a', color: '#b45309' }}>
+                  <Clock size={16} className="caution-icon" color="#f59e0b" />
+                  <p><strong>Perubahan profil sedang menunggu persetujuan Admin.</strong> Informasi aktif di atas tetap berlaku sampai pengajuan disetujui.</p>
+                </div>
+              )}
+              {providerProfile?.profileVerificationStatus === 'REJECTED' && providerProfile.profileRejectionReason && (
+                <div className="caution-box-banner" style={{ marginTop: '20px', backgroundColor: '#fef2f2', borderColor: '#fecaca', color: '#dc2626' }}>
+                  <AlertTriangle size={16} className="caution-icon" color="#ef4444" />
+                  <p>Perubahan profil ditolak: <strong>“{providerProfile.profileRejectionReason}”</strong>. Anda dapat memperbaiki dan mengajukannya kembali.</p>
                 </div>
               )}
             </div>
@@ -808,12 +805,10 @@ export const ProfileProviderPage: React.FC = () => {
               {/* Tab 2: Kontak & Media Sosial */}
               {activeModalTab === 'kontak' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {isContactLocked && lastContactUpdate && (
-                    <div className="caution-box-banner" style={{ margin: '0 0 8px 0', backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}>
-                      <AlertTriangle size={16} className="caution-icon" color="#3b82f6" />
-                      <p style={{ margin: 0 }}>Kontak & Media Sosial terakhir diperbarui pada <strong>{formatDate(lastContactUpdate)}</strong>. Perubahan berikutnya baru dapat dilakukan pada <strong>{formatDate(getNextContactUpdateDate()!)}</strong>.</p>
-                    </div>
-                  )}
+                  <div className="caution-box-banner" style={{ margin: '0 0 8px 0', backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}>
+                    <Clock size={16} className="caution-icon" color="#3b82f6" />
+                    <p style={{ margin: 0 }}>Perubahan kontak, termasuk email login, akan diajukan ke Admin dan baru berlaku setelah disetujui.</p>
+                  </div>
                   
                   <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div className="input-group">
@@ -823,8 +818,6 @@ export const ProfileProviderPage: React.FC = () => {
                         value={editFields.picName} 
                         onChange={(e) => setEditFields({ ...editFields, picName: e.target.value })}
                         required
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                     <div className="input-group">
@@ -834,8 +827,6 @@ export const ProfileProviderPage: React.FC = () => {
                         value={editFields.whatsapp} 
                         onChange={(e) => setEditFields({ ...editFields, whatsapp: e.target.value })}
                         required
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                   </div>
@@ -848,8 +839,6 @@ export const ProfileProviderPage: React.FC = () => {
                         value={editFields.email} 
                         onChange={(e) => setEditFields({ ...editFields, email: e.target.value })}
                         required
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                     <div className="input-group">
@@ -858,8 +847,6 @@ export const ProfileProviderPage: React.FC = () => {
                         type="text" 
                         value={editFields.website} 
                         onChange={(e) => setEditFields({ ...editFields, website: e.target.value })}
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                   </div>
@@ -871,8 +858,6 @@ export const ProfileProviderPage: React.FC = () => {
                         type="text" 
                         value={editFields.instagram} 
                         onChange={(e) => setEditFields({ ...editFields, instagram: e.target.value })}
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                     <div className="input-group">
@@ -881,8 +866,6 @@ export const ProfileProviderPage: React.FC = () => {
                         type="text" 
                         value={editFields.tiktok} 
                         onChange={(e) => setEditFields({ ...editFields, tiktok: e.target.value })}
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                   </div>

@@ -4,6 +4,11 @@ import { useCustomAlert } from '../components/CustomAlertModal';
 import { ArrowLeft, User, Mail, Calendar, Users, ShieldAlert, CheckCircle2, AlertCircle } from 'lucide-react';
 import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
 import { isValidIndonesianMobilePhone, normalizeIndonesianPhone } from '../utils/phone';
+import {
+  formatMeetingPointCoordinates,
+  getMeetingPointCoordinates,
+  MeetingPointMap,
+} from '../components/MeetingPointMap';
 
 // Tanggal hari ini (zona waktu lokal) dalam format YYYY-MM-DD untuk validasi tanggal lahir
 const getTodayIso = () => {
@@ -157,6 +162,7 @@ export const CustomerBookingPage: React.FC = () => {
   }
 
   const pkg = selectedPackageForDetail;
+  const meetingPointCoordinates = getMeetingPointCoordinates(pkg);
   const selectedAddOns = pkg.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
   const totalCost = (pkg.price * guestsCount) + addOnsTotal;
@@ -675,6 +681,16 @@ export const CustomerBookingPage: React.FC = () => {
                 <span>{guestsCount} Peserta</span>
               </div>
             </div>
+
+            {meetingPointCoordinates && (
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginBottom: '18px' }}>
+                <strong style={{ display: 'block', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>Titik Kumpul</strong>
+                <span style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
+                  {formatMeetingPointCoordinates(meetingPointCoordinates)}
+                </span>
+                <MeetingPointMap position={meetingPointCoordinates} height={180} zoom={15} />
+              </div>
+            )}
 
             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b' }}>

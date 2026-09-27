@@ -28,31 +28,48 @@ type packageService struct {
 	dateRepo     repositories.PackageDateRepository
 }
 
+// PackageValidationError membedakan input paket yang tidak valid dari
+// gangguan database, agar controller mengembalikan 400 dan UI tidak menerima
+// pesan internal server untuk kesalahan formulir.
+type PackageValidationError struct{ Message string }
+
+func (e *PackageValidationError) Error() string { return e.Message }
+
+func packageValidationErrorf(format string, args ...interface{}) error {
+	return &PackageValidationError{Message: fmt.Sprintf(format, args...)}
+}
+
 func NewPackageService(repo repositories.PackageRepository, providerRepo repositories.ProviderRepository, dateRepo repositories.PackageDateRepository) PackageService {
 	return &packageService{repo: repo, providerRepo: providerRepo, dateRepo: dateRepo}
 }
 
 func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackageRequest) (*models.Package, error) {
+	if err := validateMeetingPointCoordinates(req.MeetingPointLat, req.MeetingPointLng, req.Status == "Aktif"); err != nil {
+		return nil, err
+	}
+	if req.Price < 0 || req.QuotaMin < 0 || req.QuotaMax < 0 || req.Duration < 0 || req.MinGuests < 0 || req.MaxGuests < 0 || req.MinAge < 0 || req.MaxAge < 0 {
+		return nil, packageValidationErrorf("harga, kuota, durasi, jumlah peserta, dan umur tidak boleh bernilai negatif")
+	}
 	if req.Price <= 0 {
-		return nil, fmt.Errorf("harga paket harus lebih besar dari 0")
+		return nil, packageValidationErrorf("harga paket harus lebih besar dari 0")
 	}
 	if req.Price > 1_000_000_000_000 || req.QuotaMax > 10_000 {
-		return nil, fmt.Errorf("harga atau kuota paket melebihi batas yang diizinkan")
+		return nil, packageValidationErrorf("harga atau kuota paket melebihi batas yang diizinkan")
 	}
 	if req.QuotaMax <= 0 {
-		return nil, fmt.Errorf("kuota maksimal harus lebih besar dari 0")
+		return nil, packageValidationErrorf("kuota maksimal harus lebih besar dari 0")
 	}
 	if req.QuotaMin <= 0 {
 		req.QuotaMin = 1
 	}
 	if req.QuotaMax < req.QuotaMin {
-		return nil, fmt.Errorf("kuota maksimal (%d) tidak boleh lebih kecil dari kuota minimal (%d)", req.QuotaMax, req.QuotaMin)
+		return nil, packageValidationErrorf("kuota maksimal (%d) tidak boleh lebih kecil dari kuota minimal (%d)", req.QuotaMax, req.QuotaMin)
 	}
 	if req.MaxGuests > 0 && req.MinGuests > req.MaxGuests {
-		return nil, fmt.Errorf("jumlah tamu minimal tidak boleh melebihi jumlah tamu maksimal")
+		return nil, packageValidationErrorf("jumlah tamu minimal tidak boleh melebihi jumlah tamu maksimal")
 	}
 	if req.MaxAge > 0 && req.MinAge > req.MaxAge {
-		return nil, fmt.Errorf("usia minimal tidak boleh melebihi usia maksimal")
+		return nil, packageValidationErrorf("usia minimal tidak boleh melebihi usia maksimal")
 	}
 	if err := validatePackageDates(req.StartDate, req.EndDate); err != nil {
 		return nil, err
@@ -63,6 +80,8 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 		Name:               req.Name,
 		Destination:        req.Destination,
 		MeetingPoint:       req.MeetingPoint,
+		MeetingPointLat:    req.MeetingPointLat,
+		MeetingPointLng:    req.MeetingPointLng,
 		Category:           req.Category,
 		TripType:           req.TripType,
 		Price:              req.Price,
@@ -85,6 +104,11 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 		Itinerary:          req.Itinerary,
 		Image:              req.Image,
 		Images:             req.Images,
+	}
+	if pkg.Status == "Aktif" {
+		if err := validateActivePackage(pkg); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := s.repo.Create(pkg); err != nil {
@@ -207,83 +231,92 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 		return nil, err
 	}
 
-	if req.Name != "" {
-		pkg.Name = req.Name
+	if req.Name != nil {
+		pkg.Name = strings.TrimSpace(*req.Name)
 	}
-	if req.Destination != "" {
-		pkg.Destination = req.Destination
+	if req.Destination != nil {
+		pkg.Destination = strings.TrimSpace(*req.Destination)
 	}
-	if req.MeetingPoint != "" {
-		pkg.MeetingPoint = req.MeetingPoint
+	if req.MeetingPoint != nil {
+		pkg.MeetingPoint = strings.TrimSpace(*req.MeetingPoint)
 	}
-	if req.Category != "" {
-		pkg.Category = req.Category
+	if req.MeetingPointLat != nil {
+		pkg.MeetingPointLat = req.MeetingPointLat
 	}
-	if req.TripType != "" {
-		pkg.TripType = req.TripType
+	if req.MeetingPointLng != nil {
+		pkg.MeetingPointLng = req.MeetingPointLng
 	}
-	if req.Price < 0 || req.QuotaMin < 0 || req.QuotaMax < 0 || req.Duration < 0 || req.MinGuests < 0 || req.MaxGuests < 0 || req.MinAge < 0 || req.MaxAge < 0 {
-		return nil, fmt.Errorf("nilai harga, kuota, durasi, jumlah tamu, dan usia tidak boleh negatif")
+	if err := validateMeetingPointCoordinates(pkg.MeetingPointLat, pkg.MeetingPointLng, false); err != nil {
+		return nil, err
 	}
-	if req.Price > 1_000_000_000_000 || req.QuotaMax > 10_000 {
-		return nil, fmt.Errorf("harga atau kuota paket melebihi batas yang diizinkan")
+	if req.Category != nil {
+		pkg.Category = strings.TrimSpace(*req.Category)
 	}
-	if req.Status != "" && req.Status != "Aktif" && req.Status != "Draft" && req.Status != "Nonaktif" {
-		return nil, fmt.Errorf("status paket tidak valid")
+	if req.TripType != nil {
+		pkg.TripType = strings.TrimSpace(*req.TripType)
 	}
-	if req.Price > 0 {
-		pkg.Price = req.Price
+	if (req.Price != nil && *req.Price < 0) || (req.QuotaMin != nil && *req.QuotaMin < 0) ||
+		(req.QuotaMax != nil && *req.QuotaMax < 0) || (req.Duration != nil && *req.Duration < 0) ||
+		(req.MinGuests != nil && *req.MinGuests < 0) || (req.MaxGuests != nil && *req.MaxGuests < 0) ||
+		(req.MinAge != nil && *req.MinAge < 0) || (req.MaxAge != nil && *req.MaxAge < 0) {
+		return nil, packageValidationErrorf("harga, kuota, durasi, jumlah peserta, dan umur tidak boleh bernilai negatif")
 	}
-	if req.QuotaMin != 0 {
-		pkg.QuotaMin = req.QuotaMin
+	if (req.Price != nil && *req.Price > 1_000_000_000_000) || (req.QuotaMax != nil && *req.QuotaMax > 10_000) {
+		return nil, packageValidationErrorf("harga atau kuota paket melebihi batas yang diizinkan")
 	}
-	if req.QuotaMax != 0 {
-		pkg.QuotaMax = req.QuotaMax
+	if req.Status != nil && *req.Status != "Aktif" && *req.Status != "Draft" && *req.Status != "Nonaktif" {
+		return nil, packageValidationErrorf("status paket tidak valid")
 	}
-	if pkg.QuotaMin <= 0 {
-		pkg.QuotaMin = 1
+	if req.Price != nil {
+		pkg.Price = *req.Price
+	}
+	if req.QuotaMin != nil {
+		pkg.QuotaMin = *req.QuotaMin
+	}
+	if req.QuotaMax != nil {
+		pkg.QuotaMax = *req.QuotaMax
 	}
 	if pkg.QuotaMax < pkg.QuotaMin && pkg.QuotaMax > 0 {
-		return nil, fmt.Errorf("kuota maksimal (%d) tidak boleh lebih kecil dari kuota minimal (%d)", pkg.QuotaMax, pkg.QuotaMin)
+		return nil, packageValidationErrorf("kuota maksimal (%d) tidak boleh lebih kecil dari kuota minimal (%d)", pkg.QuotaMax, pkg.QuotaMin)
 	}
-	if req.StartDate != "" {
-		pkg.StartDate = req.StartDate
+	if req.StartDate != nil {
+		pkg.StartDate = strings.TrimSpace(*req.StartDate)
 	}
-	if req.EndDate != "" {
-		pkg.EndDate = req.EndDate
+	if req.EndDate != nil {
+		pkg.EndDate = strings.TrimSpace(*req.EndDate)
 	}
 	if err := validatePackageDates(pkg.StartDate, pkg.EndDate); err != nil {
 		return nil, err
 	}
-	if req.Schedule != "" {
-		pkg.Schedule = req.Schedule
+	if req.Schedule != nil {
+		pkg.Schedule = strings.TrimSpace(*req.Schedule)
 	}
-	if req.Duration != 0 {
-		pkg.Duration = req.Duration
+	if req.Duration != nil {
+		pkg.Duration = *req.Duration
 	}
-	if req.MinGuests != 0 {
-		pkg.MinGuests = req.MinGuests
+	if req.MinGuests != nil {
+		pkg.MinGuests = *req.MinGuests
 	}
-	if req.MaxGuests != 0 {
-		pkg.MaxGuests = req.MaxGuests
+	if req.MaxGuests != nil {
+		pkg.MaxGuests = *req.MaxGuests
 	}
-	if req.MinAge != 0 {
-		pkg.MinAge = req.MinAge
+	if req.MinAge != nil {
+		pkg.MinAge = *req.MinAge
 	}
-	if req.MaxAge != 0 {
-		pkg.MaxAge = req.MaxAge
+	if req.MaxAge != nil {
+		pkg.MaxAge = *req.MaxAge
 	}
 	if pkg.MaxGuests > 0 && pkg.MinGuests > pkg.MaxGuests {
-		return nil, fmt.Errorf("jumlah tamu minimal tidak boleh melebihi jumlah tamu maksimal")
+		return nil, packageValidationErrorf("jumlah tamu minimal tidak boleh melebihi jumlah tamu maksimal")
 	}
 	if pkg.MaxAge > 0 && pkg.MinAge > pkg.MaxAge {
-		return nil, fmt.Errorf("usia minimal tidak boleh melebihi usia maksimal")
+		return nil, packageValidationErrorf("usia minimal tidak boleh melebihi usia maksimal")
 	}
-	if req.Status != "" {
-		pkg.Status = req.Status
+	if req.Status != nil {
+		pkg.Status = *req.Status
 	}
-	if req.Description != "" {
-		pkg.Description = req.Description
+	if req.Description != nil {
+		pkg.Description = strings.TrimSpace(*req.Description)
 	}
 	if req.IncludedFacilities != "" {
 		pkg.IncludedFacilities = req.IncludedFacilities
@@ -300,6 +333,11 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	if req.Images != "" {
 		pkg.Images = req.Images
 	}
+	if pkg.Status == "Aktif" {
+		if err := validateActivePackage(pkg); err != nil {
+			return nil, err
+		}
+	}
 
 	err = s.repo.Update(pkg)
 	if err != nil {
@@ -309,23 +347,72 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	return pkg, nil
 }
 
+func validateActivePackage(pkg *models.Package) error {
+	if strings.TrimSpace(pkg.Name) == "" || strings.TrimSpace(pkg.Destination) == "" ||
+		strings.TrimSpace(pkg.MeetingPoint) == "" || strings.TrimSpace(pkg.Category) == "" ||
+		strings.TrimSpace(pkg.TripType) == "" || strings.TrimSpace(pkg.Description) == "" {
+		return packageValidationErrorf("nama, destinasi, titik kumpul, kategori, tipe trip, dan deskripsi wajib diisi sebelum paket diaktifkan")
+	}
+	if err := validateMeetingPointCoordinates(pkg.MeetingPointLat, pkg.MeetingPointLng, true); err != nil {
+		return err
+	}
+	if pkg.Price <= 0 {
+		return packageValidationErrorf("harga paket aktif harus lebih besar dari 0")
+	}
+	if pkg.Duration <= 0 {
+		return packageValidationErrorf("durasi paket aktif minimal 1 hari")
+	}
+	if pkg.QuotaMin <= 0 || pkg.QuotaMax <= 0 || pkg.QuotaMax < pkg.QuotaMin {
+		return packageValidationErrorf("kuota paket aktif harus valid dan minimal 1 peserta")
+	}
+	if pkg.MinGuests <= 0 || pkg.MaxGuests <= 0 || pkg.MinGuests > pkg.MaxGuests || pkg.MaxGuests > pkg.QuotaMax {
+		return packageValidationErrorf("batas peserta per booking tidak valid")
+	}
+	if pkg.MinAge < 0 || pkg.MaxAge < 0 || (pkg.MaxAge > 0 && pkg.MinAge > pkg.MaxAge) {
+		return packageValidationErrorf("batas umur tidak valid")
+	}
+	if pkg.StartDate == "" || pkg.EndDate == "" {
+		return packageValidationErrorf("tanggal mulai dan tanggal selesai wajib diisi sebelum paket diaktifkan")
+	}
+	return validatePackageDates(pkg.StartDate, pkg.EndDate)
+}
+
+func validateMeetingPointCoordinates(latitude, longitude *float64, required bool) error {
+	if latitude == nil && longitude == nil {
+		if required {
+			return packageValidationErrorf("pin titik kumpul wajib dipilih pada peta sebelum paket diaktifkan")
+		}
+		return nil
+	}
+	if latitude == nil || longitude == nil {
+		return packageValidationErrorf("latitude dan longitude titik kumpul wajib dikirim berpasangan")
+	}
+	if *latitude < -90 || *latitude > 90 {
+		return packageValidationErrorf("latitude titik kumpul harus berada antara -90 dan 90")
+	}
+	if *longitude < -180 || *longitude > 180 {
+		return packageValidationErrorf("longitude titik kumpul harus berada antara -180 dan 180")
+	}
+	return nil
+}
+
 func validatePackageDates(startDate, endDate string) error {
 	var start, end time.Time
 	var err error
 	if startDate != "" {
 		start, err = time.Parse("2006-01-02", startDate)
 		if err != nil {
-			return fmt.Errorf("tanggal mulai paket harus berformat YYYY-MM-DD")
+			return packageValidationErrorf("tanggal mulai paket harus berformat YYYY-MM-DD")
 		}
 	}
 	if endDate != "" {
 		end, err = time.Parse("2006-01-02", endDate)
 		if err != nil {
-			return fmt.Errorf("tanggal selesai paket harus berformat YYYY-MM-DD")
+			return packageValidationErrorf("tanggal selesai paket harus berformat YYYY-MM-DD")
 		}
 	}
 	if !start.IsZero() && !end.IsZero() && end.Before(start) {
-		return fmt.Errorf("tanggal selesai paket tidak boleh sebelum tanggal mulai")
+		return packageValidationErrorf("tanggal selesai paket tidak boleh sebelum tanggal mulai")
 	}
 	return nil
 }

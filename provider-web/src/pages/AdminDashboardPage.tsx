@@ -62,6 +62,20 @@ interface ProviderAdminData {
   bankAccountName?: string;
   contactLastUpdatedAt?: string;
 
+  pendingBusinessName?: string;
+  pendingBusinessCategory?: string;
+  pendingOperationalProvince?: string;
+  pendingOperationalCity?: string;
+  pendingDescription?: string;
+  pendingPicName?: string;
+  pendingEmail?: string;
+  pendingWhatsapp?: string;
+  pendingInstagram?: string;
+  pendingTiktok?: string;
+  pendingWebsite?: string;
+  profileVerificationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | '';
+  profileRejectionReason?: string;
+
   pendingNpwp?: string;
   pendingBankName?: string;
   pendingBankAccount?: string;
@@ -98,6 +112,30 @@ interface StatusHistoryItem {
   notes: string;
   createdAt: string;
 }
+
+const hasPendingProviderReview = (provider: ProviderAdminData) => (
+  provider.status === 'PENDING' ||
+  provider.profileVerificationStatus === 'PENDING' ||
+  provider.legalVerificationStatus === 'PENDING' ||
+  !!provider.pendingKtpPath || !!provider.pendingNibPath || !!provider.pendingDocumentPath ||
+  !!provider.pendingNpwpPath || !!provider.pendingAktaPath || !!provider.pendingSertifikatPath ||
+  provider.ktpStatus === 'PENDING' || provider.nibStatus === 'PENDING' || provider.siupStatus === 'PENDING' ||
+  provider.npwpDocStatus === 'PENDING' || provider.aktaStatus === 'PENDING' || provider.sertifikatStatus === 'PENDING'
+);
+
+const getPendingProfileChanges = (provider: ProviderAdminData) => [
+  ['Nama Bisnis', provider.businessName, provider.pendingBusinessName],
+  ['Kategori', provider.businessCategory, provider.pendingBusinessCategory],
+  ['Provinsi', provider.operationalProvince, provider.pendingOperationalProvince],
+  ['Kota', provider.operationalCity, provider.pendingOperationalCity],
+  ['Deskripsi', provider.description, provider.pendingDescription],
+  ['Nama PIC', provider.picName, provider.pendingPicName],
+  ['Email', provider.email, provider.pendingEmail],
+  ['WhatsApp', provider.whatsapp, provider.pendingWhatsapp],
+  ['Website', provider.website, provider.pendingWebsite],
+  ['Instagram', provider.instagram, provider.pendingInstagram],
+  ['TikTok', provider.tiktok, provider.pendingTiktok],
+].filter(([, active, pending]) => (active || '') !== (pending || '')) as Array<[string, string | undefined, string | undefined]>;
 
 export const AdminDashboardPage: React.FC = () => {
   const { providerProfile, logout, navigateTo } = useNavigation();
@@ -255,6 +293,7 @@ export const AdminDashboardPage: React.FC = () => {
         setActiveView('kelola-pembayaran');
         break;
       case 'REGISTRATION':
+      case 'ACCOUNT':
         setStatusTab('PENDING');
         setActiveView('kelola-provider');
         fetchProviders();
@@ -440,7 +479,9 @@ export const AdminDashboardPage: React.FC = () => {
       const hasPendingReview = !!target && (
         !!target.pendingKtpPath || !!target.pendingNibPath || !!target.pendingDocumentPath ||
         !!target.pendingNpwpPath || !!target.pendingAktaPath || !!target.pendingSertifikatPath ||
-        target.legalVerificationStatus === 'PENDING'
+        target.ktpStatus === 'PENDING' || target.nibStatus === 'PENDING' || target.siupStatus === 'PENDING' ||
+        target.npwpDocStatus === 'PENDING' || target.aktaStatus === 'PENDING' || target.sertifikatStatus === 'PENDING' ||
+        target.legalVerificationStatus === 'PENDING' || target.profileVerificationStatus === 'PENDING'
       );
       const warning = hasPendingReview
         ? '\n\nPerhatian: masih ada dokumen atau data legal/rekening yang menunggu verifikasi.'
@@ -583,6 +624,43 @@ export const AdminDashboardPage: React.FC = () => {
     });
   };
 
+  const handleVerifyProfile = async (id: number, action: 'APPROVE' | 'REJECT') => {
+    if (actionBusy) return;
+    let reason = '';
+    if (action === 'REJECT') {
+      const inputReason = window.prompt('Masukkan alasan penolakan perubahan profil bisnis/kontak:');
+      if (inputReason === null) return;
+      if (inputReason.trim().length < 10) {
+        setError('Alasan penolakan perubahan profil minimal 10 karakter.');
+        return;
+      }
+      reason = inputReason.trim();
+    } else if (!window.confirm('Setujui perubahan profil bisnis dan kontak ini? Nilai baru akan langsung berlaku, termasuk email untuk login.')) {
+      return;
+    }
+
+    await runAction(`profile-${action}`, async () => {
+      try {
+        setError('');
+        setSuccessMsg('');
+        await request(`/admin/providers/${id}/verify-profile`, {
+          method: 'POST',
+          body: JSON.stringify({ action, reason }),
+        });
+        const updatedProviders = await request('/admin/providers');
+        setProviders(updatedProviders);
+        const found = updatedProviders.find((provider: ProviderAdminData) => provider.id === id);
+        if (found) setSelectedProvider((current) => (current?.id === id ? found : current));
+        setSuccessMsg(action === 'APPROVE'
+          ? 'Perubahan profil bisnis/kontak disetujui dan sudah berlaku.'
+          : 'Perubahan profil bisnis/kontak ditolak dan alasan telah dikirim ke mitra.');
+      } catch (err: any) {
+        setError(err.message || 'Gagal memproses perubahan profil.');
+        fetchProviders();
+      }
+    });
+  };
+
   const handleVerifyDocument = async (id: number, docType: string, action: 'APPROVE' | 'REJECT') => {
     if (actionBusy) return;
     let reason = '';
@@ -719,7 +797,12 @@ export const AdminDashboardPage: React.FC = () => {
       p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.operationalCity.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = p.status === statusTab;
+    const pendingReview = hasPendingProviderReview(p);
+    const matchesStatus = statusTab === 'PENDING'
+      ? pendingReview
+      : statusTab === 'APPROVED'
+        ? p.status === 'APPROVED' && !pendingReview
+        : p.status === 'REJECTED' && !pendingReview;
     
     const matchesCategory = categoryFilter === 'Semua Kategori' || 
       p.businessCategory.toLowerCase() === categoryFilter.toLowerCase();
@@ -733,9 +816,9 @@ export const AdminDashboardPage: React.FC = () => {
   // Calculate statistics
   const stats = {
     total: providers.length,
-    pending: providers.filter(p => p.status === 'PENDING').length,
-    approved: providers.filter(p => p.status === 'APPROVED').length,
-    rejected: providers.filter(p => p.status === 'REJECTED').length,
+    pending: providers.filter(hasPendingProviderReview).length,
+    approved: providers.filter(p => p.status === 'APPROVED' && !hasPendingProviderReview(p)).length,
+    rejected: providers.filter(p => p.status === 'REJECTED' && !hasPendingProviderReview(p)).length,
   };
 
   // Categories list
@@ -1345,8 +1428,8 @@ export const AdminDashboardPage: React.FC = () => {
                                   </span>
                                 </td>
                                 <td>
-                                  <span className={`status-pill-small ${p.status.toLowerCase()}`}>
-                                    {p.status === 'APPROVED' ? 'Approved' : p.status === 'PENDING' ? 'Pending' : 'Rejected'}
+                                  <span className={`status-pill-small ${hasPendingProviderReview(p) ? 'pending' : p.status.toLowerCase()}`}>
+                                    {p.status === 'PENDING' ? 'Akun Baru' : hasPendingProviderReview(p) ? 'Menunggu Perubahan' : p.status === 'APPROVED' ? 'Approved' : 'Rejected'}
                                   </span>
                                 </td>
                                 <td>
@@ -1405,8 +1488,8 @@ export const AdminDashboardPage: React.FC = () => {
                   <div>
                     <h3>{selectedProvider.businessName}</h3>
                     <p>{selectedProvider.businessCategory}</p>
-                    <span className={`drawer-status-badge ${selectedProvider.status.toLowerCase()}`}>
-                      {selectedProvider.status === 'APPROVED' ? 'Approved' : selectedProvider.status === 'PENDING' ? 'Pending Approval' : 'Rejected'}
+                    <span className={`drawer-status-badge ${hasPendingProviderReview(selectedProvider) ? 'pending' : selectedProvider.status.toLowerCase()}`}>
+                      {selectedProvider.status === 'PENDING' ? 'Akun Menunggu Persetujuan' : hasPendingProviderReview(selectedProvider) ? 'Perubahan Menunggu Persetujuan' : selectedProvider.status === 'APPROVED' ? 'Approved' : 'Rejected'}
                     </span>
                   </div>
                 </div>
@@ -1464,6 +1547,74 @@ export const AdminDashboardPage: React.FC = () => {
                       )}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Perubahan profil umum menunggu keputusan tanpa mengganti data aktif. */}
+                <div className="drawer-section">
+                  <h4 className="section-title">Pengajuan Profil Bisnis & Kontak</h4>
+                  <div style={{ marginBottom: '12px' }}>
+                    <span className={`drawer-status-badge ${
+                      selectedProvider.profileVerificationStatus === 'APPROVED' ? 'approved' :
+                      selectedProvider.profileVerificationStatus === 'PENDING' ? 'pending' :
+                      selectedProvider.profileVerificationStatus === 'REJECTED' ? 'rejected' : 'approved'
+                    }`}>
+                      {selectedProvider.profileVerificationStatus === 'PENDING' ? 'Menunggu Persetujuan' :
+                       selectedProvider.profileVerificationStatus === 'REJECTED' ? 'Perubahan Ditolak' : 'Tidak Ada Pengajuan'}
+                    </span>
+                    {selectedProvider.profileVerificationStatus === 'REJECTED' && selectedProvider.profileRejectionReason && (
+                      <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '6px' }}>
+                        Alasan ditolak: “{selectedProvider.profileRejectionReason}”
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedProvider.profileVerificationStatus === 'PENDING' ? (
+                    <div>
+                      <p style={{ margin: '0 0 8px', fontSize: '12px', color: '#64748b' }}>
+                        Hanya nilai yang berubah ditampilkan. Data lama tetap aktif sampai disetujui.
+                      </p>
+                      <table className="info-table" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', marginBottom: '12px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f8fafc' }}>
+                            <th style={{ padding: '6px 8px', fontSize: '10px', textAlign: 'left' }}>Field</th>
+                            <th style={{ padding: '6px 8px', fontSize: '10px', textAlign: 'left' }}>Aktif</th>
+                            <th style={{ padding: '6px 8px', fontSize: '10px', textAlign: 'left', color: '#b45309' }}>Diajukan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {getPendingProfileChanges(selectedProvider).map(([label, active, pending]) => (
+                            <tr key={label}>
+                              <td className="field-label" style={{ padding: '6px 8px', fontSize: '11px' }}>{label}</td>
+                              <td style={{ padding: '6px 8px', fontSize: '11px', wordBreak: 'break-word' }}>{active || '—'}</td>
+                              <td style={{ padding: '6px 8px', fontSize: '11px', color: '#b45309', fontWeight: 700, wordBreak: 'break-word' }}>{pending || '— (dikosongkan)'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="legal-verification-actions">
+                        <button
+                          type="button"
+                          style={{ padding: '6px 12px', fontSize: '11px', flex: 1, backgroundColor: '#10b981', color: 'white', border: 0, borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                          onClick={() => handleVerifyProfile(selectedProvider.id, 'APPROVE')}
+                          disabled={actionBusy}
+                          aria-busy={pendingAction === 'profile-APPROVE'}
+                        >
+                          {pendingAction === 'profile-APPROVE' ? <><LoaderCircle size={14} className="btn-spinner" /> Memproses...</> : 'Setujui Perubahan'}
+                        </button>
+                        <button
+                          type="button"
+                          style={{ padding: '6px 12px', fontSize: '11px', flex: 1, backgroundColor: '#ef4444', color: 'white', border: 0, borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                          onClick={() => handleVerifyProfile(selectedProvider.id, 'REJECT')}
+                          disabled={actionBusy}
+                          aria-busy={pendingAction === 'profile-REJECT'}
+                        >
+                          {pendingAction === 'profile-REJECT' ? <><LoaderCircle size={14} className="btn-spinner" /> Memproses...</> : 'Tolak Perubahan'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '12px' }}>Belum ada perubahan profil bisnis atau kontak yang perlu diputuskan.</p>
+                  )}
                 </div>
 
                 {/* Hanya admin yang dapat mengubah potongan platform provider. */}

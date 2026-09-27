@@ -45,6 +45,37 @@ const getTomorrowLocal = () => {
   return `${d.getFullYear()}-${mm}-${dd}`;
 };
 
+const isSettledPayment = (status: string, paidAt?: string) =>
+  Boolean(paidAt) || ['PAID', 'CONFIRMED', 'COMPLETED', 'REFUND_REQUIRED', 'REFUNDED'].includes(status);
+
+const getBookingStatusMeta = (status: string) => {
+  switch (status) {
+    case 'PENDING_PAYMENT':
+      return { label: 'Menunggu Pembayaran', shortLabel: 'Pending', background: '#fef3c7', color: '#b45309' };
+    case 'PAID':
+    case 'CONFIRMED':
+      return { label: 'Lunas & Aktif', shortLabel: 'Lunas', background: '#dcfce7', color: '#15803d' };
+    case 'COMPLETED':
+      return { label: 'Selesai', shortLabel: 'Selesai', background: '#ecfdf5', color: '#047857' };
+    case 'FAILED':
+      return { label: 'Pembayaran Gagal', shortLabel: 'Gagal', background: '#fee2e2', color: '#dc2626' };
+    case 'EXPIRED':
+      return { label: 'Pembayaran Kadaluwarsa', shortLabel: 'Kadaluwarsa', background: '#fff7ed', color: '#c2410c' };
+    case 'CANCELLED_BY_CUSTOMER':
+      return { label: 'Batal (Customer)', shortLabel: 'Batal', background: '#fee2e2', color: '#dc2626' };
+    case 'CANCELLED_BY_PROVIDER':
+      return { label: 'Batal (Mitra)', shortLabel: 'Batal', background: '#fee2e2', color: '#dc2626' };
+    case 'REFUND_REQUIRED':
+      return { label: 'Butuh Refund', shortLabel: 'Proses Refund', background: '#ffedd5', color: '#c2410c' };
+    case 'REFUNDED':
+      return { label: 'Refund Selesai', shortLabel: 'Refund', background: '#e0f2fe', color: '#0369a1' };
+    case 'RESCHEDULE_OFFERED':
+      return { label: 'Menunggu Jawaban Reschedule', shortLabel: 'Reschedule', background: '#ede9fe', color: '#6d28d9' };
+    default:
+      return { label: 'Status Tidak Dikenal', shortLabel: 'Tidak Dikenal', background: '#f1f5f9', color: '#475569' };
+  }
+};
+
 interface DashboardStats {
   totalPackages: number;
   totalBookings: number;
@@ -113,7 +144,7 @@ export const ManageBookingPage: React.FC = () => {
           totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice || 0),
           paymentMethod: b.paymentMethod || 'iPaymu Redirect Payment',
           createdAt: b.createdAt || '',
-          paidAt: b.updatedAt || '',
+          paidAt: b.paidAt || '',
           paymentUrl: b.paymentUrl,
           rawEndDate: b.tripEndDate,
           participants: Array.isArray(b.participants)
@@ -311,6 +342,8 @@ export const ManageBookingPage: React.FC = () => {
               <option value="Semua">Semua Status</option>
               <option value="CONFIRMED">Lunas & Aktif</option>
               <option value="PENDING_PAYMENT">Menunggu Pembayaran</option>
+              <option value="FAILED">Pembayaran Gagal</option>
+              <option value="EXPIRED">Pembayaran Kadaluwarsa</option>
               <option value="COMPLETED">Selesai</option>
               <option value="CANCELLED_BY_CUSTOMER">Batal (Customer)</option>
               <option value="CANCELLED_BY_PROVIDER">Batal (Mitra)</option>
@@ -360,26 +393,14 @@ export const ManageBookingPage: React.FC = () => {
                         </div>
                       </td>
                       <td>
-                        <span className={`status-pill`} style={{
-                          backgroundColor: 
-                            b.status === 'PENDING_PAYMENT' ? '#fef3c7' :
-                            (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#dcfce7' :
-                            b.status === 'COMPLETED' ? '#ecfdf5' :
-                            b.status === 'REFUND_REQUIRED' ? '#fee2e2' : '#f1f5f9',
-                          color:
-                            b.status === 'PENDING_PAYMENT' ? '#d97706' :
-                            (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#15803d' :
-                            b.status === 'COMPLETED' ? '#047857' :
-                            b.status === 'REFUND_REQUIRED' ? '#dc2626' : '#475569',
-                        }}>
-                          {b.status === 'PENDING_PAYMENT' ? 'Menunggu Pembayaran' :
-                           (b.status === 'CONFIRMED' || b.status === 'PAID') ? 'Lunas & Aktif' :
-                           b.status === 'COMPLETED' ? 'Selesai' :
-                           b.status === 'CANCELLED_BY_CUSTOMER' ? 'Batal (Cust)' :
-                           b.status === 'CANCELLED_BY_PROVIDER' ? 'Batal (Mitra)' :
-                           b.status === 'REFUND_REQUIRED' ? 'Butuh Refund' :
-                           b.status === 'REFUNDED' ? 'Refund Selesai' : 'Expired / Dibatalkan'}
-                        </span>
+                        {(() => {
+                          const meta = getBookingStatusMeta(b.status);
+                          return (
+                            <span className="status-pill" style={{ backgroundColor: meta.background, color: meta.color }}>
+                              {meta.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td>
                         <div className="actions-cell">
@@ -478,7 +499,11 @@ export const ManageBookingPage: React.FC = () => {
                             selectedBooking.status === 'CANCELLED_BY_PROVIDER' || 
                             selectedBooking.status === 'REFUND_REQUIRED' || 
                             selectedBooking.status === 'REFUNDED';
-        const isPending = selectedBooking.status === 'PENDING_PAYMENT' || selectedBooking.status === 'PAID';
+        const isPending = selectedBooking.status === 'PENDING_PAYMENT';
+        const isFailed = selectedBooking.status === 'FAILED';
+        const isExpired = selectedBooking.status === 'EXPIRED';
+        const paymentSettled = isSettledPayment(selectedBooking.status, selectedBooking.paidAt);
+        const statusMeta = getBookingStatusMeta(selectedBooking.status);
         const isCompleted = selectedBooking.status === 'COMPLETED';
         
         return (
@@ -499,23 +524,8 @@ export const ManageBookingPage: React.FC = () => {
                     <p className="detail-id" style={{ fontFamily: 'sans-serif' }}>Pemesanan oleh {selectedBooking.customerName}</p>
                   </div>
                   <div style={{ marginLeft: 'auto' }}>
-                    <span className={`status-pill`} style={{
-                      backgroundColor: 
-                        selectedBooking.status === 'PENDING_PAYMENT' ? '#fef3c7' :
-                        (selectedBooking.status === 'CONFIRMED' || selectedBooking.status === 'PAID') ? '#dcfce7' :
-                        selectedBooking.status === 'COMPLETED' ? '#ecfdf5' :
-                        (selectedBooking.status === 'CANCELLED_BY_CUSTOMER' || selectedBooking.status === 'CANCELLED_BY_PROVIDER') ? '#fee2e2' : '#f1f5f9',
-                      color:
-                        selectedBooking.status === 'PENDING_PAYMENT' ? '#d97706' :
-                        (selectedBooking.status === 'CONFIRMED' || selectedBooking.status === 'PAID') ? '#15803d' :
-                        selectedBooking.status === 'COMPLETED' ? '#047857' :
-                        (selectedBooking.status === 'CANCELLED_BY_CUSTOMER' || selectedBooking.status === 'CANCELLED_BY_PROVIDER') ? '#dc2626' : '#475569',
-                    }}>
-                      {selectedBooking.status === 'PENDING_PAYMENT' ? 'Pending' :
-                       (selectedBooking.status === 'CONFIRMED' || selectedBooking.status === 'PAID') ? 'Lunas' :
-                       selectedBooking.status === 'COMPLETED' ? 'Selesai' :
-                       (selectedBooking.status === 'CANCELLED_BY_CUSTOMER' || selectedBooking.status === 'CANCELLED_BY_PROVIDER') ? 'Batal' :
-                       (selectedBooking.status === 'REFUND_REQUIRED' || selectedBooking.status === 'REFUNDED') ? 'Refund' : 'Lainnya'}
+                    <span className="status-pill" style={{ backgroundColor: statusMeta.background, color: statusMeta.color }}>
+                      {statusMeta.shortLabel}
                     </span>
                   </div>
                 </div>
@@ -568,7 +578,9 @@ export const ManageBookingPage: React.FC = () => {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#64748b' }}>Dibayar Pelanggan:</span>
-                          <span style={{ fontWeight: 700, color: '#10b981' }}>{selectedBooking.totalPrice}</span>
+                          <span style={{ fontWeight: 700, color: paymentSettled ? '#10b981' : '#64748b' }}>
+                            {paymentSettled ? selectedBooking.totalPrice : 'Rp0'}
+                          </span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#64748b' }}>Kanal:</span>
@@ -576,14 +588,19 @@ export const ManageBookingPage: React.FC = () => {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#64748b' }}>Status:</span>
-                          <span style={{ fontWeight: 700, color: isCancelled ? '#ef4444' : (isPending ? '#f59e0b' : '#10b981') }}>
-                            {isCancelled ? 'BATAL' : (isPending ? 'MENUNGGU PEMBAYARAN' : 'LUNAS')}
+                          <span style={{ fontWeight: 700, color: statusMeta.color }}>
+                            {isFailed ? 'GAGAL' : isExpired ? 'KADALUWARSA' : isPending ? 'MENUNGGU PEMBAYARAN' : paymentSettled ? 'LUNAS' : isCancelled ? 'BATAL' : statusMeta.shortLabel.toUpperCase()}
                           </span>
                         </div>
                       </div>
                       <p style={{ margin: '8px 0 0', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontSize: '9px', color: '#64748b', lineHeight: 1.5 }}>
-                        Pelanggan membayar penuh di muka melalui payment gateway. Dana diteruskan ke Anda
-                        melalui menu Keuangan sesuai jadwal pencairan, bukan melalui transfer langsung.
+                        {paymentSettled
+                          ? 'Pembayaran telah terverifikasi oleh payment gateway. Dana diteruskan melalui menu Keuangan sesuai jadwal pencairan.'
+                          : isFailed
+                            ? 'Tagihan gagal dibuat atau pembayaran ditolak oleh payment gateway. Tidak ada dana pelanggan yang tercatat.'
+                            : isExpired
+                              ? 'Batas waktu tagihan telah habis dan tidak ada pembayaran yang tercatat.'
+                              : 'Pembayaran belum terverifikasi. Jangan memproses pesanan sebagai lunas sebelum status berubah dari callback resmi iPaymu.'}
                       </p>
                     </div>
                   </div>

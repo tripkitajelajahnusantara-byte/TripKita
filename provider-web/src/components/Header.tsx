@@ -14,11 +14,30 @@ export const Header: React.FC = () => {
   };
 
   const isProviderRoute = ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard', 'provider-login', 'provider-register'].includes(route);
+  const handleLogoClick = () => {
+    // Halaman login dan pendaftaran mitra adalah halaman publik. Logo di
+    // header harus selalu membawa pengunjung kembali ke landing page utama,
+    // bukan mencoba membuka dashboard yang membutuhkan sesi provider.
+    const isPublicProviderAuthPage = route === 'provider-login' || route === 'provider-register';
+    navigateTo(isPublicProviderAuthPage ? 'beranda' : (isProviderRoute ? 'dashboard' : 'beranda'));
+  };
 
   return (
     <header className="site-header">
       <div className="container header-container">
-        <div className="logo-section" onClick={() => navigateTo(isProviderRoute ? 'dashboard' : 'beranda')}>
+        <div
+          className="logo-section"
+          role="link"
+          tabIndex={0}
+          aria-label="Kembali ke halaman utama TemenTrip"
+          onClick={handleLogoClick}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              handleLogoClick();
+            }
+          }}
+        >
           <div className="logo-brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <img src="/tementrip_official_logo.png" alt="TemenTrip" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
             {isProviderRoute && providerProfile ? (

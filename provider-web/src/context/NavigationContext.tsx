@@ -138,6 +138,20 @@ interface ProviderProfile {
   bankAccountName?: string;
   contactLastUpdatedAt?: string;
 
+  pendingBusinessName?: string;
+  pendingBusinessCategory?: string;
+  pendingOperationalProvince?: string;
+  pendingOperationalCity?: string;
+  pendingDescription?: string;
+  pendingPicName?: string;
+  pendingEmail?: string;
+  pendingWhatsapp?: string;
+  pendingInstagram?: string;
+  pendingTiktok?: string;
+  pendingWebsite?: string;
+  profileVerificationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | '';
+  profileRejectionReason?: string;
+
   pendingNpwp?: string;
   pendingBankName?: string;
   pendingBankAccount?: string;

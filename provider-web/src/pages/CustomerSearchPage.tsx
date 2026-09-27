@@ -32,6 +32,8 @@ interface TripPackage {
   duration?: number;
   minGuests?: number;
   meetingPoint?: string;
+  meetingPointLatitude?: number;
+  meetingPointLongitude?: number;
 }
 
 // Format YYYY-MM-DD menjadi "15 Okt 2026" untuk ringkasan jadwal

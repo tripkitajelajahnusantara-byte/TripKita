@@ -6,6 +6,11 @@ import { API_BASE_URL, request } from '../utils/api';
 import { TravelokaCalendarModal } from '../components/TravelokaCalendarModal';
 import { TripImage, PhotoPlaceholder } from '../components/TripImage';
 import { Skeleton } from '../components/Skeleton';
+import {
+  formatMeetingPointCoordinates,
+  getMeetingPointCoordinates,
+  MeetingPointMap,
+} from '../components/MeetingPointMap';
 
 // Format tanggal lokal ke YYYY-MM-DD (tanpa pergeseran zona waktu UTC)
 const toLocalIsoDate = (d: Date) =>
@@ -128,6 +133,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
   };
 
   const activeMeetingPoint = getSpecificMeetingPoint(pkg);
+  const activeMeetingPointCoordinates = getMeetingPointCoordinates(pkg);
 
   const formatDateIndoFull = (dateStr: string) => {
     if (!dateStr) return 'Pilih Tanggal';
@@ -816,23 +822,26 @@ export const CustomerPackageDetailPage: React.FC = () => {
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <MapPin size={18} color="#0284c7" /> Lokasi Titik Kumpul (Meeting Point)
               </h2>
-              {activeMeetingPoint ? (
+              {activeMeetingPointCoordinates ? (
                 <>
                   <p style={{ fontSize: '14px', color: '#334155', marginBottom: '16px', lineHeight: '1.6' }}>
-                    <MapPin size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" /><strong>{activeMeetingPoint}</strong>
+                    <MapPin size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />
+                    <strong>{formatMeetingPointCoordinates(activeMeetingPointCoordinates)}</strong>
                   </p>
-                  <div style={{ borderRadius: '12px', overflow: 'hidden', height: '300px', border: '1px solid #cbd5e1' }}>
-                    <iframe
-                      title="Titik Kumpul Map"
-                      width="100%"
-                      height="100%"
-                      style={{ border: 0 }}
-                      loading="lazy"
-                      allowFullScreen
-                      src={`https://maps.google.com/maps?q=${encodeURIComponent(activeMeetingPoint)}&t=m&z=16&output=embed`}
-                    />
-                  </div>
+                  <MeetingPointMap position={activeMeetingPointCoordinates} height={300} />
+                  <a
+                    href={`https://www.google.com/maps?q=${activeMeetingPointCoordinates.lat},${activeMeetingPointCoordinates.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'inline-flex', marginTop: '12px', color: '#0284c7', fontSize: '13px', fontWeight: 700 }}
+                  >
+                    Buka petunjuk arah
+                  </a>
                 </>
+              ) : activeMeetingPoint ? (
+                <p style={{ fontSize: '14px', color: '#b45309', margin: 0 }}>
+                  Paket lama ini belum memiliki koordinat pin. Provider perlu memilih ulang titik kumpul pada peta.
+                </p>
               ) : (
                 <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>Titik kumpul belum dilengkapi oleh provider.</p>
               )}

@@ -6,9 +6,16 @@ import { useActionLock } from '../utils/useActionLock';
 import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck, LoaderCircle } from 'lucide-react';
 import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsContent } from '../components/LegalModals';
 import { Skeleton } from '../components/Skeleton';
+import { useCustomAlert } from '../components/CustomAlertModal';
+import {
+  formatMeetingPointCoordinates,
+  getMeetingPointCoordinates,
+  MeetingPointMap,
+} from '../components/MeetingPointMap';
 
 export const CustomerConfirmationPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, bookingFormData } = useNavigation();
+  const { showAlert } = useCustomAlert();
   // POST /public/bookings membuat pesanan baru; kunci berbasis ref mencegah
   // klik ganda di tick yang sama membuat dua booking dan dua tagihan.
   const { pending, isBusy, run } = useActionLock();
@@ -61,6 +68,7 @@ export const CustomerConfirmationPage: React.FC = () => {
   }
 
   const pkg = selectedPackageForDetail;
+  const meetingPointCoordinates = getMeetingPointCoordinates(pkg);
   const { pemesan, peserta } = bookingFormData;
   const guestsCount = peserta.length;
   const selectedAddOns = pkg.selectedAddOns || bookingFormData?.selectedAddOns || [];
@@ -218,7 +226,12 @@ export const CustomerConfirmationPage: React.FC = () => {
     } catch (err: any) {
       console.error('[Booking Error]', err);
       setShowConfirmModal(false);
-      alert(`Gagal membuat tagihan pembayaran: ${err?.message || 'Terjadi kesalahan sistem'}`);
+      showAlert({
+        title: 'Pembayaran Belum Dapat Diproses',
+        message: err?.message || 'Tagihan iPaymu gagal dibuat. Tidak ada pembayaran yang tercatat. Silakan coba kembali.',
+        type: 'error',
+        confirmText: 'Coba Lagi',
+      });
     }
     });
   };
@@ -293,6 +306,26 @@ export const CustomerConfirmationPage: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {meetingPointCoordinates && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px' }}>
+                Titik Kumpul
+              </h2>
+              <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 14px' }}>
+                Koordinat: <strong style={{ color: '#334155' }}>{formatMeetingPointCoordinates(meetingPointCoordinates)}</strong>
+              </p>
+              <MeetingPointMap position={meetingPointCoordinates} height={220} />
+              <a
+                href={`https://www.google.com/maps?q=${meetingPointCoordinates.lat},${meetingPointCoordinates.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', marginTop: '12px', color: '#0284c7', fontSize: '13px', fontWeight: 700 }}
+              >
+                Buka petunjuk arah
+              </a>
+            </div>
+          )}
 
           {/* Ringkasan Pembayaran Card (Positioned directly below Data Peserta) */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>

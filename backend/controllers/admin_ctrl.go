@@ -134,6 +134,24 @@ type VerifyLegalRequest struct {
 	Reason string `json:"reason"`
 }
 
+func (ctrl *AdminController) VerifyProviderProfile(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid provider ID"})
+		return
+	}
+
+	var req VerifyLegalRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if respondVerificationError(c, "memverifikasi perubahan profil provider", ctrl.service.VerifyProviderProfile(uint(id), req.Action, req.Reason)) {
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Provider profile verification processed"})
+}
+
 func (ctrl *AdminController) VerifyProviderLegal(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
@@ -188,6 +206,7 @@ func (ctrl *AdminController) VerifyProviderDocument(c *gin.Context) {
 // agar klik kedua atau data yang sudah berubah tampil sebagai pesan jelas,
 // bukan gangguan server. Mengembalikan true bila respons sudah dikirim.
 func respondVerificationError(c *gin.Context, operation string, err error) bool {
+	var inputErr *services.AuthInputError
 	switch {
 	case err == nil:
 		return false
@@ -195,6 +214,8 @@ func respondVerificationError(c *gin.Context, operation string, err error) bool 
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, services.ErrProviderRejectionReasonRequired):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.As(err, &inputErr):
+		c.JSON(http.StatusConflict, gin.H{"error": inputErr.Error()})
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "Provider tidak ditemukan"})
 	default:

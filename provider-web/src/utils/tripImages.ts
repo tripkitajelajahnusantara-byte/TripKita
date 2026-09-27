@@ -22,6 +22,8 @@ export interface HighlightSource {
   duration?: number | string;
   minGuests?: number | string;
   meetingPoint?: string;
+  meetingPointLatitude?: number;
+  meetingPointLongitude?: number;
 }
 
 // Highlight kartu paket dari data asli mitra: 3 baris pertama fasilitas termasuk,

@@ -22,6 +22,7 @@ type AdminService interface {
 	UpdateProviderPlatformFee(id uint, platformFeePercent int64) error
 	DeleteProvider(id uint) error
 	GetProviderStatusHistory(providerID uint) ([]models.ProviderStatusHistory, error)
+	VerifyProviderProfile(id uint, action string, reason string) error
 	VerifyProviderLegal(id uint, action string, reason string) error
 	VerifyProviderDocument(id uint, docType string, action string, reason string) error
 }
@@ -219,14 +220,105 @@ func saveVerifiedProvider(tx *gorm.DB, provider *models.Provider) error {
 	return tx.Omit("status", "is_verified", "verification_notes", "platform_fee_percent").Save(provider).Error
 }
 
+func (s *adminService) VerifyProviderProfile(id uint, action string, reason string) error {
+	reason = strings.TrimSpace(reason)
+	if isRejectAction(action) && reason == "" {
+		return ErrProviderRejectionReasonRequired
+	}
+
+	var provider models.Provider
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&provider, id).Error; err != nil {
+			return err
+		}
+		if provider.ProfileVerificationStatus != "PENDING" {
+			return ErrNothingToVerify
+		}
+
+		if isApproveAction(action) {
+			var identity models.User
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("provider_id = ?", provider.ID).First(&identity).Error; err != nil {
+				return err
+			}
+			var duplicateCount int64
+			if err := tx.Model(&models.User{}).
+				Where("provider_id <> ? AND LOWER(email) = LOWER(?)", provider.ID, provider.PendingEmail).
+				Count(&duplicateCount).Error; err != nil {
+				return err
+			}
+			if duplicateCount > 0 {
+				return &AuthInputError{Message: "email pengajuan sudah digunakan akun lain"}
+			}
+			if err := tx.Model(&identity).Update("email", provider.PendingEmail).Error; err != nil {
+				if errors.Is(err, gorm.ErrDuplicatedKey) {
+					return &AuthInputError{Message: "email pengajuan sudah digunakan akun lain"}
+				}
+				return err
+			}
+
+			contactChanged := provider.PicName != provider.PendingPicName || provider.Email != provider.PendingEmail ||
+				provider.WhatsApp != provider.PendingWhatsApp || provider.Instagram != provider.PendingInstagram ||
+				provider.TikTok != provider.PendingTikTok || provider.Website != provider.PendingWebsite
+			provider.BusinessName = provider.PendingBusinessName
+			provider.BusinessCategory = provider.PendingBusinessCategory
+			provider.OperationalProvince = provider.PendingOperationalProvince
+			provider.OperationalCity = provider.PendingOperationalCity
+			provider.Description = provider.PendingDescription
+			provider.PicName = provider.PendingPicName
+			provider.Email = provider.PendingEmail
+			provider.WhatsApp = provider.PendingWhatsApp
+			provider.Instagram = provider.PendingInstagram
+			provider.TikTok = provider.PendingTikTok
+			provider.Website = provider.PendingWebsite
+			if contactChanged {
+				now := time.Now()
+				provider.ContactLastUpdatedAt = &now
+			}
+			provider.ProfileVerificationStatus = "APPROVED"
+			provider.ProfileRejectionReason = ""
+			provider.PendingBusinessName = ""
+			provider.PendingBusinessCategory = ""
+			provider.PendingOperationalProvince = ""
+			provider.PendingOperationalCity = ""
+			provider.PendingDescription = ""
+			provider.PendingPicName = ""
+			provider.PendingEmail = ""
+			provider.PendingWhatsApp = ""
+			provider.PendingInstagram = ""
+			provider.PendingTikTok = ""
+			provider.PendingWebsite = ""
+		} else if isRejectAction(action) {
+			provider.ProfileVerificationStatus = "REJECTED"
+			provider.ProfileRejectionReason = reason
+		}
+		return saveVerifiedProvider(tx, &provider)
+	})
+	if err != nil {
+		return err
+	}
+
+	if s.notifService != nil {
+		title := "Perubahan Profil Disetujui"
+		message := "Perubahan informasi bisnis dan kontak Anda telah disetujui dan sekarang sudah berlaku."
+		if isRejectAction(action) {
+			title = "Perubahan Profil Ditolak"
+			message = "Perubahan informasi bisnis dan kontak Anda ditolak. Catatan admin: " + reason
+		}
+		if err := s.notifService.CreateNotification(provider.ID, "PROVIDER", title, message, NotifTypeAccount, "/provider/profil"); err != nil {
+			log.Printf("[Notifikasi] Gagal memberi tahu provider %d tentang verifikasi profil: %v", provider.ID, err)
+		}
+	}
+	return nil
+}
+
 func (s *adminService) VerifyProviderLegal(id uint, action string, reason string) error {
 	reason = strings.TrimSpace(reason)
 	if isRejectAction(action) && reason == "" {
 		return ErrProviderRejectionReasonRequired
 	}
 
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		var provider models.Provider
+	var provider models.Provider
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&provider, id).Error; err != nil {
 			return err
 		}
@@ -260,6 +352,21 @@ func (s *adminService) VerifyProviderLegal(id uint, action string, reason string
 
 		return saveVerifiedProvider(tx, &provider)
 	})
+	if err != nil {
+		return err
+	}
+	if s.notifService != nil {
+		title := "Data Legal & Rekening Disetujui"
+		message := "Perubahan data legal dan rekening Anda telah disetujui dan sekarang sudah berlaku."
+		if isRejectAction(action) {
+			title = "Data Legal & Rekening Ditolak"
+			message = "Perubahan data legal dan rekening Anda ditolak. Catatan admin: " + reason
+		}
+		if err := s.notifService.CreateNotification(provider.ID, "PROVIDER", title, message, NotifTypeAccount, "/provider/profil"); err != nil {
+			log.Printf("[Notifikasi] Gagal memberi tahu provider %d tentang verifikasi legal: %v", provider.ID, err)
+		}
+	}
+	return nil
 }
 
 // providerDocumentFields menunjuk kolom milik satu jenis dokumen sehingga
@@ -288,8 +395,8 @@ func (s *adminService) VerifyProviderDocument(id uint, docType string, action st
 		return ErrProviderRejectionReasonRequired
 	}
 
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		var provider models.Provider
+	var provider models.Provider
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&provider, id).Error; err != nil {
 			return err
 		}
@@ -320,4 +427,19 @@ func (s *adminService) VerifyProviderDocument(id uint, docType string, action st
 
 		return saveVerifiedProvider(tx, &provider)
 	})
+	if err != nil {
+		return err
+	}
+	if s.notifService != nil {
+		title := "Dokumen Mitra Disetujui"
+		message := fmt.Sprintf("Dokumen %s Anda telah disetujui.", strings.ToUpper(docType))
+		if isRejectAction(action) {
+			title = "Dokumen Mitra Ditolak"
+			message = fmt.Sprintf("Dokumen %s Anda ditolak. Catatan admin: %s", strings.ToUpper(docType), reason)
+		}
+		if err := s.notifService.CreateNotification(provider.ID, "PROVIDER", title, message, NotifTypeAccount, "/provider/profil"); err != nil {
+			log.Printf("[Notifikasi] Gagal memberi tahu provider %d tentang verifikasi dokumen: %v", provider.ID, err)
+		}
+	}
+	return nil
 }

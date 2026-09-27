@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,12 +29,15 @@ func (ctrl *PackageController) Create(c *gin.Context) {
 
 	var req models.CreatePackageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Data paket belum lengkap atau format nilainya tidak valid. Periksa kembali field wajib dan nilai angka."})
 		return
 	}
 
 	pkg, err := ctrl.service.CreatePackage(providerID.(uint), &req)
 	if err != nil {
+		if respondPackageValidationError(c, err) {
+			return
+		}
 		respondInternalError(c, "membuat paket", err)
 		return
 	}
@@ -121,17 +125,29 @@ func (ctrl *PackageController) Update(c *gin.Context) {
 
 	var req models.UpdatePackageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format perubahan paket tidak valid. Nilai harga, kuota, durasi, dan umur harus berupa angka."})
 		return
 	}
 
 	pkg, err := ctrl.service.UpdatePackage(uint(id), providerID.(uint), &req)
 	if err != nil {
+		if respondPackageValidationError(c, err) {
+			return
+		}
 		respondInternalError(c, "memperbarui paket", err)
 		return
 	}
 
 	c.JSON(http.StatusOK, pkg)
+}
+
+func respondPackageValidationError(c *gin.Context, err error) bool {
+	var validationErr *services.PackageValidationError
+	if !errors.As(err, &validationErr) {
+		return false
+	}
+	c.JSON(http.StatusBadRequest, gin.H{"error": validationErr.Error()})
+	return true
 }
 
 func (ctrl *PackageController) Delete(c *gin.Context) {

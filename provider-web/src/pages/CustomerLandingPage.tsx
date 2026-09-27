@@ -34,6 +34,8 @@ interface TripPackage {
   duration?: number;
   minGuests?: number;
   meetingPoint?: string;
+  meetingPointLatitude?: number;
+  meetingPointLongitude?: number;
 }
 
 // 38 Provinsi Indonesia (Ported 100% from customer-mobile/lib/screens/home_screen.dart)

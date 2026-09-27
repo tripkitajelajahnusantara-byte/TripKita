@@ -43,6 +43,24 @@ type Provider struct {
 	WishlistData         string     `gorm:"type:text" json:"wishlistData"`
 	ContactLastUpdatedAt *time.Time `json:"contactLastUpdatedAt"`
 
+	// Perubahan profil bisnis dan kontak tidak langsung mengganti data yang
+	// sedang tayang. Seluruh nilai di bawah ini merupakan satu snapshot lengkap
+	// yang baru diterapkan setelah disetujui admin. Snapshot lengkap juga
+	// memungkinkan kolom opsional (mis. website) sengaja dikosongkan.
+	PendingBusinessName        string `gorm:"size:255" json:"pendingBusinessName"`
+	PendingBusinessCategory    string `gorm:"size:100" json:"pendingBusinessCategory"`
+	PendingOperationalProvince string `gorm:"size:255" json:"pendingOperationalProvince"`
+	PendingOperationalCity     string `gorm:"size:255" json:"pendingOperationalCity"`
+	PendingDescription         string `gorm:"type:text" json:"pendingDescription"`
+	PendingPicName             string `gorm:"size:255" json:"pendingPicName"`
+	PendingEmail               string `gorm:"size:255" json:"pendingEmail"`
+	PendingWhatsApp            string `gorm:"size:50" json:"pendingWhatsapp"`
+	PendingInstagram           string `gorm:"size:255" json:"pendingInstagram"`
+	PendingTikTok              string `gorm:"size:255" json:"pendingTiktok"`
+	PendingWebsite             string `gorm:"size:255" json:"pendingWebsite"`
+	ProfileVerificationStatus  string `gorm:"size:50;default:''" json:"profileVerificationStatus"` // PENDING, APPROVED, REJECTED
+	ProfileRejectionReason     string `gorm:"type:text" json:"profileRejectionReason"`
+
 	// Pending bank details & legal verification status
 	PendingNPWP             string `gorm:"size:100" json:"pendingNpwp"`
 	PendingBankName         string `gorm:"size:100" json:"pendingBankName"`

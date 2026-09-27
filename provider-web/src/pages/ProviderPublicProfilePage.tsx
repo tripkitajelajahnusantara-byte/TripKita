@@ -30,6 +30,8 @@ interface TripPackage {
   duration?: number;
   minGuests?: number;
   meetingPoint?: string;
+  meetingPointLatitude?: number;
+  meetingPointLongitude?: number;
 }
 
 interface PublicProviderProfile {
