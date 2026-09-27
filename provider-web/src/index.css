@@ -120,6 +120,66 @@ button {
   animation: fadeInScale var(--transition-normal) forwards;
 }
 
+/* Loading state shared by route chunks and session/profile restoration. */
+.app-loading-state {
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(13, 148, 136, 0.09), transparent 34%),
+    var(--color-bg-light);
+}
+
+.app-loading-state.is-fullscreen {
+  min-height: 100vh;
+}
+
+.app-loading-card {
+  width: min(100%, 280px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 26px 30px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-premium);
+  backdrop-filter: blur(10px);
+}
+
+.app-loading-logo {
+  display: block;
+  width: 142px;
+  height: auto;
+}
+
+.app-loading-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #ccfbf1;
+  border-top-color: #0d9488;
+  border-radius: 50%;
+  animation: appLoaderSpin 0.75s linear infinite;
+}
+
+.app-loading-label {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@keyframes appLoaderSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-spinner {
+    animation-duration: 1.8s;
+  }
+}
+
 /* Glassmorphism */
 .glass {
   background: rgba(255, 255, 255, 0.15);

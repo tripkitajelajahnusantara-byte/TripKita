@@ -63,6 +63,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 	// API Group
 	apiV1 := r.Group("/api/v1")
 	{
+		// Alias kompatibilitas untuk URL callback yang pernah dipakai pada
+		// konfigurasi deployment. Endpoint kanonis tetap berada di grup public.
+		apiV1.POST("/payments/ipaymu/callback", middleware.RateLimit(120, time.Minute), bookingCtrl.IPaymuWebhook)
+
 		// PUBLIC ROUTES (No Auth Required)
 		public := apiV1.Group("/public")
 		{

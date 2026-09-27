@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { Check, Upload, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Check, Upload, ArrowRight, ArrowLeft, LoaderCircle } from 'lucide-react';
 import { PROVINCES, CITIES_BY_PROVINCE } from '../utils/locationData';
 import { API_BASE_URL } from '../utils/api';
 
@@ -15,8 +15,34 @@ export const RegisterPage: React.FC = () => {
 
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploading, setUploading] = useState<'document' | 'ktp' | 'nib' | 'npwp' | 'akta' | 'sertifikat' | null>(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
+
+  const getLocalWhatsappNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.startsWith('62')) return digits.slice(2);
+    if (digits.startsWith('0')) return digits.slice(1);
+    return digits;
+  };
+
+  const formatWhatsappNumber = (value: string) => {
+    const digits = getLocalWhatsappNumber(value).slice(0, 12);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+    return `${digits.slice(0, 3)} ${digits.slice(3, 7)} ${digits.slice(7)}`;
+  };
+
+  const handleWhatsappChange = (value: string) => {
+    const localNumber = getLocalWhatsappNumber(value).slice(0, 12);
+    updateRegisterData({ whatsapp: localNumber ? `+62${localNumber}` : '' });
+    setLocalErrors((prev) => {
+      if (!prev.whatsapp) return prev;
+      const next = { ...prev };
+      delete next.whatsapp;
+      return next;
+    });
+  };
 
   const fileInputRefKtp = useRef<HTMLInputElement>(null);
   const fileInputRefSiup = useRef<HTMLInputElement>(null);
@@ -49,11 +75,9 @@ export const RegisterPage: React.FC = () => {
     if (!registerData.whatsapp) {
       errors.whatsapp = 'Nomor WhatsApp harus diisi';
     } else {
-      const cleaned = registerData.whatsapp.replace(/\s+/g, '');
-      if (!cleaned.startsWith('+62')) {
-        errors.whatsapp = 'Nomor WhatsApp harus diawali dengan +62';
-      } else if (cleaned.length < 11) {
-        errors.whatsapp = 'Nomor WhatsApp minimal 11 karakter (contoh: +6281234567890)';
+      const cleaned = registerData.whatsapp.replace(/\D/g, '');
+      if (!/^628\d{8,11}$/.test(cleaned)) {
+        errors.whatsapp = 'Masukkan 9–12 digit nomor seluler setelah +62 (diawali angka 8)';
       }
     }
     if (!registerData.password || registerData.password.length < 12) {
@@ -83,10 +107,13 @@ export const RegisterPage: React.FC = () => {
     if (validateStep2()) {
       try {
         setLocalErrors({});
+        setIsSubmitting(true);
         await registerProvider();
         setIsSuccess(true);
       } catch (err: any) {
         setLocalErrors({ api: err.message || 'Pendaftaran gagal' });
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -150,9 +177,10 @@ export const RegisterPage: React.FC = () => {
           <div className="register-sidebar">
             <div className="sidebar-logo">
               <span className="logo-brand">
-                <span className="logo-icon">🗺️</span>
-                <span className="logo-text">Trip<span>Kita</span></span>
-                <span className="logo-badge">Partner</span>
+                <span className="register-logo-surface">
+                  <img className="register-brand-logo" src="/tementrip_official_logo.png" alt="TemenTrip" />
+                </span>
+                <span className="logo-badge">Mitra</span>
               </span>
             </div>
 
@@ -204,9 +232,11 @@ export const RegisterPage: React.FC = () => {
         {/* Left Info Sidebar */}
         <div className="register-sidebar">
           <div className="sidebar-logo">
-            <span className="logo-brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src="/tementrip_official_logo.png" alt="TemenTrip" style={{ height: '34px', width: 'auto', objectFit: 'contain' }} />
-              <span className="logo-badge">Partner</span>
+            <span className="logo-brand">
+              <span className="register-logo-surface">
+                <img className="register-brand-logo" src="/tementrip_official_logo.png" alt="TemenTrip" />
+              </span>
+              <span className="logo-badge">Mitra</span>
             </span>
           </div>
 
@@ -463,13 +493,24 @@ export const RegisterPage: React.FC = () => {
 
                 <div className="input-group">
                   <label>Nomor WhatsApp *</label>
-                  <input 
-                    type="text" 
-                    placeholder="+62 812 3456 7890" 
-                    value={registerData.whatsapp}
-                    onChange={(e) => updateRegisterData({ whatsapp: e.target.value })}
-                  />
-                  {localErrors.whatsapp && <span className="error-text">{localErrors.whatsapp}</span>}
+                  <div className={`phone-input-shell ${localErrors.whatsapp ? 'has-error' : ''}`}>
+                    <span className="phone-country-prefix" aria-hidden="true">
+                      <span className="phone-flag" />
+                      <span>+62</span>
+                    </span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      aria-label="Nomor WhatsApp tanpa kode negara"
+                      aria-describedby="whatsapp-help"
+                      placeholder="812 3456 7890"
+                      value={formatWhatsappNumber(registerData.whatsapp)}
+                      onChange={(e) => handleWhatsappChange(e.target.value)}
+                    />
+                  </div>
+                  <span id="whatsapp-help" className="field-help-text">Cukup masukkan nomor setelah 0 — kode +62 sudah ditambahkan.</span>
+                  {localErrors.whatsapp && <span className="error-text" role="alert">{localErrors.whatsapp}</span>}
                 </div>
 
                 {/* Social Media Links */}
@@ -533,8 +574,10 @@ export const RegisterPage: React.FC = () => {
                   <button type="button" className="back-form-btn" onClick={() => setRegisterStep(1)}>
                     <ArrowLeft size={16} /> Kembali
                   </button>
-                  <button type="submit" className="submit-form-btn">
-                    Daftar Sekarang
+                  <button type="submit" className="submit-form-btn" disabled={isSubmitting} aria-busy={isSubmitting}>
+                    {isSubmitting ? (
+                      <><LoaderCircle className="button-spinner" size={18} aria-hidden="true" /> Mendaftarkan akun...</>
+                    ) : 'Daftar Sekarang'}
                   </button>
                 </div>
 
@@ -829,17 +872,35 @@ export const RegisterPage: React.FC = () => {
         .sidebar-logo .logo-brand {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
         }
 
-        .sidebar-logo .logo-icon { font-size: 24px; }
-        .sidebar-logo .logo-text { font-size: 22px; font-weight: 800; color: #ffffff; }
-        .sidebar-logo .logo-text span { color: var(--color-accent); }
+        .register-logo-surface {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 8px 12px;
+          border: 1px solid rgba(255, 255, 255, 0.5);
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.96);
+          box-shadow: 0 10px 28px rgba(2, 8, 23, 0.22);
+        }
+
+        .register-brand-logo {
+          display: block;
+          width: 154px;
+          height: auto;
+        }
+
         .sidebar-logo .logo-badge { 
-          background: rgba(0, 168, 150, 0.15); 
-          color: var(--color-accent); 
-          font-size: 11px; 
-          padding: 2px 8px; 
+          background: rgba(45, 212, 191, 0.14);
+          border: 1px solid rgba(94, 234, 212, 0.28);
+          color: #5eead4;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          padding: 5px 9px;
           border-radius: 20px; 
         }
 
@@ -1005,6 +1066,67 @@ export const RegisterPage: React.FC = () => {
           box-shadow: 0 0 0 3px rgba(0, 168, 150, 0.1);
         }
 
+        .phone-input-shell {
+          display: flex;
+          align-items: stretch;
+          overflow: hidden;
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-md);
+          background: #ffffff;
+          transition: var(--transition-fast);
+        }
+
+        .phone-input-shell:focus-within {
+          border-color: var(--color-accent);
+          box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+
+        .phone-input-shell.has-error {
+          border-color: #ef4444;
+        }
+
+        .phone-country-prefix {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          flex: 0 0 auto;
+          padding: 0 14px;
+          border-right: 1px solid var(--color-border);
+          background: #f8fafc;
+          color: #334155;
+          font-size: 13px;
+          font-weight: 700;
+          user-select: none;
+        }
+
+        .phone-flag {
+          width: 18px;
+          height: 12px;
+          border: 1px solid #e2e8f0;
+          border-radius: 2px;
+          background: linear-gradient(to bottom, #ef4444 0 50%, #ffffff 50% 100%);
+          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+        }
+
+        .phone-input-shell input {
+          min-width: 0;
+          flex: 1;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+        }
+
+        .phone-input-shell input:focus {
+          border: 0;
+          box-shadow: none;
+        }
+
+        .field-help-text {
+          color: #64748b;
+          font-size: 11px;
+          line-height: 1.45;
+        }
+
         .upload-zone-small {
           border: 2px dashed var(--color-border);
           border-radius: var(--radius-md);
@@ -1092,6 +1214,19 @@ export const RegisterPage: React.FC = () => {
           background-color: var(--color-accent-hover);
         }
 
+        .submit-form-btn:disabled {
+          cursor: wait;
+          opacity: 0.78;
+        }
+
+        .button-spinner {
+          animation: registerSpin 0.8s linear infinite;
+        }
+
+        @keyframes registerSpin {
+          to { transform: rotate(360deg); }
+        }
+
         .form-actions-row {
           display: flex;
           gap: 12px;
@@ -1134,6 +1269,15 @@ export const RegisterPage: React.FC = () => {
           }
           .register-sidebar {
             display: none;
+          }
+          .register-form-area {
+            padding: 32px 20px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .button-spinner {
+            animation-duration: 1.8s;
           }
         }
       `}</style>

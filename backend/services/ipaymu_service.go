@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -35,6 +36,10 @@ type IPaymuPaymentStatus struct {
 	Amount        int64  `json:"amount"`
 	PaymentMethod string `json:"payment_method"`
 }
+
+// ErrIPaymuAuthentication membedakan konfigurasi merchant yang ditolak dari
+// gangguan gateway umum. Nilai VA dan API key tidak pernah dimasukkan ke error.
+var ErrIPaymuAuthentication = errors.New("autentikasi iPaymu ditolak; periksa pasangan IPAYMU_VA dan IPAYMU_API_KEY")
 
 type IPaymuService interface {
 	CreatePayment(booking *models.Booking, packageName string) (*IPaymuPaymentResponse, error)
@@ -211,14 +216,14 @@ func (s *ipaymuService) CreatePayment(booking *models.Booking, packageName strin
 		referenceID = booking.BookingCode
 	}
 
-	returnURL := s.cfg.IPaymuReturnURL
-	if returnURL == "" {
-		returnURL = fmt.Sprintf("%s/?payment_result=success&booking_id=%d#/riwayat-booking", s.cfg.FrontendURL, booking.ID)
+	returnURL, err := buildIPaymuResultURL(s.cfg.IPaymuReturnURL, s.cfg.FrontendURL, "success", booking.ID)
+	if err != nil {
+		return nil, fmt.Errorf("konfigurasi IPAYMU_RETURN_URL tidak valid: %w", err)
 	}
 
-	cancelURL := s.cfg.IPaymuCancelURL
-	if cancelURL == "" {
-		cancelURL = fmt.Sprintf("%s/?payment_result=failed&booking_id=%d#/riwayat-booking", s.cfg.FrontendURL, booking.ID)
+	cancelURL, err := buildIPaymuResultURL(s.cfg.IPaymuCancelURL, s.cfg.FrontendURL, "failed", booking.ID)
+	if err != nil {
+		return nil, fmt.Errorf("konfigurasi IPAYMU_CANCEL_URL tidak valid: %w", err)
 	}
 
 	callbackURL := s.cfg.IPaymuCallbackURL
@@ -271,6 +276,9 @@ func (s *ipaymuService) CreatePayment(booking *models.Booking, packageName strin
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		log.Printf("[iPaymu Error Response] Status: %d, Body: %s", resp.StatusCode, string(bodyBytes))
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			return nil, ErrIPaymuAuthentication
+		}
 		return nil, fmt.Errorf("payment gateway menolak pembuatan tagihan")
 	}
 
@@ -309,6 +317,28 @@ func (s *ipaymuService) CreatePayment(booking *models.Booking, packageName strin
 		TransactionID: transactionID,
 		PaymentURL:    ipaymuResp.Data.URL,
 	}, nil
+}
+
+// buildIPaymuResultURL menambahkan konteks booking ke URL statis dari
+// environment. Tanpa ini, URL seperti /payment/success hanya membuka kembali
+// frontend tanpa mengetahui booking atau hasil redirect yang sedang ditampilkan.
+func buildIPaymuResultURL(configuredURL, frontendURL, result string, bookingID uint) (string, error) {
+	rawURL := strings.TrimSpace(configuredURL)
+	if rawURL == "" {
+		rawURL = strings.TrimRight(strings.TrimSpace(frontendURL), "/") + "/"
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return "", fmt.Errorf("wajib berupa URL HTTP(S) absolut")
+	}
+	query := parsed.Query()
+	query.Set("payment_result", result)
+	query.Set("booking_id", strconv.FormatUint(uint64(bookingID), 10))
+	parsed.RawQuery = query.Encode()
+	if parsed.Fragment == "" {
+		parsed.Fragment = "/riwayat-booking"
+	}
+	return parsed.String(), nil
 }
 
 func (s *ipaymuService) GetTransactionStatus(transactionID string) (*IPaymuPaymentStatus, error) {
@@ -354,6 +384,9 @@ func (s *ipaymuService) GetTransactionStatus(transactionID string) (*IPaymuPayme
 
 	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			return nil, ErrIPaymuAuthentication
+		}
 		return nil, fmt.Errorf("iPaymu error status (HTTP %d)", resp.StatusCode)
 	}
 

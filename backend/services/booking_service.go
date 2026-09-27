@@ -497,7 +497,8 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 			booking.Status = models.StatusPaymentFailed
 			s.sendNotificationsAndEmails(booking, models.StatusPendingPayment, models.StatusPaymentFailed)
 		}
-		return &BookingGatewayError{Message: fmt.Sprintf("gagal membuat tagihan pembayaran iPaymu: %v", err)}
+		log.Printf("[Booking Payment Gateway] booking_id=%d: %v", booking.ID, err)
+		return &BookingGatewayError{Message: "Layanan pembayaran sedang tidak tersedia. Silakan coba lagi beberapa saat lagi."}
 	}
 	invoiceID := payResp.SessionID
 	if payResp.TransactionID > 0 {

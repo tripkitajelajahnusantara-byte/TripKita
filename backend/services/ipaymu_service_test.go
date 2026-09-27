@@ -5,8 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +38,7 @@ func TestIPaymuCreatePaymentAcceptsOfficialRedirectResponse(t *testing.T) {
 	cfg := &config.Config{
 		IPaymuVA: "1179001234567890", IPaymuAPIKey: "sandbox-api-key", IPaymuBaseURL: server.URL,
 		FrontendURL: "https://example.test", BackendURL: "https://api.example.test",
+		IPaymuReturnURL: "https://example.test/payment/success", IPaymuCancelURL: "https://example.test/payment/cancel",
 	}
 	service := NewIPaymuService(cfg)
 	booking := &models.Booking{ID: 42, BookingCode: "TK-TEST-42", CustomerName: "Test User", CustomerEmail: "test@example.com", CustomerPhone: "081234567890", Guests: 2, TotalPrice: 250000}
@@ -49,6 +54,49 @@ func TestIPaymuCreatePaymentAcceptsOfficialRedirectResponse(t *testing.T) {
 	}
 	if received["referenceId"] != "TK-TEST-42" {
 		t.Fatalf("wrong referenceId: %#v", received["referenceId"])
+	}
+	if received["notifyUrl"] != "https://api.example.test/api/v1/public/webhooks/ipaymu" {
+		t.Fatalf("wrong notifyUrl: %#v", received["notifyUrl"])
+	}
+	assertIPaymuResultURL(t, received["returnUrl"], "https://example.test/payment/success", "success", "42")
+	assertIPaymuResultURL(t, received["cancelUrl"], "https://example.test/payment/cancel", "failed", "42")
+}
+
+func assertIPaymuResultURL(t *testing.T, value interface{}, expectedBase, expectedResult, expectedBookingID string) {
+	t.Helper()
+	parsed, err := url.Parse(fmt.Sprint(value))
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, _ := url.Parse(expectedBase)
+	if parsed.Scheme != base.Scheme || parsed.Host != base.Host || parsed.Path != base.Path {
+		t.Fatalf("unexpected result URL: %s", parsed.String())
+	}
+	if parsed.Query().Get("payment_result") != expectedResult || parsed.Query().Get("booking_id") != expectedBookingID || parsed.Fragment != "/riwayat-booking" {
+		t.Fatalf("result URL is missing payment context: %s", parsed.String())
+	}
+}
+
+func TestIPaymuCreatePaymentClassifiesRejectedCredentials(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"Status":401,"Success":false,"Message":"unauthorized signature","Data":null}`))
+	}))
+	defer server.Close()
+
+	service := NewIPaymuService(&config.Config{
+		IPaymuVA: "1179001234567890", IPaymuAPIKey: "rejected-key", IPaymuBaseURL: server.URL,
+		FrontendURL: "https://example.test", BackendURL: "https://api.example.test",
+	})
+	booking := &models.Booking{ID: 42, BookingCode: "TK-TEST-42", CustomerName: "Test User", CustomerEmail: "test@example.com", CustomerPhone: "081234567890", Guests: 1, TotalPrice: 100000}
+
+	_, err := service.CreatePayment(booking, "Paket Uji")
+	if !errors.Is(err, ErrIPaymuAuthentication) {
+		t.Fatalf("expected ErrIPaymuAuthentication, got %v", err)
+	}
+	if strings.Contains(err.Error(), "1179001234567890") || strings.Contains(err.Error(), "rejected-key") {
+		t.Fatalf("credential value leaked in error: %v", err)
 	}
 }
 

@@ -6,6 +6,16 @@ import { LegalModalContainer, CustomerRegistrationTermsContent } from './compone
 import { getCustomerToken, getProviderToken } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
+const AppLoadingIndicator: React.FC<{ label: string; fullScreen?: boolean }> = ({ label, fullScreen = false }) => (
+  <div className={`app-loading-state ${fullScreen ? 'is-fullscreen' : ''}`} role="status" aria-live="polite">
+    <div className="app-loading-card">
+      <img src="/tementrip_official_logo.png" alt="" className="app-loading-logo" aria-hidden="true" />
+      <span className="app-loading-spinner" aria-hidden="true" />
+      <span className="app-loading-label">{label}</span>
+    </div>
+  </div>
+);
+
 // Setiap halaman dimuat sebagai chunk terpisah supaya kunjungan pertama tidak
 // perlu mengunduh seluruh aplikasi sekaligus.
 const AboutPage = React.lazy(() => import('./pages/AboutPage').then((m) => ({ default: m.AboutPage })));
@@ -102,11 +112,7 @@ const AppContent: React.FC = () => {
   }, [route, loadingProfile, providerProfile, customerProfile, navigateTo]);
 
   if (loadingProfile) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif' }}>
-        <p>Memuat profil...</p>
-      </div>
-    );
+    return <AppLoadingIndicator label="Menyiapkan profil Anda..." fullScreen />;
   }
 
   // Mandatory Terms Modal Overlay for Google OAuth / First Time Customer Login
@@ -294,9 +300,7 @@ const AppContent: React.FC = () => {
 import { CustomAlertProvider } from './components/CustomAlertModal';
 
 const PageLoadingFallback: React.FC = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', fontFamily: 'sans-serif', color: '#475569' }}>
-    <p>Memuat halaman...</p>
-  </div>
+  <AppLoadingIndicator label="Menyiapkan halaman..." />
 );
 
 function App() {
