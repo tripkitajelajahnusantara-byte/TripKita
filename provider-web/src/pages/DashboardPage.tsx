@@ -9,7 +9,8 @@ import {
   TrendingUp,
   Star,
   ChevronRight,
-  ArrowUpRight
+  ArrowUpRight,
+  Users
 } from 'lucide-react';
 import type { Booking } from '../types';
 import { request } from '../utils/api';
@@ -36,6 +37,13 @@ export const DashboardPage: React.FC = () => {
   const [popularPackages, setPopularPackages] = useState<any[]>([]);
 
   const providerName = providerProfile?.businessName || 'Mitra TemenTrip';
+  const [greeting] = useState(() => {
+    const hour = new Date().getHours();
+    if (hour < 11) return 'Selamat pagi';
+    if (hour < 15) return 'Selamat siang';
+    if (hour < 18) return 'Selamat sore';
+    return 'Selamat malam';
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -119,7 +127,7 @@ export const DashboardPage: React.FC = () => {
         <header className="dashboard-header" style={{ position: 'relative' }}>
           <div className="header-welcome">
             <h1>Dashboard</h1>
-            <p>Selamat pagi, {providerName}! 👋</p>
+            <p>{greeting}, {providerName}.</p>
           </div>
           <div className="header-actions">
             <div className="search-bar">
@@ -146,7 +154,6 @@ export const DashboardPage: React.FC = () => {
               <div className="stat-icon-bg bg-cyan">
                 <Package size={20} color="#00a896" />
               </div>
-              <span className="trend-up">Aktif</span>
             </div>
             <div className="card-bottom">
               <h3>{stats ? stats.totalPackages : '...'}</h3>
@@ -159,7 +166,6 @@ export const DashboardPage: React.FC = () => {
               <div className="stat-icon-bg bg-blue">
                 <CalendarDays size={20} color="#3b82f6" />
               </div>
-              <span className="trend-up">Semua</span>
             </div>
             <div className="card-bottom">
               <h3>{stats ? stats.totalBookings : '...'}</h3>
@@ -172,7 +178,6 @@ export const DashboardPage: React.FC = () => {
               <div className="stat-icon-bg bg-green">
                 <CheckCircle size={20} color="#10b981" />
               </div>
-              <span className="trend-up">Selesai</span>
             </div>
             <div className="card-bottom">
               <h3>{stats ? stats.completedBookings : '...'}</h3>
@@ -185,7 +190,6 @@ export const DashboardPage: React.FC = () => {
               <div className="stat-icon-bg bg-purple">
                 <TrendingUp size={20} color="#8b5cf6" />
               </div>
-              <span className="trend-up">Total</span>
             </div>
             <div className="card-bottom">
               <h3 style={{ fontSize: '15px' }}>
@@ -200,7 +204,6 @@ export const DashboardPage: React.FC = () => {
               <div className="stat-icon-bg bg-yellow">
                 <Star size={20} color="#eab308" />
               </div>
-              <span className="trend-up">Rating</span>
             </div>
             <div className="card-bottom">
               <h3>{stats ? stats.rating.toFixed(2) : '...'}</h3>
@@ -261,7 +264,7 @@ export const DashboardPage: React.FC = () => {
                         </td>
                         <td className="package-cell">{b.package}</td>
                         <td>{b.tripDate}</td>
-                        <td>👥 {b.guests}</td>
+                        <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Users size={13} aria-hidden="true" /> {b.guests}</span></td>
                         <td className="price-cell">{b.totalPrice}</td>
                         <td>
                           <span className={`status-pill`} style={{
@@ -323,7 +326,7 @@ export const DashboardPage: React.FC = () => {
                     <img src={p.img} alt={p.name} />
                     <div className="pack-details">
                       <h4>{p.name}</h4>
-                      <p>{p.location} • ⭐ {p.rating}</p>
+                      <p style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{p.location} · <Star size={13} aria-hidden="true" /> {p.rating}</p>
                     </div>
                     <span className="pack-bookings">{p.bookings} booking</span>
                   </div>

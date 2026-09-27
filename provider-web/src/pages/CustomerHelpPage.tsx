@@ -6,7 +6,6 @@ import {
   ShieldCheck, 
   MessageSquare, 
   Mail, 
-  PhoneCall, 
   ChevronDown, 
   Search,
   MapPin
@@ -29,7 +28,7 @@ export const CustomerHelpPage: React.FC = () => {
       id: 'faq-1',
       category: 'pemesanan',
       question: 'Bagaimana cara memesan paket wisata di TemenTrip?',
-      answer: 'Sangat mudah! Pilih paket wisata pilihan Anda dari Beranda, tentukan tanggal keberangkatan dan jumlah peserta, lalu klik "Pesan Sekarang". Anda dapat memesan langsung tanpa ribet dan pembayaran diproses secara instan.'
+      answer: 'Pilih paket dari Beranda, tentukan tanggal keberangkatan dan jumlah peserta, lalu klik "Pesan Sekarang". Setelah itu Anda diarahkan ke halaman pembayaran iPaymu.'
     },
     {
       id: 'faq-2',
@@ -53,19 +52,25 @@ export const CustomerHelpPage: React.FC = () => {
       id: 'faq-5',
       category: 'tiket',
       question: 'Bagaimana jika saya tidak sengaja lupa atau kehilangan Kode Booking?',
-      answer: 'Jangan khawatir! Anda dapat masuk (login) ke akun Customer Anda untuk melihat seluruh e-voucher dan riwayat transaksi. Atau Anda dapat menghubungi tim Customer Service kami melalui email tripkitajelajahnusantara@gmail.com.'
+      answer: 'Masuk ke akun Anda untuk melihat semua e-voucher dan riwayat transaksi. Anda juga bisa menghubungi kami melalui email tripkitajelajahnusantara@gmail.com.'
     },
     {
       id: 'faq-6',
       category: 'refund',
-      question: 'Bagaimana kebijakan refund jika terjadi cuaca ekstrem atau bencana alam (Force Majeure)?',
-      answer: 'Jika trip dibatalkan secara sepihak oleh mitra provider demi alasan keselamatan akibat cuaca ekstrem atau bencana alam, dana pembayaran Anda dijamin dikembalikan 100% (Full Refund) melalui platform TemenTrip.'
+      question: 'Bagaimana jika trip dibatalkan atau dijadwal ulang oleh mitra?',
+      answer: 'Tiga hari sebelum keberangkatan (H-3), mitra memeriksa kuota untuk Open Trip atau kondisi cuaca untuk jenis trip lainnya. Jika mitra membatalkan trip, pembayaran Anda dikembalikan penuh. Jika mitra menawarkan jadwal baru, jadwal itu hanya berlaku setelah Anda setujui; jika Anda menolak atau tidak menanggapi, pembayaran Anda dikembalikan penuh.'
     },
     {
       id: 'faq-7',
       category: 'keamanan',
-      question: 'Apakah transaksi dan data pribadi saya di TemenTrip aman?',
-      answer: 'Sangat aman. Seluruh transaksi pembayaran dilindungi enkripsi SSL 256-bit berstandar internasional dan dana disimpan di rekening penampung resmi sampai jadwal perjalanan Anda selesai.'
+      question: 'Bagaimana pembayaran saya diproses?',
+      answer: 'Pembayaran diproses di halaman checkout iPaymu. Pesanan Anda terkonfirmasi setelah iPaymu mencatat pembayaran berhasil, dan statusnya bisa dilihat di riwayat booking.'
+    },
+    {
+      id: 'faq-8',
+      category: 'refund',
+      question: 'Bagaimana jika saya ingin membatalkan pesanan?',
+      answer: 'Jika Anda membatalkan paling lambat 7 hari sebelum tanggal trip, pembayaran dikembalikan penuh. Pembatalan kurang dari 7 hari sebelum trip tidak mendapat refund.'
     }
   ];
 
@@ -85,9 +90,8 @@ export const CustomerHelpPage: React.FC = () => {
       {/* Help Hero Header */}
       <section className="help-hero">
         <div className="container help-hero-container">
-          <span className="help-hero-tag">PUSAT BANTUAN TEMENTRIP</span>
-          <h1>Ada yang Bisa Kami Bantu?</h1>
-          <p>Temukan jawaban lengkap atas pertanyaan seputar pemesanan paket wisata, skema pembayaran, akses grup WA, dan layanan pelanggan TemenTrip.</p>
+          <h1>Pusat bantuan</h1>
+          <p>Jawaban untuk pertanyaan seputar pemesanan, pembayaran, pembatalan, dan cara menghubungi mitra.</p>
 
           {/* Search Box */}
           <div className="help-search-box">
@@ -109,22 +113,22 @@ export const CustomerHelpPage: React.FC = () => {
             <div className={`category-card ${activeCategory === 'semua' ? 'active' : ''}`} onClick={() => setActiveCategory('semua')}>
               <div className="cat-icon bg-blue"><HelpCircle size={22} color="#0284c7" /></div>
               <h3>Semua Bantuan</h3>
-              <p>Panduan lengkap platform TemenTrip</p>
+              <p>Tampilkan semua pertanyaan</p>
             </div>
             <div className={`category-card ${activeCategory === 'pemesanan' ? 'active' : ''}`} onClick={() => setActiveCategory('pemesanan')}>
               <div className="cat-icon bg-teal"><Calendar size={22} color="#00c9a7" /></div>
-              <h3>Pemesanan & Tiket</h3>
+              <h3>Pemesanan</h3>
               <p>Cara booking & cek voucher</p>
             </div>
             <div className={`category-card ${activeCategory === 'pembayaran' ? 'active' : ''}`} onClick={() => setActiveCategory('pembayaran')}>
               <div className="cat-icon bg-purple"><CreditCard size={22} color="#8b5cf6" /></div>
-              <h3>Pembayaran & Refund</h3>
-              <p>iPaymu Hosted Checkout</p>
+              <h3>Pembayaran</h3>
+              <p>Checkout melalui iPaymu</p>
             </div>
             <div className={`category-card ${activeCategory === 'refund' ? 'active' : ''}`} onClick={() => setActiveCategory('refund')}>
               <div className="cat-icon bg-green"><ShieldCheck size={22} color="#10b981" /></div>
-              <h3>Garansi & Refund</h3>
-              <p>Keamanan transaksi & garansi 100%</p>
+              <h3>Pembatalan & refund</h3>
+              <p>Aturan refund dan jadwal ulang</p>
             </div>
           </div>
         </div>
@@ -134,9 +138,7 @@ export const CustomerHelpPage: React.FC = () => {
       <section className="faq-section">
         <div className="container faq-container">
           <div className="section-header">
-            <span className="section-tag">FREQUENTLY ASKED QUESTIONS</span>
-            <h2 className="section-title">Pertanyaan Sering Diajukan</h2>
-            <p className="section-subtitle">Jawaban cepat untuk pertanyaan yang sering ditanyakan oleh wisatawan kami.</p>
+            <h2 className="section-title">Pertanyaan yang sering diajukan</h2>
           </div>
 
           <div className="faq-list">
@@ -160,7 +162,7 @@ export const CustomerHelpPage: React.FC = () => {
             ) : (
               <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
                 <HelpCircle size={40} color="#94a3b8" style={{ marginBottom: '12px' }} />
-                <p style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>Pertanyaan tidak ditemukan. Silakan hubungi Customer Service kami di bawah ini.</p>
+                <p style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>Pertanyaan tidak ditemukan. Silakan hubungi kami melalui kontak di bawah.</p>
               </div>
             )}
           </div>
@@ -172,9 +174,8 @@ export const CustomerHelpPage: React.FC = () => {
         <div className="container contact-container">
           <div className="contact-card-main">
             <div className="contact-info-left">
-              <span className="contact-badge">KONTAK BANTUAN TRIPKITA</span>
-              <h2>Butuh Bantuan Lebih Lanjut?</h2>
-              <p>Tim Customer Support TripKita siap membantu melalui kanal dukungan yang tersedia untuk memastikan perjalanan Anda berjalan lancar.</p>
+              <h2>Masih butuh bantuan?</h2>
+              <p>Hubungi kami melalui WhatsApp atau email.</p>
 
               <div className="contact-methods-list">
                 <div className="contact-method-item">
@@ -182,7 +183,7 @@ export const CustomerHelpPage: React.FC = () => {
                     <Mail size={20} color="#0284c7" />
                   </div>
                   <div>
-                    <span className="method-label">Email Dukungan Pelanggan Resmi:</span>
+                    <span className="method-label">Email:</span>
                     <a href="mailto:tripkitajelajahnusantara@gmail.com" className="method-value">tripkitajelajahnusantara@gmail.com</a>
                   </div>
                 </div>
@@ -192,18 +193,8 @@ export const CustomerHelpPage: React.FC = () => {
                     <MessageSquare size={20} color="#00c9a7" />
                   </div>
                   <div>
-                    <span className="method-label">WhatsApp Fast Response CS:</span>
+                    <span className="method-label">WhatsApp:</span>
                     <a href="https://wa.me/628132008875" target="_blank" rel="noreferrer" className="method-value">+62 813 2008 875</a>
-                  </div>
-                </div>
-
-                <div className="contact-method-item">
-                  <div className="method-icon-box">
-                    <PhoneCall size={20} color="#8b5cf6" />
-                  </div>
-                  <div>
-                    <span className="method-label">Jam Operasional Layanan:</span>
-                    <span className="method-value-text">24 Jam / 7 Hari Seminggu (Senin - Minggu)</span>
                   </div>
                 </div>
 
@@ -212,7 +203,7 @@ export const CustomerHelpPage: React.FC = () => {
                     <MapPin size={20} color="#f59e0b" />
                   </div>
                   <div>
-                    <span className="method-label">Alamat Kantor / Operasional Resmi:</span>
+                    <span className="method-label">Alamat:</span>
                     <span className="method-value-text">Jl. Puskesmas No.35-22, RT.11/RW.7, Duri Kosambi, Kecamatan Cengkareng, Kota Jakarta Barat, Daerah Khusus Ibukota Jakarta</span>
                   </div>
                 </div>
@@ -235,14 +226,6 @@ export const CustomerHelpPage: React.FC = () => {
           max-width: 720px;
         }
 
-        .help-hero-tag {
-          font-size: 12px;
-          font-weight: 800;
-          color: #00c9a7;
-          letter-spacing: 1.5px;
-          display: block;
-          margin-bottom: 12px;
-        }
 
         .help-hero h1 {
           color: #ffffff;
@@ -425,14 +408,6 @@ export const CustomerHelpPage: React.FC = () => {
           box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
         }
 
-        .contact-badge {
-          font-size: 11px;
-          font-weight: 800;
-          color: #0284c7;
-          letter-spacing: 1px;
-          display: block;
-          margin-bottom: 8px;
-        }
 
         .contact-info-left h2 {
           font-size: 26px;

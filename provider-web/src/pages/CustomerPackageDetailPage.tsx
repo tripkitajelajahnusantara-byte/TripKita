@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
-import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare, AlertTriangle } from 'lucide-react';
 import { API_BASE_URL, request } from '../utils/api';
 import { TravelokaCalendarModal } from '../components/TravelokaCalendarModal';
 import { TripImage, PhotoPlaceholder } from '../components/TripImage';
@@ -819,7 +819,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
               {activeMeetingPoint ? (
                 <>
                   <p style={{ fontSize: '14px', color: '#334155', marginBottom: '16px', lineHeight: '1.6' }}>
-                    📍 <strong>{activeMeetingPoint}</strong>
+                    <MapPin size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" /><strong>{activeMeetingPoint}</strong>
                   </p>
                   <div style={{ borderRadius: '12px', overflow: 'hidden', height: '300px', border: '1px solid #cbd5e1' }}>
                     <iframe
@@ -1115,7 +1115,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   </div>
                 ) : (
                   <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '10px 12px', borderRadius: '8px', color: '#92400e', fontSize: '12px', fontWeight: '700', lineHeight: '1.5' }}>
-                    ⚠️ Belum ada jadwal keberangkatan yang akan datang untuk Open Trip ini.
+                    <AlertTriangle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />Belum ada jadwal keberangkatan yang akan datang untuk Open Trip ini.
                   </div>
                 )}
 
@@ -1144,7 +1144,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                         <strong style={{ color: '#0284c7' }}>{quotaUsed} / {quotaMin} Pax</strong>
                       </div>
                       <div style={{ color: '#92400e', backgroundColor: '#fef3c7', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', marginTop: '4px', textAlign: 'center' }}>
-                        Kurang {quotaShortage} orang lagi agar trip PASTI BERANGKAT!
+                        Kurang {quotaShortage} orang lagi agar kuota minimum terpenuhi dan trip berangkat.
                       </div>
                     </div>
                   );
@@ -1206,19 +1206,19 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
                 {isDateOutsidePeriod && (
                   <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '10px 12px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
-                    ❌ Tanggal {formatDateIndoFull(customStartDate)} berada di luar periode paket. Silakan pilih tanggal mulai antara {formatDateIndoFull(periodMinDateIso)}{periodMaxDateIso ? ` dan ${formatDateIndoFull(periodMaxDateIso)}` : ''} pada kalender.
+                    <XCircle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />Tanggal {formatDateIndoFull(customStartDate)} berada di luar periode paket. Silakan pilih tanggal mulai antara {formatDateIndoFull(periodMinDateIso)}{periodMaxDateIso ? ` dan ${formatDateIndoFull(periodMaxDateIso)}` : ''} pada kalender.
                   </div>
                 )}
 
                 {isSelectedDateClosed && !isRangeBooked && (
                   <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '10px 12px', borderRadius: '8px', color: '#92400e', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
-                    ⚠️ Tanggal {formatDateIndoFull(customStartDate)} tidak dibuka penyelenggara untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.
+                    <AlertTriangle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />Tanggal {formatDateIndoFull(customStartDate)} tidak dibuka penyelenggara untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.
                   </div>
                 )}
 
                 {isRangeBooked && (
                   <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '10px 12px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
-                    ❌ Dalam rentang tanggal yang Anda pilih ({customStartDate === customEndDate ? formatDateIndoFull(customStartDate) : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`}), terdapat tanggal yang sudah terbooking ({bookedDatesInRange.map(d => formatDateIndoFull(d)).join(', ')} FULL). Silakan pilih rentang tanggal lain pada kalender.
+                    <XCircle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />Dalam rentang tanggal yang Anda pilih ({customStartDate === customEndDate ? formatDateIndoFull(customStartDate) : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`}), terdapat tanggal yang sudah terbooking ({bookedDatesInRange.map(d => formatDateIndoFull(d)).join(', ')} FULL). Silakan pilih rentang tanggal lain pada kalender.
                   </div>
                 )}
               </div>

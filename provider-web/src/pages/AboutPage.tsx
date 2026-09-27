@@ -5,38 +5,36 @@ import {
   Smile, 
   Award, 
   ChevronUp, 
-  Compass,
-  Users,
-  Sparkles
+  Compass
 } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
   const values = [
-    { icon: <Heart size={20} color="#ef4444" />, title: 'Kepercayaan', desc: 'Kami membangun ekosistem wisata yang transparan, jujur, dan saling menguntungkan antara provider dan traveler.' },
-    { icon: <Lightbulb size={20} color="#0284c7" />, title: 'Inovasi', desc: 'Terus menerus menghadirkan teknologi terkini untuk mempermudah operasional bisnis wisata digital.' },
-    { icon: <Smile size={20} color="#00c9a7" />, title: 'Inklusivitas', desc: 'Membuka akses bagi semua pelaku wisata, dari UMKM lokal hingga operator besar berskala nasional.' },
-    { icon: <Award size={20} color="#f59e0b" />, title: 'Kualitas', desc: 'Standar tinggi dalam seleksi provider demi memberikan pengalaman wisata terbaik bagi setiap traveler.' },
+    { icon: <Heart size={20} color="#ef4444" />, title: 'Keterbukaan', desc: 'Harga, jadwal, dan aturan refund ditampilkan sebelum Anda membayar. Ulasan hanya bisa ditulis oleh peserta yang sudah menyelesaikan trip.' },
+    { icon: <Lightbulb size={20} color="#0284c7" />, title: 'Kemudahan', desc: 'Mitra mengelola paket, kuota, dan jadwal dari satu dasbor, sehingga tidak perlu mencatat pesanan secara manual.' },
+    { icon: <Smile size={20} color="#00c9a7" />, title: 'Inklusivitas', desc: 'Pelaku wisata lokal, termasuk usaha kecil, bisa mendaftar sebagai mitra dan menjual paketnya di TemenTrip.' },
+    { icon: <Award size={20} color="#f59e0b" />, title: 'Verifikasi mitra', desc: 'Setiap mitra diperiksa oleh admin TemenTrip sebelum bisa menerbitkan paket.' },
   ];
 
   const milestones = [
-    { year: '2026', title: 'Peluncuran Resmi TemenTrip', desc: 'TemenTrip resmi hadir di Jakarta sebagai platform digital open trip modern bagi wisatawan Indonesia.' },
-    { year: '2026', title: 'Pembayaran Penuh & Dana Mitra Bertahap', desc: 'Pembayaran penuh di muka melalui iPaymu; buku besar TemenTrip menyediakan separuh hak mitra setelah pembayaran dan separuh sisanya setelah trip selesai.' },
-    { year: '2026', title: 'Jaringan Mitra Destinasi Nusantara', desc: 'Mengintegrasikan paket wisata unggulan terverifikasi dari Bromo, Bali, Lombok, hingga Raja Ampat.' },
+    { year: '2026', title: 'TemenTrip diluncurkan', desc: 'TemenTrip mulai beroperasi dari Jakarta sebagai tempat memesan open trip dan paket wisata lainnya.' },
+    { year: '2026', title: 'Pembayaran penuh, dana mitra bertahap', desc: 'Pembayaran penuh di muka melalui iPaymu; buku besar TemenTrip menyediakan separuh hak mitra setelah pembayaran dan separuh sisanya setelah trip selesai.' },
+    { year: '2026', title: 'Membangun jaringan mitra', desc: 'Mengajak mitra lokal di berbagai daerah untuk mendaftar dan menerbitkan paket setelah diverifikasi admin.' },
   ];
 
   const teamMembers = [
-    { name: 'Evan', role: 'Co-Founder & Product/Project Lead', initial: 'EV', bg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', dept: 'Co-Founder & Product' },
-    { name: 'Garry', role: 'Co-Founder & Tech Strategy Lead', initial: 'GA', bg: 'linear-gradient(135deg, #00c9a7 0%, #0f766e 100%)', dept: 'Co-Founder & Tech' },
-    { name: 'Liviani', role: 'Finance & Investor Relations Lead', initial: 'LI', bg: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', dept: 'Finance & Investor Relations' },
-    { name: 'Kris', role: 'Provider & Partnership Lead', initial: 'KR', bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', dept: 'Partnership' },
-    { name: 'Bakri', role: 'Legal & Compliance Lead', initial: 'BA', bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', dept: 'Legal' },
-    { name: 'Cindy', role: 'Business Analyst Lead', initial: 'CI', bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', dept: 'Analytics' },
-    { name: 'Farza', role: 'FSD & Documentation Lead', initial: 'FA', bg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', dept: 'Engineering' },
-    { name: 'Heaven', role: 'Marketing Lead', initial: 'HE', bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', dept: 'Marketing' },
-    { name: 'Ilham', role: 'Customer Relations Lead', initial: 'IL', bg: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', dept: 'Relations' },
-    { name: 'Kevin', role: 'QA Lead', initial: 'KE', bg: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', dept: 'Quality Assurance' },
-    { name: 'Ando', role: 'Business Development Associate', initial: 'AN', bg: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)', dept: 'Business Dev' },
-    { name: 'Aan', role: 'Support Lead', initial: 'AA', bg: 'linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%)', dept: 'Customer Support' },
+    { name: 'Evan', role: 'Co-Founder & Product/Project Lead', initial: 'EV', dept: 'Co-Founder & Product' },
+    { name: 'Garry', role: 'Co-Founder & Tech Strategy Lead', initial: 'GA', dept: 'Co-Founder & Tech' },
+    { name: 'Liviani', role: 'Finance & Investor Relations Lead', initial: 'LI', dept: 'Finance & Investor Relations' },
+    { name: 'Kris', role: 'Provider & Partnership Lead', initial: 'KR', dept: 'Partnership' },
+    { name: 'Bakri', role: 'Legal & Compliance Lead', initial: 'BA', dept: 'Legal' },
+    { name: 'Cindy', role: 'Business Analyst Lead', initial: 'CI', dept: 'Analytics' },
+    { name: 'Farza', role: 'FSD & Documentation Lead', initial: 'FA', dept: 'Engineering' },
+    { name: 'Heaven', role: 'Marketing Lead', initial: 'HE', dept: 'Marketing' },
+    { name: 'Ilham', role: 'Customer Relations Lead', initial: 'IL', dept: 'Relations' },
+    { name: 'Kevin', role: 'QA Lead', initial: 'KE', dept: 'Quality Assurance' },
+    { name: 'Ando', role: 'Business Development Associate', initial: 'AN', dept: 'Business Dev' },
+    { name: 'Aan', role: 'Support Lead', initial: 'AA', dept: 'Customer Support' },
   ];
 
   return (
@@ -44,9 +42,8 @@ export const AboutPage: React.FC = () => {
       {/* About Hero */}
       <section className="about-hero">
         <div className="container about-hero-container">
-          <span className="about-hero-tag">TENTANG KAMI</span>
-          <h1>Kisah di Balik TemenTrip</h1>
-          <p>Platform digital open trip terpercaya yang lahir dari semangat memajukan pariwisata Indonesia.</p>
+          <h1>Tentang TemenTrip</h1>
+          <p>TemenTrip mempertemukan traveler dengan mitra penyelenggara trip lokal di Indonesia.</p>
         </div>
       </section>
 
@@ -54,13 +51,12 @@ export const AboutPage: React.FC = () => {
       <section className="about-intro">
         <div className="container intro-container">
           <div className="intro-content">
-            <span className="section-tag">CERITA KAMI</span>
-            <h2>Dimulai dari Passion untuk Pariwisata Indonesia</h2>
+            <h2>Cerita kami</h2>
             <p>
-              TemenTrip lahir dari passion untuk pariwisata Indonesia, dibuat di Jakarta oleh sekumpulan talenta Indonesia yang luar biasa. Kami berkumpul untuk menjawab tantangan dalam menghubungkan keindahan destinasi Nusantara dengan traveler secara aman dan serba digital.
+              TemenTrip dibuat di Jakarta oleh tim yang ingin memudahkan orang menemukan dan memesan trip dari penyelenggara lokal. Traveler bisa melihat paket, memesan, dan membayar di satu tempat, sementara mitra mengelola pesanan tanpa harus mencatatnya satu per satu.
             </p>
             <p>
-              Kami percaya bahwa Indonesia memiliki kekayaan wisata yang luar biasa dari Sabang sampai Merauke. Yang dibutuhkan adalah jembatan digital terpercaya yang memberikan kemudahan bagi traveler sekaligus memberdayakan usaha jasa pariwisata lokal.
+              Banyak penyelenggara trip lokal masih menerima pesanan lewat chat dan transfer manual. Kami ingin proses itu lebih rapi: pembayaran online melalui iPaymu, kuota tercatat otomatis, dan aturan pembatalan yang sama untuk semua pihak.
             </p>
 
             <div className="intro-stats">
@@ -68,27 +64,12 @@ export const AboutPage: React.FC = () => {
                 <h3>2026</h3>
                 <p>Tahun Peluncuran</p>
               </div>
-              <div className="intro-stat-item">
-                <h3>100%</h3>
-                <p>Karya Talenta Lokal</p>
-              </div>
-              <div className="intro-stat-item">
-                <h3>8+</h3>
-                <p>Destinasi Utama Terintegrasi</p>
-              </div>
             </div>
           </div>
 
           <div className="intro-media">
             <div className="media-wrapper">
               <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80" alt="Wisata Indonesia" />
-              <div className="glass-card media-pill">
-                <Sparkles size={18} color="#00c9a7" />
-                <div>
-                  <strong>Platform Digital Terbaru 2026</strong>
-                  <p>Aman, Cepat, dan Transparan</p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -103,7 +84,7 @@ export const AboutPage: React.FC = () => {
             </div>
             <h3>Visi</h3>
             <p>
-              Menjadi platform ekosistem pariwisata digital terbesar dan terpercaya di Indonesia, yang memberdayakan pelaku wisata lokal untuk berkembang pesat di era digital.
+              Membantu pelaku wisata lokal di Indonesia menjual paketnya secara online, dan membantu traveler menemukan trip yang jelas harga, jadwal, dan aturannya.
             </p>
           </div>
           <div className="mission-card">
@@ -112,10 +93,10 @@ export const AboutPage: React.FC = () => {
             </div>
             <h3>Misi</h3>
             <ul>
-              <li>✓ Mendigitalisasi bisnis wisata lokal dengan teknologi praktis dan ramah pengguna.</li>
-              <li>✓ Menghubungkan provider terpercaya dengan para traveler di seluruh Nusantara.</li>
-              <li>✓ Menjamin keamanan transaksi escrow & garansi kepuasan semua pihak.</li>
-              <li>✓ Mendorong pertumbuhan pariwisata domestik secara berkelanjutan.</li>
+              <li>Menyediakan alat sederhana bagi mitra untuk mengelola paket, kuota, dan jadwal.</li>
+              <li>Memverifikasi setiap mitra sebelum paketnya bisa dipesan.</li>
+              <li>Menerapkan aturan refund yang sama untuk semua pesanan: pembatalan paling lambat 7 hari sebelum trip atau pembatalan oleh mitra, dana kembali penuh.</li>
+              <li>Mendorong lebih banyak orang berwisata di dalam negeri.</li>
             </ul>
           </div>
         </div>
@@ -125,8 +106,7 @@ export const AboutPage: React.FC = () => {
       <section className="values-section">
         <div className="container">
           <div className="section-header">
-            <span className="section-tag">NILAI KAMI</span>
-            <h2 className="section-title">Prinsip yang Memandu Kami</h2>
+            <h2 className="section-title">Prinsip kami</h2>
           </div>
 
           <div className="values-grid">
@@ -147,8 +127,7 @@ export const AboutPage: React.FC = () => {
       <section className="timeline-section">
         <div className="container">
           <div className="section-header">
-            <span className="section-tag">LENGKAH AWAL KAMI</span>
-            <h2 className="section-title">Fokus & Komitmen 2026</h2>
+            <h2 className="section-title">Langkah awal di 2026</h2>
           </div>
 
           <div className="timeline-list">
@@ -172,16 +151,15 @@ export const AboutPage: React.FC = () => {
       <section className="team-section">
         <div className="container">
           <div className="section-header">
-            <span className="section-tag"><Users size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> TIM KAMI</span>
-            <h2 className="section-title">Orang-orang di Balik TemenTrip</h2>
-            <p className="section-subtitle">Talenta hebat Indonesia yang berdedikasi tinggi membangun platform wisata digital terbaik.</p>
+            <h2 className="section-title">Tim TemenTrip</h2>
+            <p className="section-subtitle">Orang-orang yang membangun dan menjalankan TemenTrip.</p>
           </div>
 
           {/* Equal Grid of All Team Members */}
           <div className="unified-team-grid">
             {teamMembers.map((t, i) => (
               <div key={i} className="team-member-card">
-                <div className="member-avatar-circle" style={{ background: t.bg }}>
+                <div className="member-avatar-circle">
                   {t.initial}
                 </div>
                 <div className="member-info">
@@ -211,14 +189,6 @@ export const AboutPage: React.FC = () => {
           max-width: 640px;
         }
 
-        .about-hero-tag {
-          font-size: 11px;
-          font-weight: 800;
-          color: #00c9a7;
-          letter-spacing: 1.5px;
-          display: block;
-          margin-bottom: 12px;
-        }
 
         .about-hero h1 {
           color: #ffffff;
@@ -246,14 +216,6 @@ export const AboutPage: React.FC = () => {
           align-items: center;
         }
 
-        .section-tag {
-          font-size: 12px;
-          font-weight: 800;
-          color: #0284c7;
-          letter-spacing: 1px;
-          display: block;
-          margin-bottom: 8px;
-        }
 
         .intro-content h2 {
           font-size: 32px;
@@ -310,32 +272,8 @@ export const AboutPage: React.FC = () => {
           display: block;
         }
 
-        .media-pill {
-          position: absolute;
-          bottom: 24px;
-          left: 24px;
-          right: 24px;
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.6);
-          padding: 16px 20px;
-          border-radius: 16px;
-          display: flex;
-          align-items: center;
-          gap: 14px;
-        }
 
-        .media-pill strong {
-          display: block;
-          font-size: 14px;
-          color: #0f172a;
-        }
 
-        .media-pill p {
-          font-size: 12px;
-          color: #64748b;
-          margin: 0;
-        }
 
         /* Vision & Mission */
         .vision-mission-section {
@@ -551,15 +489,14 @@ export const AboutPage: React.FC = () => {
           width: 54px;
           height: 54px;
           border-radius: 50%;
-          color: #ffffff;
+          background: #e2e8f0;
+          color: #334155;
           font-size: 17px;
           font-weight: 800;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-          border: 2.5px solid #ffffff;
         }
 
         .member-info {

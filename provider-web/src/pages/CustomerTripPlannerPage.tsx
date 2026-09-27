@@ -7,7 +7,7 @@ import { TripImage } from '../components/TripImage';
 import { SkeletonCards } from '../components/Skeleton';
 import type { TripPlan, TripChecklistItem, TripSavingsLog, PackageItem } from '../types';
 import { 
-  Target, Calendar, Users, Wallet, CheckCircle2, Circle, Sparkles, Compass, 
+  Target, Calendar, Users, Wallet, CheckCircle2, Circle, Compass, ListChecks, CalendarClock, Star, 
   Trash2, Save, Info, Plus, ArrowLeft, HeartHandshake, ShieldCheck, Edit3, LoaderCircle
 } from 'lucide-react';
 
@@ -72,11 +72,13 @@ const formatRupiah = (val: number) => {
 };
 
 const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => {
+  const pctLabel = Math.min(100, Math.max(0, Math.floor(pct)));
+
   if (isExpired && pct < 100) {
     return {
-      icon: '🗓️',
-      title: 'Waktu Keberangkatan Tiba, Tapi Jangan Patah Semangat! 💪',
-      text: `Target tabungan liburan ke ${dest} belum 100% terkumpul. Usahamu sudah luar biasa! Yuk sesuaikan ulang tanggal keberangkatanmu dan coba lagi! ✨`,
+      icon: CalendarClock,
+      title: 'Tanggal keberangkatan sudah lewat',
+      text: `Tabungan untuk ${dest} baru ${pctLabel}% dari target. Ubah tanggal keberangkatan jika rencana ini masih berjalan.`,
       bg: '#fffbe6',
       border: '#ffe58f',
       titleColor: '#d48806',
@@ -86,9 +88,9 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
 
   if (pct >= 100) {
     return {
-      icon: '🎉',
-      title: 'Hore! Target Tabunganmu 100% Tercapai! 🎉',
-      text: `Selamat! Tabungan untuk liburan impian ke ${dest} sudah terkumpul 100%. Yuk langsung cari dan pesan paket trip impianmu! 🚀`,
+      icon: CheckCircle2,
+      title: 'Target tabungan tercapai',
+      text: `Tabungan untuk ${dest} sudah 100% dari target. Anda bisa mulai memilih paket trip.`,
       bg: '#dcfce7',
       border: '#86efac',
       titleColor: '#15803d',
@@ -98,9 +100,9 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
 
   if (pct >= 75) {
     return {
-      icon: '💪',
-      title: 'Hampir Sampai! 75%+ Tabungan Terkumpul! 💪',
-      text: `Ayo semangat! Tinggal sedikit lagi nih tabungan kamu terkumpul 100% untuk liburan impian ke ${dest}! Yuk sisihkan tabungan bulan ini! ✨`,
+      icon: Wallet,
+      title: `Tabungan mencapai ${pctLabel}% dari target`,
+      text: `Sisa kurang dari 25% lagi untuk trip ke ${dest}.`,
       bg: '#ecfdf5',
       border: '#a7f3d0',
       titleColor: '#047857',
@@ -110,9 +112,9 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
 
   if (pct >= 50) {
     return {
-      icon: '⚡',
-      title: 'Setengah Jalan Tercapai! 50% Tabungan Terkumpul! ⚡',
-      text: `Hebat! Kamu sudah berhasil mengumpulkan setengah dari target budget liburan ke ${dest}. Pertahankan semangatmu! 🔥`,
+      icon: Wallet,
+      title: `Tabungan mencapai ${pctLabel}% dari target`,
+      text: `Lebih dari setengah dana untuk trip ke ${dest} sudah terkumpul.`,
       bg: '#e0e7ff',
       border: '#c7d2fe',
       titleColor: '#4338ca',
@@ -122,9 +124,9 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
 
   if (pct >= 25) {
     return {
-      icon: '🔥',
-      title: 'Awal yang Bagus! 25% Tabungan Sudah Terkumpul! 🔥',
-      text: `Kerja bagus! Tabungan liburan ke ${dest} sudah mulai terkumpul. Tetap konsisten menyisihkan tabungan tiap bulan ya! ✨`,
+      icon: Wallet,
+      title: `Tabungan mencapai ${pctLabel}% dari target`,
+      text: `Catat setoran berikutnya agar progres trip ke ${dest} tetap terpantau.`,
       bg: '#e0f2fe',
       border: '#bae6fd',
       titleColor: '#0284c7',
@@ -134,9 +136,9 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
 
   // 0% - 24% Progress
   return {
-    icon: '🌱',
-    title: 'Langkah Awal Memulai Perjalanan Impian! 🚀',
-    text: `Setiap perjalanan besar dimulai dari langkah kecil. Rencana trip impianmu ke ${dest} baru saja dimulai. Yuk konsisten sisihkan tabungan bulan ini! ✨`,
+    icon: Wallet,
+    title: pctLabel > 0 ? `Tabungan mencapai ${pctLabel}% dari target` : 'Belum ada tabungan tercatat',
+    text: `Tambahkan setoran untuk mulai melacak progres trip ke ${dest}.`,
     bg: '#e6f4f4',
     border: '#b2e0e0',
     titleColor: '#0f8b8d',
@@ -430,7 +432,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
       { id: '5', label: 'Capai 100% Target Tabungan', completed: false },
       { id: '6', label: 'Cari & Pesan Paket Open Trip di TemenTrip', completed: false },
       { id: '7', label: 'Siapkan Barang Bawaan & Pakaian Liburan', completed: false },
-      { id: '8', label: 'Siap Berangkat & Nikmati Liburan! 🥳', completed: false },
+      { id: '8', label: 'Berangkat sesuai jadwal', completed: false },
     ];
 
     if (isEditingExisting && activePlan) {
@@ -828,15 +830,15 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
                   }}
                 >
-                  <HeartHandshake size={14} /> Liburan Impian Tanpa Beban
+                  <HeartHandshake size={14} /> Perencana tabungan trip
                 </span>
                 
                 <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#ffffff', margin: '14px 0 8px 0', lineHeight: 1.3, textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-                  Rencanakan Liburan Seru Bersama Pasangan, Teman, atau Keluarga! 🏝️✨
+                  Rencanakan trip bersama pasangan, teman, atau keluarga
                 </h2>
                 
                 <p style={{ fontSize: '14px', color: '#f0f9ff', margin: 0, lineHeight: 1.6, fontWeight: '500', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
-                  Susun target budget dan tabungan bulananmu mulai dari sekarang. Nikmati perjalanan impian tanpa perlu risau masalah keuangan!
+                  Tentukan destinasi, target budget, dan tanggal berangkat. Catat setiap setoran tabungan untuk melihat progresnya.
                 </p>
               </div>
             </div>
@@ -902,7 +904,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                             </div>
 
                             <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0' }}>
-                              🏝️ {p.destination}
+                              {p.destination}
                             </h3>
 
                             <div style={{ fontSize: '12.5px', color: '#64748b', marginBottom: '14px', display: 'flex', gap: '16px', fontWeight: '600' }}>
@@ -1069,15 +1071,15 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
                   }}
                 >
-                  <HeartHandshake size={14} /> Liburan Impian Tanpa Beban
+                  <HeartHandshake size={14} /> Perencana tabungan trip
                 </span>
                 
                 <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#ffffff', margin: '14px 0 8px 0', lineHeight: 1.3, textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-                  Rencanakan Liburan Seru Bersama Pasangan, Teman, atau Keluarga! 🏝️✨
+                  Rencanakan trip bersama pasangan, teman, atau keluarga
                 </h2>
                 
                 <p style={{ fontSize: '14px', color: '#f0f9ff', margin: 0, lineHeight: 1.6, fontWeight: '500', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
-                  Susun target budget dan tabungan bulananmu mulai dari sekarang. Nikmati perjalanan impian tanpa perlu risau masalah keuangan!
+                  Tentukan destinasi, target budget, dan tanggal berangkat. Catat setiap setoran tabungan untuk melihat progresnya.
                 </p>
               </div>
             </div>
@@ -1347,7 +1349,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
               {/* Savings Progress Bar */}
               <div style={{ backgroundColor: '#f8fafc', borderRadius: '16px', padding: '18px', border: '1px solid #f1f5f9' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', color: '#334155', marginBottom: '8px' }}>
-                  <span>📈 Progres Tabungan</span>
+                  <span>Progres tabungan</span>
                   <span style={{ color: '#0f8b8d' }}>{savedPercentage}%</span>
                 </div>
                 
@@ -1398,7 +1400,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
               const motivation = getMotivationContent(savedPercentage, isExpired, activePlan.destination);
               return (
                 <div style={{ backgroundColor: motivation.bg, borderRadius: '20px', padding: '18px 24px', border: `1px solid ${motivation.border}`, marginBottom: '28px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <span style={{ fontSize: '28px' }}>{motivation.icon}</span>
+                  <motivation.icon size={24} color={motivation.titleColor} style={{ flexShrink: 0 }} aria-hidden="true" />
                   <div>
                     <h4 style={{ fontSize: '14.5px', fontWeight: '800', color: motivation.titleColor, margin: '0 0 2px 0' }}>
                       {motivation.title}
@@ -1417,7 +1419,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
               {/* Scrollable Checklist Persiapan Liburan with Edit/Hapus for Manual items (Point 3) */}
               <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 6px 20px rgba(0,0,0,0.03)' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Sparkles size={18} color="#0f8b8d" /> Checklist Persiapan Trip
+                  <ListChecks size={18} color="#0f8b8d" /> Checklist persiapan trip
                 </h3>
 
                 {/* Scrollable Container Box */}
@@ -1659,7 +1661,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                         <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0', lineHeight: 1.3 }}>{pkg.name}</h4>
                         <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 10px 0' }}>{pkg.destination}</p>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                          <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '800' }}>⭐ {pkg.rating && Number(pkg.rating) > 0 ? Number(pkg.rating).toFixed(1) : 'Baru'}</span>
+                          <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Star size={13} aria-hidden="true" /> {pkg.rating && Number(pkg.rating) > 0 ? Number(pkg.rating).toFixed(1) : 'Baru'}</span>
                           <strong style={{ fontSize: '14px', color: '#0f8b8d', fontWeight: '800' }}>{typeof pkg.price === 'number' ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(pkg.price) : pkg.price}</strong>
                         </div>
                       </div>

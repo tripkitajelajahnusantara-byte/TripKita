@@ -186,12 +186,11 @@ export const RegisterPage: React.FC = () => {
 
             <div className="sidebar-content">
               <h2 className="sidebar-title">
-                Mulai Perjalanan <br />
-                <span>Bisnis Digital</span> <br />
-                Anda Hari Ini
+                Daftar sebagai <br />
+                <span>mitra TemenTrip</span>
               </h2>
               <p className="sidebar-subtitle">
-                Bergabung dengan ribuan provider wisata yang sudah berkembang bersama TemenTrip. Daftar gratis dan mulai terima booking hari ini.
+                Isi data usaha dan unggah dokumen legalitas. Admin TemenTrip memverifikasi akun Anda sebelum paket bisa dipublikasikan.
               </p>
             </div>
           </div>
@@ -203,15 +202,14 @@ export const RegisterPage: React.FC = () => {
                 <div className="success-icon-wrapper" style={{ margin: '0 auto 24px', width: '72px', height: '72px', borderRadius: '50%', backgroundColor: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Check size={36} color="#10b981" />
                 </div>
-                <h2 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '12px' }}>Pendaftaran Berhasil!</h2>
+                <h2 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '12px' }}>Pendaftaran terkirim</h2>
                 <p style={{ fontSize: '14px', color: 'var(--color-text-medium)', lineHeight: 1.6, marginBottom: '24px' }}>
-                  Terima kasih telah mendaftar sebagai partner TemenTrip. Akun Anda saat ini <strong>sedang menunggu verifikasi</strong> dari tim Admin kami.
+                  Akun Anda <strong>menunggu verifikasi</strong> dari admin TemenTrip.
                 </p>
                 <div style={{ backgroundColor: 'var(--color-bg-light)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '16px', textAlign: 'left', marginBottom: '28px', fontSize: '13px', color: 'var(--color-text-medium)', lineHeight: 1.6 }}>
-                  <p style={{ fontWeight: 600, color: 'var(--color-primary-medium)', marginBottom: '8px' }}>Langkah Selanjutnya:</p>
+                  <p style={{ fontWeight: 600, color: 'var(--color-primary-medium)', marginBottom: '8px' }}>Langkah selanjutnya</p>
                   <ul style={{ listStyleType: 'disc', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <li>Tim kami akan memverifikasi dokumen legalitas yang Anda unggah.</li>
-                    <li>Proses verifikasi biasanya memakan waktu maksimal 1x24 jam.</li>
                     <li>Setelah disetujui, Anda dapat masuk ke dashboard menggunakan email dan password yang telah Anda daftarkan.</li>
                   </ul>
                 </div>
@@ -242,30 +240,29 @@ export const RegisterPage: React.FC = () => {
 
           <div className="sidebar-content">
             <h2 className="sidebar-title">
-              Mulai Perjalanan <br />
-              <span>Bisnis Digital</span> <br />
-              Anda Hari Ini
+              Daftar sebagai <br />
+              <span>mitra TemenTrip</span>
             </h2>
             <p className="sidebar-subtitle">
-              Bergabung dengan ribuan provider wisata yang sudah berkembang bersama TemenTrip. Daftar gratis dan mulai terima booking hari ini.
+              Isi data usaha dan unggah dokumen legalitas. Admin TemenTrip memverifikasi akun Anda sebelum paket bisa dipublikasikan.
             </p>
 
             <ul className="benefits-checklist">
               <li>
                 <div className="chk-icon"><Check size={14} color="#00a896" /></div>
-                <span>Gratis daftar, tanpa biaya setup</span>
+                <span>Akun diverifikasi admin sebelum paket tayang</span>
               </li>
               <li>
                 <div className="chk-icon"><Check size={14} color="#00a896" /></div>
-                <span>Terima booking dari jutaan traveler</span>
+                <span>Customer membayar online lewat iPaymu</span>
               </li>
               <li>
                 <div className="chk-icon"><Check size={14} color="#00a896" /></div>
-                <span>Dashboard manajemen terintegrasi</span>
+                <span>Pencairan dua tahap: DP 50% setelah pembayaran, pelunasan setelah trip selesai</span>
               </li>
               <li>
                 <div className="chk-icon"><Check size={14} color="#00a896" /></div>
-                <span>Pembayaran aman dan tepat waktu</span>
+                <span>Setiap pencairan ditransfer manual dengan bukti transfer</span>
               </li>
             </ul>
           </div>
@@ -379,7 +376,7 @@ export const RegisterPage: React.FC = () => {
                     <input type="file" ref={fileInputRefKtp} style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleFileChange(e, 'ktp')} />
                     <div className={`upload-zone-small ${registerData.ktpPath ? 'uploaded' : ''}`} onClick={() => fileInputRefKtp.current?.click()} style={{ padding: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                       <Upload size={20} />
-                      <span>{uploading === 'ktp' ? 'Uploading...' : registerData.ktpPath ? '✓ KTP Uploaded' : 'KTP_PIC.jpg (Wajib)'}</span>
+                      <span>{uploading === 'ktp' ? 'Mengunggah...' : registerData.ktpPath ? '✓ KTP terunggah' : 'KTP_PIC.jpg (Wajib)'}</span>
                     </div>
                     {localErrors.ktp && <span className="error-text">{localErrors.ktp}</span>}
                   </div>
@@ -390,14 +387,14 @@ export const RegisterPage: React.FC = () => {
                     <input type="file" ref={fileInputRefNib} style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleFileChange(e, 'nib')} />
                     <div className={`upload-zone-small ${registerData.nibPath ? 'uploaded' : ''}`} onClick={() => fileInputRefNib.current?.click()} style={{ padding: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                       <Upload size={20} />
-                      <span>{uploading === 'nib' ? 'Uploading...' : registerData.nibPath ? '✓ NIB Uploaded' : 'NIB.pdf (Wajib)'}</span>
+                      <span>{uploading === 'nib' ? 'Mengunggah...' : registerData.nibPath ? '✓ NIB terunggah' : 'NIB.pdf (Wajib)'}</span>
                     </div>
                     {localErrors.nib && <span className="error-text">{localErrors.nib}</span>}
                   </div>
 
                   {/* Informational Notice */}
                   <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '14px', fontSize: '12px', color: '#1e3a8a', lineHeight: '1.5', marginBottom: '20px' }}>
-                    <strong>💡 Info Tambahan Dokumen:</strong> Mengunggah dokumen legalitas bisnis tambahan seperti SIUP, NPWP, Akta Pendirian, dan Sertifikat Pariwisata membantu meningkatkan kredibilitas provider, memperkuat proses verifikasi usaha, meningkatkan kepercayaan wisatawan, serta meningkatkan visibilitas di platform TemenTrip.
+                    <strong>Dokumen tambahan (opsional):</strong> SIUP, NPWP, akta pendirian, dan sertifikat pariwisata membantu admin memverifikasi usaha Anda.
                   </div>
 
                   {/* Optional Docs Grid */}
@@ -409,7 +406,7 @@ export const RegisterPage: React.FC = () => {
                       <input type="file" ref={fileInputRefSiup} style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleFileChange(e, 'document')} />
                       <div className={`upload-zone-small ${registerData.documentPath ? 'uploaded' : ''}`} onClick={() => fileInputRefSiup.current?.click()}>
                         <Upload size={16} />
-                        <span>{uploading === 'document' ? 'Uploading...' : registerData.documentPath ? '✓ SIUP Uploaded' : 'SIUP.pdf'}</span>
+                        <span>{uploading === 'document' ? 'Mengunggah...' : registerData.documentPath ? '✓ SIUP terunggah' : 'SIUP.pdf'}</span>
                       </div>
                       {localErrors.document && <span className="error-text">{localErrors.document}</span>}
                     </div>
@@ -420,7 +417,7 @@ export const RegisterPage: React.FC = () => {
                       <input type="file" ref={fileInputRefNpwp} style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleFileChange(e, 'npwp')} />
                       <div className={`upload-zone-small ${registerData.npwpPath ? 'uploaded' : ''}`} onClick={() => fileInputRefNpwp.current?.click()}>
                         <Upload size={16} />
-                        <span>{uploading === 'npwp' ? 'Uploading...' : registerData.npwpPath ? '✓ NPWP Uploaded' : 'NPWP.pdf'}</span>
+                        <span>{uploading === 'npwp' ? 'Mengunggah...' : registerData.npwpPath ? '✓ NPWP terunggah' : 'NPWP.pdf'}</span>
                       </div>
                       {localErrors.npwp && <span className="error-text">{localErrors.npwp}</span>}
                     </div>
@@ -431,7 +428,7 @@ export const RegisterPage: React.FC = () => {
                       <input type="file" ref={fileInputRefAkta} style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleFileChange(e, 'akta')} />
                       <div className={`upload-zone-small ${registerData.aktaPath ? 'uploaded' : ''}`} onClick={() => fileInputRefAkta.current?.click()}>
                         <Upload size={16} />
-                        <span>{uploading === 'akta' ? 'Uploading...' : registerData.aktaPath ? '✓ Akta Uploaded' : 'Akta.pdf'}</span>
+                        <span>{uploading === 'akta' ? 'Mengunggah...' : registerData.aktaPath ? '✓ Akta terunggah' : 'Akta.pdf'}</span>
                       </div>
                       {localErrors.akta && <span className="error-text">{localErrors.akta}</span>}
                     </div>
@@ -442,7 +439,7 @@ export const RegisterPage: React.FC = () => {
                       <input type="file" ref={fileInputRefSertifikat} style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleFileChange(e, 'sertifikat')} />
                       <div className={`upload-zone-small ${registerData.sertifikatPath ? 'uploaded' : ''}`} onClick={() => fileInputRefSertifikat.current?.click()}>
                         <Upload size={16} />
-                        <span>{uploading === 'sertifikat' ? 'Uploading...' : registerData.sertifikatPath ? '✓ Sertifikat Uploaded' : 'Sertifikat.pdf'}</span>
+                        <span>{uploading === 'sertifikat' ? 'Mengunggah...' : registerData.sertifikatPath ? '✓ Sertifikat terunggah' : 'Sertifikat.pdf'}</span>
                       </div>
                       {localErrors.sertifikat && <span className="error-text">{localErrors.sertifikat}</span>}
                     </div>

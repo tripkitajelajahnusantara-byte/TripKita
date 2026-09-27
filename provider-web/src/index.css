@@ -1752,6 +1752,249 @@ button[aria-busy="true"] {
   margin-bottom: 40px;
 }
 
+/* Halaman Jadi Mitra (ProviderLandingPage) */
+.pl-hero-note {
+  margin-top: -24px;
+  font-size: 13px;
+  color: var(--color-text-medium);
+}
+
+.pl-flow-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 26px 26px 10px;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.pl-flow-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  margin-bottom: 18px;
+}
+
+.pl-flow-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pl-flow-list li {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding-bottom: 18px;
+}
+
+/* Garis penghubung antar langkah */
+.pl-flow-list li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 30px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.pl-flow-index {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pl-flow-list strong {
+  display: block;
+  font-size: 14px;
+  color: var(--color-primary-dark);
+  margin: 4px 0 2px;
+}
+
+.pl-flow-list p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-medium);
+  margin: 0;
+}
+
+.pl-section {
+  padding: 72px 0;
+  background: #ffffff;
+}
+
+.pl-section-muted {
+  background: var(--color-bg-light);
+}
+
+.pl-section-head {
+  max-width: 640px;
+  margin-bottom: 36px;
+}
+
+.pl-section-head h2 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-primary-dark);
+  margin-bottom: 8px;
+}
+
+.pl-section-head p {
+  font-size: 15px;
+  color: var(--color-text-medium);
+}
+
+.pl-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px 40px;
+}
+
+.pl-feature {
+  padding-top: 16px;
+  border-top: 2px solid var(--color-primary-dark);
+}
+
+.pl-feature h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  margin-bottom: 8px;
+}
+
+.pl-feature p,
+.pl-steps p,
+.pl-faq p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-medium);
+  margin: 0;
+}
+
+.pl-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.pl-step-index {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--color-accent);
+  margin-bottom: 6px;
+}
+
+.pl-steps h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  margin-bottom: 6px;
+}
+
+.pl-faq-wrap {
+  max-width: 820px;
+}
+
+.pl-faq details {
+  border-bottom: 1px solid var(--color-border);
+  padding: 16px 0;
+}
+
+.pl-faq summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  list-style-position: outside;
+}
+
+.pl-faq details[open] summary {
+  margin-bottom: 8px;
+}
+
+.pl-cta {
+  padding: 56px 0;
+  background: var(--color-primary-dark);
+  color: #ffffff;
+}
+
+.pl-cta-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.pl-cta h2 {
+  font-size: 26px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.pl-cta-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.pl-cta-points li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pl-cta-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.pl-cta-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #cbd5e1;
+  font-size: 14px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 991px) {
+  .pl-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pl-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .pl-section { padding: 48px 0; }
+  .pl-section-head h2 { font-size: 23px; }
+  .pl-feature-grid,
+  .pl-steps { grid-template-columns: 1fr; }
+  .pl-hero-note { margin-top: -16px; }
+}
+
 .primary-btn {
   background-color: var(--color-accent);
   color: #ffffff;

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage, OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
-import { Search, ShieldCheck, CreditCard, Headset, ThumbsUp, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight, Share2 } from 'lucide-react';
+import { Search, ShieldCheck, CreditCard, RotateCcw, MessageSquare, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight, Share2 } from 'lucide-react';
 import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 import { ShareModal } from '../components/ShareModal';
 import { TripImage } from '../components/TripImage';
@@ -222,7 +222,7 @@ export const CustomerLandingPage: React.FC = () => {
             Indonesia dengan Mudah
           </h1>
           <p style={{ fontSize: 'clamp(14px, 2.5vw, 16.5px)', color: '#f1f5f9', marginBottom: '24px', fontWeight: 600, maxWidth: '500px', lineHeight: '1.5', textShadow: '0 1px 6px rgba(0, 0, 0, 0.5)' }}>
-            Temukan berbagai open trip seru dan tour guide terpercaya di seluruh Indonesia.
+            Bandingkan paket open trip dan private trip dari mitra lokal, lalu pesan dan bayar online.
           </p>
           <button 
             onClick={() => {
@@ -467,9 +467,9 @@ export const CustomerLandingPage: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
                 <div>
                   <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                    Trip Populer (Open Trip) <span style={{ color: '#007bff' }}>✦</span>
+                    Trip populer (Open Trip)
                   </h2>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>Paket wisata gabungan hemat & seru dengan jadwal teratur</span>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Bergabung dengan peserta lain pada jadwal yang ditentukan mitra</span>
                 </div>
                 <span 
                   onClick={() => {
@@ -630,9 +630,9 @@ export const CustomerLandingPage: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
                 <div>
                   <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                    Private Trip & Honeymoon Spesial <span style={{ color: '#e11d48' }}>🌹</span>
+                    Private trip & honeymoon
                   </h2>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>Jadwal bebas pilih customer (Min 2 Orang) • Fasilitas eksklusif & privat</span>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Tanggal pilihan Anda (min. 2 orang) • Hanya untuk rombongan Anda</span>
                 </div>
                 <span 
                   onClick={() => {
@@ -792,9 +792,9 @@ export const CustomerLandingPage: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
                 <div>
                   <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                    Family & Corporate Gathering <span style={{ color: '#059669' }}>🏢</span>
+                    Family & corporate gathering
                   </h2>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>Family (Min 3 orang) • Corporate Gathering (Min 10 orang) • Tanggal Bebas Pilih</span>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Family (min. 3 orang) • Corporate gathering (min. 10 orang) • Tanggal pilihan Anda</span>
                 </div>
                 <span 
                   onClick={() => {
@@ -931,7 +931,7 @@ export const CustomerLandingPage: React.FC = () => {
           </div>
         )}
 
-        {/* Feature Grid Ribbon (Footer details matching Gambar 1) */}
+        {/* Feature Grid Ribbon */}
         <div 
           style={{ 
             backgroundColor: '#ffffff', 
@@ -950,17 +950,17 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShieldCheck size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Aman & Terpercaya</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Provider terverifikasi dan berpengalaman</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Mitra diverifikasi</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Admin TemenTrip memeriksa setiap mitra sebelum paketnya bisa dipesan</span>
           </div>
 
           {/* Item 2 */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '10px' }}>
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Headset size={24} />
+              <RotateCcw size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Layanan 24/7</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Customer service siap membantu kapan saja</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Aturan refund jelas</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Batal paling lambat 7 hari sebelum trip, atau trip dibatalkan mitra: dana kembali penuh</span>
           </div>
 
           {/* Item 3 */}
@@ -968,23 +968,18 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CreditCard size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Pembayaran Mudah</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Transfer & QR Code praktis dan aman</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Bayar online via iPaymu</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Metode pembayaran yang tersedia ditampilkan di halaman checkout iPaymu</span>
           </div>
 
           {/* Item 4 */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '10px' }}>
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ThumbsUp size={24} />
+              <MessageSquare size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Banyak Pilihan</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Beragam destinasi menarik sesuai keinginanmu</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Ulasan dari peserta</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Ulasan hanya bisa ditulis setelah trip selesai</span>
           </div>
-        </div>
-
-        {/* Copyright Footer */}
-        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '12px', marginTop: '30px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
-          &copy; {new Date().getFullYear()} TripKita. All rights reserved.
         </div>
       </div>
 

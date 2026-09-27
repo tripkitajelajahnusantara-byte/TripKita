@@ -105,22 +105,22 @@ export const LoginPage: React.FC = () => {
 
           <div className="sidebar-main-content">
             <h1 className="sidebar-title">
-              {isAdminMode ? 'Portal Administrator TemenTrip' : 'Selamat Datang Kembali, Partner!'}
+              {isAdminMode ? 'Portal administrator TemenTrip' : 'Masuk ke dashboard mitra'}
             </h1>
             <p className="sidebar-description">
-              {isAdminMode 
-                ? 'Kelola sistem, verifikasi mitra tour, pantau transaksi sistem, dan kelola saldo secara terpusat.' 
-                : 'Kelola paket wisata, pantau booking, dan tingkatkan pendapatan bisnis Anda dari satu dashboard terintegrasi.'}
+              {isAdminMode
+                ? 'Verifikasi mitra, cek transaksi, dan proses pencairan dana mitra.'
+                : 'Atur paket wisata, cek booking yang masuk, dan lihat status pencairan dana Anda.'}
             </p>
 
             <div className="stats-cards-grid">
               <div className="stat-card-item">
                 <span className="stat-icon"><CalendarCheck2 size={19} /></span>
-                <span><strong>Kelola Pesanan</strong><small>Pantau operasional trip dalam satu tempat</small></span>
+                <span><strong>Booking dan jadwal</strong><small>Daftar peserta, tanggal trip, dan cek kuota H-3</small></span>
               </div>
               <div className="stat-card-item">
                 <span className="stat-icon"><WalletCards size={19} /></span>
-                <span><strong>Pantau Payout</strong><small>Lihat saldo dan riwayat pencairan transparan</small></span>
+                <span><strong>Pencairan dua tahap</strong><small>DP 50% setelah customer bayar, pelunasan setelah trip selesai</small></span>
               </div>
             </div>
           </div>
@@ -131,7 +131,9 @@ export const LoginPage: React.FC = () => {
                 <ShieldCheck size={15} />
               </div>
               <span className="security-text">
-                <strong>Keamanan terjamin.</strong> Sistem dilindungi dengan enkripsi SSL 256-bit.
+                {isAdminMode
+                  ? 'Akses ini hanya untuk admin TemenTrip.'
+                  : 'Akun mitra diverifikasi admin TemenTrip sebelum paket bisa tayang.'}
               </span>
             </div>
           </div>
@@ -216,7 +218,7 @@ export const LoginPage: React.FC = () => {
               {/* Register Prompt */}
               {!isAdminMode && (
                 <p className="register-prompt-text">
-                  Belum punya akun Provider? <span onClick={() => navigateTo('provider-register')} className="register-link">Daftar Mitra gratis sekarang</span>
+                  Belum punya akun Provider? <span onClick={() => navigateTo('provider-register')} className="register-link">Daftar sebagai mitra</span>
                 </p>
               )}
 
