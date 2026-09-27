@@ -55,6 +55,11 @@ Konfigurasi production dipisahkan ke `docker-compose.prod.yml` dan tetap membutu
      tanpa tabel tersebut pembuatan booking dan daftar paket publik akan gagal. Migrasi ini juga
      memindahkan penamaan lama `open_trip_departures` bila ada, dan mengisi tanggal yang sudah
      terpakai pesanan berjalan agar kalender pelanggan langsung akurat.
+   - `backend/database/migrations/008_booking_participants.sql` — tabel `booking_participants`
+     berisi data setiap peserta (nama, HP, jenis kelamin, tanggal lahir, riwayat penyakit) yang
+     diisi saat checkout. **Wajib dijalankan sebelum backend versi ini menerima trafik**: daftar
+     booking mitra dan riwayat booking customer memuat tabel ini, sehingga tanpa tabel tersebut
+     kedua halaman gagal dimuat. Tabel berisi data kesehatan, jadi RLS diaktifkan.
 4. Atur callback Xendit ke `/api/v1/public/webhooks/xendit` dan samakan verification token dengan `XENDIT_WEBHOOK_TOKEN`.
 5. Gunakan persistent private volume/object storage untuk direktori `/app/uploads`. Jangan expose direktori ini langsung dari CDN atau web server.
 6. Pastikan frontend menggunakan `VITE_API_BASE_URL=https://<api-domain>/api/v1` bila tidak memakai reverse proxy `/api/v1`.

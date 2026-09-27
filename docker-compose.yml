@@ -55,6 +55,8 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      WEATHER_API_KEY: ${WEATHER_API_KEY:-}
+      WEATHER_API_BASE_URL: ${WEATHER_API_BASE_URL:-https://api.weatherapi.com/v1}
       RUN_MIGRATIONS: "true"
       SEED_DB: ${SEED_DB:-false}
       SKIP_SEEDING: ${SKIP_SEEDING:-true}

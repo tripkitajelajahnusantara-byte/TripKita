@@ -404,6 +404,11 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 	if database.DB == nil {
 		return fmt.Errorf("database belum tersedia")
 	}
+	normalizedCustomerPhone, err := normalizeIndonesianMobilePhone(booking.CustomerPhone)
+	if err != nil {
+		return &BookingInputError{Message: "nomor HP pemesan tidak valid: " + err.Error()}
+	}
+	booking.CustomerPhone = normalizedCustomerPhone
 	if booking.TripDate.Before(time.Now().Add(-5 * time.Minute)) {
 		return &BookingInputError{Message: "tanggal perjalanan harus berada di masa mendatang"}
 	}
@@ -412,7 +417,7 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 	}
 
 	var pkg models.Package
-	err := database.DB.Transaction(func(tx *gorm.DB) error {
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&pkg, booking.PackageID).Error; err != nil {
 			return &BookingInputError{Message: "paket tidak ditemukan"}
 		}
@@ -526,7 +531,6 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 	return nil
 }
 
-var participantPhonePattern = regexp.MustCompile(`^(08|62)\d{8,12}$`)
 var participantNamePattern = regexp.MustCompile(`^[a-zA-Z\s.'-]{3,255}$`)
 
 // normalizeBookingParticipants memvalidasi data peserta yang dikirim saat
@@ -551,9 +555,11 @@ func normalizeBookingParticipants(booking *models.Booking) error {
 		if !participantNamePattern.MatchString(p.Name) {
 			return &BookingInputError{Message: label + ": nama minimal 3 karakter dan hanya berisi huruf"}
 		}
-		if !participantPhonePattern.MatchString(p.Phone) {
-			return &BookingInputError{Message: label + ": nomor HP harus diawali 08 atau 62 (10–14 digit)"}
+		normalizedPhone, err := normalizeIndonesianMobilePhone(p.Phone)
+		if err != nil {
+			return &BookingInputError{Message: label + ": " + err.Error()}
 		}
+		p.Phone = normalizedPhone
 		if p.Gender != "Laki-laki" && p.Gender != "Perempuan" {
 			return &BookingInputError{Message: label + ": jenis kelamin tidak valid"}
 		}

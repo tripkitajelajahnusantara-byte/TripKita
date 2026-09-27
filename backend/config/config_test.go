@@ -40,6 +40,7 @@ func loadWith(t *testing.T, env map[string]string) (*Config, error) {
 		"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
 		"IPAYMU_VA", "IPAYMU_API_KEY", "IPAYMU_BASE_URL", "IPAYMU_CALLBACK_URL", "IPAYMU_RETURN_URL", "IPAYMU_CANCEL_URL",
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM",
+		"WEATHER_API_KEY", "WEATHER_API_BASE_URL",
 		"RUN_MIGRATIONS", "SEED_DB", "ENABLE_DEV_MOCKS", "ENABLE_BACKGROUND_JOBS",
 		"ENABLE_AUTOMATIC_PAYOUT", "UPLOAD_DIR", "RAILWAY_VOLUME_MOUNT_PATH",
 	} {
@@ -161,6 +162,9 @@ func TestDevelopmentDefaultsStayUsable(t *testing.T) {
 	}
 	if cfg.Port != "8080" {
 		t.Errorf("PORT default tidak sesuai: %s", cfg.Port)
+	}
+	if cfg.WeatherAPIBaseURL != "https://api.weatherapi.com/v1" {
+		t.Errorf("WEATHER_API_BASE_URL default tidak sesuai: %s", cfg.WeatherAPIBaseURL)
 	}
 }
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, X, CreditCard, RefreshCw, Calendar, Wallet, Info, UserPlus, ShieldCheck, CheckCheck, Target } from 'lucide-react';
+import { Bell, X, CreditCard, RefreshCw, Calendar, Wallet, Info, UserPlus, ShieldCheck, CheckCheck, Target, CloudSun } from 'lucide-react';
 import { request } from '../utils/api';
 import { useNavigation } from '../context/NavigationContext';
 
@@ -177,6 +177,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
       case 'ACCOUNT':
         navigateTo('profil-provider');
         break;
+      case 'WEATHER':
+        navigateTo('dashboard');
+        break;
       default:
         navigateTo('booking');
     }
@@ -198,6 +201,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
         return <ShieldCheck size={16} color="#0f766e" />;
       case 'TRIP_PLAN':
         return <Target size={16} color="#0f8b8d" />;
+      case 'WEATHER':
+        return <CloudSun size={16} color="#0891b2" />;
       default:
         return <Info size={16} color="#0284c7" />;
     }

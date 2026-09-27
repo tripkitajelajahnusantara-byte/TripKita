@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { ArrowRight, CalendarCheck2, Eye, EyeOff, LoaderCircle, Lock, Mail, ShieldCheck, WalletCards } from 'lucide-react';
 import { request } from '../utils/api';
 
 export const LoginPage: React.FC = () => {
@@ -97,8 +97,10 @@ export const LoginPage: React.FC = () => {
         {/* Left Side: Brand Highlights & Stats (Dark Teal Panel) */}
         <div className="login-sidebar">
           <div className="sidebar-brand-box">
-            <span className="brand-logo-icon">🛡️</span>
-            <span className="brand-name-text">TemenTrip Admin & Provider</span>
+            <span className="sidebar-logo-surface">
+              <img src="/tementrip_official_logo.png" alt="TemenTrip" />
+            </span>
+            <span className="portal-badge">{isAdminMode ? 'Portal Admin' : 'Portal Mitra'}</span>
           </div>
 
           <div className="sidebar-main-content">
@@ -113,12 +115,12 @@ export const LoginPage: React.FC = () => {
 
             <div className="stats-cards-grid">
               <div className="stat-card-item">
-                <span className="stat-number">2,500+</span>
-                <span className="stat-label">Provider Aktif</span>
+                <span className="stat-icon"><CalendarCheck2 size={19} /></span>
+                <span><strong>Kelola Pesanan</strong><small>Pantau operasional trip dalam satu tempat</small></span>
               </div>
               <div className="stat-card-item">
-                <span className="stat-number">850K+</span>
-                <span className="stat-label">Wisatawan</span>
+                <span className="stat-icon"><WalletCards size={19} /></span>
+                <span><strong>Pantau Payout</strong><small>Lihat saldo dan riwayat pencairan transparan</small></span>
               </div>
             </div>
           </div>
@@ -126,9 +128,7 @@ export const LoginPage: React.FC = () => {
           <div className="sidebar-footer">
             <div className="security-badge">
               <div className="security-icon-circle">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20 6L9 17L4 12" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <ShieldCheck size={15} />
               </div>
               <span className="security-text">
                 <strong>Keamanan terjamin.</strong> Sistem dilindungi dengan enkripsi SSL 256-bit.
@@ -210,7 +210,7 @@ export const LoginPage: React.FC = () => {
 
               {/* Submit Button */}
               <button type="submit" className="submit-form-btn" disabled={isLoading}>
-                {isLoading ? 'Memproses...' : (isAdminMode ? 'Masuk Portal Admin' : 'Masuk ke Dashboard')} <ArrowRight size={16} className="arrow-btn-icon" />
+                {isLoading ? <><LoaderCircle size={17} className="login-spinner" /> Memverifikasi akun</> : <>{isAdminMode ? 'Masuk Portal Admin' : 'Masuk ke Dashboard'} <ArrowRight size={16} className="arrow-btn-icon" /></>}
               </button>
 
               {/* Register Prompt */}
@@ -331,13 +331,146 @@ export const LoginPage: React.FC = () => {
 
         /* Left Sidebar: Green/Teal Gradient Panel */
         .login-sidebar {
-          background: linear-gradient(180deg, #092c2e 0%, #061d1f 100%);
+          background:
+            radial-gradient(circle at 12% 18%, rgba(20, 184, 166, .18), transparent 34%),
+            radial-gradient(circle at 88% 85%, rgba(14, 116, 144, .13), transparent 38%),
+            linear-gradient(145deg, #073b3d 0%, #05272a 52%, #041c1f 100%);
           color: #ffffff;
-          padding: 64px;
+          padding: clamp(36px, 5vw, 72px);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           position: relative;
+          overflow: hidden;
+        }
+
+        .login-sidebar::after {
+          content: '';
+          position: absolute;
+          width: 360px;
+          height: 360px;
+          border: 1px solid rgba(255,255,255,.06);
+          border-radius: 50%;
+          right: -190px;
+          top: 22%;
+          box-shadow: 0 0 0 52px rgba(255,255,255,.018), 0 0 0 104px rgba(255,255,255,.012);
+          pointer-events: none;
+        }
+
+        .sidebar-brand-box {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .sidebar-logo-surface {
+          display: inline-flex;
+          align-items: center;
+          background: #ffffff;
+          border: 1px solid rgba(255,255,255,.55);
+          padding: 9px 13px;
+          border-radius: 13px;
+          box-shadow: 0 10px 30px rgba(0,0,0,.14);
+        }
+
+        .sidebar-logo-surface img {
+          display: block;
+          width: 144px;
+          height: 35px;
+          object-fit: contain;
+        }
+
+        .portal-badge {
+          border: 1px solid rgba(94, 234, 212, .28);
+          background: rgba(13, 148, 136, .2);
+          color: #99f6e4;
+          padding: 7px 11px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 750;
+          letter-spacing: .03em;
+        }
+
+        .sidebar-main-content {
+          position: relative;
+          z-index: 1;
+          width: min(100%, 560px);
+          margin: auto 0;
+          padding: 58px 0;
+        }
+
+        .sidebar-description {
+          max-width: 520px;
+          font-size: 16px;
+          color: rgba(255,255,255,.72);
+          line-height: 1.75;
+          margin: 0;
+        }
+
+        .stats-cards-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+          margin-top: 30px;
+        }
+
+        .stat-card-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-height: 84px;
+          padding: 16px;
+          background: rgba(255,255,255,.055);
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 15px;
+          backdrop-filter: blur(8px);
+        }
+
+        .stat-icon {
+          width: 38px;
+          height: 38px;
+          display: grid;
+          place-items: center;
+          border-radius: 11px;
+          background: rgba(45,212,191,.14);
+          color: #5eead4;
+          flex: 0 0 auto;
+        }
+
+        .stat-card-item strong {
+          display: block;
+          color: #ffffff;
+          font-size: 13px;
+          margin-bottom: 4px;
+        }
+
+        .stat-card-item small {
+          display: block;
+          color: rgba(255,255,255,.56);
+          font-size: 10.5px;
+          line-height: 1.45;
+        }
+
+        .sidebar-footer { position: relative; z-index: 1; }
+
+        .security-badge {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          color: rgba(255,255,255,.66);
+        }
+
+        .security-icon-circle {
+          width: 30px;
+          height: 30px;
+          display: grid;
+          place-items: center;
+          color: #5eead4;
+          background: rgba(45,212,191,.12);
+          border-radius: 9px;
+          flex: 0 0 auto;
         }
 
         .sidebar-logo {
@@ -469,7 +602,9 @@ export const LoginPage: React.FC = () => {
           align-items: center;
           justify-content: center;
           padding: 64px;
-          background-color: #ffffff;
+          background:
+            radial-gradient(circle at 90% 8%, rgba(20,184,166,.06), transparent 28%),
+            #f8fafc;
         }
 
         .form-inner-box {
@@ -478,8 +613,8 @@ export const LoginPage: React.FC = () => {
           background: #ffffff;
           padding: 40px;
           border-radius: 24px;
-          box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.04);
-          border: 1px solid #f1f5f9;
+          box-shadow: 0 24px 60px -32px rgba(15, 23, 42, .28);
+          border: 1px solid #e2e8f0;
         }
 
         .form-body {
@@ -639,6 +774,9 @@ export const LoginPage: React.FC = () => {
           cursor: not-allowed;
           box-shadow: none;
         }
+
+        .login-spinner { animation: login-spin .8s linear infinite; }
+        @keyframes login-spin { to { transform: rotate(360deg); } }
 
         .arrow-btn-icon {
           transition: transform 0.2s ease;

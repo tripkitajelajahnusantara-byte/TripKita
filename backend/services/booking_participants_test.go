@@ -39,13 +39,16 @@ func TestNormalizeBookingParticipantsSetsOrderAndTrims(t *testing.T) {
 	if booking.Participants[0].Name != "Budi Santoso" {
 		t.Fatalf("nama peserta tidak dirapikan: %q", booking.Participants[0].Name)
 	}
+	if booking.Participants[0].Phone != "+6281234567890" {
+		t.Fatalf("nomor peserta tidak dinormalisasi: %q", booking.Participants[0].Phone)
+	}
 }
 
 func TestNormalizeBookingParticipantsRejectsInvalidData(t *testing.T) {
 	tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
 	cases := map[string]func(p *models.BookingParticipant){
 		"nama berisi angka":    func(p *models.BookingParticipant) { p.Name = "Budi 123" },
-		"nomor HP salah":       func(p *models.BookingParticipant) { p.Phone = "+6281234567890" },
+		"nomor HP salah":       func(p *models.BookingParticipant) { p.Phone = "12345" },
 		"jenis kelamin asing":  func(p *models.BookingParticipant) { p.Gender = "L" },
 		"tanggal lahir besok":  func(p *models.BookingParticipant) { p.BirthDate = tomorrow },
 		"tanggal lahir kosong": func(p *models.BookingParticipant) { p.BirthDate = "" },

@@ -55,6 +55,11 @@ func NewAuthService(db *gorm.DB, repo repositories.ProviderRepository, cfg *conf
 
 func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, error) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	normalizedPhone, err := normalizeIndonesianMobilePhone(req.WhatsApp)
+	if err != nil {
+		return nil, &AuthInputError{Message: err.Error()}
+	}
+	req.WhatsApp = normalizedPhone
 	if req.KtpPath == "" {
 		return nil, &AuthInputError{Message: "dokumen KTP wajib diunggah"}
 	}
@@ -135,6 +140,11 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 
 func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*models.LoginResponse, error) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	normalizedPhone, err := normalizeIndonesianMobilePhone(req.WhatsApp)
+	if err != nil {
+		return nil, &AuthInputError{Message: err.Error()}
+	}
+	req.WhatsApp = normalizedPhone
 	hashedPassword, err := authn.HashPassword(req.Password)
 	if err != nil {
 		return nil, &AuthInputError{Message: err.Error()}
@@ -406,6 +416,13 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 	provider, err := s.repo.FindByID(providerID)
 	if err != nil {
 		return nil, err
+	}
+	if strings.TrimSpace(req.WhatsApp) != "" {
+		normalizedPhone, normalizeErr := normalizeIndonesianMobilePhone(req.WhatsApp)
+		if normalizeErr != nil {
+			return nil, &AuthInputError{Message: normalizeErr.Error()}
+		}
+		req.WhatsApp = normalizedPhone
 	}
 
 	if provider.Role == "CUSTOMER" {

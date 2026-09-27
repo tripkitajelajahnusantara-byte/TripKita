@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { API_BASE_URL } from '../utils/api';
-import { Mail, Lock, Eye, EyeOff, User, Phone, ArrowRight, UserCheck, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User, ArrowRight, UserCheck, AlertCircle } from 'lucide-react';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from '../components/LegalModals';
+import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
+import { isValidIndonesianMobilePhone } from '../utils/phone';
 
 export const CustomerLoginPage: React.FC = () => {
   const { login, registerCustomer, navigateTo, customerProfile, logout } = useNavigation();
@@ -47,8 +49,8 @@ export const CustomerLoginPage: React.FC = () => {
       // Validate WhatsApp
       if (!whatsapp) {
         errors.whatsapp = 'Nomor WhatsApp wajib diisi.';
-      } else if (!/^(081|082|083|085|087|088|089|08|62)\d{7,11}$/.test(whatsapp.trim())) {
-        errors.whatsapp = 'Nomor WhatsApp harus diawali 081 atau 08 (10–14 digit angka).';
+      } else if (!isValidIndonesianMobilePhone(whatsapp)) {
+        errors.whatsapp = 'Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.';
       }
 
       // Validate Confirm Password
@@ -299,28 +301,15 @@ export const CustomerLoginPage: React.FC = () => {
           {/* WhatsApp Field */}
           {isRegisterMode && (
             <div>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <Phone size={18} color={fieldErrors.whatsapp ? '#ef4444' : '#94a3b8'} style={{ position: 'absolute', left: '14px' }} />
-                <input 
-                  type="tel" 
-                  placeholder="Nomor WhatsApp (contoh: 081234567890)..."
-                  value={whatsapp}
-                  onChange={(e) => {
-                    setWhatsapp(e.target.value);
-                    if (fieldErrors.whatsapp) setFieldErrors(prev => ({ ...prev, whatsapp: '' }));
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px 14px 12px 42px',
-                    borderRadius: '10px',
-                    border: fieldErrors.whatsapp ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                    fontSize: '14px',
-                    outline: 'none',
-                    color: '#0f172a',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
+              <IndonesianPhoneInput
+                value={whatsapp}
+                onChange={(value) => {
+                  setWhatsapp(value);
+                  if (fieldErrors.whatsapp) setFieldErrors(prev => ({ ...prev, whatsapp: '' }));
+                }}
+                invalid={Boolean(fieldErrors.whatsapp)}
+                required
+              />
               {fieldErrors.whatsapp && (
                 <span style={{ fontSize: '11.5px', color: '#ef4444', fontWeight: '700', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <AlertCircle size={13} /> {fieldErrors.whatsapp}

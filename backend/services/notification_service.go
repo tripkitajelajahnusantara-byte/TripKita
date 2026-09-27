@@ -49,6 +49,7 @@ const (
 	NotifTypePayout       = "PAYOUT"
 	NotifTypeRegistration = "REGISTRATION"
 	NotifTypeDeparture    = "DEPARTURE"
+	NotifTypeWeather      = "WEATHER"
 	NotifTypeAccount      = "ACCOUNT"
 	NotifTypeTripPlan     = "TRIP_PLAN"
 	NotifTypeGeneral      = "GENERAL"

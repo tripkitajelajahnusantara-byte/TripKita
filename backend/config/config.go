@@ -41,6 +41,8 @@ type Config struct {
 	SMTPUser           string
 	SMTPPass           string
 	SMTPFrom           string
+	WeatherAPIKey      string
+	WeatherAPIBaseURL  string
 	AllowedOrigins     []string
 	TrustedProxies     []string
 	EnableDevMocks     bool
@@ -100,6 +102,8 @@ func LoadConfig() (*Config, error) {
 		SMTPUser:           getEnv("SMTP_USER", ""),
 		SMTPPass:           getEnv("SMTP_PASS", ""),
 		SMTPFrom:           getEnv("SMTP_FROM", ""),
+		WeatherAPIKey:      getEnv("WEATHER_API_KEY", ""),
+		WeatherAPIBaseURL:  strings.TrimRight(getEnv("WEATHER_API_BASE_URL", "https://api.weatherapi.com/v1"), "/"),
 		AllowedOrigins:     splitCSV(getEnv("ALLOWED_ORIGINS", getEnv("FRONTEND_URL", "http://localhost:5173"))),
 		TrustedProxies:     splitCSV(getEnv("TRUSTED_PROXIES", "")),
 		EnableDevMocks:     getBoolEnv("ENABLE_DEV_MOCKS", false) && !isProduction,
@@ -151,6 +155,10 @@ func (c *Config) Validate() error {
 	}
 	if c.EnableAutoPayout {
 		return fmt.Errorf("ENABLE_AUTOMATIC_PAYOUT belum didukung: integrasi API pembayaran massal dua tahap iPaymu belum dikonfigurasi")
+	}
+	weatherURL, err := url.Parse(c.WeatherAPIBaseURL)
+	if err != nil || weatherURL.Scheme != "https" || weatherURL.Host == "" {
+		return fmt.Errorf("WEATHER_API_BASE_URL wajib berupa URL HTTPS yang valid")
 	}
 	if c.DatabaseURL == "" && (c.DBHost == "" || c.DBUser == "" || c.DBPass == "" || c.DBName == "") {
 		return fmt.Errorf("konfigurasi database belum lengkap")

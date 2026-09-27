@@ -177,3 +177,11 @@ ditelusuri ke baris log yang tepat.
 Langkah rilis, nilai environment yang wajib, dan pemeriksaan setelah deploy ada di
 [`PRODUCTION_RELEASE.md`](PRODUCTION_RELEASE.md). Baca dokumen tersebut sebelum
 melakukan deploy pertama.
+
+## Prakiraan cuaca H-3
+
+Prakiraan cuaca H-3 untuk booking selain Open Trip memakai WeatherAPI.com. Isi
+`WEATHER_API_KEY`, gunakan `WEATHER_API_BASE_URL=https://api.weatherapi.com/v1`, dan
+pastikan `ENABLE_BACKGROUND_JOBS=true`. Tanpa API key, backend tetap berjalan tetapi
+job prakiraan dilewati; booking dan payout tidak diubah. Pada production, jalankan juga
+`backend/database/migrations/012_weather_advisories.sql` sebelum deploy backend baru.

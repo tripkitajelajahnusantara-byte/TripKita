@@ -589,6 +589,50 @@ func (s *EmailService) SendOpenTripQuotaAlertEmail(provider *models.Provider, de
 	return s.sendMailWithAttachment(provider.Email, subject, htmlBody, nil, "")
 }
 
+// SendWeatherAdvisoryEmail mengirim snapshot prakiraan H-3 untuk trip selain
+// Open Trip. Teksnya sengaja menegaskan bahwa data cuaca bukan keputusan sistem
+// dan bahwa memilih lanjut tidak mengubah ketentuan payout yang berlaku.
+func (s *EmailService) SendWeatherAdvisoryEmail(provider *models.Provider, departure *models.TripDeparture, pkg *models.Package) error {
+	if provider == nil || departure == nil || strings.TrimSpace(provider.Email) == "" {
+		return nil
+	}
+	packageName := "Paket Wisata"
+	destination := departure.WeatherLocation
+	tripType := "Trip Non-Open-Trip"
+	if pkg != nil {
+		if strings.TrimSpace(pkg.Name) != "" {
+			packageName = pkg.Name
+		}
+		if strings.TrimSpace(pkg.Destination) != "" && strings.TrimSpace(destination) == "" {
+			destination = pkg.Destination
+		}
+		if strings.TrimSpace(pkg.TripType) != "" {
+			tripType = pkg.TripType
+		}
+	}
+	riskTitle := "Prakiraan Cuaca Tersedia"
+	riskColor := "#0369a1"
+	riskBackground := "#f0f9ff"
+	riskBorder := "#bae6fd"
+	if departure.WeatherIsAdverse {
+		riskTitle = "Ada Potensi Cuaca Kurang Mendukung"
+		riskColor = "#b45309"
+		riskBackground = "#fffbeb"
+		riskBorder = "#fde68a"
+	}
+	dashboardURL := s.cfg.FrontendURL + "/#/provider/dashboard"
+	subject := fmt.Sprintf("Prakiraan Cuaca H-3: %s - TemenTrip Partner", packageName)
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:620px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:30px"><h2 style="color:#0284c7;text-align:center">Temen<span style="color:#00c9a7">Trip</span> Partner</h2><div style="background:%s;border:1px solid %s;padding:18px;border-radius:14px;margin:20px 0"><h3 style="color:%s;margin:0 0 8px">%s</h3><p style="color:%s;margin:0;font-size:14px;line-height:1.7">Halo <strong>%s</strong>, berikut prakiraan untuk <strong>%s</strong> (%s) pada <strong>%s</strong> di <strong>%s</strong>.</p></div><table style="width:100%%;border-collapse:collapse;font-size:14px;color:#475569"><tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0">Kondisi</td><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;text-align:right"><strong>%s</strong></td></tr><tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0">Suhu</td><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;text-align:right">%.0f–%.0f°C</td></tr><tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0">Peluang hujan</td><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;text-align:right">%d%%</td></tr><tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0">Perkiraan curah hujan</td><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;text-align:right">%.1f mm</td></tr><tr><td style="padding:9px 0">Angin maksimum</td><td style="padding:9px 0;text-align:right">%.1f km/jam</td></tr></table><div style="background:#f8fafc;border-left:4px solid #64748b;padding:14px 16px;border-radius:8px;margin:20px 0;font-size:13px;line-height:1.65;color:#475569"><strong>Penting:</strong> Prakiraan cuaca hanya bahan pertimbangan provider dan bukan keputusan otomatis TemenTrip. Anda dapat tetap melanjutkan, menawarkan reschedule, atau membatalkan trip. Jika memilih tetap melanjutkan, trip dan pencairan DP 50%% tetap mengikuti ketentuan payout yang berlaku.</div><p style="font-size:13px;color:#475569">%s</p><div style="text-align:center;margin:26px 0"><a href="%s" style="background:#0f8b8d;color:#fff;padding:12px 26px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block">Tinjau di Dashboard Provider</a></div><p style="font-size:11px;color:#94a3b8;text-align:center">Prakiraan dapat berubah. Pertimbangkan informasi BMKG dan kondisi lapangan sebelum mengambil keputusan operasional.</p></div></body></html>`,
+		riskBackground, riskBorder, riskColor, html.EscapeString(riskTitle), riskColor,
+		html.EscapeString(provider.PicName), html.EscapeString(packageName), html.EscapeString(tripType),
+		html.EscapeString(departure.DepartureAt.Format("02 January 2006")), html.EscapeString(destination),
+		html.EscapeString(departure.WeatherCondition), departure.WeatherMinTempC, departure.WeatherMaxTempC,
+		departure.WeatherRainChance, departure.WeatherPrecipMM, departure.WeatherMaxWindKPH,
+		html.EscapeString(departure.WeatherAdvisory), html.EscapeString(dashboardURL),
+	)
+	return s.sendMailWithAttachment(provider.Email, subject, body, nil, "")
+}
+
 // SendRescheduleOfferEmail meminta persetujuan pelanggan atas tanggal pengganti.
 // Berbeda dengan SendRescheduleEmail yang mengabarkan jadwal yang sudah berubah,
 // email ini menuntut jawaban: diterima atau ditolak.

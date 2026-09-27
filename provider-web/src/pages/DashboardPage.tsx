@@ -135,7 +135,7 @@ export const DashboardPage: React.FC = () => {
           </div>
         </header>
 
-        {/* Keputusan H-3 keberangkatan open trip; isinya dari backend. */}
+        {/* Pertimbangan H-3: kuota Open Trip dan prakiraan cuaca trip non-Open-Trip. */}
         <TripDepartureAlert />
 
         {/* Stats Grid */}

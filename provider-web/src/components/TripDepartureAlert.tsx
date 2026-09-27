@@ -1,5 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CalendarClock, CheckCircle2, RefreshCw, Users, XCircle } from 'lucide-react';
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  CloudRain,
+  CloudSun,
+  Droplets,
+  Info,
+  RefreshCw,
+  ThermometerSun,
+  Users,
+  Wind,
+  XCircle,
+} from 'lucide-react';
 import { request } from '../utils/api';
 
 interface DepartureBooking {
@@ -20,14 +33,24 @@ export interface TripDeparture {
   seatsRequired: number;
   bookingCount: number;
   status: 'AWAITING_PROVIDER' | 'CONTINUED' | 'CANCELLED' | 'RESCHEDULE_OFFERED' | 'RESOLVED';
-  reason: 'QUOTA_SHORTFALL' | 'FORCE_MAJEURE';
+  reason: 'QUOTA_SHORTFALL' | 'FORCE_MAJEURE' | 'WEATHER_FORECAST';
   responseDeadline?: string | null;
   decision: string;
   proposedDate?: string | null;
   decisionNotes?: string;
   acceptedCount: number;
   declinedCount: number;
-  packageDetails?: { id: number; name: string; tripType: string; quotaMin: number };
+  weatherLocation?: string;
+  weatherCondition?: string;
+  weatherMinTempC?: number;
+  weatherMaxTempC?: number;
+  weatherRainChance?: number;
+  weatherPrecipMm?: number;
+  weatherMaxWindKph?: number;
+  weatherIsAdverse?: boolean;
+  weatherAdvisory?: string;
+  weatherForecastedAt?: string;
+  packageDetails?: { id: number; name: string; tripType: string; quotaMin: number; endDate?: string };
   bookings?: DepartureBooking[];
 }
 
@@ -36,20 +59,18 @@ type DecisionAction = 'CONTINUE' | 'CANCEL' | 'RESCHEDULE';
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
-/** Tanggal minimal untuk input jadwal pengganti: besok, dalam format YYYY-MM-DD. */
 function tomorrowISO(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
 }
 
-/**
- * Panel keputusan H-3 untuk open trip yang kuota minimalnya belum terpenuhi.
- *
- * Seluruh isinya berasal dari `/provider/open-trips/departures`; baris
- * keberangkatan hanya muncul bila job latar belakang sudah mencatat kekurangan
- * kuota pada batas H-3 pukul 00:01.
- */
+const decisionCause = (departure: TripDeparture) => {
+  if (departure.reason === 'WEATHER_FORECAST') return 'berdasarkan pertimbangan prakiraan cuaca H-3';
+  if (departure.reason === 'FORCE_MAJEURE') return 'karena keadaan kahar';
+  return 'karena kuota minimal belum terpenuhi';
+};
+
 export const TripDepartureAlert: React.FC = () => {
   const [departures, setDepartures] = useState<TripDeparture[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +86,7 @@ export const TripDepartureAlert: React.FC = () => {
       setDepartures(Array.isArray(data) ? data : []);
       setError('');
     } catch (err: any) {
-      setError(err?.message || 'Data keberangkatan tidak dapat dimuat.');
+      setError(err?.message || 'Data pertimbangan keberangkatan tidak dapat dimuat.');
     } finally {
       setLoading(false);
     }
@@ -80,13 +101,14 @@ export const TripDepartureAlert: React.FC = () => {
       setError('Tanggal pengganti wajib diisi sebelum mengirim penjadwalan ulang.');
       return;
     }
-
-    const confirmText =
-      action === 'CONTINUE'
-        ? 'Tetap berangkatkan trip ini meski peserta di bawah kuota minimal?'
-        : action === 'CANCEL'
-          ? 'Batalkan keberangkatan ini? Seluruh pesanan akan diteruskan ke admin untuk pengembalian dana penuh.'
-          : `Tawarkan tanggal pengganti ${proposedDate} kepada seluruh pelanggan? Pelanggan yang menolak akan masuk proses pengembalian dana.`;
+    const isWeather = departure.reason === 'WEATHER_FORECAST';
+    const confirmText = action === 'CONTINUE'
+      ? isWeather
+        ? 'Tetap melanjutkan trip ini? Trip berjalan seperti biasa dan payout tetap mengikuti ketentuan yang berlaku.'
+        : 'Tetap berangkatkan trip ini meski peserta di bawah kuota minimal?'
+      : action === 'CANCEL'
+        ? 'Batalkan trip ini? Pesanan akan diteruskan ke admin untuk pengembalian dana penuh.'
+        : `Tawarkan tanggal pengganti ${proposedDate} kepada pelanggan? Pelanggan yang menolak akan masuk proses pengembalian dana.`;
     if (!window.confirm(confirmText)) return;
 
     setSubmittingId(departure.id);
@@ -95,19 +117,15 @@ export const TripDepartureAlert: React.FC = () => {
     try {
       await request(`/provider/departures/${departure.id}/decision`, {
         method: 'POST',
-        body: JSON.stringify({
-          action,
-          proposedDate: action === 'RESCHEDULE' ? proposedDate : '',
-          notes: '',
-        }),
+        body: JSON.stringify({ action, proposedDate: action === 'RESCHEDULE' ? proposedDate : '', notes: '' }),
       });
-      setSuccess(
-        action === 'CONTINUE'
-          ? 'Keberangkatan dikonfirmasi tetap jalan. Pelanggan telah diberi tahu.'
-          : action === 'CANCEL'
-            ? 'Keberangkatan dibatalkan. Admin menerima permintaan pengembalian dana.'
-            : 'Tawaran jadwal pengganti telah dikirim ke seluruh pelanggan melalui notifikasi dan email.',
-      );
+      setSuccess(action === 'CONTINUE'
+        ? isWeather
+          ? 'Trip tetap berjalan. Status booking dan ketentuan payout tidak berubah.'
+          : 'Keberangkatan dikonfirmasi tetap jalan. Pelanggan telah diberi tahu.'
+        : action === 'CANCEL'
+          ? 'Trip dibatalkan. Admin menerima permintaan pengembalian dana.'
+          : 'Tawaran jadwal pengganti telah dikirim kepada pelanggan melalui notifikasi dan email.');
       setRescheduleFor(null);
       setProposedDate('');
       await load();
@@ -118,170 +136,145 @@ export const TripDepartureAlert: React.FC = () => {
     }
   };
 
-  const pending = departures.filter((d) => d.status === 'AWAITING_PROVIDER');
-  const awaitingCustomers = departures.filter((d) => d.status === 'RESCHEDULE_OFFERED');
-
-  if (loading || (pending.length === 0 && awaitingCustomers.length === 0 && !success)) {
-    return null;
-  }
+  const pending = departures.filter((item) => item.status === 'AWAITING_PROVIDER');
+  const awaitingCustomers = departures.filter((item) => item.status === 'RESCHEDULE_OFFERED');
+  if (loading || (pending.length === 0 && awaitingCustomers.length === 0 && !success && !error)) return null;
 
   return (
-    <section style={{ margin: '20px 0 10px 0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {error && (
-        <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
-          {error}
-        </div>
-      )}
-      {success && (
-        <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
-          {success}
-        </div>
-      )}
+    <section className="departure-review" aria-label="Pertimbangan keberangkatan H-3">
+      {error && <div className="departure-feedback error">{error}</div>}
+      {success && <div className="departure-feedback success">{success}</div>}
 
       {pending.map((departure) => {
-        const packageName = departure.packageDetails?.name || 'Open Trip';
+        const isWeather = departure.reason === 'WEATHER_FORECAST';
+        const isAdverse = Boolean(departure.weatherIsAdverse);
+        const packageName = departure.packageDetails?.name || 'Paket Wisata';
         const isSubmitting = submittingId === departure.id;
+
         return (
-          <div
-            key={departure.id}
-            style={{
-              backgroundColor: '#fffbeb',
-              border: '1.5px solid #fde68a',
-              borderRadius: '20px',
-              padding: '20px 24px',
-              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' }}>
-              <AlertTriangle size={20} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <article key={departure.id} className={`departure-card ${isWeather ? (isAdverse ? 'weather-adverse' : 'weather-clear') : 'quota-alert'}`}>
+            <header className="departure-card-header">
+              <div className="departure-icon">
+                {isWeather ? (isAdverse ? <CloudRain size={22} /> : <CloudSun size={22} />) : <AlertTriangle size={22} />}
+              </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#92400e' }}>
-                  Keputusan H-3: Kuota Open Trip Belum Terpenuhi
-                </h3>
-                <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#b45309', lineHeight: 1.6 }}>
-                  <strong>{packageName}</strong> berangkat <strong>{formatDate(departure.departureAt)}</strong> baru terisi{' '}
-                  <strong>{departure.seatsBooked} dari minimal {departure.seatsRequired} kursi</strong> ({departure.bookingCount} pesanan).
-                  Tentukan keputusan Anda sebelum tanggal keberangkatan.
+                <span className="departure-eyebrow">PERTIMBANGAN H-3 • {departure.packageDetails?.tripType || 'Trip'}</span>
+                <h3>{isWeather ? (isAdverse ? 'Potensi Cuaca Kurang Mendukung' : 'Prakiraan Cuaca Trip') : 'Kuota Open Trip Belum Terpenuhi'}</h3>
+                <p>
+                  <strong>{packageName}</strong> • {formatDate(departure.departureAt)}
+                  {isWeather && departure.weatherLocation ? ` • ${departure.weatherLocation}` : ''}
                 </p>
               </div>
-            </div>
+            </header>
+
+            {isWeather ? (
+              <>
+                <div className="weather-summary">
+                  <div className="weather-condition"><span>Kondisi diperkirakan</span><strong>{departure.weatherCondition || 'Tidak tersedia'}</strong></div>
+                  <div className="weather-metric"><ThermometerSun size={17} /><span><small>Suhu</small><strong>{departure.weatherMinTempC ?? 0}–{departure.weatherMaxTempC ?? 0}°C</strong></span></div>
+                  <div className="weather-metric"><Droplets size={17} /><span><small>Peluang hujan</small><strong>{departure.weatherRainChance ?? 0}%</strong></span></div>
+                  <div className="weather-metric"><CloudRain size={17} /><span><small>Curah hujan</small><strong>{departure.weatherPrecipMm ?? 0} mm</strong></span></div>
+                  <div className="weather-metric"><Wind size={17} /><span><small>Angin maks.</small><strong>{departure.weatherMaxWindKph ?? 0} km/jam</strong></span></div>
+                </div>
+                <div className="weather-disclaimer">
+                  <Info size={17} />
+                  <p><strong>Prakiraan ini hanya bahan pertimbangan, bukan keputusan otomatis sistem.</strong> {departure.weatherAdvisory} Jika Anda memilih tetap berangkat, trip berjalan seperti biasa dan pencairan DP 50% tetap mengikuti ketentuan payout yang berlaku.</p>
+                </div>
+              </>
+            ) : (
+              <p className="quota-copy">Baru terisi <strong>{departure.seatsBooked} dari minimal {departure.seatsRequired} kursi</strong> ({departure.bookingCount} pesanan). Tentukan keputusan sebelum tanggal keberangkatan.</p>
+            )}
 
             {departure.bookings && departure.bookings.length > 0 && (
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '12px', padding: '10px 14px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 700, color: '#92400e', marginBottom: '6px' }}>
-                  <Users size={13} /> Pesanan terdampak
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {departure.bookings.map((b) => (
-                    <span key={b.id} style={{ fontSize: '11.5px', color: '#475569', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '4px 10px' }}>
-                      #{b.bookingCode} — {b.customerName} ({b.guests} orang)
-                    </span>
-                  ))}
+              <div className="affected-bookings">
+                <div className="affected-title"><Users size={14} /> Pesanan terdampak</div>
+                <div className="affected-list">
+                  {departure.bookings.map((booking) => <span key={booking.id}>#{booking.bookingCode} — {booking.customerName} ({booking.guests} orang)</span>)}
                 </div>
               </div>
             )}
 
             {rescheduleFor === departure.id && (
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#92400e', marginBottom: '6px' }}>
-                  TANGGAL PENGGANTI YANG DITAWARKAN
-                </label>
-                <input
-                  type="date"
-                  value={proposedDate}
-                  min={tomorrowISO()}
-                  onChange={(e) => setProposedDate(e.target.value)}
-                  style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px', width: '100%', maxWidth: '240px' }}
-                />
-                <p style={{ margin: '8px 0 0 0', fontSize: '11.5px', color: '#b45309', lineHeight: 1.5 }}>
-                  Setiap pelanggan akan menerima notifikasi dan email untuk menerima atau menolak tanggal ini.
-                  Yang menolak otomatis masuk proses pengembalian dana.
-                </p>
+              <div className="reschedule-box">
+                <label htmlFor={`reschedule-${departure.id}`}>Tanggal pengganti yang ditawarkan</label>
+                <input id={`reschedule-${departure.id}`} type="date" value={proposedDate} min={tomorrowISO()} max={departure.packageDetails?.endDate || undefined} onChange={(event) => setProposedDate(event.target.value)} />
+                <p>Pelanggan menerima notifikasi dan email untuk menerima atau menolak. Penolakan diteruskan ke proses refund.</p>
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', paddingTop: '14px', borderTop: '1px dashed #fde68a' }}>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => submitDecision(departure, 'CONTINUE')}
-                style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: isSubmitting ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <CheckCircle2 size={14} /> Tetap Berangkat
-              </button>
-
+            <div className="decision-actions">
+              <button type="button" className="decision-button continue" disabled={isSubmitting} onClick={() => submitDecision(departure, 'CONTINUE')}><CheckCircle2 size={15} /> Tetap Berangkat</button>
               {rescheduleFor === departure.id ? (
                 <>
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={() => submitDecision(departure, 'RESCHEDULE')}
-                    style={{ backgroundColor: '#d97706', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: isSubmitting ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <CalendarClock size={14} /> Kirim Tawaran Jadwal
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={() => { setRescheduleFor(null); setProposedDate(''); }}
-                    style={{ backgroundColor: '#ffffff', color: '#64748b', border: '1px solid #cbd5e1', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    Batal
-                  </button>
+                  <button type="button" className="decision-button reschedule" disabled={isSubmitting} onClick={() => submitDecision(departure, 'RESCHEDULE')}><CalendarClock size={15} /> Kirim Jadwal</button>
+                  <button type="button" className="decision-button neutral" disabled={isSubmitting} onClick={() => { setRescheduleFor(null); setProposedDate(''); }}>Tutup</button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => { setRescheduleFor(departure.id); setProposedDate(''); setError(''); }}
-                  style={{ backgroundColor: '#d97706', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: isSubmitting ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <CalendarClock size={14} /> Jadwalkan Ulang
-                </button>
+                <button type="button" className="decision-button reschedule" disabled={isSubmitting} onClick={() => { setRescheduleFor(departure.id); setProposedDate(''); setError(''); }}><CalendarClock size={15} /> Reschedule</button>
               )}
-
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => submitDecision(departure, 'CANCEL')}
-                style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: isSubmitting ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <XCircle size={14} /> Batalkan (Refund)
-              </button>
+              <button type="button" className="decision-button cancel" disabled={isSubmitting} onClick={() => submitDecision(departure, 'CANCEL')}><XCircle size={15} /> Batalkan &amp; Refund</button>
             </div>
-          </div>
+          </article>
         );
       })}
 
       {awaitingCustomers.map((departure) => {
-        const packageName = departure.packageDetails?.name || 'Open Trip';
         const responded = departure.acceptedCount + departure.declinedCount;
         return (
-          <div
-            key={departure.id}
-            style={{ backgroundColor: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '20px', padding: '16px 20px' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-              <RefreshCw size={18} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div style={{ fontSize: '12.5px', color: '#1e40af', lineHeight: 1.6 }}>
-                <strong style={{ display: 'block', fontSize: '14px', marginBottom: '2px' }}>
-                  Menunggu Jawaban Pelanggan
-                </strong>
-                Tawaran jadwal pengganti{' '}
-                {departure.proposedDate && <strong>{formatDate(departure.proposedDate)}</strong>} untuk{' '}
-                <strong>{packageName}</strong> ({formatDate(departure.departureAt)}) sudah dikirim
-                {departure.reason === 'FORCE_MAJEURE' ? ' karena keadaan kahar' : ' karena kuota minimal tidak terpenuhi'}.
-                {departure.responseDeadline && (
-                  <> Batas jawaban pelanggan: <strong>{formatDate(departure.responseDeadline)}</strong>.</>
-                )}
-                Sejauh ini <strong>{departure.acceptedCount} menerima</strong> dan{' '}
-                <strong>{departure.declinedCount} menolak</strong> dari {departure.bookingCount} pesanan
-                {responded < departure.bookingCount && ' — sisanya belum menjawab'}.
-              </div>
-            </div>
-          </div>
+          <article key={departure.id} className="awaiting-card">
+            <RefreshCw size={19} />
+            <div><strong>Menunggu jawaban pelanggan</strong><p>Tawaran tanggal {departure.proposedDate && <b>{formatDate(departure.proposedDate)}</b>} untuk <b>{departure.packageDetails?.name || 'Paket Wisata'}</b> sudah dikirim {decisionCause(departure)}. {departure.acceptedCount} menerima dan {departure.declinedCount} menolak dari {departure.bookingCount} pesanan{responded < departure.bookingCount ? '; sisanya belum menjawab.' : '.'}</p></div>
+          </article>
         );
       })}
+
+      <style>{`
+        .departure-review { margin: 22px 0 10px; display: grid; gap: 14px; }
+        .departure-feedback { border-radius: 12px; padding: 12px 16px; font-size: 13px; font-weight: 600; }
+        .departure-feedback.error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+        .departure-feedback.success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+        .departure-card { border-radius: 20px; padding: 22px; border: 1px solid; box-shadow: 0 14px 35px rgba(15, 23, 42, .06); }
+        .departure-card.weather-adverse, .departure-card.quota-alert { background: linear-gradient(135deg, #fffaf0, #fff); border-color: #fcd34d; }
+        .departure-card.weather-clear { background: linear-gradient(135deg, #effcf9, #fff); border-color: #99f6e4; }
+        .departure-card-header { display: flex; gap: 13px; align-items: flex-start; }
+        .departure-icon { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; flex: 0 0 auto; color: #0f766e; background: #ccfbf1; }
+        .weather-adverse .departure-icon, .quota-alert .departure-icon { color: #b45309; background: #fef3c7; }
+        .departure-eyebrow { display: block; color: #64748b; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; margin-bottom: 3px; }
+        .departure-card h3 { margin: 0; color: #0f172a; font-size: 17px; line-height: 1.35; }
+        .departure-card-header p { margin: 5px 0 0; color: #64748b; font-size: 12.5px; }
+        .weather-summary { display: grid; grid-template-columns: minmax(180px, 1.5fr) repeat(4, minmax(105px, 1fr)); gap: 9px; margin: 18px 0 12px; }
+        .weather-condition, .weather-metric { min-height: 66px; padding: 11px 13px; border: 1px solid rgba(148, 163, 184, .24); border-radius: 13px; background: rgba(255,255,255,.82); }
+        .weather-condition span, .weather-metric small { display: block; color: #64748b; font-size: 10.5px; margin-bottom: 5px; }
+        .weather-condition strong { color: #0f172a; font-size: 13.5px; }
+        .weather-metric { display: flex; align-items: center; gap: 9px; color: #0f8b8d; }
+        .weather-metric strong { color: #1e293b; font-size: 12.5px; white-space: nowrap; }
+        .weather-disclaimer { display: flex; align-items: flex-start; gap: 10px; background: rgba(255,255,255,.75); border-radius: 12px; padding: 12px 14px; color: #475569; }
+        .weather-disclaimer svg { color: #0f8b8d; flex: 0 0 auto; margin-top: 2px; }
+        .weather-disclaimer p, .quota-copy { margin: 0; font-size: 12px; line-height: 1.65; }
+        .quota-copy { color: #92400e; margin: 14px 0; }
+        .affected-bookings { margin-top: 12px; padding: 11px 13px; background: rgba(255,255,255,.82); border: 1px solid rgba(148,163,184,.24); border-radius: 12px; }
+        .affected-title { display: flex; gap: 6px; align-items: center; color: #475569; font-size: 11px; font-weight: 800; margin-bottom: 7px; }
+        .affected-list { display: flex; flex-wrap: wrap; gap: 7px; }
+        .affected-list span { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; color: #475569; font-size: 11px; padding: 4px 9px; }
+        .reschedule-box { margin-top: 12px; padding: 13px; background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; }
+        .reschedule-box label { display: block; color: #334155; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-bottom: 7px; }
+        .reschedule-box input { width: min(100%, 250px); padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
+        .reschedule-box p { margin: 7px 0 0; color: #64748b; font-size: 11px; line-height: 1.5; }
+        .decision-actions { display: flex; gap: 9px; flex-wrap: wrap; padding-top: 15px; margin-top: 15px; border-top: 1px dashed rgba(148,163,184,.55); }
+        .decision-button { border: 0; border-radius: 9px; padding: 9px 14px; display: inline-flex; align-items: center; gap: 6px; color: #fff; font-size: 11.5px; font-weight: 750; cursor: pointer; transition: transform .15s ease, opacity .15s ease; }
+        .decision-button:hover:not(:disabled) { transform: translateY(-1px); }
+        .decision-button:disabled { opacity: .55; cursor: wait; }
+        .decision-button.continue { background: #059669; }
+        .decision-button.reschedule { background: #d97706; }
+        .decision-button.cancel { background: #dc2626; }
+        .decision-button.neutral { background: #64748b; }
+        .awaiting-card { display: flex; gap: 11px; align-items: flex-start; padding: 16px 18px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 16px; color: #1d4ed8; }
+        .awaiting-card svg { flex: 0 0 auto; margin-top: 2px; }
+        .awaiting-card strong { font-size: 13.5px; }
+        .awaiting-card p { margin: 4px 0 0; color: #1e40af; font-size: 12px; line-height: 1.6; }
+        @media (max-width: 920px) { .weather-summary { grid-template-columns: repeat(2, 1fr); } .weather-condition { grid-column: 1 / -1; } }
+        @media (max-width: 560px) { .departure-card { padding: 17px; border-radius: 16px; } .weather-summary { grid-template-columns: 1fr 1fr; } .decision-button { flex: 1 1 145px; justify-content: center; } }
+      `}</style>
     </section>
   );
 };

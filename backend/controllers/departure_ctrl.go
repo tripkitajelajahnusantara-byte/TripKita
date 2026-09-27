@@ -35,8 +35,8 @@ func principalIDFromContext(c *gin.Context) (uint, bool) {
 	return id, true
 }
 
-// GetProviderDepartures mengembalikan seluruh keberangkatan open trip milik
-// mitra yang pernah ditinjau pada batas H-3, termasuk yang sudah diputuskan.
+// GetProviderDepartures mengembalikan peninjauan H-3 milik mitra: kuota Open
+// Trip dan prakiraan cuaca untuk trip non-Open-Trip, termasuk yang diputuskan.
 func (ctrl *DepartureController) GetProviderDepartures(c *gin.Context) {
 	providerID, ok := principalIDFromContext(c)
 	if !ok {
@@ -46,7 +46,7 @@ func (ctrl *DepartureController) GetProviderDepartures(c *gin.Context) {
 
 	departures, err := ctrl.service.ListForProvider(providerID)
 	if err != nil {
-		respondInternalError(c, "memuat keberangkatan open trip", err)
+		respondInternalError(c, "memuat pertimbangan keberangkatan", err)
 		return
 	}
 	c.JSON(http.StatusOK, departures)

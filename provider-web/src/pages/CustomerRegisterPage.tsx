@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from '../components/LegalModals';
+import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
+import { isValidIndonesianMobilePhone } from '../utils/phone';
 
 export const CustomerRegisterPage: React.FC = () => {
   const { navigateTo, registerCustomer } = useNavigation();
@@ -27,6 +29,11 @@ export const CustomerRegisterPage: React.FC = () => {
 
     if (password !== confirmPassword) {
       setError('Konfirmasi kata sandi tidak cocok.');
+      return;
+    }
+
+    if (!isValidIndonesianMobilePhone(whatsapp)) {
+      setError('Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.');
       return;
     }
 
@@ -146,26 +153,7 @@ export const CustomerRegisterPage: React.FC = () => {
             <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
               Nomor WhatsApp
             </label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <Phone size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px' }} />
-              <input 
-                type="tel" 
-                placeholder="Contoh: 081234567890"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px 14px 12px 42px',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '14px',
-                  outline: 'none',
-                  color: '#0f172a',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
+            <IndonesianPhoneInput value={whatsapp} onChange={setWhatsapp} required />
           </div>
 
           {/* Password */}

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -15,11 +16,12 @@ import (
 
 // DepartureService menangani keberangkatan yang tidak dapat berjalan apa adanya.
 //
-// Ada dua pemicu. Pertama, kuota minimal open trip: pada H-3 pukul 00:01, bila
+// Ada tiga pemicu. Pertama, kuota minimal open trip: pada H-3 pukul 00:01, bila
 // kursi terisi masih di bawah quotaMin, mitra diberi tiga pilihan — tetap
-// berangkat, membatalkan, atau menawarkan tanggal pengganti. Kedua, keadaan
-// kahar yang dinyatakan sendiri oleh mitra untuk tipe paket apa pun, kapan saja
-// sampai hari keberangkatan berakhir.
+// berangkat, membatalkan, atau menawarkan tanggal pengganti. Kedua, prakiraan
+// cuaca H-3 untuk trip selain Open Trip sebagai bahan pertimbangan tanpa
+// keputusan otomatis. Ketiga, keadaan kahar yang dinyatakan sendiri oleh mitra
+// untuk tipe paket apa pun sampai hari keberangkatan berakhir.
 //
 // Keduanya berujung pada pilihan yang sama bagi pelanggan: menerima tanggal
 // pengganti, atau menolak dan menerima pengembalian dana penuh. Pembatalan
@@ -27,6 +29,7 @@ import (
 // mitra dan notifikasi admin tetap satu jalur.
 type DepartureService interface {
 	ReviewDepartures() error
+	ReviewWeatherAdvisories(ctx context.Context) error
 	ExpireStaleRescheduleOffers() error
 	ListForProvider(providerID uint) ([]models.TripDeparture, error)
 	ListUpcomingForProvider(providerID uint) ([]repositories.DepartureCandidate, error)
@@ -42,6 +45,7 @@ type departureService struct {
 	bookingService BookingService
 	notifService   *NotificationService
 	emailService   *EmailService
+	weatherService WeatherService
 }
 
 func NewDepartureService(
@@ -51,6 +55,7 @@ func NewDepartureService(
 	bookingService BookingService,
 	notifService *NotificationService,
 	emailService *EmailService,
+	weatherService WeatherService,
 ) DepartureService {
 	return &departureService{
 		db:             db,
@@ -59,7 +64,92 @@ func NewDepartureService(
 		bookingService: bookingService,
 		notifService:   notifService,
 		emailService:   emailService,
+		weatherService: weatherService,
 	}
+}
+
+// ReviewWeatherAdvisories mengambil prakiraan H-3 untuk booking terbayar selain
+// Open Trip. Snapshot dibuat satu kali per paket/tanggal sehingga job per jam
+// tidak mengirim email berulang. Klasifikasi cuaca hanya menentukan penekanan
+// visual; status booking tidak pernah berubah sebelum provider mengirim pilihan.
+func (s *departureService) ReviewWeatherAdvisories(ctx context.Context) error {
+	if s.weatherService == nil {
+		return ErrWeatherServiceDisabled
+	}
+	now := time.Now()
+	candidates, err := s.repo.FindNonOpenTripWeatherCandidates(now)
+	if err != nil {
+		return err
+	}
+
+	created := 0
+	for _, candidate := range candidates {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		deadline := models.ReviewDeadlineFor(candidate.DepartureAt)
+		if now.Before(deadline) {
+			continue
+		}
+
+		existing, findErr := s.repo.FindDeparture(candidate.PackageID, candidate.DepartureDay)
+		if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+			log.Printf("[Cuaca H-3] Gagal memeriksa paket %d tanggal %s: %v", candidate.PackageID, candidate.DepartureDay, findErr)
+			continue
+		}
+		if existing != nil {
+			continue
+		}
+
+		forecast, forecastErr := s.weatherService.Forecast(ctx, candidate.Destination, candidate.DepartureAt)
+		if forecastErr != nil {
+			if errors.Is(forecastErr, ErrWeatherServiceDisabled) {
+				return forecastErr
+			}
+			log.Printf("[Cuaca H-3] Prakiraan %s (%s) gagal: %v", candidate.PackageName, candidate.DepartureDay, forecastErr)
+			continue
+		}
+		forecastedAt := forecast.ForecastedAt
+		departure := models.TripDeparture{
+			PackageID:           candidate.PackageID,
+			ProviderID:          candidate.ProviderID,
+			DepartureDay:        candidate.DepartureDay,
+			DepartureAt:         candidate.DepartureAt,
+			ReviewDeadline:      deadline,
+			SeatsBooked:         candidate.SeatsBooked,
+			SeatsRequired:       candidate.SeatsRequired,
+			BookingCount:        candidate.BookingCount,
+			Status:              models.DepartureAwaitingProvider,
+			Reason:              models.DepartureReasonWeatherForecast,
+			WeatherLocation:     forecast.Location,
+			WeatherCondition:    forecast.Condition,
+			WeatherMinTempC:     forecast.MinTempC,
+			WeatherMaxTempC:     forecast.MaxTempC,
+			WeatherRainChance:   forecast.RainChance,
+			WeatherPrecipMM:     forecast.PrecipMM,
+			WeatherMaxWindKPH:   forecast.MaxWindKPH,
+			WeatherIsAdverse:    forecast.IsAdverse,
+			WeatherAdvisory:     forecast.Advisory,
+			WeatherForecastedAt: &forecastedAt,
+		}
+		result := s.db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "package_id"}, {Name: "departure_day"}},
+			DoNothing: true,
+		}).Create(&departure)
+		if result.Error != nil {
+			log.Printf("[Cuaca H-3] Gagal menyimpan prakiraan paket %d tanggal %s: %v", candidate.PackageID, candidate.DepartureDay, result.Error)
+			continue
+		}
+		if result.RowsAffected == 0 {
+			continue
+		}
+		created++
+		s.notifyProviderOfWeather(&departure)
+	}
+	if created > 0 {
+		log.Printf("[Cuaca H-3] %d prakiraan trip non-open-trip dikirim ke provider.", created)
+	}
+	return nil
 }
 
 // DepartureInputError menandai kesalahan yang disebabkan masukan pengguna,
@@ -170,7 +260,7 @@ func (s *departureService) closeSettledDepartures() {
 		case len(bookings) == 0:
 			status, decision = models.DepartureResolved, ""
 			notes = "Tidak ada pesanan aktif tersisa pada keberangkatan ini."
-		case seats >= departure.SeatsRequired:
+		case departure.Reason == models.DepartureReasonQuotaShortfall && seats >= departure.SeatsRequired:
 			status, decision = models.DepartureContinued, models.DepartureDecisionContinue
 			notes = "Kuota minimal terpenuhi sebelum keberangkatan; keputusan manual tidak diperlukan."
 		case !now.Before(departure.DepartureAt):
@@ -232,6 +322,38 @@ func (s *departureService) notifyProviderOfShortfall(departure *models.TripDepar
 	}
 }
 
+func (s *departureService) notifyProviderOfWeather(departure *models.TripDeparture) {
+	pkg, packageName := s.packageOf(departure.PackageID)
+	riskLabel := "prakiraan cuaca"
+	if departure.WeatherIsAdverse {
+		riskLabel = "potensi cuaca kurang mendukung"
+	}
+	if s.notifService != nil {
+		message := fmt.Sprintf(
+			"%s untuk %s tanggal %s di %s: %s, peluang hujan %d%%. Informasi ini hanya bahan pertimbangan; pilih tetap berangkat, reschedule, atau batalkan bila diperlukan.",
+			riskLabel, packageName, departure.DepartureAt.Format("02 Jan 2006"), departure.WeatherLocation,
+			departure.WeatherCondition, departure.WeatherRainChance,
+		)
+		if err := s.notifService.CreateNotification(
+			departure.ProviderID, "PROVIDER", "Prakiraan Cuaca Trip (H-3)", message,
+			NotifTypeWeather, "/provider/dashboard",
+		); err != nil {
+			log.Printf("[Cuaca H-3] Gagal membuat notifikasi provider %d: %v", departure.ProviderID, err)
+		}
+	}
+	if s.emailService == nil || s.providerRepo == nil {
+		return
+	}
+	provider, err := s.providerRepo.FindByID(departure.ProviderID)
+	if err != nil {
+		log.Printf("[Cuaca H-3] Provider %d tidak ditemukan untuk email: %v", departure.ProviderID, err)
+		return
+	}
+	if err := s.emailService.SendWeatherAdvisoryEmail(provider, departure, pkg); err != nil {
+		log.Printf("[Cuaca H-3] Email prakiraan ke provider %d gagal: %v", departure.ProviderID, err)
+	}
+}
+
 func (s *departureService) packageOf(packageID uint) (*models.Package, string) {
 	var pkg models.Package
 	if err := s.db.First(&pkg, packageID).Error; err != nil {
@@ -253,7 +375,7 @@ func (s *departureService) ListForProvider(providerID uint) ([]models.TripDepart
 	for i := range departures {
 		bookings, err := s.repo.FindActiveBookings(departures[i].PackageID, departures[i].DepartureDay)
 		if err != nil {
-			log.Printf("[Open Trip] Gagal memuat booking keberangkatan %d: %v", departures[i].ID, err)
+			log.Printf("[Keberangkatan] Gagal memuat booking keberangkatan %d: %v", departures[i].ID, err)
 			continue
 		}
 		departures[i].Bookings = bookings
@@ -436,6 +558,13 @@ func (s *departureService) finalizeDecision(departure *models.TripDeparture, dec
 func causeText(departure *models.TripDeparture) string {
 	if departure.Reason == models.DepartureReasonForceMajeure {
 		cause := "Keadaan kahar (force majeure) di luar kendali penyelenggara"
+		if departure.DecisionNotes != "" {
+			cause += ": " + departure.DecisionNotes
+		}
+		return cause
+	}
+	if departure.Reason == models.DepartureReasonWeatherForecast {
+		cause := "Pertimbangan kondisi cuaca berdasarkan prakiraan H-3"
 		if departure.DecisionNotes != "" {
 			cause += ": " + departure.DecisionNotes
 		}

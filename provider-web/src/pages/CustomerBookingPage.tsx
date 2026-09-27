@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
-import { ArrowLeft, User, Mail, Phone, Calendar, Users, ShieldAlert, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, User, Mail, Calendar, Users, ShieldAlert, CheckCircle2, AlertCircle } from 'lucide-react';
+import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
+import { isValidIndonesianMobilePhone, normalizeIndonesianPhone } from '../utils/phone';
 
 // Tanggal hari ini (zona waktu lokal) dalam format YYYY-MM-DD untuk validasi tanggal lahir
 const getTodayIso = () => {
@@ -51,7 +53,7 @@ export const CustomerBookingPage: React.FC = () => {
     customerProfile?.email || activeFormData?.pemesan?.email || ''
   );
   const [pemesanPhone, setPemesanPhone] = useState(() => 
-    customerProfile?.whatsapp || activeFormData?.pemesan?.whatsapp || ''
+    normalizeIndonesianPhone(customerProfile?.whatsapp || activeFormData?.pemesan?.whatsapp || '')
   );
   const [pemesanBirthDate, setPemesanBirthDate] = useState(() => customerProfile?.birthDate || activeFormData?.peserta?.[0]?.tanggalLahir || '');
   const [pemesanGender, setPemesanGender] = useState(() => customerProfile?.gender || activeFormData?.peserta?.[0]?.gender || '');
@@ -71,7 +73,7 @@ export const CustomerBookingPage: React.FC = () => {
     if (activeFormData?.peserta && activeFormData.peserta.length > 0) {
       return activeFormData.peserta.map(p => ({
         nama: p.nama || '',
-        hp: p.hp || '',
+        hp: normalizeIndonesianPhone(p.hp || ''),
         gender: p.gender || '',
         tanggalLahir: p.tanggalLahir || '',
         riwayatPenyakit: p.riwayatPenyakit || ''
@@ -93,7 +95,7 @@ export const CustomerBookingPage: React.FC = () => {
         setPemesanEmail(customerProfile.email || '');
       }
       if (customerProfile.whatsapp) {
-        setPemesanPhone(customerProfile.whatsapp || '');
+        setPemesanPhone(normalizeIndonesianPhone(customerProfile.whatsapp || ''));
       }
       if (customerProfile.birthDate) {
         setPemesanBirthDate(customerProfile.birthDate);
@@ -113,7 +115,7 @@ export const CustomerBookingPage: React.FC = () => {
           const isFirst = (i === 0);
           updated.push({
             nama: isFirst && customerProfile ? (customerProfile.picName || customerProfile.businessName || '') : '',
-            hp: isFirst && customerProfile ? (customerProfile.whatsapp || '') : '',
+            hp: isFirst && customerProfile ? normalizeIndonesianPhone(customerProfile.whatsapp || '') : '',
             gender: isFirst && customerProfile ? (customerProfile.gender || '') : '',
             tanggalLahir: isFirst && customerProfile ? (customerProfile.birthDate || '') : '',
             riwayatPenyakit: ''
@@ -192,8 +194,8 @@ export const CustomerBookingPage: React.FC = () => {
     }
 
     // Validate Pemesan Phone
-    if (!pemesanPhone || !/^(08|62)\d{8,12}$/.test(pemesanPhone)) {
-      newErrors.pemesanPhone = 'Nomor HP pemesan harus diawali 08 atau 62 (10–14 digit angka).';
+    if (!isValidIndonesianMobilePhone(pemesanPhone)) {
+      newErrors.pemesanPhone = 'Masukkan 9–12 digit nomor pemesan setelah +62, diawali angka 8.';
     }
 
     // Validate Pemesan Birthdate
@@ -215,8 +217,8 @@ export const CustomerBookingPage: React.FC = () => {
         newErrors[`p_nama_${idx}`] = `Nama Peserta ${idx + 1} hanya boleh berisi huruf.`;
       }
 
-      if (!p.hp || !/^(08|62)\d{8,12}$/.test(p.hp)) {
-        newErrors[`p_hp_${idx}`] = `Nomor HP Peserta ${idx + 1} harus diawali 08 atau 62 (10–14 digit angka).`;
+      if (!isValidIndonesianMobilePhone(p.hp)) {
+        newErrors[`p_hp_${idx}`] = `Masukkan 9–12 digit nomor Peserta ${idx + 1} setelah +62.`;
       }
 
       if (p.gender !== 'Laki-laki' && p.gender !== 'Perempuan') {
@@ -374,27 +376,12 @@ export const CustomerBookingPage: React.FC = () => {
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
                     Nomor WhatsApp / HP <span style={{ color: '#ef4444' }}>*</span>
                   </label>
-                  <div style={{ display: 'flex', alignItems: 'center', borderRadius: '10px', border: errors.pemesanPhone ? '1.5px solid #ef4444' : '1px solid #cbd5e1', padding: '0 14px', backgroundColor: '#ffffff' }}>
-                    <Phone size={16} color="#94a3b8" style={{ flexShrink: 0, marginRight: '10px' }} />
-                    <input 
-                      type="tel" 
-                      placeholder="Contoh: 081234567890..."
-                      value={pemesanPhone}
-                      onChange={(e) => setPemesanPhone(e.target.value)}
-                      required
-                      style={{
-                        flex: 1,
-                        width: '100%',
-                        padding: '12px 0',
-                        border: 'none',
-                        outline: 'none',
-                        fontSize: '14px',
-                        color: '#0f172a',
-                        backgroundColor: 'transparent',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
+                  <IndonesianPhoneInput
+                    value={pemesanPhone}
+                    onChange={setPemesanPhone}
+                    invalid={Boolean(errors.pemesanPhone)}
+                    required
+                  />
                   {errors.pemesanPhone && (
                     <span style={{ fontSize: '11.5px', color: '#ef4444', fontWeight: '700', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <AlertCircle size={13} /> {errors.pemesanPhone}
@@ -537,24 +524,14 @@ export const CustomerBookingPage: React.FC = () => {
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
                           Nomor HP Peserta <span style={{ color: '#ef4444' }}>*</span>
                         </label>
-                        <input 
-                          type="tel"
-                          placeholder="Nomor HP..."
+                        <IndonesianPhoneInput
                           value={p.hp}
-                          onChange={(e) => handleParticipantChange(idx, 'hp', e.target.value)}
+                          onChange={(value) => handleParticipantChange(idx, 'hp', value)}
+                          invalid={Boolean(errors[`p_hp_${idx}`])}
                           readOnly={idx === 0 && isSameAsPemesan}
                           required
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            borderRadius: '8px',
-                            border: errors[`p_hp_${idx}`] ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                            fontSize: '13px',
-                            outline: 'none',
-                            backgroundColor: idx === 0 && isSameAsPemesan ? '#f1f5f9' : '#ffffff',
-                            color: '#0f172a',
-                            boxSizing: 'border-box'
-                          }}
+                          compact
+                          ariaLabel={`Nomor HP Peserta ${idx + 1} tanpa kode negara`}
                         />
                         {errors[`p_hp_${idx}`] && (
                           <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: '700', marginTop: '3px', display: 'block' }}>

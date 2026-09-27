@@ -5,6 +5,7 @@ import { request, setProviderToken, getProviderToken, removeProviderToken, setCu
 
 
 import { AuthModal } from '../components/AuthModal';
+import { normalizeIndonesianPhone } from '../utils/phone';
 
 export function getRouteFromHash(): Route {
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
@@ -520,7 +521,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const registerCustomer = async (name: string, email: string, password: string, whatsapp: string, options: { redirect?: boolean } = {}) => {
     const res = await request('/public/auth/register-customer', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, whatsapp }),
+      body: JSON.stringify({ name, email, password, whatsapp: normalizeIndonesianPhone(whatsapp) }),
     });
 
     if (res && res.token && (res.customer || res.provider)) {

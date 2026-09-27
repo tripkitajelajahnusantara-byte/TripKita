@@ -163,8 +163,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			// Ulasan yang diterima mitra
 			provider.GET("/reviews", reviewCtrl.GetProviderReviews)
 
-			// Keputusan atas keberangkatan bermasalah: kuota open trip kurang
-			// pada H-3, maupun pembatalan force majeure oleh mitra.
+			// Keputusan atas keberangkatan: kuota Open Trip, prakiraan cuaca H-3
+			// khusus non-Open-Trip, dan force majeure oleh mitra.
 			provider.GET("/departures", departureCtrl.GetProviderDepartures)
 			provider.GET("/departures/upcoming", departureCtrl.GetUpcomingDepartures)
 			provider.POST("/departures/force-majeure", departureCtrl.DeclareForceMajeure)

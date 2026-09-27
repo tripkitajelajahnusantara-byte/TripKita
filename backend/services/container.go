@@ -28,6 +28,7 @@ type Container struct {
 	AdminService     AdminService
 	PackageService   PackageService
 	IPaymuService    IPaymuService
+	WeatherService   WeatherService
 	BookingService   BookingService
 	DashService      DashboardService
 	PayoutService    PayoutService
@@ -51,6 +52,7 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 	excelService := NewExcelService()
 	notifService := NewNotificationService(db)
 	ipaymuService := NewIPaymuService(cfg)
+	weatherService := NewWeatherService(cfg)
 
 	bookingService := NewBookingService(bookingRepo, packageRepo, ipaymuService, emailService, notifService)
 
@@ -69,6 +71,7 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 		ExcelService:     excelService,
 		NotifService:     notifService,
 		IPaymuService:    ipaymuService,
+		WeatherService:   weatherService,
 		AuthService:      NewAuthService(db, providerRepo, cfg, emailService, notifService),
 		AdminService:     NewAdminService(db, providerRepo, notifService, emailService),
 		PackageService:   NewPackageService(packageRepo, providerRepo, packageDateRepo),
@@ -76,7 +79,7 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 		DashService:      NewDashboardService(packageRepo, bookingRepo, providerRepo, reviewRepo),
 		PayoutService:    NewPayoutService(payoutRepo, providerRepo, bookingRepo, emailService, notifService, ipaymuService, cfg),
 		ReviewService:    NewReviewService(reviewRepo, bookingRepo, packageRepo),
-		DepartureService: NewDepartureService(db, departureRepo, providerRepo, bookingService, notifService, emailService),
+		DepartureService: NewDepartureService(db, departureRepo, providerRepo, bookingService, notifService, emailService, weatherService),
 		TripPlanService:  NewTripPlanService(tripPlanRepo, providerRepo, notifService, emailService),
 	}
 }

@@ -5,6 +5,8 @@ import { request } from '../utils/api';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
 import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin } from 'lucide-react';
+import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
+import { isValidIndonesianMobilePhone } from '../utils/phone';
 
 export const CustomerSettingsPage: React.FC = () => {
   const { customerProfile, setCustomerProfile, navigateTo, setSelectedPackageForDetail } = useNavigation();
@@ -71,6 +73,10 @@ export const CustomerSettingsPage: React.FC = () => {
     e.preventDefault();
     if (!namaLengkap.trim()) {
       showAlert({ type: 'error', message: 'Nama Lengkap wajib diisi.' });
+      return;
+    }
+    if (!isValidIndonesianMobilePhone(whatsapp)) {
+      showAlert({ type: 'error', message: 'Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.' });
       return;
     }
 
@@ -310,21 +316,7 @@ export const CustomerSettingsPage: React.FC = () => {
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
                         Nomor HP / WhatsApp
                       </label>
-                      <input
-                        type="text"
-                        value={whatsapp}
-                        onChange={(e) => setWhatsapp(e.target.value)}
-                        placeholder="Contoh: 08123456789"
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          borderRadius: '12px',
-                          border: '1.5px solid #cbd5e1',
-                          fontSize: '14px',
-                          color: '#0f172a',
-                          outline: 'none'
-                        }}
-                      />
+                      <IndonesianPhoneInput value={whatsapp} onChange={setWhatsapp} required />
                     </div>
                   </div>
 
