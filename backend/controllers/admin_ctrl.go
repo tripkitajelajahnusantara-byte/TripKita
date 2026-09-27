@@ -75,8 +75,17 @@ func (ctrl *AdminController) UpdateProviderPlatformFee(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Potongan platform harus berupa angka bulat antara 1 dan 100 persen"})
 		return
 	}
-	if err := ctrl.service.UpdateProviderPlatformFee(uint(id), req.PlatformFeePercent); err != nil {
+	err = ctrl.service.UpdateProviderPlatformFee(uint(id), req.PlatformFeePercent)
+	switch {
+	case errors.Is(err, services.ErrInvalidPlatformFee), errors.Is(err, services.ErrPlatformFeeNotProvider):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "Provider tidak ditemukan"})
+		return
+	case err != nil:
+		// Detail database tidak boleh tampil ke admin sebagai pesan validasi.
+		respondInternalError(c, "memperbarui potongan platform", err)
 		return
 	}
 

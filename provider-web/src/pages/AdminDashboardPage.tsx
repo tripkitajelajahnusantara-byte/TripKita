@@ -485,7 +485,7 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const handleUpdatePlatformFee = async () => {
-    if (!selectedProvider || savingPlatformFee) return;
+    if (!selectedProvider || actionBusy) return;
 
     const numericPercent = Number(platformFeePercent);
     if (!/^\d{1,3}$/.test(platformFeePercent) || !Number.isInteger(numericPercent) || numericPercent < 1 || numericPercent > 100) {
@@ -494,25 +494,30 @@ export const AdminDashboardPage: React.FC = () => {
       return;
     }
 
+    // Id disimpan lebih dulu karena admin bisa berpindah provider selama
+    // permintaan berjalan; hasilnya tidak boleh ditempel ke drawer lain.
+    const providerId = selectedProvider.id;
+    await runAction('platform-fee', async () => {
     setSavingPlatformFee(true);
     try {
       setError('');
       setSuccessMsg('');
-      await request(`/admin/providers/${selectedProvider.id}/platform-fee`, {
+      await request(`/admin/providers/${providerId}/platform-fee`, {
         method: 'PUT',
         body: JSON.stringify({ platformFeePercent: numericPercent }),
       });
 
       const updatedProviders = await request('/admin/providers');
       setProviders(updatedProviders);
-      const updated = updatedProviders.find((provider: ProviderAdminData) => provider.id === selectedProvider.id);
-      if (updated) setSelectedProvider(updated);
+      const updated = updatedProviders.find((provider: ProviderAdminData) => provider.id === providerId);
+      if (updated) setSelectedProvider((current) => (current && current.id === providerId ? updated : current));
       setSuccessMsg(`Potongan platform ${numericPercent}% berhasil disimpan.`);
     } catch (err: any) {
       setError(err.message || 'Gagal memperbarui potongan platform.');
     } finally {
       setSavingPlatformFee(false);
     }
+    });
   };
 
   const handleDeleteProvider = async (id: number) => {
@@ -1486,7 +1491,8 @@ export const AdminDashboardPage: React.FC = () => {
                       type="button"
                       className="platform-fee-save-btn"
                       onClick={handleUpdatePlatformFee}
-                      disabled={savingPlatformFee || Number(platformFeePercent) === (selectedProvider.platformFeePercent || 15)}
+                      disabled={actionBusy || Number(platformFeePercent) === (selectedProvider.platformFeePercent || 15)}
+                      aria-busy={savingPlatformFee}
                     >
                       {savingPlatformFee ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Simpan Potongan'}
                     </button>

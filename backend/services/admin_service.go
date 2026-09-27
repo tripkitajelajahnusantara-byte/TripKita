@@ -41,9 +41,16 @@ func (s *adminService) ListProviders() ([]models.Provider, error) {
 	return s.repo.FindAllProviders()
 }
 
+// ErrInvalidPlatformFee menandai input potongan yang ditolak aturan bisnis,
+// sehingga controller dapat membedakannya dari gangguan database.
+var ErrInvalidPlatformFee = errors.New("potongan platform harus berupa angka bulat antara 1% dan 100%")
+
+// ErrPlatformFeeNotProvider mencegah potongan diatur pada akun admin/customer.
+var ErrPlatformFeeNotProvider = errors.New("potongan platform hanya dapat diatur untuk provider")
+
 func (s *adminService) UpdateProviderPlatformFee(id uint, platformFeePercent int64) error {
 	if !models.IsAllowedProviderPlatformFeePercent(platformFeePercent) {
-		return errors.New("potongan platform harus berupa angka bulat antara 1% dan 100%")
+		return ErrInvalidPlatformFee
 	}
 
 	// Update bersyarat di bawah kunci baris: permintaan kedua dengan nilai sama
@@ -55,7 +62,7 @@ func (s *adminService) UpdateProviderPlatformFee(id uint, platformFeePercent int
 			return err
 		}
 		if provider.Role != "PROVIDER" {
-			return errors.New("potongan platform hanya dapat diatur untuk provider")
+			return ErrPlatformFeeNotProvider
 		}
 		if provider.PlatformFeePercent == platformFeePercent {
 			return nil
