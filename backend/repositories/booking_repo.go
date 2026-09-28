@@ -54,7 +54,7 @@ func (r *bookingRepository) FindAllByProvider(providerID uint) ([]models.Booking
 	var bookings []models.Booking
 	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Participants", orderParticipants).
-		Where("provider_id = ?", providerID).
+		Where("provider_id = ? AND (paid_at IS NOT NULL OR status IN ?)", providerID, []string{models.StatusPaid, models.StatusConfirmed, models.StatusCompleted}).
 		Order("id desc").Find(&bookings).Error
 	return bookings, err
 }
@@ -122,7 +122,9 @@ func (r *bookingRepository) Update(booking *models.Booking) error {
 
 func (r *bookingRepository) CountByProvider(providerID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&models.Booking{}).Where("provider_id = ?", providerID).Count(&count).Error
+	err := r.db.Model(&models.Booking{}).
+		Where("provider_id = ? AND (paid_at IS NOT NULL OR status IN ?)", providerID, []string{models.StatusPaid, models.StatusConfirmed, models.StatusCompleted}).
+		Count(&count).Error
 	return count, err
 }
 

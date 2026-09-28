@@ -14,14 +14,12 @@ import {
 } from '../components/MeetingPointMap';
 
 export const CustomerConfirmationPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, bookingFormData } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, bookingFormData, setSelectedBookingForInvoice } = useNavigation();
   const { showAlert } = useCustomAlert();
   // POST /public/bookings membuat pesanan baru; kunci berbasis ref mencegah
   // klik ganda di tick yang sama membuat dua booking dan dua tagihan.
   const { pending, isBusy, run } = useActionLock();
-  // Setelah booking berhasil, halaman masih terlihat sampai redirect ke iPaymu
-  // selesai. Kunci aksi sudah dilepas di finally, jadi status ini menjaga
-  // tombol tetap nonaktif selama perpindahan halaman berlangsung.
+  // Menjaga tombol tetap nonaktif selama perpindahan ke halaman pembayaran.
   const redirectingRef = useRef(false);
   const [redirecting, setRedirecting] = useState(false);
   const submitting = pending === 'create-booking' || redirecting;
@@ -185,18 +183,6 @@ export const CustomerConfirmationPage: React.FC = () => {
         body: JSON.stringify(payload)
       });
 
-      const paymentUrl = response.paymentUrl || response.payment_url;
-	  let parsedPaymentURL: URL;
-	  try {
-		parsedPaymentURL = new URL(paymentUrl);
-	  } catch {
-		throw new Error('Backend tidak mengembalikan URL checkout iPaymu yang valid');
-	  }
-	  const paymentHost = parsedPaymentURL.hostname.toLowerCase();
-	  if (parsedPaymentURL.protocol !== 'https:' || (paymentHost !== 'my.ipaymu.com' && paymentHost !== 'sandbox.ipaymu.com')) {
-		throw new Error('Backend tidak mengembalikan URL checkout iPaymu yang valid');
-	  }
-
 	  const finalBookingCode = response.bookingCode || response.booking_code;
 	  if (!finalBookingCode) throw new Error('Backend tidak mengembalikan kode booking');
       const bookingObj = {
@@ -208,7 +194,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         tripDate: selectedTripSchedule || parsedTripDate.toISOString().split('T')[0],
         createdAt: response.createdAt || nowIso,
         status: response.status || 'PENDING_PAYMENT',
-        paymentUrl: paymentUrl
+        paymentMethod: response.paymentMethod || 'Transfer Bank Manual'
       };
 
       // Save into local history
@@ -218,17 +204,18 @@ export const CustomerConfirmationPage: React.FC = () => {
       localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
       sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
-	  // Redirect langsung ke hosted checkout resmi iPaymu.
+	  // Booking telah dibuat dan kuota langsung ditahan selama 24 jam.
 	  redirectingRef.current = true;
 	  setRedirecting(true);
-	  window.location.replace(parsedPaymentURL.toString());
+	  setSelectedBookingForInvoice(bookingObj);
+	  navigateTo('halaman-pembayaran');
 
     } catch (err: any) {
       console.error('[Booking Error]', err);
       setShowConfirmModal(false);
       showAlert({
         title: 'Pembayaran Belum Dapat Diproses',
-        message: err?.message || 'Tagihan iPaymu gagal dibuat. Tidak ada pembayaran yang tercatat. Silakan coba kembali.',
+        message: err?.message || 'Booking belum dapat dibuat. Silakan coba kembali.',
         type: 'error',
         confirmText: 'Coba Lagi',
       });

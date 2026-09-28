@@ -2,8 +2,8 @@ package models
 
 import "time"
 
-// PaymentWindow adalah masa berlaku tagihan iPaymu sejak booking dibuat.
-// Setelah lewat, booking yang belum dibayar dikedaluwarsakan oleh job.
+// PaymentWindow adalah batas waktu transfer dan unggah bukti sejak booking dibuat.
+// Setelah lewat, booking yang belum mengirim bukti dibatalkan oleh job.
 const PaymentWindow = 24 * time.Hour
 
 // CancellationFullRefundWindow adalah batas minimal pembatalan customer untuk

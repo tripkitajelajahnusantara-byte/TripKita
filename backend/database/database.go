@@ -660,7 +660,7 @@ func SeedDatabase() {
 			TripEndDate:     time.Now().AddDate(0, 0, 10+1),
 			Guests:          2,
 			TotalPrice:      700000,
-			PaymentMethod:   "iPaymu Redirect Payment",
+			PaymentMethod:   "Transfer Bank Manual",
 			Status:          "CONFIRMED",
 		},
 		{
@@ -673,7 +673,7 @@ func SeedDatabase() {
 			TripEndDate:     time.Now().AddDate(0, 0, 13+1),
 			Guests:          4,
 			TotalPrice:      1800000,
-			PaymentMethod:   "iPaymu Redirect Payment",
+			PaymentMethod:   "Transfer Bank Manual",
 			Status:          "CONFIRMED",
 		},
 		{
@@ -969,7 +969,7 @@ func EnsureAllTestProvidersAndSeats() {
 			SELECT SUM(b.guests)
 			FROM bookings b
 			WHERE b.package_id = p.id
-			AND b.status IN ('PENDING_PAYMENT', 'PAID', 'CONFIRMED', 'COMPLETED')
+			AND b.status IN ('PENDING_PAYMENT', 'PAYMENT_REVIEW', 'PAID', 'CONFIRMED', 'COMPLETED')
 		), 0)
 	`).Error
 

@@ -28,6 +28,9 @@ Konfigurasi production dipisahkan ke `docker-compose.prod.yml` dan tetap membutu
    disetujui pemilik data, dan catat sebagai insiden data pribadi.
 1. Rotasi seluruh secret yang pernah tersimpan di source/repository: database, JWT, Xendit, Google OAuth, dan SMTP.
 2. Isi environment production dari `backend/.env.example`. Pastikan `APP_ENV=production`, `SEED_DB=false`, dan `ENABLE_DEV_MOCKS=false`.
+   Isi juga `MANUAL_PAYMENT_BANK_NAME`, `MANUAL_PAYMENT_ACCOUNT_NUMBER`, dan
+   `MANUAL_PAYMENT_ACCOUNT_HOLDER`; backend production menolak startup bila rekening
+   pembayaran customer belum lengkap.
 3. Jalankan backup database, lalu terapkan migrasi berikut satu kali, berurutan:
    - `backend/database/migrations/001_production_hardening.sql`
    - `backend/database/migrations/003_refund_audit_trail.sql` — tabel jejak audit refund.

@@ -29,7 +29,10 @@ class SectionCard extends StatelessWidget {
         color: color,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: borderColor),
-        boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 6, offset: Offset(0, 2))],
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x05000000), blurRadius: 6, offset: Offset(0, 2))
+        ],
       ),
       child: child,
     );
@@ -42,15 +45,23 @@ class SectionHeading extends StatelessWidget {
   final Color iconColor;
   final Widget? trailing;
 
-  const SectionHeading(this.text, {super.key, this.icon, this.iconColor = AppColors.accent, this.trailing});
+  const SectionHeading(this.text,
+      {super.key, this.icon, this.iconColor = AppColors.accent, this.trailing});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        if (icon != null) ...[Icon(icon, size: 18, color: iconColor), const SizedBox(width: 8)],
+        if (icon != null) ...[
+          Icon(icon, size: 18, color: iconColor),
+          const SizedBox(width: 8)
+        ],
         Expanded(
-          child: Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+          child: Text(text,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark)),
         ),
         if (trailing != null) trailing!,
       ],
@@ -73,13 +84,21 @@ class FieldLabel extends StatelessWidget {
       child: Text.rich(
         TextSpan(
           text: text,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMedium),
+          style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMedium),
           children: [
-            if (required) const TextSpan(text: ' *', style: TextStyle(color: AppColors.danger)),
+            if (required)
+              const TextSpan(
+                  text: ' *', style: TextStyle(color: AppColors.danger)),
             if (hint != null)
               TextSpan(
                 text: ' $hint',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: AppColors.textMuted),
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                    color: AppColors.textMuted),
               ),
           ],
         ),
@@ -105,7 +124,10 @@ class ErrorText extends StatelessWidget {
           const SizedBox(width: 4),
           Expanded(
             child: Text(message!,
-                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.danger)),
+                style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.danger)),
           ),
         ],
       ),
@@ -141,11 +163,18 @@ class PrimaryButton extends StatelessWidget {
         ),
         onPressed: loading ? null : onPressed,
         child: loading
-            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.4, color: Colors.white))
             : Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
+                  if (icon != null) ...[
+                    Icon(icon, size: 18),
+                    const SizedBox(width: 8)
+                  ],
                   Flexible(child: Text(label, textAlign: TextAlign.center)),
                 ],
               ),
@@ -167,26 +196,37 @@ class StatusStyle {
 StatusStyle bookingStatusStyle(String status) {
   switch (status) {
     case BookingStatus.completed:
-      return const StatusStyle('Trip Selesai (Completed)', AppColors.success, AppColors.successBg, Icons.check_circle_outline);
+      return const StatusStyle('Trip Selesai (Completed)', AppColors.success,
+          AppColors.successBg, Icons.check_circle_outline);
     case BookingStatus.paid:
     case BookingStatus.confirmed:
-      return const StatusStyle('Lunas & Aktif', AppColors.success, AppColors.successBg, Icons.check_circle_outline);
+      return const StatusStyle('Lunas & Aktif', AppColors.success,
+          AppColors.successBg, Icons.check_circle_outline);
     case BookingStatus.expired:
-      return const StatusStyle('Kadaluwarsa (Batas Waktu Habis)', AppColors.danger, AppColors.dangerBg, Icons.cancel_outlined);
+      return const StatusStyle('Kadaluwarsa (Batas Waktu Habis)',
+          AppColors.danger, AppColors.dangerBg, Icons.cancel_outlined);
     case BookingStatus.pendingPayment:
-      return const StatusStyle('Menunggu Pembayaran', AppColors.warning, AppColors.warningBg, Icons.schedule);
+      return const StatusStyle('Menunggu Pembayaran', AppColors.warning,
+          AppColors.warningBg, Icons.schedule);
+    case BookingStatus.paymentReview:
+      return const StatusStyle('Menunggu Konfirmasi Admin', AppColors.info,
+          AppColors.infoBg, Icons.verified_user_outlined);
     case BookingStatus.rescheduleOffered:
-      return const StatusStyle(
-          'Menunggu Jawaban Anda (Jadwal Pengganti)', AppColors.warningDark, AppColors.warningBg, Icons.error_outline);
+      return const StatusStyle('Menunggu Jawaban Anda (Jadwal Pengganti)',
+          AppColors.warningDark, AppColors.warningBg, Icons.error_outline);
     case BookingStatus.refundRequired:
-      return const StatusStyle('Proses Refund', AppColors.info, AppColors.infoBg, Icons.error_outline);
+      return const StatusStyle('Proses Refund', AppColors.info,
+          AppColors.infoBg, Icons.error_outline);
     case BookingStatus.refunded:
-      return const StatusStyle('Dana Dikembalikan', AppColors.info, AppColors.infoBg, Icons.check_circle_outline);
+      return const StatusStyle('Dana Dikembalikan', AppColors.info,
+          AppColors.infoBg, Icons.check_circle_outline);
     case BookingStatus.cancelledByCustomer:
     case 'CANCELLED':
-      return const StatusStyle('Pesanan Dibatalkan', AppColors.danger, AppColors.dangerBg, Icons.cancel_outlined);
+      return const StatusStyle('Pesanan Dibatalkan', AppColors.danger,
+          AppColors.dangerBg, Icons.cancel_outlined);
     default:
-      return const StatusStyle('Dibatalkan', AppColors.danger, AppColors.dangerBg, Icons.cancel_outlined);
+      return const StatusStyle('Dibatalkan', AppColors.danger,
+          AppColors.dangerBg, Icons.cancel_outlined);
   }
 }
 
@@ -199,7 +239,8 @@ class StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(30)),
+      decoration: BoxDecoration(
+          color: style.background, borderRadius: BorderRadius.circular(30)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -207,7 +248,10 @@ class StatusBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Flexible(
             child: Text(style.label,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: style.color),
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: style.color),
                 overflow: TextOverflow.ellipsis),
           ),
         ],
@@ -253,7 +297,9 @@ class InfoBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (icon != null) ...[
-            Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 16, color: color)),
+            Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(icon, size: 16, color: color)),
             const SizedBox(width: 8),
           ],
           Expanded(
@@ -263,10 +309,19 @@ class InfoBanner extends StatelessWidget {
                 if (title != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(title!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
+                    child: Text(title!,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: color)),
                   ),
                 if (message != null)
-                  Text(message!, style: TextStyle(fontSize: 12, color: textColor, height: 1.5, fontWeight: FontWeight.w600)),
+                  Text(message!,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: textColor,
+                          height: 1.5,
+                          fontWeight: FontWeight.w600)),
                 if (child != null) child!,
               ],
             ),
@@ -328,7 +383,8 @@ class NetworkPhoto extends StatelessWidget {
   final double? width;
   final BoxFit fit;
 
-  const NetworkPhoto(this.url, {super.key, this.height, this.width, this.fit = BoxFit.cover});
+  const NetworkPhoto(this.url,
+      {super.key, this.height, this.width, this.fit = BoxFit.cover});
 
   @override
   Widget build(BuildContext context) {
@@ -340,9 +396,11 @@ class NetworkPhoto extends StatelessWidget {
       height: height,
       width: width,
       fit: fit,
-      errorBuilder: (_, __, ___) => _PhotoPlaceholder(height: height, width: width),
-      loadingBuilder: (context, child, progress) =>
-          progress == null ? child : Container(height: height, width: width, color: AppColors.divider),
+      errorBuilder: (_, __, ___) =>
+          _PhotoPlaceholder(height: height, width: width),
+      loadingBuilder: (context, child, progress) => progress == null
+          ? child
+          : Container(height: height, width: width, color: AppColors.divider),
     );
   }
 }
@@ -368,11 +426,16 @@ class _PhotoPlaceholder extends StatelessWidget {
       child: LayoutBuilder(builder: (context, c) {
         final compact = c.maxHeight < 110;
         return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.landscape_outlined, size: compact ? 26 : 40, color: AppColors.primary.withValues(alpha: 0.55)),
+          Icon(Icons.landscape_outlined,
+              size: compact ? 26 : 40,
+              color: AppColors.primary.withValues(alpha: 0.55)),
           if (!compact) ...[
             const SizedBox(height: 6),
             Text('Foto belum tersedia',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary.withValues(alpha: 0.7))),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary.withValues(alpha: 0.7))),
           ],
         ]);
       }),
@@ -393,7 +456,9 @@ class LoadingView extends StatelessWidget {
         children: [
           const CircularProgressIndicator(color: AppColors.accent),
           const SizedBox(height: 14),
-          Text(message, style: const TextStyle(color: AppColors.textMuted), textAlign: TextAlign.center),
+          Text(message,
+              style: const TextStyle(color: AppColors.textMuted),
+              textAlign: TextAlign.center),
         ],
       ),
     );
@@ -406,7 +471,12 @@ class EmptyState extends StatelessWidget {
   final String message;
   final List<Widget> actions;
 
-  const EmptyState({super.key, required this.icon, required this.title, required this.message, this.actions = const []});
+  const EmptyState(
+      {super.key,
+      required this.icon,
+      required this.title,
+      required this.message,
+      this.actions = const []});
 
   @override
   Widget build(BuildContext context) {
@@ -418,14 +488,22 @@ class EmptyState extends StatelessWidget {
           const SizedBox(height: 12),
           Text(title,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark)),
           const SizedBox(height: 6),
           Text(message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13.5, color: AppColors.textMuted, height: 1.5)),
+              style: const TextStyle(
+                  fontSize: 13.5, color: AppColors.textMuted, height: 1.5)),
           if (actions.isNotEmpty) ...[
             const SizedBox(height: 18),
-            Wrap(spacing: 10, runSpacing: 10, alignment: WrapAlignment.center, children: actions),
+            Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
+                children: actions),
           ],
         ],
       ),
@@ -444,11 +522,15 @@ Future<void> showNoticeDialog(BuildContext context,
       iconBackground: isError ? AppColors.dangerBg : AppColors.successBg,
       title: title,
       message: Text(message,
-          textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: AppColors.textMuted, height: 1.6)),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+              fontSize: 14, color: AppColors.textMuted, height: 1.6)),
       actions: [
         Expanded(
           child: ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: isError ? AppColors.danger : AppColors.primary),
+            style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    isError ? AppColors.danger : AppColors.primary),
             onPressed: () => Navigator.pop(context),
             child: const Text('OK, Mengerti'),
           ),
@@ -480,7 +562,9 @@ Future<bool> showConfirmDialog(
       message: message,
       actions: [
         Expanded(
-          child: OutlinedButton(onPressed: () => Navigator.pop(context, false), child: Text(cancelLabel, textAlign: TextAlign.center)),
+          child: OutlinedButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(cancelLabel, textAlign: TextAlign.center)),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -525,13 +609,17 @@ class _CenteredDialog extends StatelessWidget {
             Container(
               width: 60,
               height: 60,
-              decoration: BoxDecoration(color: iconBackground, shape: BoxShape.circle),
+              decoration:
+                  BoxDecoration(color: iconBackground, shape: BoxShape.circle),
               child: Icon(icon, size: 30, color: iconColor),
             ),
             const SizedBox(height: 16),
             Text(title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark)),
             const SizedBox(height: 10),
             message,
             const SizedBox(height: 22),
@@ -560,6 +648,7 @@ class BrandLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset('assets/images/tementrip_official_logo.png', height: height, fit: BoxFit.contain);
+    return Image.asset('assets/images/tementrip_official_logo.png',
+        height: height, fit: BoxFit.contain);
   }
 }

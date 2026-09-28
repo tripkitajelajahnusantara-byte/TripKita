@@ -53,7 +53,7 @@ const _generalTerms = _LegalDocument(
       '5.2 Pembatalan oleh Provider / Cuaca Buruk / Kuota Tidak Terpenuhi:',
       '• Jika trip dibatalkan oleh Provider karena cuaca buruk (Force Majeure) atau kuota minimal Open Trip belum terpenuhi di H-3, Customer berhak memilih Full Refund 100% atau Pindah Jadwal (Reschedule).',
       '• Penjadwalan ulang (Reschedule) akibat kuota kurang berlaku maksimal 1 (satu) kali. Jika pada jadwal pengganti kuota masih tidak terpenuhi di H-3, sistem akan melakukan Full Refund 100% otomatis.',
-      '5.3 Pembayaran Penuh & Dana Tertahan: Customer membayar penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari customer. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Provider tersedia untuk diajukan sebagai biaya persiapan dan separuh sisanya baru tersedia setelah trip selesai.',
+      '5.3 Pembayaran Penuh & Dana Tertahan: Customer membayar penuh di muka melalui transfer ke rekening TemenTrip dan mengunggah bukti pembayaran, tanpa uang muka (DP) dari customer. Booking diteruskan ke Provider setelah verifikasi admin. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Provider tersedia untuk diajukan sebagai biaya persiapan dan separuh sisanya baru tersedia setelah trip selesai.',
     ]),
   ],
 );
@@ -104,11 +104,15 @@ class _LegalBody extends StatelessWidget {
             children: [
               Text(doc.heading,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark)),
               const SizedBox(height: 8),
               Text(doc.intro,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5)),
+                  style: const TextStyle(
+                      fontSize: 12.5, color: AppColors.textMuted, height: 1.5)),
             ],
           ),
         ),
@@ -126,12 +130,19 @@ class _LegalBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('${i + 1}. ${doc.sections[i].title}',
-                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                    style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary)),
                 const SizedBox(height: 8),
                 for (final item in doc.sections[i].items)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(item, style: const TextStyle(fontSize: 12.5, color: AppColors.textBody, height: 1.5)),
+                    child: Text(item,
+                        style: const TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.textBody,
+                            height: 1.5)),
                   ),
               ],
             ),
@@ -142,7 +153,8 @@ class _LegalBody extends StatelessWidget {
   }
 }
 
-Future<void> _showLegalSheet(BuildContext context, String title, _LegalDocument doc) {
+Future<void> _showLegalSheet(
+    BuildContext context, String title, _LegalDocument doc) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -164,9 +176,14 @@ Future<void> _showLegalSheet(BuildContext context, String title, _LegalDocument 
               children: [
                 Expanded(
                   child: Text(title,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textDark)),
                 ),
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close)),
               ],
             ),
           ),
@@ -183,14 +200,18 @@ Future<void> _showLegalSheet(BuildContext context, String title, _LegalDocument 
   );
 }
 
-Future<void> showGeneralTerms(BuildContext context) =>
-    _showLegalSheet(context, 'Syarat & Ketentuan Customer TemenTrip', _generalTerms);
+Future<void> showGeneralTerms(BuildContext context) => _showLegalSheet(
+    context, 'Syarat & Ketentuan Customer TemenTrip', _generalTerms);
 
-Future<void> showCancellationPolicy(BuildContext context) =>
-    _showLegalSheet(context, 'Kebijakan Pembatalan Strict H-7 TripKita', _customerRegistrationTerms);
+Future<void> showCancellationPolicy(BuildContext context) => _showLegalSheet(
+    context,
+    'Kebijakan Pembatalan Strict H-7 TripKita',
+    _customerRegistrationTerms);
 
-Future<void> showRegistrationTerms(BuildContext context) =>
-    _showLegalSheet(context, 'Syarat & Ketentuan Pendaftaran Customer', _customerRegistrationTerms);
+Future<void> showRegistrationTerms(BuildContext context) => _showLegalSheet(
+    context,
+    'Syarat & Ketentuan Pendaftaran Customer',
+    _customerRegistrationTerms);
 
 /// Persetujuan wajib saat customer pertama kali masuk, seperti modal global
 /// di `App.tsx` web. Tidak dapat ditutup tanpa menyetujui.
@@ -215,15 +236,20 @@ Future<void> showMandatoryCustomerTerms(BuildContext context) {
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
-              child: const Text('Persetujuan Syarat & Ketentuan Customer TemenTrip',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              child: const Text(
+                  'Persetujuan Syarat & Ketentuan Customer TemenTrip',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark)),
             ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
                       color: AppColors.accentLight,
@@ -232,7 +258,10 @@ Future<void> showMandatoryCustomerTerms(BuildContext context) {
                     ),
                     child: const Text(
                       'Selamat datang di TemenTrip! Sebelum melanjutkan, harap baca dan menyetujui Syarat & Ketentuan Pendaftaran Customer berikut.',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryDark),
                     ),
                   ),
                   const _LegalBody(_customerRegistrationTerms),
@@ -246,9 +275,12 @@ Future<void> showMandatoryCustomerTerms(BuildContext context) {
                 child: SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary),
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Saya Menyetujui Syarat & Ketentuan & Lanjutkan', textAlign: TextAlign.center),
+                    child: const Text(
+                        'Saya Menyetujui Syarat & Ketentuan & Lanjutkan',
+                        textAlign: TextAlign.center),
                   ),
                 ),
               ),

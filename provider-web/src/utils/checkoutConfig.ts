@@ -3,6 +3,12 @@ import { request } from './api';
 export interface CheckoutConfig {
   serviceFee: number;
   paymentWindowSeconds: number;
+  adminReviewWindowSeconds: number;
+  manualPayment: {
+    bankName: string;
+    accountNumber: string;
+    accountHolder: string;
+  };
   cancellationRefundDays: number;
 }
 
@@ -12,9 +18,15 @@ export async function fetchCheckoutConfig(): Promise<CheckoutConfig> {
   const data = await request('/public/checkout-config');
   const serviceFee = Number(data?.serviceFee);
   const paymentWindowSeconds = Number(data?.paymentWindowSeconds);
+  const adminReviewWindowSeconds = Number(data?.adminReviewWindowSeconds);
   const cancellationRefundDays = Number(data?.cancellationRefundDays);
-  if (!Number.isFinite(serviceFee) || serviceFee < 0 || !Number.isFinite(paymentWindowSeconds) || paymentWindowSeconds <= 0 || !Number.isInteger(cancellationRefundDays) || cancellationRefundDays <= 0) {
+  const manualPayment = {
+    bankName: String(data?.manualPayment?.bankName || '').trim(),
+    accountNumber: String(data?.manualPayment?.accountNumber || '').trim(),
+    accountHolder: String(data?.manualPayment?.accountHolder || '').trim(),
+  };
+  if (!Number.isFinite(serviceFee) || serviceFee < 0 || !Number.isFinite(paymentWindowSeconds) || paymentWindowSeconds <= 0 || !Number.isFinite(adminReviewWindowSeconds) || adminReviewWindowSeconds <= 0 || !Number.isInteger(cancellationRefundDays) || cancellationRefundDays <= 0) {
     throw new Error('Konfigurasi checkout dari server tidak valid.');
   }
-  return { serviceFee, paymentWindowSeconds, cancellationRefundDays };
+  return { serviceFee, paymentWindowSeconds, adminReviewWindowSeconds, manualPayment, cancellationRefundDays };
 }

@@ -124,6 +124,19 @@ diperlakukan sebagai penolakan agar dana pelanggan tidak menggantung.
 Pemeriksaan dijalankan oleh job latar belakang, sehingga `ENABLE_BACKGROUND_JOBS`
 wajib bernilai `true` agar aturan ini berjalan.
 
+## Pembayaran customer manual
+
+Checkout customer sementara menggunakan transfer bank tanpa payment gateway. Backend
+membuat Booking ID unik dan langsung menahan kuota selama 24 jam. Customer wajib
+mentransfer sesuai total lalu mengunggah JPG, PNG, atau PDF maksimal 5 MB. Setelah
+unggah, status menjadi `PAYMENT_REVIEW`; admin wajib menyetujui atau menolak bukti
+maksimal 1×24 jam. Booking belum tampil ke provider sebelum admin menyetujuinya.
+
+Rekening tujuan dibaca dari `MANUAL_PAYMENT_BANK_NAME`,
+`MANUAL_PAYMENT_ACCOUNT_NUMBER`, dan `MANUAL_PAYMENT_ACCOUNT_HOLDER`. Ketiganya wajib
+diisi pada production. Jalankan migrasi
+`backend/database/migrations/011_manual_customer_payments.sql` saat rollout production.
+
 ### Pembatalan karena keadaan kahar (force majeure)
 
 Berbeda dengan aturan kuota yang hanya berlaku untuk Open Trip dan terikat batas

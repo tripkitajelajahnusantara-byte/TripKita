@@ -18,7 +18,7 @@ export const AboutPage: React.FC = () => {
 
   const milestones = [
     { year: '2026', title: 'TemenTrip diluncurkan', desc: 'TemenTrip mulai beroperasi dari Jakarta sebagai tempat memesan open trip dan paket wisata lainnya.' },
-    { year: '2026', title: 'Pembayaran penuh, dana mitra bertahap', desc: 'Pembayaran penuh di muka melalui iPaymu; buku besar TemenTrip menyediakan separuh hak mitra setelah pembayaran dan separuh sisanya setelah trip selesai.' },
+    { year: '2026', title: 'Pembayaran penuh, dana mitra bertahap', desc: 'Pembayaran penuh di muka melalui transfer yang diverifikasi admin; buku besar TemenTrip menyediakan separuh hak mitra setelah pembayaran dan separuh sisanya setelah trip selesai.' },
     { year: '2026', title: 'Membangun jaringan mitra', desc: 'Mengajak mitra lokal di berbagai daerah untuk mendaftar dan menerbitkan paket setelah diverifikasi admin.' },
   ];
 
@@ -56,7 +56,7 @@ export const AboutPage: React.FC = () => {
               TemenTrip dibuat di Jakarta oleh tim yang ingin memudahkan orang menemukan dan memesan trip dari penyelenggara lokal. Traveler bisa melihat paket, memesan, dan membayar di satu tempat, sementara mitra mengelola pesanan tanpa harus mencatatnya satu per satu.
             </p>
             <p>
-              Banyak penyelenggara trip lokal masih menerima pesanan lewat chat dan transfer manual. Kami ingin proses itu lebih rapi: pembayaran online melalui iPaymu, kuota tercatat otomatis, dan aturan pembatalan yang sama untuk semua pihak.
+              Banyak penyelenggara trip lokal masih menerima pesanan lewat chat dan transfer manual. Kami membuat proses itu lebih rapi: Booking ID unik, hold kuota otomatis, upload bukti transfer, verifikasi admin, dan aturan pembatalan yang sama untuk semua pihak.
             </p>
 
             <div className="intro-stats">

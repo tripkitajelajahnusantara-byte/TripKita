@@ -41,9 +41,12 @@ func (s *PDFService) GenerateBookingReceiptPDF(b *models.Booking, pkg *models.Pa
 	if transactionID == "" {
 		transactionID = b.XenditInvoiceID
 	}
+	if transactionID == "" {
+		transactionID = "MANUAL-" + b.BookingCode
+	}
 	paymentMethod := b.PaymentMethod
 	if paymentMethod == "" {
-		paymentMethod = "iPaymu"
+		paymentMethod = "Transfer Bank Manual"
 	}
 
 	pdfContent := fmt.Sprintf(`================================================================================

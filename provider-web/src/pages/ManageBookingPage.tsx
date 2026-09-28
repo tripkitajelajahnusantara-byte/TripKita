@@ -142,7 +142,7 @@ export const ManageBookingPage: React.FC = () => {
           tripDate: b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
           guests: b.guests || 1,
           totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice || 0),
-          paymentMethod: b.paymentMethod || 'iPaymu Redirect Payment',
+          paymentMethod: b.paymentMethod || 'Transfer Bank Manual',
           createdAt: b.createdAt || '',
           paidAt: b.paidAt || '',
           paymentUrl: b.paymentUrl,
@@ -341,7 +341,6 @@ export const ManageBookingPage: React.FC = () => {
             >
               <option value="Semua">Semua Status</option>
               <option value="CONFIRMED">Lunas & Aktif</option>
-              <option value="PENDING_PAYMENT">Menunggu Pembayaran</option>
               <option value="FAILED">Pembayaran Gagal</option>
               <option value="EXPIRED">Pembayaran Kadaluwarsa</option>
               <option value="COMPLETED">Selesai</option>
@@ -571,7 +570,7 @@ export const ManageBookingPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Status Pembayaran (data sebenarnya dari payment gateway) */}
+                  {/* Status pembayaran yang sudah lolos verifikasi admin */}
                   <div className="detail-item">
                     <span className="detail-label">Status Pembayaran</span>
                     <div className="proof-preview-container" style={{ display: 'block', padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginTop: '4px' }}>
@@ -595,12 +594,12 @@ export const ManageBookingPage: React.FC = () => {
                       </div>
                       <p style={{ margin: '8px 0 0', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontSize: '9px', color: '#64748b', lineHeight: 1.5 }}>
                         {paymentSettled
-                          ? 'Pembayaran telah terverifikasi oleh payment gateway. Dana diteruskan melalui menu Keuangan sesuai jadwal pencairan.'
+                          ? 'Pembayaran telah diverifikasi admin TemenTrip. Dana diteruskan melalui menu Keuangan sesuai jadwal pencairan.'
                           : isFailed
-                            ? 'Tagihan gagal dibuat atau pembayaran ditolak oleh payment gateway. Tidak ada dana pelanggan yang tercatat.'
+                            ? 'Pembayaran tidak berhasil diverifikasi. Tidak ada dana pelanggan yang dicatat sebagai lunas.'
                             : isExpired
                               ? 'Batas waktu tagihan telah habis dan tidak ada pembayaran yang tercatat.'
-                              : 'Pembayaran belum terverifikasi. Jangan memproses pesanan sebagai lunas sebelum status berubah dari callback resmi iPaymu.'}
+                              : 'Pembayaran belum terverifikasi. Booking baru dapat diproses setelah disetujui admin TemenTrip.'}
                       </p>
                     </div>
                   </div>

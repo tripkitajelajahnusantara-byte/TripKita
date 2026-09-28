@@ -28,19 +28,19 @@ export const CustomerHelpPage: React.FC = () => {
       id: 'faq-1',
       category: 'pemesanan',
       question: 'Bagaimana cara memesan paket wisata di TemenTrip?',
-      answer: 'Pilih paket dari Beranda, tentukan tanggal keberangkatan dan jumlah peserta, lalu klik "Pesan Sekarang". Setelah itu Anda diarahkan ke halaman pembayaran iPaymu.'
+      answer: 'Pilih paket dari Beranda, tentukan tanggal keberangkatan dan jumlah peserta, lalu klik "Pesan Sekarang". Setelah Booking ID dibuat, kuota ditahan 24 jam dan Anda diarahkan ke halaman transfer serta upload bukti pembayaran.'
     },
     {
       id: 'faq-2',
       category: 'pembayaran',
       question: 'Bagaimana skema pembayaran di TemenTrip?',
-      answer: 'Pembayaran dilakukan penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari customer. Batas pembayaran selalu mengikuti penghitung waktu pada invoice. Buku besar TemenTrip mencatat separuh hak mitra tersedia untuk diajukan setelah pembayaran dan separuh sisanya setelah perjalanan selesai.'
+      answer: 'Pembayaran dilakukan penuh di muka melalui transfer ke rekening TemenTrip, tanpa uang muka (DP) dari customer. Batas pembayaran mengikuti countdown 24 jam. Setelah bukti disetujui admin, buku besar TemenTrip mencatat separuh hak mitra tersedia untuk diajukan dan separuh sisanya setelah perjalanan selesai.'
     },
     {
       id: 'faq-3',
       category: 'pembayaran',
       question: 'Metode pembayaran apa saja yang didukung?',
-      answer: 'TemenTrip memakai hosted checkout iPaymu. Pilihan QRIS, e-wallet, kartu, atau Virtual Account yang tersedia akan ditampilkan langsung oleh iPaymu sesuai kanal yang aktif pada akun merchant.'
+      answer: 'Untuk sementara pembayaran dilakukan melalui transfer bank manual ke rekening TemenTrip yang tercantum pada halaman pembayaran, lalu customer mengunggah bukti transfer.'
     },
     {
       id: 'faq-4',
@@ -64,7 +64,7 @@ export const CustomerHelpPage: React.FC = () => {
       id: 'faq-7',
       category: 'keamanan',
       question: 'Bagaimana pembayaran saya diproses?',
-      answer: 'Pembayaran diproses di halaman checkout iPaymu. Pesanan Anda terkonfirmasi setelah iPaymu mencatat pembayaran berhasil, dan statusnya bisa dilihat di riwayat booking.'
+      answer: 'Setelah transfer, unggah bukti pembayaran sebelum countdown berakhir. Status berubah menjadi Menunggu Konfirmasi Admin dan wajib diperiksa maksimal 1×24 jam. Status dapat dipantau melalui Cek Booking.'
     },
     {
       id: 'faq-8',
@@ -123,7 +123,7 @@ export const CustomerHelpPage: React.FC = () => {
             <div className={`category-card ${activeCategory === 'pembayaran' ? 'active' : ''}`} onClick={() => setActiveCategory('pembayaran')}>
               <div className="cat-icon bg-purple"><CreditCard size={22} color="#8b5cf6" /></div>
               <h3>Pembayaran</h3>
-              <p>Checkout melalui iPaymu</p>
+              <p>Transfer manual & upload bukti</p>
             </div>
             <div className={`category-card ${activeCategory === 'refund' ? 'active' : ''}`} onClick={() => setActiveCategory('refund')}>
               <div className="cat-icon bg-green"><ShieldCheck size={22} color="#10b981" /></div>

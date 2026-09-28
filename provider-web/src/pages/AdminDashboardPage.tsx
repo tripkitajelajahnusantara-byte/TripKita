@@ -20,7 +20,7 @@ import {
   Wallet,
   LoaderCircle
 } from 'lucide-react';
-import { getProtectedDocumentURL, request } from '../utils/api';
+import { getProtectedDocumentURL, openProtectedDocument, request } from '../utils/api';
 import { NotificationCenter, type NotificationItem } from '../components/NotificationCenter';
 import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
 import { useActionLock } from '../utils/useActionLock';
@@ -351,6 +351,33 @@ export const AdminDashboardPage: React.FC = () => {
     } finally {
       setBookingsLoading(false);
     }
+  };
+
+  const handlePaymentReview = async (booking: any, decision: 'APPROVED' | 'REJECTED') => {
+    if (actionBusy) return;
+    const notes = decision === 'REJECTED'
+      ? window.prompt('Masukkan alasan penolakan agar customer dapat memperbaiki bukti transfer:', '')
+      : window.prompt('Catatan konfirmasi (opsional):', 'Pembayaran sudah diterima di rekening TemenTrip');
+    if (notes === null) return;
+    if (decision === 'REJECTED' && notes.trim().length < 4) {
+      setError('Alasan penolakan minimal 4 karakter.');
+      return;
+    }
+    if (decision === 'APPROVED' && !window.confirm(`Konfirmasi pembayaran ${booking.bookingCode} sebesar ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(booking.totalPrice)}?`)) return;
+    await runAction(`payment-${booking.id}-${decision}`, async () => {
+      setError('');
+      setSuccessMsg('');
+      try {
+        await request(`/admin/bookings/${booking.id}/payment-review`, {
+          method: 'POST',
+          body: JSON.stringify({ decision, notes: notes.trim() }),
+        });
+        setSuccessMsg(decision === 'APPROVED' ? `Pembayaran ${booking.bookingCode} disetujui dan booking diteruskan ke provider.` : `Bukti ${booking.bookingCode} ditolak. Customer dapat mengunggah ulang selama batas pembayaran aktif.`);
+        await fetchAdminBookings();
+      } catch (err: any) {
+        setError(err.message || 'Konfirmasi pembayaran gagal disimpan.');
+      }
+    });
   };
 
   const handleSubmitRefund = async () => {
@@ -926,7 +953,7 @@ export const AdminDashboardPage: React.FC = () => {
                 {activeView === 'administrasi-refund' 
                   ? 'Administrasi Refund' 
                   : activeView === 'kelola-pembayaran'
-                  ? 'Monitor Pembayaran'
+                  ? 'Verifikasi Pembayaran Manual'
                   : activeView === 'pencairan-provider'
                   ? 'Pengajuan Pencairan Dana Provider (Payouts)'
                   : 'Provider Verification Center'}
@@ -935,7 +962,7 @@ export const AdminDashboardPage: React.FC = () => {
                 {activeView === 'administrasi-refund' 
                   ? 'Pantau dan kelola proses refund dana customer.' 
                   : activeView === 'kelola-pembayaran'
-                  ? 'Pantau status pembayaran booking. Pembayaran diterima otomatis melalui payment gateway; tidak ada verifikasi manual.'
+                  ? 'Verifikasi bukti transfer manual maksimal 1×24 jam. Booking baru tampil ke provider setelah pembayaran disetujui admin.'
                   : activeView === 'pencairan-provider'
                   ? 'Kelola pengajuan pencairan saldo DP 50% & pelunasan dari mitra provider.'
                   : 'Kelola dan verifikasi semua provider yang terdaftar di TripKita.'}
@@ -966,7 +993,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
             ) : activeView === 'kelola-pembayaran' ? (
-              /* View 4: Monitor Pembayaran (baca saja; settlement ditangani payment gateway) */
+              /* View 4: Verifikasi pembayaran transfer manual */
               <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
                 <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
                   {bookingsLoading ? (
@@ -981,6 +1008,8 @@ export const AdminDashboardPage: React.FC = () => {
                           <th>Total Pembayaran</th>
                           <th>Metode</th>
                           <th>Status</th>
+                          <th>Bukti & Tenggat</th>
+                          <th>Aksi Admin</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -999,12 +1028,31 @@ export const AdminDashboardPage: React.FC = () => {
                                 <td>
                                   <span className={`status-badge-inline ${b.status.toLowerCase()}`}>{b.status}</span>
                                 </td>
+                                <td>
+                                  {b.paymentProof ? (
+                                    <button type="button" onClick={() => openProtectedDocument('admin', b.paymentProof).catch((err) => setError(err.message))} style={{ border: 0, background: 'transparent', color: '#0284c7', fontWeight: 700, cursor: 'pointer', padding: 0 }}>Lihat Bukti</button>
+                                  ) : <span style={{ color: '#94a3b8' }}>Belum diunggah</span>}
+                                  {b.status === 'PAYMENT_REVIEW' && b.paymentReviewDeadline && (
+                                    <div style={{ fontSize: 11, color: new Date(b.paymentReviewDeadline).getTime() < Date.now() ? '#dc2626' : '#b45309', marginTop: 5, fontWeight: 700 }}>
+                                      {new Date(b.paymentReviewDeadline).getTime() < Date.now() ? 'MELEWATI SLA · ' : 'Batas · '}
+                                      {new Date(b.paymentReviewDeadline).toLocaleString('id-ID')}
+                                    </div>
+                                  )}
+                                </td>
+                                <td>
+                                  {b.status === 'PAYMENT_REVIEW' ? (
+                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                      <button disabled={actionBusy} onClick={() => handlePaymentReview(b, 'APPROVED')} style={{ border: 0, background: '#10b981', color: '#fff', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: 'pointer' }}>Setujui</button>
+                                      <button disabled={actionBusy} onClick={() => handlePaymentReview(b, 'REJECTED')} style={{ border: '1px solid #ef4444', background: '#fff', color: '#dc2626', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: 'pointer' }}>Tolak</button>
+                                    </div>
+                                  ) : <span style={{ color: '#94a3b8' }}>—</span>}
+                                </td>
                               </tr>
                             );
                           })
                         ) : (
                           <tr>
-                            <td colSpan={6} className="empty-table-state" style={{ padding: '40px 0' }}>
+                            <td colSpan={8} className="empty-table-state" style={{ padding: '40px 0' }}>
                               Tidak ada data transaksi pembayaran saat ini.
                             </td>
                           </tr>
@@ -1046,7 +1094,6 @@ export const AdminDashboardPage: React.FC = () => {
                         style={{ width: '100%', padding: '10px', marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }}
                       >
                         <option value="MANUAL_TRANSFER">Transfer manual dari rekening platform</option>
-                        <option value="GATEWAY_REFUND">Refund via payment gateway</option>
                         <option value="GATEWAY_PAYOUT">Payout ke rekening pelanggan</option>
                       </select>
 

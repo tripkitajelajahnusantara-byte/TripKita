@@ -222,7 +222,6 @@ export const DashboardPage: React.FC = () => {
                 {[
                   { value: 'Semua', label: 'Semua' },
                   { value: 'CONFIRMED', label: 'Dikonfirmasi / Lunas' },
-                  { value: 'PENDING_PAYMENT', label: 'Menunggu Pembayaran' },
                   { value: 'COMPLETED', label: 'Selesai' }
                 ].map((tab) => (
                   <button 

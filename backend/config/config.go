@@ -14,44 +14,47 @@ import (
 )
 
 type Config struct {
-	AppEnv             string
-	Port               string
-	DatabaseURL        string
-	DBHost             string
-	DBPort             string
-	DBUser             string
-	DBPass             string
-	DBName             string
-	DBSSLMode          string
-	UploadDir          string
-	JWTSecret          string
-	GoogleClientID     string
-	GoogleClientSecret string
-	GoogleRedirectURI  string
-	FrontendURL        string
-	BackendURL         string
-	IPaymuVA           string
-	IPaymuAPIKey       string
-	IPaymuBaseURL      string
-	IPaymuCallbackURL  string
-	IPaymuReturnURL    string
-	IPaymuCancelURL    string
-	SMTPHost           string
-	SMTPPort           string
-	SMTPUser           string
-	SMTPPass           string
-	SMTPFrom           string
-	WeatherAPIKey      string
-	WeatherAPIBaseURL  string
-	AllowedOrigins     []string
-	TrustedProxies     []string
-	EnableDevMocks     bool
-	RunMigrations      bool
-	SeedDatabase       bool
-	EnableJobs         bool
-	DBMaxOpenConns     int
-	DBMaxIdleConns     int
-	EnableAutoPayout   bool
+	AppEnv                     string
+	Port                       string
+	DatabaseURL                string
+	DBHost                     string
+	DBPort                     string
+	DBUser                     string
+	DBPass                     string
+	DBName                     string
+	DBSSLMode                  string
+	UploadDir                  string
+	JWTSecret                  string
+	GoogleClientID             string
+	GoogleClientSecret         string
+	GoogleRedirectURI          string
+	FrontendURL                string
+	BackendURL                 string
+	IPaymuVA                   string
+	IPaymuAPIKey               string
+	IPaymuBaseURL              string
+	IPaymuCallbackURL          string
+	IPaymuReturnURL            string
+	IPaymuCancelURL            string
+	ManualPaymentBankName      string
+	ManualPaymentAccountNumber string
+	ManualPaymentAccountHolder string
+	SMTPHost                   string
+	SMTPPort                   string
+	SMTPUser                   string
+	SMTPPass                   string
+	SMTPFrom                   string
+	WeatherAPIKey              string
+	WeatherAPIBaseURL          string
+	AllowedOrigins             []string
+	TrustedProxies             []string
+	EnableDevMocks             bool
+	RunMigrations              bool
+	SeedDatabase               bool
+	EnableJobs                 bool
+	DBMaxOpenConns             int
+	DBMaxIdleConns             int
+	EnableAutoPayout           bool
 }
 
 func LoadConfig() (*Config, error) {
@@ -75,44 +78,47 @@ func LoadConfig() (*Config, error) {
 	uploadDir = getEnv("UPLOAD_DIR", uploadDir)
 
 	cfg := &Config{
-		AppEnv:             appEnv,
-		Port:               getEnv("PORT", "8080"),
-		DatabaseURL:        getEnv("DATABASE_URL", ""),
-		DBHost:             getEnv("DB_HOST", "localhost"),
-		DBPort:             getEnv("DB_PORT", "5432"),
-		DBUser:             getEnv("DB_USER", "postgres"),
-		DBPass:             getEnv("DB_PASSWORD", ""),
-		DBName:             getEnv("DB_NAME", "tripkita_provider"),
-		DBSSLMode:          getEnv("DB_SSLMODE", "disable"),
-		UploadDir:          uploadDir,
-		JWTSecret:          getEnv("JWT_SECRET", ""),
-		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
-		GoogleRedirectURI:  getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/v1/public/auth/google/callback"),
-		FrontendURL:        strings.TrimRight(getEnv("FRONTEND_URL", "http://localhost:5173"), "/"),
-		BackendURL:         strings.TrimRight(getEnv("BACKEND_URL", "http://localhost:8080"), "/"),
-		IPaymuVA:           getEnv("IPAYMU_VA", ""),
-		IPaymuAPIKey:       getEnv("IPAYMU_API_KEY", ""),
-		IPaymuBaseURL:      getEnv("IPAYMU_BASE_URL", "https://sandbox.ipaymu.com/api/v2"),
-		IPaymuCallbackURL:  getEnv("IPAYMU_CALLBACK_URL", ""),
-		IPaymuReturnURL:    getEnv("IPAYMU_RETURN_URL", ""),
-		IPaymuCancelURL:    getEnv("IPAYMU_CANCEL_URL", ""),
-		SMTPHost:           getEnv("SMTP_HOST", "smtp.gmail.com"),
-		SMTPPort:           getEnv("SMTP_PORT", "587"),
-		SMTPUser:           getEnv("SMTP_USER", ""),
-		SMTPPass:           getEnv("SMTP_PASS", ""),
-		SMTPFrom:           getEnv("SMTP_FROM", ""),
-		WeatherAPIKey:      getEnv("WEATHER_API_KEY", ""),
-		WeatherAPIBaseURL:  strings.TrimRight(getEnv("WEATHER_API_BASE_URL", "https://api.weatherapi.com/v1"), "/"),
-		AllowedOrigins:     splitCSV(getEnv("ALLOWED_ORIGINS", getEnv("FRONTEND_URL", "http://localhost:5173"))),
-		TrustedProxies:     splitCSV(getEnv("TRUSTED_PROXIES", "")),
-		EnableDevMocks:     getBoolEnv("ENABLE_DEV_MOCKS", false) && !isProduction,
-		RunMigrations:      getBoolEnv("RUN_MIGRATIONS", !isProduction),
-		SeedDatabase:       getBoolEnv("SEED_DB", false) && !isProduction,
-		EnableJobs:         getBoolEnv("ENABLE_BACKGROUND_JOBS", true),
-		DBMaxOpenConns:     getIntEnv("DB_MAX_OPEN_CONNS", 25),
-		DBMaxIdleConns:     getIntEnv("DB_MAX_IDLE_CONNS", 10),
-		EnableAutoPayout:   getBoolEnv("ENABLE_AUTOMATIC_PAYOUT", false),
+		AppEnv:                     appEnv,
+		Port:                       getEnv("PORT", "8080"),
+		DatabaseURL:                getEnv("DATABASE_URL", ""),
+		DBHost:                     getEnv("DB_HOST", "localhost"),
+		DBPort:                     getEnv("DB_PORT", "5432"),
+		DBUser:                     getEnv("DB_USER", "postgres"),
+		DBPass:                     getEnv("DB_PASSWORD", ""),
+		DBName:                     getEnv("DB_NAME", "tripkita_provider"),
+		DBSSLMode:                  getEnv("DB_SSLMODE", "disable"),
+		UploadDir:                  uploadDir,
+		JWTSecret:                  getEnv("JWT_SECRET", ""),
+		GoogleClientID:             getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret:         getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURI:          getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/v1/public/auth/google/callback"),
+		FrontendURL:                strings.TrimRight(getEnv("FRONTEND_URL", "http://localhost:5173"), "/"),
+		BackendURL:                 strings.TrimRight(getEnv("BACKEND_URL", "http://localhost:8080"), "/"),
+		IPaymuVA:                   getEnv("IPAYMU_VA", ""),
+		IPaymuAPIKey:               getEnv("IPAYMU_API_KEY", ""),
+		IPaymuBaseURL:              getEnv("IPAYMU_BASE_URL", "https://sandbox.ipaymu.com/api/v2"),
+		IPaymuCallbackURL:          getEnv("IPAYMU_CALLBACK_URL", ""),
+		IPaymuReturnURL:            getEnv("IPAYMU_RETURN_URL", ""),
+		IPaymuCancelURL:            getEnv("IPAYMU_CANCEL_URL", ""),
+		ManualPaymentBankName:      getEnv("MANUAL_PAYMENT_BANK_NAME", "BCA"),
+		ManualPaymentAccountNumber: getEnv("MANUAL_PAYMENT_ACCOUNT_NUMBER", ""),
+		ManualPaymentAccountHolder: getEnv("MANUAL_PAYMENT_ACCOUNT_HOLDER", "TemenTrip"),
+		SMTPHost:                   getEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:                   getEnv("SMTP_PORT", "587"),
+		SMTPUser:                   getEnv("SMTP_USER", ""),
+		SMTPPass:                   getEnv("SMTP_PASS", ""),
+		SMTPFrom:                   getEnv("SMTP_FROM", ""),
+		WeatherAPIKey:              getEnv("WEATHER_API_KEY", ""),
+		WeatherAPIBaseURL:          strings.TrimRight(getEnv("WEATHER_API_BASE_URL", "https://api.weatherapi.com/v1"), "/"),
+		AllowedOrigins:             splitCSV(getEnv("ALLOWED_ORIGINS", getEnv("FRONTEND_URL", "http://localhost:5173"))),
+		TrustedProxies:             splitCSV(getEnv("TRUSTED_PROXIES", "")),
+		EnableDevMocks:             getBoolEnv("ENABLE_DEV_MOCKS", false) && !isProduction,
+		RunMigrations:              getBoolEnv("RUN_MIGRATIONS", !isProduction),
+		SeedDatabase:               getBoolEnv("SEED_DB", false) && !isProduction,
+		EnableJobs:                 getBoolEnv("ENABLE_BACKGROUND_JOBS", true),
+		DBMaxOpenConns:             getIntEnv("DB_MAX_OPEN_CONNS", 25),
+		DBMaxIdleConns:             getIntEnv("DB_MAX_IDLE_CONNS", 10),
+		EnableAutoPayout:           getBoolEnv("ENABLE_AUTOMATIC_PAYOUT", false),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -174,23 +180,23 @@ func (c *Config) Validate() error {
 	}
 
 	required := map[string]string{
-		"IPAYMU_VA":            c.IPaymuVA,
-		"IPAYMU_API_KEY":       c.IPaymuAPIKey,
-		"GOOGLE_CLIENT_ID":     c.GoogleClientID,
-		"GOOGLE_CLIENT_SECRET": c.GoogleClientSecret,
-		"GOOGLE_REDIRECT_URI":  c.GoogleRedirectURI,
-		"FRONTEND_URL":         c.FrontendURL,
-		"BACKEND_URL":          c.BackendURL,
-		"SMTP_HOST":            c.SMTPHost,
-		"SMTP_USER":            c.SMTPUser,
-		"SMTP_PASS":            c.SMTPPass,
-		"SMTP_FROM":            c.SMTPFrom,
+		"MANUAL_PAYMENT_BANK_NAME":      c.ManualPaymentBankName,
+		"MANUAL_PAYMENT_ACCOUNT_NUMBER": c.ManualPaymentAccountNumber,
+		"MANUAL_PAYMENT_ACCOUNT_HOLDER": c.ManualPaymentAccountHolder,
+		"GOOGLE_CLIENT_ID":              c.GoogleClientID,
+		"GOOGLE_CLIENT_SECRET":          c.GoogleClientSecret,
+		"GOOGLE_REDIRECT_URI":           c.GoogleRedirectURI,
+		"FRONTEND_URL":                  c.FrontendURL,
+		"BACKEND_URL":                   c.BackendURL,
+		"SMTP_HOST":                     c.SMTPHost,
+		"SMTP_USER":                     c.SMTPUser,
+		"SMTP_PASS":                     c.SMTPPass,
+		"SMTP_FROM":                     c.SMTPFrom,
 	}
 	productionSecrets := map[string]string{
 		"DATABASE_URL":         c.DatabaseURL,
 		"DB_PASSWORD":          c.DBPass,
 		"JWT_SECRET":           c.JWTSecret,
-		"IPAYMU_API_KEY":       c.IPaymuAPIKey,
 		"GOOGLE_CLIENT_ID":     c.GoogleClientID,
 		"GOOGLE_CLIENT_SECRET": c.GoogleClientSecret,
 		"SMTP_PASS":            c.SMTPPass,
@@ -224,23 +230,6 @@ func (c *Config) Validate() error {
 		parsed, err := url.Parse(rawURL)
 		if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
 			return fmt.Errorf("URL production wajib berupa HTTPS yang valid: %s", rawURL)
-		}
-	}
-	ipaymuBaseURL, err := url.Parse(c.IPaymuBaseURL)
-	if err != nil || ipaymuBaseURL.Scheme != "https" || !strings.EqualFold(ipaymuBaseURL.Hostname(), "my.ipaymu.com") || strings.TrimRight(ipaymuBaseURL.Path, "/") != "/api/v2" {
-		return fmt.Errorf("IPAYMU_BASE_URL production wajib https://my.ipaymu.com/api/v2")
-	}
-	for name, rawURL := range map[string]string{
-		"IPAYMU_CALLBACK_URL": c.IPaymuCallbackURL,
-		"IPAYMU_RETURN_URL":   c.IPaymuReturnURL,
-		"IPAYMU_CANCEL_URL":   c.IPaymuCancelURL,
-	} {
-		if strings.TrimSpace(rawURL) == "" {
-			continue
-		}
-		parsed, parseErr := url.Parse(rawURL)
-		if parseErr != nil || parsed.Scheme != "https" || parsed.Host == "" {
-			return fmt.Errorf("%s production wajib berupa URL HTTPS yang valid", name)
 		}
 	}
 	backendURL, _ := url.Parse(c.BackendURL)

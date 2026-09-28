@@ -24,6 +24,8 @@ type BookingService interface {
 	UpdateBookingStatus(id uint, providerID uint, status string) (*models.Booking, error)
 	ProviderReschedule(id uint, providerID uint, newDate string) (*models.Booking, error)
 	CreateBooking(booking *models.Booking) error
+	SubmitPaymentProof(bookingID uint, proofPath string) (*models.Booking, error)
+	ReviewManualPayment(bookingID uint, adminID uint, req *models.ReviewManualPaymentRequest) (*models.Booking, error)
 	CancelBookingByCustomer(id uint, customerID uint) (*models.Booking, error)
 	UpdateStatusByWebhook(transactionID string, referenceID string, paymentStatus string, paymentMethod string, amount int64, currency string) error
 	GetRefunds() ([]models.Booking, error)
@@ -173,7 +175,7 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 
 		switch status {
 		case "CANCELLED_BY_CUSTOMER":
-			if oldStatus == "PENDING_PAYMENT" {
+			if oldStatus == models.StatusPendingPayment || oldStatus == models.StatusPaymentReview {
 				booking.Status = "CANCELLED_BY_CUSTOMER"
 				booking.RefundAmount = 0
 				booking.CancellationReason = "Dibatalkan oleh pelanggan sebelum pembayaran"
@@ -193,7 +195,7 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 				}
 			}
 		case "CANCELLED_BY_PROVIDER":
-			if oldStatus == "PENDING_PAYMENT" {
+			if oldStatus == models.StatusPendingPayment || oldStatus == models.StatusPaymentReview {
 				booking.Status = "CANCELLED_BY_PROVIDER"
 				booking.RefundAmount = 0
 			} else {
@@ -337,11 +339,11 @@ func validateProviderStatusTransition(current, next string, tripEndDate time.Tim
 		// RESCHEDULE_OFFERED ikut diizinkan: tawaran jadwal pengganti yang
 		// ditolak pelanggan atau tidak dijawab sampai tanggal berangkat harus
 		// dapat dialihkan ke proses pengembalian dana.
-		if current != "PENDING_PAYMENT" && current != "PAID" && current != "CONFIRMED" && current != models.StatusRescheduleOffered {
+		if current != "PENDING_PAYMENT" && current != models.StatusPaymentReview && current != "PAID" && current != "CONFIRMED" && current != models.StatusRescheduleOffered {
 			return fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", current)
 		}
 	case "CANCELLED_BY_CUSTOMER":
-		if current != "PENDING_PAYMENT" && current != "PAID" && current != "CONFIRMED" {
+		if current != "PENDING_PAYMENT" && current != models.StatusPaymentReview && current != "PAID" && current != "CONFIRMED" {
 			return fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", current)
 		}
 	case "RESCHEDULE_OFFERED":
@@ -369,7 +371,7 @@ func (s *bookingService) CancelBookingByCustomer(id uint, customerID uint) (*mod
 	if err := database.DB.Where("id = ? AND customer_id = ?", id, customerID).First(&booking).Error; err != nil {
 		return nil, fmt.Errorf("booking tidak ditemukan")
 	}
-	if booking.Status != "PENDING_PAYMENT" && booking.Status != "PAID" && booking.Status != "CONFIRMED" {
+	if booking.Status != "PENDING_PAYMENT" && booking.Status != models.StatusPaymentReview && booking.Status != "PAID" && booking.Status != "CONFIRMED" {
 		return nil, fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", booking.Status)
 	}
 	return s.UpdateBookingStatus(booking.ID, booking.ProviderID, "CANCELLED_BY_CUSTOMER")
@@ -518,8 +520,9 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		booking.TripEndDate = calculateTripEnd(booking.TripDate, pkg.Duration)
 		serviceFee := models.BookingServiceFee
 		booking.TotalPrice = int64(booking.Guests)*pkg.Price + addOnTotal + serviceFee
-		booking.Status = "PENDING_PAYMENT"
-		booking.PaymentMethod = "iPaymu Redirect Payment"
+		booking.Status = models.StatusPendingPayment
+		booking.PaymentMethod = "Transfer Bank Manual"
+		booking.PaymentURL = ""
 		booking.BookingCode = ""
 
 		for i := 0; i < 10; i++ {
@@ -548,47 +551,96 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		return err
 	}
 
-	payResp, err := s.ipaymuService.CreatePayment(booking, pkg.Name)
-	if err != nil {
-		updated := false
-		_ = database.DB.Transaction(func(tx *gorm.DB) error {
-			if updateErr := tx.Model(&models.Booking{}).Where("id = ? AND status = ?", booking.ID, models.StatusPendingPayment).Update("status", models.StatusPaymentFailed).Error; updateErr != nil {
-				return updateErr
-			}
-			updated = true
-			return tx.Model(&models.Package{}).Where("id = ?", booking.PackageID).UpdateColumn("quota_used", gorm.Expr("GREATEST(quota_used - ?, 0)", booking.Guests)).Error
-		})
-		if updated {
-			booking.Status = models.StatusPaymentFailed
-			s.sendNotificationsAndEmails(booking, models.StatusPendingPayment, models.StatusPaymentFailed)
-		}
-		log.Printf("[Booking Payment Gateway] booking_id=%d: %v", booking.ID, err)
-		return &BookingGatewayError{Message: "Layanan pembayaran sedang tidak tersedia. Silakan coba lagi beberapa saat lagi."}
-	}
-	invoiceID := payResp.SessionID
-	if payResp.TransactionID > 0 {
-		invoiceID = fmt.Sprintf("%d", payResp.TransactionID)
-	}
-	booking.XenditInvoiceID = invoiceID
-	booking.IPaymuSessionID = payResp.SessionID
-	if payResp.TransactionID > 0 {
-		booking.IPaymuTransactionID = fmt.Sprintf("%d", payResp.TransactionID)
-	}
-	booking.PaymentURL = payResp.PaymentURL
-	result := database.DB.Model(&models.Booking{}).
-		Where("id = ? AND status = ?", booking.ID, "PENDING_PAYMENT").
-		Updates(map[string]interface{}{
-			"xendit_invoice_id": invoiceID, "ipaymu_session_id": payResp.SessionID,
-			"ipaymu_transaction_id": booking.IPaymuTransactionID,
-			"payment_url":           payResp.PaymentURL, "updated_at": time.Now(),
-		})
-	if result.Error != nil {
-		return fmt.Errorf("tagihan dibuat tetapi gagal disimpan; hubungi administrator dengan booking ID %d", booking.ID)
-	}
-	if result.RowsAffected != 1 {
-		return fmt.Errorf("status booking berubah sebelum tagihan tersimpan")
-	}
 	return nil
+}
+
+func (s *bookingService) SubmitPaymentProof(bookingID uint, proofPath string) (*models.Booking, error) {
+	proofPath = strings.TrimSpace(proofPath)
+	if proofPath == "" {
+		return nil, &BookingInputError{Message: "bukti transfer wajib diunggah"}
+	}
+
+	var booking models.Booking
+	expired := false
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Package").First(&booking, bookingID).Error; err != nil {
+			return err
+		}
+		if booking.Status != models.StatusPendingPayment {
+			return &BookingInputError{Message: "bukti transfer hanya dapat dikirim untuk booking yang menunggu pembayaran"}
+		}
+		now := time.Now()
+		if booking.CreatedAt.IsZero() || !now.Before(booking.CreatedAt.Add(models.PaymentWindow)) {
+			booking.Status = models.StatusExpired
+			if err := tx.Save(&booking).Error; err != nil {
+				return err
+			}
+			if err := recalculatePackageQuotaTx(tx, booking.PackageID); err != nil {
+				return err
+			}
+			expired = true
+			return nil
+		}
+		reviewDeadline := now.Add(models.AdminPaymentReviewWindow)
+		booking.Status = models.StatusPaymentReview
+		booking.PaymentProof = proofPath
+		booking.PaymentProofSubmittedAt = &now
+		booking.PaymentReviewDeadline = &reviewDeadline
+		booking.PaymentReviewedAt = nil
+		booking.PaymentReviewedBy = nil
+		booking.PaymentReviewNotes = ""
+		return tx.Save(&booking).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	if expired {
+		s.sendNotificationsAndEmails(&booking, models.StatusPendingPayment, models.StatusExpired)
+		return nil, &BookingInputError{Message: "batas waktu pembayaran telah berakhir"}
+	}
+	s.sendNotificationsAndEmails(&booking, models.StatusPendingPayment, models.StatusPaymentReview)
+	return &booking, nil
+}
+
+func (s *bookingService) ReviewManualPayment(bookingID uint, adminID uint, req *models.ReviewManualPaymentRequest) (*models.Booking, error) {
+	var booking models.Booking
+	var newStatus string
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Package").First(&booking, bookingID).Error; err != nil {
+			return err
+		}
+		if booking.Status != models.StatusPaymentReview {
+			return &BookingInputError{Message: "booking tidak sedang menunggu konfirmasi pembayaran"}
+		}
+		now := time.Now()
+		booking.PaymentReviewedAt = &now
+		booking.PaymentReviewedBy = &adminID
+		booking.PaymentReviewNotes = strings.TrimSpace(req.Notes)
+
+		if req.Decision == "APPROVED" {
+			booking.Status = models.StatusPaid
+			booking.PaymentMethod = "Transfer Bank Manual"
+			booking.PaidAt = &now
+			if err := recordFinanceOnPaymentTx(tx, &booking); err != nil {
+				return err
+			}
+		} else if !now.Before(booking.CreatedAt.Add(models.PaymentWindow)) {
+			booking.Status = models.StatusExpired
+		} else {
+			booking.Status = models.StatusPendingPayment
+			booking.PaymentReviewDeadline = nil
+		}
+		newStatus = booking.Status
+		if err := tx.Save(&booking).Error; err != nil {
+			return err
+		}
+		return recalculatePackageQuotaTx(tx, booking.PackageID)
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.sendNotificationsAndEmails(&booking, models.StatusPaymentReview, newStatus)
+	return &booking, nil
 }
 
 var participantNamePattern = regexp.MustCompile(`^[a-zA-Z\s.'-]{3,255}$`)
@@ -914,7 +966,7 @@ func recalculatePackageQuotaTx(tx *gorm.DB, packageID uint) error {
 		SET quota_used = COALESCE((
 			SELECT SUM(b.guests) FROM bookings b
 			WHERE b.package_id = p.id
-			AND b.status IN ('PENDING_PAYMENT', 'PAID', 'CONFIRMED', 'COMPLETED')
+			AND b.status IN ('PENDING_PAYMENT', 'PAYMENT_REVIEW', 'PAID', 'CONFIRMED', 'COMPLETED')
 		), 0)
 		WHERE p.id = ?
 	`, packageID).Error; err != nil {
@@ -981,6 +1033,17 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 
 			if s.emailService != nil {
 				sendEmail(s.emailService.SendPaymentSuccessEmail(&b, pkg))
+			}
+		case models.StatusPaymentReview:
+			notifType = NotifTypePayment
+			title = "Bukti Pembayaran Dikirim"
+			msgCustomer = fmt.Sprintf("Bukti transfer pesanan #%s (%s) sudah diterima dan menunggu konfirmasi admin maksimal 1×24 jam.", b.BookingCode, packageName)
+
+		case models.StatusPendingPayment:
+			if oldS == models.StatusPaymentReview {
+				notifType = NotifTypePayment
+				title = "Bukti Pembayaran Ditolak"
+				msgCustomer = fmt.Sprintf("Bukti transfer pesanan #%s belum dapat dikonfirmasi. Silakan periksa catatan admin dan unggah bukti baru sebelum waktu pembayaran berakhir.", b.BookingCode)
 			}
 		case models.StatusConfirmed:
 			title = "Pesanan Dikonfirmasi"
@@ -1049,10 +1112,11 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 		}
 
 		// Save in-app notification for Provider
-		if b.ProviderID > 0 && s.notifService != nil && title != "" {
+		providerVisibleStatus := newS != models.StatusPendingPayment && newS != models.StatusPaymentReview && newS != models.StatusExpired && newS != models.StatusPaymentFailed
+		if b.ProviderID > 0 && s.notifService != nil && title != "" && providerVisibleStatus {
 			_ = s.notifService.CreateNotification(b.ProviderID, "PROVIDER", title, msgProvider, notifType, "/booking")
 		}
-		if b.ProviderID > 0 && s.emailService != nil && title != "" {
+		if b.ProviderID > 0 && s.emailService != nil && title != "" && providerVisibleStatus {
 			var provider models.Provider
 			if database.DB != nil && database.DB.Select("id", "business_name", "email").First(&provider, b.ProviderID).Error == nil {
 				sendEmail(s.emailService.SendProviderTransactionStatusEmail(&provider, &b, title, msgProvider))
@@ -1069,6 +1133,14 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 				"/admin/refunds",
 			)
 		}
+		if newS == models.StatusPaymentReview && s.notifService != nil {
+			_ = s.notifService.NotifyAdmins(
+				"Pembayaran Menunggu Konfirmasi",
+				fmt.Sprintf("Bukti transfer pesanan #%s (%s) menunggu verifikasi maksimal 1×24 jam.", b.BookingCode, packageName),
+				NotifTypePayment,
+				"/admin/bookings",
+			)
+		}
 	}(*booking, oldStatus, newStatus)
 }
 
@@ -1076,6 +1148,7 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 // tanggal. Sama persis dengan status yang dihitung recalculatePackageQuotaTx.
 var activeBookingStatuses = []string{
 	models.StatusPendingPayment,
+	models.StatusPaymentReview,
 	models.StatusPaid,
 	models.StatusConfirmed,
 	models.StatusCompleted,

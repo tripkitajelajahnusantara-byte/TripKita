@@ -6,6 +6,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -81,17 +83,26 @@ func (ctrl *BookingController) GetPublicStatus(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki akses untuk melihat data pesanan ini"})
 			return
 		}
+		if callerRole == "PROVIDER" && (booking.Status == models.StatusPendingPayment || booking.Status == models.StatusPaymentReview) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Booking tidak ditemukan"})
+			return
+		}
 		c.JSON(http.StatusOK, booking)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"bookingCode":    booking.BookingCode,
-		"status":         booking.Status,
-		"tripDate":       booking.TripDate,
-		"guests":         booking.Guests,
-		"totalPrice":     booking.TotalPrice,
-		"packageDetails": gin.H{"name": booking.Package.Name},
+		"bookingCode":             booking.BookingCode,
+		"status":                  booking.Status,
+		"createdAt":               booking.CreatedAt,
+		"tripDate":                booking.TripDate,
+		"guests":                  booking.Guests,
+		"totalPrice":              booking.TotalPrice,
+		"paymentMethod":           booking.PaymentMethod,
+		"paymentProofSubmittedAt": booking.PaymentProofSubmittedAt,
+		"paymentReviewDeadline":   booking.PaymentReviewDeadline,
+		"paymentReviewNotes":      booking.PaymentReviewNotes,
+		"packageDetails":          gin.H{"name": booking.Package.Name},
 	})
 }
 
@@ -187,7 +198,7 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 		CustomerInitial:  req.CustomerInitial,
 		Guests:           req.Guests,
 		TripDate:         req.TripDate,
-		PaymentMethod:    "iPaymu Redirect Payment",
+		PaymentMethod:    "Transfer Bank Manual",
 		SelectedAddOnIDs: req.AddOnIDs,
 	}
 	for _, p := range req.Participants {
@@ -233,10 +244,105 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 // dengan perhitungan backend, agar ringkasan pembayaran tidak menebak sendiri.
 func (ctrl *BookingController) GetCheckoutConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"serviceFee":             models.BookingServiceFee,
-		"paymentWindowSeconds":   int(models.PaymentWindow.Seconds()),
+		"serviceFee":               models.BookingServiceFee,
+		"paymentWindowSeconds":     int(models.PaymentWindow.Seconds()),
+		"adminReviewWindowSeconds": int(models.AdminPaymentReviewWindow.Seconds()),
+		"manualPayment": gin.H{
+			"bankName":      ctrl.cfg.ManualPaymentBankName,
+			"accountNumber": ctrl.cfg.ManualPaymentAccountNumber,
+			"accountHolder": ctrl.cfg.ManualPaymentAccountHolder,
+		},
 		"cancellationRefundDays": int(models.CancellationFullRefundWindow.Hours() / 24),
 	})
+}
+
+func (ctrl *BookingController) SubmitPaymentProof(c *gin.Context) {
+	booking, err := ctrl.service.GetBookingByCode(c.Param("code"))
+	if err != nil || booking == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Booking tidak ditemukan"})
+		return
+	}
+	if booking.CustomerID != nil && *booking.CustomerID > 0 {
+		callerID, hasID := c.Get("provider_id")
+		callerRole, _ := c.Get("role")
+		if !hasID || callerRole != "CUSTOMER" || callerID.(uint) != *booking.CustomerID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki akses untuk mengirim bukti pembayaran booking ini"})
+			return
+		}
+	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxDocumentSize+1024*1024)
+	if err := c.Request.ParseMultipartForm(maxDocumentSize); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Ukuran bukti transfer melebihi batas 5 MB"})
+		return
+	}
+	file, err := c.FormFile("file")
+	if err != nil || file.Size <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Bukti transfer wajib diunggah"})
+		return
+	}
+	ext, err := validateDocumentContent(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	filename, err := randomDocumentName(ext)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyiapkan penyimpanan bukti transfer"})
+		return
+	}
+	savePath := filepath.Join(ctrl.cfg.DocumentUploadDir(), filename)
+	if err := c.SaveUploadedFile(file, savePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan bukti transfer"})
+		return
+	}
+	if err := os.Chmod(savePath, 0o600); err != nil {
+		_ = os.Remove(savePath)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengamankan bukti transfer"})
+		return
+	}
+
+	updated, err := ctrl.service.SubmitPaymentProof(booking.ID, "/uploads/"+filename)
+	if err != nil {
+		_ = os.Remove(savePath)
+		var inputErr *services.BookingInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+			return
+		}
+		respondInternalError(c, "mengirim bukti pembayaran", err)
+		return
+	}
+	c.JSON(http.StatusOK, updated)
+}
+
+func (ctrl *BookingController) ReviewManualPayment(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID booking tidak valid"})
+		return
+	}
+	adminID, exists := c.Get("provider_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi admin tidak valid"})
+		return
+	}
+	var req models.ReviewManualPaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Keputusan APPROVED atau REJECTED wajib dipilih"})
+		return
+	}
+	booking, err := ctrl.service.ReviewManualPayment(uint(id), adminID.(uint), &req)
+	if err != nil {
+		var inputErr *services.BookingInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+			return
+		}
+		respondInternalError(c, "mengonfirmasi pembayaran manual", err)
+		return
+	}
+	c.JSON(http.StatusOK, booking)
 }
 
 func (ctrl *BookingController) CustomerCancelBooking(c *gin.Context) {

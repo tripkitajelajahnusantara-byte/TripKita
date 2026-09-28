@@ -4,6 +4,7 @@ import 'package:customer_mobile/models/package.dart';
 /// Status pesanan dari backend (`backend/models/booking.go`).
 class BookingStatus {
   static const pendingPayment = 'PENDING_PAYMENT';
+  static const paymentReview = 'PAYMENT_REVIEW';
   static const paid = 'PAID';
   static const confirmed = 'CONFIRMED';
   static const completed = 'COMPLETED';
@@ -40,7 +41,8 @@ class Participant {
       'phone': phone.trim(),
       'gender': gender,
       'birthDate': birthDate,
-      'medicalNotes': notes == '-' || notes.toLowerCase() == 'tidak ada' ? '' : notes,
+      'medicalNotes':
+          notes == '-' || notes.toLowerCase() == 'tidak ada' ? '' : notes,
     };
   }
 
@@ -59,7 +61,8 @@ class BookerContact {
   final String email;
   final String whatsapp;
 
-  const BookerContact({required this.name, required this.email, required this.whatsapp});
+  const BookerContact(
+      {required this.name, required this.email, required this.whatsapp});
 }
 
 /// Pilihan yang dibawa dari halaman detail paket ke form pemesanan.
@@ -85,6 +88,7 @@ class BookingDraft {
   });
 
   int get packageTotal => package.price * guests;
+
   /// Total tagihan dengan biaya layanan dari `CheckoutConfig` backend.
   int totalWithFee(int serviceFee) => packageTotal + serviceFee;
 }
@@ -101,6 +105,10 @@ class Booking {
   final int totalPrice;
   final String status;
   final String paymentUrl;
+  final String paymentProof;
+  final DateTime? paymentProofSubmittedAt;
+  final DateTime? paymentReviewDeadline;
+  final String paymentReviewNotes;
   final DateTime? createdAt;
   final String providerWhatsApp;
   final String providerName;
@@ -119,6 +127,10 @@ class Booking {
     this.totalPrice = 0,
     this.status = BookingStatus.pendingPayment,
     this.paymentUrl = '',
+    this.paymentProof = '',
+    this.paymentProofSubmittedAt,
+    this.paymentReviewDeadline,
+    this.paymentReviewNotes = '',
     this.createdAt,
     this.providerWhatsApp = '',
     this.providerName = '',
@@ -129,22 +141,37 @@ class Booking {
   factory Booking.fromJson(Map<String, dynamic> json) {
     int asInt(Object? v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
     String asString(Object? v) => v is String ? v : '';
-    DateTime? asDate(Object? v) => v is String && v.isNotEmpty ? DateTime.tryParse(v)?.toLocal() : null;
+    DateTime? asDate(Object? v) =>
+        v is String && v.isNotEmpty ? DateTime.tryParse(v)?.toLocal() : null;
 
     final details = json['packageDetails'];
-    final pkg = details is Map<String, dynamic> && asInt(details['id']) > 0 ? TripPackage.fromJson(details) : null;
+    final pkg = details is Map<String, dynamic> && asInt(details['id']) > 0
+        ? TripPackage.fromJson(details)
+        : null;
     return Booking(
       id: asInt(json['id']),
-      bookingCode: asString(json['bookingCode']).isNotEmpty ? asString(json['bookingCode']) : asString(json['booking_code']),
+      bookingCode: asString(json['bookingCode']).isNotEmpty
+          ? asString(json['bookingCode'])
+          : asString(json['booking_code']),
       packageId: asInt(json['packageId']),
       packageDetails: pkg,
-      packageNameFallback: details is Map ? asString(details['name']) : asString(json['packageName']),
+      packageNameFallback: details is Map
+          ? asString(details['name'])
+          : asString(json['packageName']),
       customerName: asString(json['customerName']),
       tripDate: asDate(json['tripDate']),
       guests: asInt(json['guests']),
       totalPrice: asInt(json['totalPrice']),
-      status: asString(json['status']).isEmpty ? BookingStatus.pendingPayment : asString(json['status']),
-      paymentUrl: asString(json['paymentUrl']).isNotEmpty ? asString(json['paymentUrl']) : asString(json['payment_url']),
+      status: asString(json['status']).isEmpty
+          ? BookingStatus.pendingPayment
+          : asString(json['status']),
+      paymentUrl: asString(json['paymentUrl']).isNotEmpty
+          ? asString(json['paymentUrl'])
+          : asString(json['payment_url']),
+      paymentProof: asString(json['paymentProof']),
+      paymentProofSubmittedAt: asDate(json['paymentProofSubmittedAt']),
+      paymentReviewDeadline: asDate(json['paymentReviewDeadline']),
+      paymentReviewNotes: asString(json['paymentReviewNotes']),
       createdAt: asDate(json['createdAt']),
       providerWhatsApp: asString(json['providerWhatsApp']),
       providerName: asString(json['providerName']),
@@ -154,18 +181,26 @@ class Booking {
   }
 
   String get packageName =>
-      packageDetails?.name ?? (packageNameFallback.isNotEmpty ? packageNameFallback : 'Paket Wisata Nusantara');
+      packageDetails?.name ??
+      (packageNameFallback.isNotEmpty
+          ? packageNameFallback
+          : 'Paket Wisata Nusantara');
 
-  DateTime? get paymentDeadline => createdAt?.add(CheckoutConfig.currentPaymentWindow);
+  DateTime? get paymentDeadline =>
+      createdAt?.add(CheckoutConfig.currentPaymentWindow);
 
-  /// Checkout iPaymu berlaku 24 jam; setelah itu pesanan dianggap kedaluwarsa
+  /// Transfer dan upload bukti berlaku 24 jam; setelah itu pesanan dianggap kedaluwarsa
   /// di tampilan walaupun backend belum memperbarui statusnya.
   bool get isPaymentExpired {
     if (status == BookingStatus.expired) return true;
     final deadline = paymentDeadline;
-    return status == BookingStatus.pendingPayment && deadline != null && DateTime.now().isAfter(deadline);
+    return status == BookingStatus.pendingPayment &&
+        deadline != null &&
+        DateTime.now().isAfter(deadline);
   }
 
   bool get isPaidOrActive =>
-      status == BookingStatus.paid || status == BookingStatus.confirmed || status == BookingStatus.completed;
+      status == BookingStatus.paid ||
+      status == BookingStatus.confirmed ||
+      status == BookingStatus.completed;
 }

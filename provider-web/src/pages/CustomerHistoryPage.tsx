@@ -25,8 +25,10 @@ interface BookingItem {
   totalPrice: number;
   paymentMethod: string;
   status: string;
-  paymentUrl: string;
   createdAt: string;
+  paymentProofSubmittedAt?: string;
+  paymentReviewDeadline?: string;
+  paymentReviewNotes?: string;
   providerWhatsApp?: string;
   providerName?: string;
   // Terisi saat penyelenggara menawarkan tanggal pengganti karena kuota minimal
@@ -46,22 +48,11 @@ const getWhatsAppURL = (phone?: string): string | null => {
   return `https://wa.me/${digits}`;
 };
 
-const getTrustedPaymentURL = (value?: string): string | null => {
-  if (!value) return null;
-  try {
-    const parsed = new URL(value);
-    const host = parsed.hostname.toLowerCase();
-    return parsed.protocol === 'https:' && (host === 'my.ipaymu.com' || host === 'sandbox.ipaymu.com') ? parsed.toString() : null;
-  } catch {
-    return null;
-  }
-};
-
 // Batas waktu pembayaran invoice. Nilai sebenarnya diambil dari /public/checkout-config;
 // konstanta ini hanya dipakai selama konfigurasi belum termuat.
 const DEFAULT_PAYMENT_WINDOW_SECONDS = 24 * 60 * 60;
 
-const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; onExpire?: () => void }> = ({ createdAt, windowSeconds, onExpire }) => {
+const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; label?: string; onExpire?: () => void }> = ({ createdAt, windowSeconds, label = 'Batas Transfer', onExpire }) => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const onExpireRef = useRef(onExpire);
 
@@ -100,21 +91,27 @@ const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; onEx
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', padding: '5px 12px', borderRadius: '30px', fontSize: '12px', fontWeight: '800' }}>
       <Clock size={14} color="#ea580c" />
-      <span>Batas Transfer: {hours}:{minutes}:{seconds}</span>
+      <span>{label}: {hours}:{minutes}:{seconds}</span>
     </div>
   );
 };
 
 export const CustomerHistoryPage: React.FC = () => {
-  const { navigateTo, customerProfile, setSelectedPackageForDetail } = useNavigation();
+  const { navigateTo, customerProfile, setSelectedPackageForDetail, setSelectedBookingForInvoice } = useNavigation();
 
   // Batas waktu pembayaran dari backend (detik)
   const [paymentWindowSeconds, setPaymentWindowSeconds] = useState<number>(DEFAULT_PAYMENT_WINDOW_SECONDS);
+  const [adminReviewWindowSeconds, setAdminReviewWindowSeconds] = useState<number>(DEFAULT_PAYMENT_WINDOW_SECONDS);
 
   useEffect(() => {
     let cancelled = false;
     fetchCheckoutConfig()
-      .then((cfg) => { if (!cancelled) setPaymentWindowSeconds(cfg.paymentWindowSeconds); })
+      .then((cfg) => {
+        if (!cancelled) {
+          setPaymentWindowSeconds(cfg.paymentWindowSeconds);
+          setAdminReviewWindowSeconds(cfg.adminReviewWindowSeconds);
+        }
+      })
       .catch((err) => console.error('Failed to load checkout config:', err));
     return () => { cancelled = true; };
   }, []);
@@ -206,31 +203,6 @@ export const CustomerHistoryPage: React.FC = () => {
 	};
 
   useEffect(() => {
-	// Parameter redirect iPaymu hanya informasional; webhook tetap sumber status.
-    const urlParams = new URLSearchParams(window.location.search);
-	const paymentResult = urlParams.get('payment_result');
-	const bookingId = urlParams.get('booking_id');
-
-	if (paymentResult && bookingId) {
-	  if (paymentResult.toLowerCase() === 'failed') {
-		setModalNotice({
-		  title: 'Pembayaran Belum Berhasil',
-		  message: 'Pembayaran iPaymu dibatalkan atau gagal diproses. Pesanan tidak dianggap lunas dan tidak ada dana yang kami catat. Anda dapat memeriksa status pesanan atau membuat pemesanan kembali.',
-		  isError: true,
-		});
-	  } else if (paymentResult.toLowerCase() === 'success') {
-		setModalNotice({
-		  title: 'Pembayaran Sedang Diverifikasi',
-		  message: 'Anda telah kembali dari iPaymu. Status lunas hanya akan tampil setelah pembayaran dikonfirmasi melalui callback resmi iPaymu.',
-		  isError: false,
-		});
-	  }
-	  // Redirect parameters are informational only. Payment status is accepted
-	  // exclusively from the verified backend webhook.
-	  if (window.history.replaceState) {
-		window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-	  }
-	}
 	fetchHistory();
   }, [customerProfile]);
 
@@ -280,7 +252,7 @@ export const CustomerHistoryPage: React.FC = () => {
     if (!createdAt) return false;
     const createdTime = new Date(createdAt).getTime();
     if (isNaN(createdTime)) return false;
-    const expireTime = createdTime + paymentWindowSeconds * 1000; // Batas waktu checkout iPaymu
+    const expireTime = createdTime + paymentWindowSeconds * 1000;
     return Date.now() > expireTime;
   };
 
@@ -413,6 +385,13 @@ export const CustomerHistoryPage: React.FC = () => {
           color: '#ef4444',
           bgColor: '#fee2e2',
           icon: <XCircle size={14} color="#ef4444" />
+        };
+      case 'PAYMENT_REVIEW':
+        return {
+          label: 'Menunggu Konfirmasi Admin',
+          color: '#2563eb',
+          bgColor: '#eff6ff',
+          icon: <Clock size={14} color="#2563eb" />
         };
       case 'PENDING_PAYMENT':
       case 'Menunggu':
@@ -564,13 +543,9 @@ export const CustomerHistoryPage: React.FC = () => {
                     {trackedBooking.status === 'PENDING_PAYMENT' && (
                       <button
                         onClick={() => {
-                          const pUrl = trackedBooking.paymentUrl || trackedBooking.payment_url;
-                          const trustedURL = getTrustedPaymentURL(pUrl);
-                          if (trustedURL) {
-                            window.location.href = trustedURL;
-                          } else {
-                            alert('Tautan pembayaran iPaymu tidak ditemukan. Silakan lakukan pemesanan ulang.');
-                          }
+                          setSelectedBookingForInvoice(trackedBooking);
+                          sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(trackedBooking));
+                          navigateTo('halaman-pembayaran');
                         }}
                         style={{
                           padding: '10px 18px',
@@ -585,6 +560,9 @@ export const CustomerHistoryPage: React.FC = () => {
                       >
                         Selesaikan Pembayaran
                       </button>
+                    )}
+                    {trackedBooking.status === 'PAYMENT_REVIEW' && trackedBooking.paymentProofSubmittedAt && (
+                      <CountdownTimer createdAt={trackedBooking.paymentProofSubmittedAt} windowSeconds={adminReviewWindowSeconds} label="Batas Konfirmasi Admin" />
                     )}
                     {(trackedBooking.status === 'PAID' || trackedBooking.status === 'CONFIRMED') && getWhatsAppURL(
                       trackedBooking.providerWhatsApp || bookings.find(item => item.bookingCode === trackedBooking.bookingCode)?.providerWhatsApp
@@ -775,6 +753,16 @@ export const CustomerHistoryPage: React.FC = () => {
                     </div>
                   )}
 
+                  {booking.status === 'PAYMENT_REVIEW' && (
+                    <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      <div>
+                        <strong style={{ color: '#1d4ed8' }}>Bukti transfer sedang diperiksa admin</strong>
+                        <div style={{ color: '#475569', fontSize: '13px', marginTop: '4px' }}>Booking belum diteruskan ke provider sampai pembayaran disetujui.</div>
+                      </div>
+                      {booking.paymentProofSubmittedAt && <CountdownTimer createdAt={booking.paymentProofSubmittedAt} windowSeconds={adminReviewWindowSeconds} label="Batas Konfirmasi Admin" />}
+                    </div>
+                  )}
+
                   {booking.status === 'PENDING_PAYMENT' && (
                     isExpired ? (
                       /* EXPIRED CARD BANNER */
@@ -822,12 +810,12 @@ export const CustomerHistoryPage: React.FC = () => {
                       /* ACTIVE PENDING PAYMENT BANNER */
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Pembayaran iPaymu:</strong>
+                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Transfer Manual:</strong>
                           <CountdownTimer createdAt={booking.createdAt} windowSeconds={paymentWindowSeconds} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
                         </div>
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
-                          Silakan lakukan pembayaran sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> melalui checkout resmi iPaymu.
+                          Silakan transfer sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> lalu unggah bukti pembayaran sebelum countdown berakhir.
                         </span>
                         
                         <div style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
@@ -860,13 +848,9 @@ export const CustomerHistoryPage: React.FC = () => {
 
                             <button
                               onClick={() => {
-                                const pUrl = booking.paymentUrl || (booking as any).payment_url;
-                                const trustedURL = getTrustedPaymentURL(pUrl);
-                                if (trustedURL) {
-                                  window.location.href = trustedURL;
-                                } else {
-                                  alert('Tautan pembayaran iPaymu tidak ditemukan. Silakan lakukan pemesanan ulang.');
-                                }
+                                setSelectedBookingForInvoice(booking);
+                                sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(booking));
+                                navigateTo('halaman-pembayaran');
                               }}
                               style={{
                                 padding: '10px 18px',

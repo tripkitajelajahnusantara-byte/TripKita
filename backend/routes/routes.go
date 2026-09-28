@@ -63,10 +63,6 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 	// API Group
 	apiV1 := r.Group("/api/v1")
 	{
-		// Alias kompatibilitas untuk URL callback yang pernah dipakai pada
-		// konfigurasi deployment. Endpoint kanonis tetap berada di grup public.
-		apiV1.POST("/payments/ipaymu/callback", middleware.RateLimit(120, time.Minute), bookingCtrl.IPaymuWebhook)
-
 		// PUBLIC ROUTES (No Auth Required)
 		public := apiV1.Group("/public")
 		{
@@ -83,12 +79,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			// derived from a valid token and never accepted from the request body.
 			public.POST("/bookings", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.CreateBooking)
 			public.GET("/bookings/status/:code", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.GetPublicStatus)
-			public.POST("/webhooks/ipaymu", middleware.RateLimit(120, time.Minute), bookingCtrl.IPaymuWebhook)
-
-			if cfg.EnableDevMocks {
-				public.GET("/ipaymu-mock-checkout/:id", bookingCtrl.RenderMockCheckout)
-				public.POST("/ipaymu-mock-checkout/:id/pay", bookingCtrl.ProcessMockPayment)
-			}
+			public.POST("/bookings/:code/payment-proof", middleware.RateLimit(10, time.Hour), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.SubmitPaymentProof)
 
 			// Auth routes
 			auth := public.Group("/auth")
@@ -188,6 +179,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			admin.GET("/refunds", bookingCtrl.GetRefunds)
 			admin.POST("/refunds/:id/complete", bookingCtrl.CompleteRefund)
 			admin.GET("/bookings", bookingCtrl.AdminListBookings)
+			admin.POST("/bookings/:id/payment-review", bookingCtrl.ReviewManualPayment)
 
 			// Admin Payout management
 			admin.GET("/payouts", payoutCtrl.AdminGetAllPayouts)

@@ -7,7 +7,7 @@ import { ArrowRight, Check } from 'lucide-react';
 // ada data nyata yang bisa dipertanggungjawabkan.
 
 const PAYOUT_FLOW = [
-  { title: 'Pelanggan membayar', detail: 'Pembayaran online melalui iPaymu. Booking tercatat lunas setelah pembayaran terverifikasi.' },
+  { title: 'Pelanggan membayar', detail: 'Pelanggan transfer ke rekening TemenTrip dan mengunggah bukti pembayaran.' },
   { title: 'Pencairan tahap 1 (50%)', detail: 'Separuh hak Anda (disebut DP 50% di menu Keuangan) dapat diajukan sebelum trip berangkat. Pelanggan tetap membayar penuh di awal.' },
   { title: 'Pencairan tahap 2 (50%)', detail: 'Sisa hak Anda (pelunasan) terbuka otomatis setelah tanggal trip berakhir.' },
   { title: 'Transfer ke rekening', detail: 'Tim TemenTrip mentransfer dan mengunggah bukti transfer yang bisa Anda unduh.' },
@@ -16,7 +16,7 @@ const PAYOUT_FLOW = [
 const FEATURES = [
   {
     title: 'Booking dan pembayaran di satu tempat',
-    body: 'Pelanggan memilih tanggal, membayar online, dan booking langsung muncul di dashboard Anda lengkap dengan data peserta.',
+    body: 'Pelanggan memilih tanggal, transfer, dan mengunggah bukti. Booking muncul di dashboard Anda setelah pembayaran disetujui admin.',
   },
   {
     title: 'Open Trip atau private trip',
@@ -78,7 +78,7 @@ export const ProviderLandingPage: React.FC = () => {
               Jual paket wisata Anda di TemenTrip
             </h1>
             <p className="hero-subtitle">
-              Tampilkan paket Anda ke pelanggan yang sedang mencari trip, terima pembayaran online,
+              Tampilkan paket Anda ke pelanggan yang sedang mencari trip, terima booking terverifikasi,
               dan kelola booking sampai pencairan dana dari satu dashboard.
             </p>
             <div className="hero-actions">

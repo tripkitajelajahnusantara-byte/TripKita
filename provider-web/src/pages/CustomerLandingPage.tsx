@@ -970,8 +970,8 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CreditCard size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Bayar online via iPaymu</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Metode pembayaran yang tersedia ditampilkan di halaman checkout iPaymu</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Transfer & upload bukti</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Kuota ditahan 24 jam hingga bukti pembayaran dikirim</span>
           </div>
 
           {/* Item 4 */}

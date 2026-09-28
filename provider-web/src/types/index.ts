@@ -84,9 +84,14 @@ export interface Booking {
   createdAt?: string;
   paidAt?: string;
   paymentUrl?: string;
+  paymentProof?: string;
+  paymentProofSubmittedAt?: string;
+  paymentReviewDeadline?: string;
+  paymentReviewedAt?: string;
+  paymentReviewNotes?: string;
   rawEndDate?: string;
   participants?: BookingParticipant[];
-  status: 'PENDING_PAYMENT' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED' | 'RESCHEDULE_OFFERED';
+  status: 'PENDING_PAYMENT' | 'PAYMENT_REVIEW' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED' | 'RESCHEDULE_OFFERED';
 }
 
 export interface PopularPackage {

@@ -5,16 +5,28 @@ import 'package:customer_mobile/services/api_service.dart';
 class CheckoutConfig {
   final int serviceFee;
   final Duration paymentWindow;
+  final Duration adminReviewWindow;
+  final String bankName;
+  final String accountNumber;
+  final String accountHolder;
 
-  const CheckoutConfig({required this.serviceFee, required this.paymentWindow});
+  const CheckoutConfig({
+    required this.serviceFee,
+    required this.paymentWindow,
+    required this.adminReviewWindow,
+    required this.bankName,
+    required this.accountNumber,
+    required this.accountHolder,
+  });
 
   static CheckoutConfig? _cached;
   static Future<CheckoutConfig>? _pending;
 
-  /// Masa berlaku invoice untuk hitung mundur. Sebelum konfigurasi termuat
+  /// Masa berlaku transfer untuk hitung mundur. Sebelum konfigurasi termuat
   /// dipakai 24 jam, nilai yang sama dengan `models.PaymentWindow` backend;
   /// status kedaluwarsa yang sebenarnya tetap ditentukan backend.
-  static Duration get currentPaymentWindow => _cached?.paymentWindow ?? const Duration(hours: 24);
+  static Duration get currentPaymentWindow =>
+      _cached?.paymentWindow ?? const Duration(hours: 24);
 
   static Future<CheckoutConfig> load() {
     final cached = _cached;

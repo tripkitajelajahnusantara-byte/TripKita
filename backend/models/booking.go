@@ -21,9 +21,15 @@ type Booking struct {
 	TotalPrice      int64     `gorm:"not null" json:"totalPrice"`
 	// PlatformFeePercent adalah snapshot tarif provider saat booking dibuat.
 	// Nilai ini tidak ikut berubah saat admin mengganti tarif provider di kemudian hari.
-	PlatformFeePercent int64  `gorm:"not null;default:15" json:"platformFeePercent"`
-	PaymentMethod      string `gorm:"size:100" json:"paymentMethod"`
-	Status             string `gorm:"size:50;default:'PENDING_PAYMENT'" json:"status"` // PENDING_PAYMENT, PAID, CONFIRMED, COMPLETED, FAILED, EXPIRED, CANCELLED_BY_CUSTOMER, CANCELLED_BY_PROVIDER, REFUND_REQUIRED, REFUNDED
+	PlatformFeePercent      int64      `gorm:"not null;default:15" json:"platformFeePercent"`
+	PaymentMethod           string     `gorm:"size:100" json:"paymentMethod"`
+	Status                  string     `gorm:"size:50;default:'PENDING_PAYMENT';index" json:"status"` // PENDING_PAYMENT, PAYMENT_REVIEW, PAID, CONFIRMED, COMPLETED, FAILED, EXPIRED, CANCELLED_BY_CUSTOMER, CANCELLED_BY_PROVIDER, REFUND_REQUIRED, REFUNDED
+	PaymentProof            string     `gorm:"size:500" json:"paymentProof,omitempty"`
+	PaymentProofSubmittedAt *time.Time `gorm:"index" json:"paymentProofSubmittedAt,omitempty"`
+	PaymentReviewDeadline   *time.Time `gorm:"index" json:"paymentReviewDeadline,omitempty"`
+	PaymentReviewedAt       *time.Time `json:"paymentReviewedAt,omitempty"`
+	PaymentReviewedBy       *uint      `json:"paymentReviewedBy,omitempty"`
+	PaymentReviewNotes      string     `gorm:"size:500" json:"paymentReviewNotes,omitempty"`
 	// XenditInvoiceID dipertahankan sementara agar klien/data lama tetap dapat
 	// dibaca. Integrasi baru menggunakan kedua field iPaymu di bawah ini.
 	XenditInvoiceID     string     `gorm:"size:255" json:"xenditInvoiceId,omitempty"`
@@ -52,6 +58,7 @@ type Booking struct {
 
 const (
 	StatusPendingPayment      = "PENDING_PAYMENT"
+	StatusPaymentReview       = "PAYMENT_REVIEW"
 	StatusPaid                = "PAID"
 	StatusPaymentFailed       = "FAILED"
 	StatusExpired             = "EXPIRED"
@@ -63,6 +70,13 @@ const (
 	StatusRefunded            = "REFUNDED"
 	StatusRescheduleOffered   = "RESCHEDULE_OFFERED"
 )
+
+const AdminPaymentReviewWindow = 24 * time.Hour
+
+type ReviewManualPaymentRequest struct {
+	Decision string `json:"decision" binding:"required,oneof=APPROVED REJECTED"`
+	Notes    string `json:"notes" binding:"max=500"`
+}
 
 type UpdateBookingStatusRequest struct {
 	Status             string `json:"status" binding:"required,oneof=CONFIRMED COMPLETED CANCELLED_BY_PROVIDER RESCHEDULE_OFFERED"`

@@ -254,7 +254,7 @@ export const RegisterPage: React.FC = () => {
               </li>
               <li>
                 <div className="chk-icon"><Check size={14} color="#00a896" /></div>
-                <span>Customer membayar online lewat iPaymu</span>
+                <span>Customer transfer dan mengunggah bukti pembayaran</span>
               </li>
               <li>
                 <div className="chk-icon"><Check size={14} color="#00a896" /></div>
@@ -636,7 +636,7 @@ export const RegisterPage: React.FC = () => {
 
               <strong>4. BIAYA DAN PENCAIRAN DANA (ESCROW SYSTEM)</strong>
               <p>4.1 Biaya Layanan: TemenTrip mengenakan komisi sesuai tarif kerja sama yang tercantum pada akun Mitra. Tarif awal provider baru adalah 15% dan dapat disesuaikan oleh Administrator untuk kerja sama tertentu.<br/>
-              4.2 Pencairan Dana Mitra: Pengguna membayar penuh di muka melalui checkout iPaymu, tanpa uang muka (DP) dari pengguna. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Mitra tersedia untuk diajukan sebagai biaya persiapan operasional, dan separuh sisanya baru tersedia setelah trip selesai.<br/>
+              4.2 Pencairan Dana Mitra: Pengguna membayar penuh di muka melalui transfer ke rekening TemenTrip dan pembayaran diverifikasi admin, tanpa uang muka (DP) dari pengguna. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Mitra tersedia untuk diajukan sebagai biaya persiapan operasional, dan separuh sisanya baru tersedia setelah trip selesai.<br/>
               4.3 Batas Waktu Kuota H-3: Jika pada H-3 kuota minimal belum terpenuhi, Mitra diberikan wewenang di dashboard untuk memilih [Tetap Berangkat], [Jadwalkan Ulang], atau [Batalkan] (seluruh pesanan dikembalikan penuh kepada pengguna).</p>
 
               <strong>5. PEMBATALAN, REFUND & RESCHEDULE</strong>

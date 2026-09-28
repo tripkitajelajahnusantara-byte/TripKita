@@ -278,13 +278,22 @@ class ApiService {
         await _request('GET', '/public/checkout-config', withAuth: false));
     final fee = data['serviceFee'];
     final window = data['paymentWindowSeconds'];
-    if (fee is! num || window is! num) {
+    final reviewWindow = data['adminReviewWindowSeconds'];
+    final manual = data['manualPayment'];
+    if (fee is! num ||
+        window is! num ||
+        reviewWindow is! num ||
+        manual is! Map) {
       throw const ApiException(
           'Konfigurasi pembayaran dari server tidak valid.', 0);
     }
     return CheckoutConfig(
         serviceFee: fee.toInt(),
-        paymentWindow: Duration(seconds: window.toInt()));
+        paymentWindow: Duration(seconds: window.toInt()),
+        adminReviewWindow: Duration(seconds: reviewWindow.toInt()),
+        bankName: '${manual['bankName'] ?? ''}',
+        accountNumber: '${manual['accountNumber'] ?? ''}',
+        accountHolder: '${manual['accountHolder'] ?? ''}');
   }
 
   static Future<List<Booking>> fetchCustomerBookings() async {
@@ -327,5 +336,63 @@ class ApiService {
     final data = await _request(
         'GET', '/public/bookings/status/${Uri.encodeComponent(bookingCode)}');
     return Booking.fromJson(_asMap(data));
+  }
+
+  static Future<Booking> submitPaymentProof(
+      String bookingCode, List<int> bytes, String fileName) async {
+    if (bytes.isEmpty || bytes.length > 5 * 1024 * 1024) {
+      throw const ApiException(
+          'Ukuran bukti transfer harus antara 1 byte dan 5 MB.', 400);
+    }
+    final extension = fileName.toLowerCase().split('.').last;
+    final contentType = extension == 'pdf'
+        ? 'application/pdf'
+        : extension == 'png'
+            ? 'image/png'
+            : 'image/jpeg';
+    final boundary = '----TemenTrip${DateTime.now().microsecondsSinceEpoch}';
+    final safeName = fileName.replaceAll(RegExp(r'[\r\n"]'), '_');
+    final prefix = utf8.encode('--$boundary\r\n'
+        'Content-Disposition: form-data; name="file"; filename="$safeName"\r\n'
+        'Content-Type: $contentType\r\n\r\n');
+    final suffix = utf8.encode('\r\n--$boundary--\r\n');
+    final token = tokenProvider();
+    final client = HttpClient()..connectionTimeout = _timeout;
+    try {
+      final request = await client
+          .postUrl(Uri.parse(
+              '${AppConfig.apiBaseUrl}/public/bookings/${Uri.encodeComponent(bookingCode)}/payment-proof'))
+          .timeout(_timeout);
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.contentTypeHeader,
+          'multipart/form-data; boundary=$boundary');
+      request.contentLength = prefix.length + bytes.length + suffix.length;
+      if (token != null && token.isNotEmpty) {
+        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      }
+      request.add(prefix);
+      request.add(bytes);
+      request.add(suffix);
+      final response = await request.close().timeout(_timeout);
+      final text =
+          await response.transform(utf8.decoder).join().timeout(_timeout);
+      final data = text.isEmpty ? null : jsonDecode(text);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final message = data is Map && data['error'] is String
+            ? data['error'] as String
+            : 'Bukti transfer belum dapat dikirim.';
+        throw ApiException(message, response.statusCode);
+      }
+      return Booking.fromJson(_asMap(data));
+    } on ApiException {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiException(
+          'Permintaan terlalu lama. Silakan coba lagi.', 0);
+    } catch (_) {
+      throw const ApiException('Tidak dapat mengirim bukti transfer.', 0);
+    } finally {
+      client.close(force: true);
+    }
   }
 }

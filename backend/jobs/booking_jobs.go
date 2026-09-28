@@ -16,10 +16,8 @@ import (
 
 // ExpirePendingBookings menutup booking yang tidak dibayar dalam 24 jam.
 //
-// Sebelum mengedaluwarsakan, status invoice dipastikan dulu ke payment gateway.
-// Status pembayaran sebelumnya hanya bergantung pada webhook; bila webhook hilang
-// permanen, booking yang sudah dibayar pelanggan ikut dikedaluwarsakan padahal
-// dananya sudah diterima.
+// Booking yang sudah mengunggah bukti berstatus PAYMENT_REVIEW sehingga tidak
+// ikut dilepas ketika batas transfer berakhir.
 func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 	cutoff := time.Now().Add(-models.PaymentWindow)
 	var candidates []models.Booking
@@ -30,21 +28,10 @@ func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 		return
 	}
 
-	expired, settled, deferred := 0, 0, 0
+	expired := 0
 	for _, candidate := range candidates {
 		if ctx.Err() != nil {
 			return
-		}
-
-		// Jaring pengaman: booking yang ternyata sudah dibayar diselesaikan,
-		// bukan dikedaluwarsakan.
-		switch r.checkInvoiceBeforeExpiry(candidate) {
-		case invoiceSettled:
-			settled++
-			continue
-		case invoiceUnverified:
-			deferred++
-			continue
 		}
 
 		if err := r.container.BookingService.ExpirePendingBooking(candidate.ID, cutoff); err != nil {
@@ -58,12 +45,6 @@ func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 
 	if expired > 0 {
 		log.Printf("[Auto Expire] %d booking kedaluwarsa dan kuota dilepas.", expired)
-	}
-	if settled > 0 {
-		log.Printf("[Auto Expire] %d booking diselesaikan: pembayaran terkonfirmasi ke gateway meski webhook tidak diterima.", settled)
-	}
-	if deferred > 0 {
-		log.Printf("[Auto Expire] %d booking ditunda: status pembayaran belum dapat dipastikan ke gateway. Perlu diperiksa bila berulang.", deferred)
 	}
 }
 
