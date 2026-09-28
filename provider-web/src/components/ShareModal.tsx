@@ -28,7 +28,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
   };
 
   const handleWhatsAppShare = () => {
-    const text = `Halo! Cek paket wisata "${pkg.name}" di TripKita!\n\n📍 Destinasi: ${pkg.destination || 'Indonesia'}\n💰 Harga: Rp ${(pkg.price || 0).toLocaleString('id-ID')} / orang\n\nLihat detail paket selengkapnya di sini:\n${shareUrl}`;
+    const text = `Halo! Cek paket wisata "${pkg.name}" di TemenTrip!\n\n📍 Destinasi: ${pkg.destination || 'Indonesia'}\n💰 Harga: Rp ${(pkg.price || 0).toLocaleString('id-ID')} / orang\n\nLihat detail paket selengkapnya di sini:\n${shareUrl}`;
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
   };

@@ -182,3 +182,14 @@ func TestAutomaticPayoutIsOffByDefault(t *testing.T) {
 		t.Error("ENABLE_AUTOMATIC_PAYOUT harus default false")
 	}
 }
+
+func TestManualPaymentAccountRequiresBankAndHolder(t *testing.T) {
+	_, err := loadWith(t, map[string]string{
+		"APP_ENV": "development", "DB_HOST": "localhost", "DB_USER": "u", "DB_PASSWORD": "p", "DB_NAME": "d",
+		"JWT_SECRET":                    "9f2b7c41ae6d05938bd14c7ea2f6091d",
+		"MANUAL_PAYMENT_ACCOUNT_NUMBER": "1234567890",
+	})
+	if err == nil || !strings.Contains(err.Error(), "MANUAL_PAYMENT_BANK_NAME") {
+		t.Fatalf("rekening tanpa nama bank seharusnya ditolak, dapat %v", err)
+	}
+}

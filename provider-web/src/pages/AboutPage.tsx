@@ -536,13 +536,23 @@ export const AboutPage: React.FC = () => {
         }
 
         @media (max-width: 900px) {
-          .unified-team-grid {
+          .unified-team-grid,
+          .values-grid {
             grid-template-columns: repeat(2, 1fr);
+          }
+          .intro-container,
+          .vision-mission-grid {
+            grid-template-columns: 1fr;
+            gap: 24px;
+          }
+          .intro-media img {
+            max-width: 100%;
           }
         }
 
         @media (max-width: 600px) {
-          .unified-team-grid {
+          .unified-team-grid,
+          .values-grid {
             grid-template-columns: 1fr;
           }
         }

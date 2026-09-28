@@ -50,6 +50,12 @@ func MigrateLegacyPackagePhotos(db *gorm.DB, uploadDir string) error {
 			return done
 		}
 		newPath, err := copyLegacyPhoto(db, uploadDir, filename)
+		var keep *keepPhotoError
+		if errors.As(err, &keep) {
+			log.Printf("[Migrasi Foto] %s dibiarkan: %v", filename, err)
+			converted[filename] = ref
+			return ref
+		}
 		if err != nil {
 			var skip *skipPhotoError
 			if !errors.As(err, &skip) {
@@ -102,6 +108,12 @@ type skipPhotoError struct{ reason string }
 
 func (e *skipPhotoError) Error() string { return e.reason }
 
+// keepPhotoError menandai foto lama yang belum dapat dipindahkan sekarang;
+// referensinya dipertahankan dan dicoba lagi pada startup berikutnya.
+type keepPhotoError struct{ reason string }
+
+func (e *keepPhotoError) Error() string { return e.reason }
+
 func copyLegacyPhoto(db *gorm.DB, uploadDir, filename string) (string, error) {
 	documentPath := "/uploads/" + filename
 	var privateCount int64
@@ -124,7 +136,9 @@ func copyLegacyPhoto(db *gorm.DB, uploadDir, filename string) (string, error) {
 
 	source, err := os.Open(filepath.Join(uploadDir, filename))
 	if errors.Is(err, os.ErrNotExist) {
-		return "", &skipPhotoError{"berkas tidak ada di penyimpanan"}
+		// Bisa jadi volume belum terpasang atau UPLOAD_DIR salah: jangan hapus
+		// referensi secara permanen, cukup lewati sampai berkasnya tersedia.
+		return "", &keepPhotoError{"berkas tidak ada di penyimpanan"}
 	}
 	if err != nil {
 		return "", err

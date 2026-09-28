@@ -47,6 +47,16 @@ export function getRouteFromHash(): Route {
   return 'beranda';
 }
 
+// Halaman masuk/daftar tidak pernah menjadi tujuan setelah login; bila
+// tersimpan (mis. saat guard berjalan di tengah logout) pengguna akan tertahan
+// di form login walau sudah masuk.
+const AUTH_HASH_PREFIXES = ['#/provider/login', '#/provider-login', '#/provider/register', '#/admin/login', '#/masuk', '#/customer-register', '#/daftar'];
+export function isReturnableHash(hash: string | null | undefined): hash is string {
+  if (!hash || !hash.startsWith('#/') || hash.startsWith('#//')) return false;
+  if (hash === '#/' || hash === '#') return false;
+  return !AUTH_HASH_PREFIXES.some((prefix) => hash.startsWith(prefix));
+}
+
 export function getHashFromRoute(r: Route): string {
   switch (r) {
     case 'dashboard': return '#/provider/dashboard';
@@ -457,7 +467,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     sessionStorage.removeItem('tementrip_auth_return_to');
 
     // Tujuan harus route internal dan harus sesuai area role pengguna.
-    if (returnHash?.startsWith('#/') && !returnHash.startsWith('#//')) {
+    if (isReturnableHash(returnHash)) {
       const isProviderDestination = returnHash.startsWith('#/provider/');
       const isAdminDestination = returnHash.startsWith('#/admin/');
       const providerIsOperational = profile.status === 'APPROVED' && profile.isVerified;

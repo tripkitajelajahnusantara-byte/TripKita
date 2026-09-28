@@ -60,13 +60,25 @@ function toStoredPhotoPath(raw: string): string {
   if (!trimmed) return '';
   try {
     const parsed = new URL(trimmed);
-    if (['localhost', '127.0.0.1', '0.0.0.0'].includes(parsed.hostname) && parsed.pathname.startsWith('/uploads/')) {
+    // Foto paket publik disimpan relatif, apa pun host yang dulu tercatat.
+    if (/^\/uploads\/pkg_[0-9a-f]{32}\.(jpg|png)$/.test(parsed.pathname)) {
+      return parsed.pathname;
+    }
+    if (['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'].includes(parsed.hostname) && parsed.pathname.startsWith('/uploads/')) {
       return parsed.pathname;
     }
   } catch {
     // Bukan URL absolut: sudah berupa path.
   }
   return trimmed;
+}
+
+// Hanya referensi yang diterima backend saat simpan: foto paket publik
+// ("/uploads/pkg_...") atau URL HTTPS eksternal. Sisa data lama (teks bukan
+// URL, http://, dokumen "doc_") dibuang agar paket tetap dapat disimpan.
+function isSavablePhotoRef(ref: string): boolean {
+  if (/^\/uploads\/pkg_[0-9a-f]{32}\.(jpg|png)$/.test(ref)) return true;
+  return /^https:\/\//i.test(ref) && !ref.includes('/uploads/doc_');
 }
 
 export const AddPackagePage: React.FC = () => {
@@ -222,12 +234,18 @@ export const AddPackagePage: React.FC = () => {
               // ignore
             }
           }
-          if (pkg.images) {
-            const splitImgs = pkg.images.split(',').map(toStoredPhotoPath).filter(Boolean);
-            if (splitImgs.length > 0) setPackagePhotos(splitImgs);
-          } else if (pkg.image) {
-            const single = toStoredPhotoPath(pkg.image);
-            if (single) setPackagePhotos([single]);
+          const rawPhotos: string[] = (pkg.images ? pkg.images.split(',') : [pkg.image || ''])
+            .map(toStoredPhotoPath)
+            .filter(Boolean);
+          const savablePhotos = rawPhotos.filter(isSavablePhotoRef);
+          if (savablePhotos.length > 0) setPackagePhotos(savablePhotos);
+          const droppedPhotos = rawPhotos.length - savablePhotos.length;
+          if (droppedPhotos > 0) {
+            showAlert({
+              title: 'Sebagian Foto Perlu Diunggah Ulang',
+              message: `${droppedPhotos} foto lama pada paket ini tidak lagi valid dan tidak ditampilkan. Unggah ulang foto tersebut di langkah Foto sebelum menyimpan.`,
+              type: 'warning',
+            });
           }
           setPackageLoadError('');
         } catch (err: any) {
@@ -650,7 +668,7 @@ export const AddPackagePage: React.FC = () => {
               <Sparkles size={18} className="tips-icon" />
               <div>
                 <strong>Tips Paket Populer</strong>
-                <p>Tambahkan minimal 5 foto berkualitas tinggi untuk meningkatkan booking hingga 3x lipat.</p>
+                <p>Unggah minimal 3 foto asli yang terang dan jelas (disarankan 5 atau lebih). Foto pertama menjadi sampul paket.</p>
               </div>
             </div>
           </div>

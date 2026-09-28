@@ -110,6 +110,9 @@ class Booking {
   final DateTime? paymentReviewDeadline;
   final String paymentReviewNotes;
   final DateTime? createdAt;
+
+  /// Batas bayar dari server; dapat diperpanjang setelah bukti ditolak admin.
+  final DateTime? serverPaymentDeadline;
   final String providerWhatsApp;
   final String providerName;
   final DateTime? rescheduleDate;
@@ -132,6 +135,7 @@ class Booking {
     this.paymentReviewDeadline,
     this.paymentReviewNotes = '',
     this.createdAt,
+    this.serverPaymentDeadline,
     this.providerWhatsApp = '',
     this.providerName = '',
     this.rescheduleDate,
@@ -173,6 +177,7 @@ class Booking {
       paymentReviewDeadline: asDate(json['paymentReviewDeadline']),
       paymentReviewNotes: asString(json['paymentReviewNotes']),
       createdAt: asDate(json['createdAt']),
+      serverPaymentDeadline: asDate(json['paymentDeadline']),
       providerWhatsApp: asString(json['providerWhatsApp']),
       providerName: asString(json['providerName']),
       rescheduleDate: asDate(json['rescheduleDate']),
@@ -187,6 +192,7 @@ class Booking {
           : 'Paket Wisata Nusantara');
 
   DateTime? get paymentDeadline =>
+      serverPaymentDeadline ??
       createdAt?.add(CheckoutConfig.currentPaymentWindow);
 
   /// Transfer dan upload bukti berlaku 24 jam; setelah itu pesanan dianggap kedaluwarsa

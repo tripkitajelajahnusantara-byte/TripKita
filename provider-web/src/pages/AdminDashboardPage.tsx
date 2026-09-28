@@ -225,6 +225,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [paymentReviewError, setPaymentReviewError] = useState('');
   const [proofPreview, setProofPreview] = useState<{ url: string; isPdf: boolean } | null>(null);
   const [proofPreviewLoading, setProofPreviewLoading] = useState(false);
+  const proofRequestRef = React.useRef(0);
 
   // Admin Payout States
   const [adminPayouts, setAdminPayouts] = useState<any[]>([]);
@@ -381,8 +382,11 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const closePaymentReview = () => {
+    // Batalkan respons pratinjau yang masih berjalan agar tidak muncul di modal berikutnya.
+    proofRequestRef.current += 1;
     if (proofPreview) URL.revokeObjectURL(proofPreview.url);
     setProofPreview(null);
+    setProofPreviewLoading(false);
     setPaymentReviewTarget(null);
     setPaymentReviewNotes('');
     setPaymentReviewError('');
@@ -393,16 +397,22 @@ export const AdminDashboardPage: React.FC = () => {
     setPaymentReviewTarget({ booking, decision });
     setPaymentReviewNotes('');
     setPaymentReviewError('');
+    if (proofPreview) URL.revokeObjectURL(proofPreview.url);
     setProofPreview(null);
+    const requestId = ++proofRequestRef.current;
     if (!booking.paymentProof) return;
     setProofPreviewLoading(true);
     try {
       const url = await getProtectedDocumentURL('admin', booking.paymentProof);
+      if (requestId !== proofRequestRef.current) {
+        URL.revokeObjectURL(url);
+        return;
+      }
       setProofPreview({ url, isPdf: /\.pdf$/i.test(booking.paymentProof) });
     } catch (err: any) {
-      setPaymentReviewError(err.message || 'Bukti transfer tidak dapat dimuat.');
+      if (requestId === proofRequestRef.current) setPaymentReviewError(err.message || 'Bukti transfer tidak dapat dimuat.');
     } finally {
-      setProofPreviewLoading(false);
+      if (requestId === proofRequestRef.current) setProofPreviewLoading(false);
     }
   };
 
@@ -1010,7 +1020,7 @@ export const AdminDashboardPage: React.FC = () => {
                   ? 'Verifikasi Pembayaran Manual'
                   : activeView === 'pencairan-provider'
                   ? 'Pengajuan Pencairan Dana Provider (Payouts)'
-                  : 'Provider Verification Center'}
+                  : 'Pusat Verifikasi Mitra'}
               </h1>
               <p>
                 {activeView === 'administrasi-refund' 
@@ -1019,7 +1029,7 @@ export const AdminDashboardPage: React.FC = () => {
                   ? 'Verifikasi bukti transfer manual maksimal 1×24 jam. Booking baru tampil ke provider setelah pembayaran disetujui admin.'
                   : activeView === 'pencairan-provider'
                   ? 'Kelola pengajuan pencairan saldo DP 50% & pelunasan dari mitra provider.'
-                  : 'Kelola dan verifikasi semua provider yang terdaftar di TripKita.'}
+                  : 'Kelola dan verifikasi semua mitra yang terdaftar di TemenTrip.'}
               </p>
             </div>
 
@@ -1032,7 +1042,7 @@ export const AdminDashboardPage: React.FC = () => {
               <div className="dashboard-view-panel">
                 <div style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '32px', textAlign: 'center' }}>
                   <Building size={48} color="#3b82f6" style={{ marginBottom: '16px' }} />
-                  <h2>Ringkasan Platform TripKita</h2>
+                  <h2>Ringkasan Platform TemenTrip</h2>
                   <p style={{ color: 'var(--color-text-medium)', maxWidth: '500px', margin: '8px auto 24px' }}>
                     Gunakan menu "Kelola Provider" untuk memverifikasi dokumen kelayakan provider baru atau "Administrasi Refund" untuk memproses refund dana.
                   </p>
@@ -3278,7 +3288,13 @@ export const AdminDashboardPage: React.FC = () => {
 
         @media (max-width: 900px) {
           .admin-layout {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
+          }
+
+          .admin-sidebar,
+          .admin-main-wrapper {
+            min-width: 0;
+            max-width: 100vw;
           }
 
           .admin-sidebar {

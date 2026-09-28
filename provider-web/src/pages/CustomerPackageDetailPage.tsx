@@ -172,6 +172,16 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const [customEndDate, setCustomEndDate] = useState<string>(customStartDate);
 
+  // Saat paket dimuat belakangan (refresh / tautan ?id=), tanggal default
+  // dihitung ulang dari periode paket yang sebenarnya.
+  useEffect(() => {
+    if (!pkg.id) return;
+    const initialDate = pkg.bookingDate && pkg.bookingDate.length === 10 && pkg.bookingDate >= periodMinDateIso ? pkg.bookingDate : periodMinDateIso;
+    setCustomStartDate(initialDate);
+    setCustomEndDate(initialDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pkg.id]);
+
   const currentPkgBookedDates: string[] = Array.isArray(pkg.bookedDates) && pkg.bookedDates.length > 0
     ? pkg.bookedDates
     : [];
@@ -218,19 +228,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
   // Hanya foto asli yang diunggah mitra; tidak ada foto stok pengganti
   const getGalleryImages = (): string[] => getTripImages(pkg as any);
 
-  const photos = (() => {
-    let images: string[] = [];
-    if (typeof pkg.images === 'string' && pkg.images.trim()) {
-      images = pkg.images.split(',').map((img: string) => img.trim()).filter(Boolean);
-    }
-    if (images.length === 0 && pkg.image) {
-      images = [pkg.image];
-    }
-    if (images.length === 0) {
-      images = getGalleryImages();
-    }
-    return images;
-  })();
+  // URL di-resolve ke origin backend (dan host lokal lama diarahkan ulang).
+  const photos = getGalleryImages();
 
   // Add-on dinonaktifkan sampai katalog dan harga dikelola dari database.
   const addOnsList: AddOn[] = [];

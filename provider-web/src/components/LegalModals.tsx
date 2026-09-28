@@ -248,7 +248,7 @@ export const GeneralTermsContent: React.FC<RefundPolicyProps> = ({ cancellationR
       <ul style={{ paddingLeft: '20px', margin: 0 }}>
         <li><strong>TripKita:</strong> Platform digital beserta pengelola dan sistem pendukungnya.</li>
         <li><strong>Customer:</strong> Pengguna yang mencari, memesan, atau menggunakan layanan perjalanan melalui TripKita.</li>
-        <li><strong>Provider:</strong> Pihak penyedia layanan perjalanan yang terdaftar di TripKita.</li>
+        <li><strong>Provider:</strong> Pihak penyedia layanan perjalanan yang terdaftar di TemenTrip.</li>
         <li><strong>Platform:</strong> Situs web, aplikasi, dan sarana digital lain milik TemenTrip / TripKita.</li>
         <li><strong>Booking:</strong> Pemesanan layanan perjalanan yang dilakukan melalui Platform.</li>
         <li><strong>Force Majeure:</strong> Keadaan darurat di luar kendali wajar para pihak (bencana alam, cuaca ekstrem, dll).</li>

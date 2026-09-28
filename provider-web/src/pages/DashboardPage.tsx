@@ -154,7 +154,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
             <div className="card-bottom">
-              <h3>{stats ? stats.totalPackages : '...'}</h3>
+              <h3>{stats ? stats.totalPackages : (isLoading ? '...' : '–')}</h3>
               <p>Total Paket</p>
             </div>
           </div>
@@ -166,7 +166,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
             <div className="card-bottom">
-              <h3>{stats ? stats.totalBookings : '...'}</h3>
+              <h3>{stats ? stats.totalBookings : (isLoading ? '...' : '–')}</h3>
               <p>Total Booking</p>
             </div>
           </div>
@@ -178,7 +178,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
             <div className="card-bottom">
-              <h3>{stats ? stats.completedBookings : '...'}</h3>
+              <h3>{stats ? stats.completedBookings : (isLoading ? '...' : '–')}</h3>
               <p>Booking Selesai</p>
             </div>
           </div>
@@ -191,7 +191,7 @@ export const DashboardPage: React.FC = () => {
             </div>
             <div className="card-bottom">
               <h3 style={{ fontSize: '15px' }}>
-                {stats ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(stats.totalRevenue) : 'Rp ...'}
+                {stats ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(stats.totalRevenue) : (isLoading ? 'Rp ...' : '–')}
               </h3>
               <p>Total Pendapatan (Kotor)</p>
             </div>
@@ -204,7 +204,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
             <div className="card-bottom">
-              <h3>{stats ? (Number(stats.rating) > 0 ? Number(stats.rating).toFixed(1) : '–') : '...'}</h3>
+              <h3>{stats ? (Number(stats.rating) > 0 ? Number(stats.rating).toFixed(1) : '–') : (isLoading ? '...' : '–')}</h3>
               <p>{stats && !(Number(stats.rating) > 0) ? 'Rating (belum ada ulasan)' : 'Rating Provider'}</p>
             </div>
           </div>
@@ -361,7 +361,7 @@ export const DashboardPage: React.FC = () => {
                   <div>
                     <span className="rev-label">Total Pendapatan</span>
                     <span className="rev-amount">
-                      {stats ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(stats.totalRevenue) : 'Rp 0'}
+                      {stats ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(stats.totalRevenue) : '–'}
                     </span>
                   </div>
                   <span className="rev-trend positive">

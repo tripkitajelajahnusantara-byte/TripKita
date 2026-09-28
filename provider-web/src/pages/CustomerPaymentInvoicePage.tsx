@@ -166,8 +166,8 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
     return (
       <main style={{ minHeight: '65vh', display: 'grid', placeItems: 'center', padding: '32px 16px' }}>
         <section style={{ textAlign: 'center', maxWidth: 420 }}>
-          <h1 style={{ fontSize: 22 }}>Data pembayaran tidak ditemukan</h1>
-          <p style={{ color: '#64748b' }}>Buka Cek Booking, cari kode booking Anda, lalu pilih <strong>Selesaikan Pembayaran</strong>.</p>
+          <h1 style={{ fontSize: 22, margin: '0 0 8px' }}>Data pembayaran tidak ditemukan</h1>
+          <p style={{ color: '#64748b', margin: '0 0 20px', lineHeight: 1.6 }}>Buka Cek Booking, cari kode booking Anda, lalu pilih <strong>Selesaikan Pembayaran</strong>.</p>
           <button type="button" className="btn btn-primary" onClick={() => navigateTo('riwayat-booking')}>Buka Cek Booking</button>
         </section>
       </main>
@@ -180,8 +180,8 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
         <section style={{ textAlign: 'center', maxWidth: 420 }}>
           {statusLoadError ? (
             <>
-              <h1 style={{ fontSize: 22 }}>Tagihan belum dapat dibuka</h1>
-              <p style={{ color: '#64748b' }}>{statusLoadError}</p>
+              <h1 style={{ fontSize: 22, margin: '0 0 8px' }}>Tagihan belum dapat dibuka</h1>
+              <p style={{ color: '#64748b', margin: '0 0 20px', lineHeight: 1.6 }}>{statusLoadError}</p>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button type="button" className="btn btn-outline" onClick={() => refreshStatus()}>Coba Lagi</button>
                 <button type="button" className="btn btn-primary" onClick={() => navigateTo('riwayat-booking')}>Buka Cek Booking</button>

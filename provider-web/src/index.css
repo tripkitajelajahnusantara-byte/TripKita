@@ -905,8 +905,15 @@ button {
 }
 
 @media (max-width: 768px) {
+  /* minmax(0, 1fr): tanpa ini kolom melebar mengikuti menu sidebar yang
+     nowrap sehingga seluruh halaman dapat digeser horizontal di ponsel. */
   .dashboard-layout {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .dashboard-sidebar,
+  .dashboard-main {
+    min-width: 0;
+    max-width: 100vw;
   }
   .dashboard-sidebar {
     display: flex !important;
@@ -2682,9 +2689,13 @@ button[aria-busy="true"] {
     gap: 12px !important;
   }
 
+  /* Hanya padding vertikal yang diseragamkan: padding kiri/kanan milik input
+     berikon (mis. email/sandi) tidak boleh ditimpa. 16px mencegah iOS zoom
+     otomatis saat input difokus. */
   input, select, textarea {
-    font-size: 14px !important;
-    padding: 12px 14px !important;
+    font-size: 16px !important;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
   }
 
   /* Modals & Popups Mobile Responsiveness */
@@ -2754,3 +2765,63 @@ button[aria-busy="true"] {
 
 
 
+
+/* Tombol generik untuk layar status sederhana (kosong, error, pengalihan). */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.btn-primary { background: #0284c7; color: #ffffff; }
+.btn-primary:hover:not(:disabled) { background: #0369a1; }
+.btn-outline { background: #ffffff; color: #0369a1; border-color: #bae6fd; }
+.btn-outline:hover:not(:disabled) { background: #f0f9ff; border-color: #7dd3fc; }
+
+/* Kerangka halaman customer: footer selalu di dasar layar walau konten pendek
+   (layar kosong/error/tidak ditemukan), tanpa area kosong di bawah footer. */
+.app-wrapper {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.app-wrapper > * {
+  flex-shrink: 0;
+  /* Anak dengan margin auto tetap selebar layout blok biasa (dibatasi max-width). */
+  width: 100%;
+}
+.app-wrapper > .site-footer {
+  margin-top: auto;
+}
+
+/* Baris filter tabel (Kelola Paket, Booking) di ponsel: pencarian selebar
+   penuh, dropdown & jumlah hasil di baris berikutnya. */
+@media (max-width: 640px) {
+  .filters-row-bar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .filters-row-bar .search-field {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .filters-row-bar .status-dropdown {
+    flex: 1 1 auto;
+  }
+  .filters-row-bar .search-field input {
+    padding: 0 !important;
+  }
+}

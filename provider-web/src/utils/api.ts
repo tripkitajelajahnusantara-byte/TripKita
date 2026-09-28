@@ -241,6 +241,14 @@ export async function request(endpoint: string, options: RequestInit = {}) {
     );
   }
 
+  // Respons HTML berarti request tidak sampai ke API (mis. VITE_API_BASE_URL
+  // kosong sehingga /api/v1 dilayani SPA). Gagal dengan jelas, jangan diam-diam
+  // dianggap data kosong.
+  const contentType = response.headers.get('Content-Type') || '';
+  if (contentType.includes('text/html')) {
+    console.error(`[API] ${API_BASE_URL}${endpoint} mengembalikan HTML; periksa konfigurasi VITE_API_BASE_URL.`);
+    throw new ApiError('Server tidak dapat dihubungi dengan benar. Silakan coba lagi nanti.', response.status, response.headers.get('X-Request-ID'));
+  }
   return response.json().catch(() => ({}));
 }
 

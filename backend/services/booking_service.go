@@ -103,7 +103,7 @@ func (s *bookingService) checkAutoExpire(booking *models.Booking) {
 	var expired models.Booking
 	changed := false
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&expired, booking.ID).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Package").First(&expired, booking.ID).Error; err != nil {
 			return err
 		}
 		if expired.Status != "PENDING_PAYMENT" || expired.CreatedAt.IsZero() || time.Now().Before(models.PaymentDeadline(&expired)) {
@@ -584,6 +584,9 @@ func (s *bookingService) SubmitPaymentProof(bookingID uint, proofPath string) (*
 			return &BookingInputError{Message: "bukti transfer hanya dapat dikirim untuk booking yang menunggu pembayaran"}
 		}
 		now := time.Now()
+		if !now.Before(paymentAcceptanceEnd(&booking)) {
+			return &BookingInputError{Message: "perjalanan sudah berakhir sehingga pembayaran tidak dapat diterima lagi"}
+		}
 		if booking.CreatedAt.IsZero() || !now.Before(models.PaymentDeadline(&booking)) {
 			booking.Status = models.StatusExpired
 			if err := tx.Save(&booking).Error; err != nil {
@@ -631,8 +634,10 @@ func (s *bookingService) ReviewManualPayment(bookingID uint, adminID uint, req *
 		if req.Decision == "REJECTED" && len([]rune(notes)) < 4 {
 			return &BookingInputError{Message: "alasan penolakan wajib diisi agar customer tahu apa yang harus diperbaiki"}
 		}
-		if req.Decision == "APPROVED" && !booking.TripDate.IsZero() && !now.Before(booking.TripDate) {
-			return &BookingInputError{Message: "tanggal trip sudah lewat; tolak bukti ini dan proses dana yang diterima sebagai refund"}
+		// TripDate tersimpan tengah malam UTC (07.00 WIB), jadi batasnya akhir
+		// perjalanan: pembayaran pagi hari keberangkatan masih dapat disetujui.
+		if req.Decision == "APPROVED" && !now.Before(paymentAcceptanceEnd(&booking)) {
+			return &BookingInputError{Message: "perjalanan sudah berakhir; pembayaran tidak dapat disetujui lagi. Hubungi customer untuk pengembalian dana"}
 		}
 		booking.PaymentReviewedAt = &now
 		booking.PaymentReviewedBy = &adminID
@@ -662,6 +667,15 @@ func (s *bookingService) ReviewManualPayment(bookingID uint, adminID uint, req *
 	}
 	s.sendNotificationsAndEmails(&booking, models.StatusPaymentReview, newStatus)
 	return &booking, nil
+}
+
+// paymentAcceptanceEnd adalah batas terakhir bukti dapat dikirim/disetujui:
+// akhir perjalanan (atau 24 jam setelah tanggal trip untuk data lama).
+func paymentAcceptanceEnd(b *models.Booking) time.Time {
+	if !b.TripEndDate.IsZero() {
+		return b.TripEndDate
+	}
+	return b.TripDate.Add(24 * time.Hour)
 }
 
 var participantNamePattern = regexp.MustCompile(`^[a-zA-Z\s.'-]{3,255}$`)

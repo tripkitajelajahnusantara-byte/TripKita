@@ -45,6 +45,10 @@ func main() {
 		log.Fatalf("Konfigurasi tidak valid: %v", err)
 	}
 
+	if cfg.ManualPaymentAccountNumber == "" {
+		log.Println("[PERINGATAN] MANUAL_PAYMENT_ACCOUNT_NUMBER kosong: checkout customer akan ditolak (503) sampai rekening diisi.")
+	}
+
 	// Ensure uploads directory exists
 	if err := os.MkdirAll(cfg.DocumentUploadDir(), 0750); err != nil {
 		log.Fatalf("Failed to create uploads directory: %v", err)

@@ -54,6 +54,17 @@ export const CustomerConfirmationPage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  // Setelah booking dibuat, data form dikosongkan sementara halaman tagihan
+  // masih dimuat; tampilkan status pengalihan, bukan pesan "tidak ditemukan".
+  if (redirecting) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }} role="status" aria-live="polite">
+        <LoaderCircle size={20} className="btn-spinner" aria-hidden="true" style={{ verticalAlign: 'middle', marginRight: 8 }} />
+        Booking berhasil dibuat. Membuka halaman pembayaran...
+      </div>
+    );
+  }
+
   if (!selectedPackageForDetail || !bookingFormData) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
@@ -376,7 +387,7 @@ export const CustomerConfirmationPage: React.FC = () => {
           {/* Cancellation Policy Banner */}
           <div style={{ backgroundColor: '#f0f9ff', borderRadius: '16px', padding: '16px 20px', border: '1px solid #bae6fd', marginBottom: '16px' }}>
             <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '800', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ShieldCheck size={16} color="#0369a1" /> Kebijakan Pembatalan H-{cancellationRefundDays ?? '—'} TripKita
+              <ShieldCheck size={16} color="#0369a1" /> Kebijakan Pembatalan H-{cancellationRefundDays ?? '—'} TemenTrip
             </h4>
             <p style={{ margin: 0, fontSize: '12px', color: '#0c4a6e', lineHeight: '1.5' }}>
               • Pembatalan <strong>≥ {cancellationRefundDays ?? '—'} hari sebelum trip</strong> berhak pengembalian dana <strong>100% Full Refund</strong>.<br/>
@@ -409,7 +420,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveLegalModal('cancellation'); }}
                   style={{ background: 'none', border: 'none', padding: 0, color: '#0284c7', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
                 >
-                  Kebijakan Pembatalan H-{cancellationRefundDays ?? '—'} TripKita
+                  Kebijakan Pembatalan H-{cancellationRefundDays ?? '—'} TemenTrip
                 </button>
                 . Seluruh data peserta yang diisikan adalah benar.
               </span>

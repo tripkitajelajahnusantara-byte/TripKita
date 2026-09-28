@@ -8,8 +8,8 @@ export const Header: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const handleNav = (targetRoute: 'beranda' | 'tentang-kami' | 'partner-landing' | 'bantuan' | 'riwayat-booking' | 'masuk' | 'pengaturan') => {
-    navigateTo(targetRoute as any);
+  const handleNav = (targetRoute: Parameters<typeof navigateTo>[0]) => {
+    navigateTo(targetRoute);
     setMobileMenuOpen(false);
   };
 
@@ -93,11 +93,12 @@ export const Header: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <NotificationCenter />
                 {providerProfile.role === 'ADMIN' ? (
-                  <button className="masuk-btn" onClick={() => navigateTo('admin-dashboard')}>Admin Panel</button>
+                  <button className="masuk-btn header-desktop-only" onClick={() => navigateTo('admin-dashboard')}>Admin Panel</button>
                 ) : (
-                  <button className="masuk-btn" onClick={() => navigateTo('dashboard')}>Mitra Panel</button>
+                  <button className="masuk-btn header-desktop-only" onClick={() => navigateTo('dashboard')}>Mitra Panel</button>
                 )}
                 <button 
+                  className="header-desktop-only"
                   onClick={logout}
                   style={{ 
                     padding: '7px 16px', 
@@ -115,7 +116,7 @@ export const Header: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <button className="masuk-btn" onClick={() => navigateTo('provider-login')}>Masuk Mitra</button>
+              <button className="masuk-btn header-desktop-only" onClick={() => navigateTo('provider-login')}>Masuk Mitra</button>
             )
           ) : (
             customerProfile ? (
@@ -137,10 +138,10 @@ export const Header: React.FC = () => {
                     }}
                   >
                     <User size={16} color="#0284c7" />
-                    <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0369a1' }}>
+                    <span className="header-user-name" style={{ fontSize: '13.5px', fontWeight: '700', color: '#0369a1' }}>
                       {customerProfile.picName || customerProfile.businessName || customerProfile.email || 'Traveler'}
                     </span>
-                    <ChevronDown size={14} color="#0284c7" />
+                    <ChevronDown size={14} color="#0284c7" className="header-user-name" />
                   </button>
 
                   {showUserMenu && (
@@ -162,7 +163,7 @@ export const Header: React.FC = () => {
                     >
                       <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
                         <span style={{ display: 'block', fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>
-                          {customerProfile.picName || 'Pelanggan TripKita'}
+                          {customerProfile.picName || 'Pelanggan'}
                         </span>
                         <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>
                           {customerProfile.email || ''}
@@ -276,7 +277,13 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Mobile menu trigger */}
-        <button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+        <button
+          type="button"
+          className="mobile-menu-toggle"
+          aria-label={mobileMenuOpen ? 'Tutup menu' : 'Buka menu'}
+          aria-expanded={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
           {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
@@ -317,10 +324,26 @@ export const Header: React.FC = () => {
             </button>
             {customerProfile && (
               <button 
+                className={`mobile-nav-link ${route === 'rencana-trip' ? 'active' : ''}`}
+                onClick={() => handleNav('rencana-trip')}
+              >
+                Rencana Trip
+              </button>
+            )}
+            {customerProfile && (
+              <button 
                 className={`mobile-nav-link ${route === 'pengaturan' ? 'active' : ''}`}
                 onClick={() => handleNav('pengaturan')}
               >
                 Pengaturan (Akun & Favorit)
+              </button>
+            )}
+            {isProviderRoute && providerProfile && (
+              <button
+                className="mobile-nav-link"
+                onClick={() => handleNav(providerProfile.role === 'ADMIN' ? 'admin-dashboard' : 'dashboard')}
+              >
+                {providerProfile.role === 'ADMIN' ? 'Admin Panel' : 'Mitra Panel'}
               </button>
             )}
             <hr className="mobile-divider" />
@@ -539,11 +562,33 @@ export const Header: React.FC = () => {
         }
 
         @media (max-width: 768px) {
-          .desktop-nav, .auth-buttons {
+          .main-nav, .auth-buttons, .header-desktop-only {
+            display: none !important;
+          }
+          .header-user-name {
             display: none;
           }
+          .header-container {
+            gap: 8px;
+          }
+          .header-actions {
+            margin-left: auto;
+          }
           .mobile-menu-toggle {
-            display: block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            flex-shrink: 0;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+          }
+          .mobile-nav-menu {
+            max-height: calc(100dvh - 80px);
+            overflow-y: auto;
+            z-index: 1000;
           }
         }
       `}</style>

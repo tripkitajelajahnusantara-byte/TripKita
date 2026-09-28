@@ -169,6 +169,10 @@ func (c *Config) Validate() error {
 	if c.DatabaseURL == "" && (c.DBHost == "" || c.DBUser == "" || c.DBPass == "" || c.DBName == "") {
 		return fmt.Errorf("konfigurasi database belum lengkap")
 	}
+	if strings.TrimSpace(c.ManualPaymentAccountNumber) != "" &&
+		(strings.TrimSpace(c.ManualPaymentBankName) == "" || strings.TrimSpace(c.ManualPaymentAccountHolder) == "") {
+		return fmt.Errorf("MANUAL_PAYMENT_BANK_NAME dan MANUAL_PAYMENT_ACCOUNT_HOLDER wajib diisi bersama MANUAL_PAYMENT_ACCOUNT_NUMBER")
+	}
 	if !c.IsProduction() {
 		return nil
 	}

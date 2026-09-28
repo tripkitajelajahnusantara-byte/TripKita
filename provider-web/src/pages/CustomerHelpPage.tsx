@@ -114,22 +114,22 @@ export const CustomerHelpPage: React.FC = () => {
       <section className="help-categories-section">
         <div className="container">
           <div className="categories-grid">
-            <div className={`category-card ${activeCategory === 'semua' ? 'active' : ''}`} onClick={() => setActiveCategory('semua')}>
+            <div role="button" tabIndex={0} aria-pressed={activeCategory === 'semua'} className={`category-card ${activeCategory === 'semua' ? 'active' : ''}`} onClick={() => setActiveCategory('semua')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveCategory('semua'); } }}>
               <div className="cat-icon bg-blue"><HelpCircle size={22} color="#0284c7" /></div>
               <h3>Semua Bantuan</h3>
               <p>Tampilkan semua pertanyaan</p>
             </div>
-            <div className={`category-card ${activeCategory === 'pemesanan' ? 'active' : ''}`} onClick={() => setActiveCategory('pemesanan')}>
+            <div role="button" tabIndex={0} aria-pressed={activeCategory === 'pemesanan'} className={`category-card ${activeCategory === 'pemesanan' ? 'active' : ''}`} onClick={() => setActiveCategory('pemesanan')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveCategory('pemesanan'); } }}>
               <div className="cat-icon bg-teal"><Calendar size={22} color="#00c9a7" /></div>
               <h3>Pemesanan</h3>
               <p>Cara booking & cek voucher</p>
             </div>
-            <div className={`category-card ${activeCategory === 'pembayaran' ? 'active' : ''}`} onClick={() => setActiveCategory('pembayaran')}>
+            <div role="button" tabIndex={0} aria-pressed={activeCategory === 'pembayaran'} className={`category-card ${activeCategory === 'pembayaran' ? 'active' : ''}`} onClick={() => setActiveCategory('pembayaran')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveCategory('pembayaran'); } }}>
               <div className="cat-icon bg-purple"><CreditCard size={22} color="#8b5cf6" /></div>
               <h3>Pembayaran</h3>
               <p>Transfer manual & upload bukti</p>
             </div>
-            <div className={`category-card ${activeCategory === 'refund' ? 'active' : ''}`} onClick={() => setActiveCategory('refund')}>
+            <div role="button" tabIndex={0} aria-pressed={activeCategory === 'refund'} className={`category-card ${activeCategory === 'refund' ? 'active' : ''}`} onClick={() => setActiveCategory('refund')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveCategory('refund'); } }}>
               <div className="cat-icon bg-green"><ShieldCheck size={22} color="#10b981" /></div>
               <h3>Pembatalan & refund</h3>
               <p>Aturan refund dan jadwal ulang</p>
@@ -523,7 +523,14 @@ export const CustomerHelpPage: React.FC = () => {
 
         @media (max-width: 540px) {
           .categories-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+          }
+          .category-card {
+            padding: 14px !important;
+          }
+          .category-card p {
+            display: none;
           }
         }
       `}</style>
