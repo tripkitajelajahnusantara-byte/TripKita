@@ -45,7 +45,8 @@ func (s *bookingService) ExpirePendingBooking(id uint, cutoff time.Time) error {
 	changed := false
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Package").
-			Where("id = ? AND status = ? AND created_at < ?", id, models.StatusPendingPayment, cutoff).
+			Where("id = ? AND status = ? AND created_at < ? AND (payment_reviewed_at IS NULL OR payment_reviewed_at < ?)",
+				id, models.StatusPendingPayment, cutoff, time.Now().Add(-models.RejectedProofReuploadWindow)).
 			First(&booking).Error; err != nil {
 			return err
 		}
@@ -95,7 +96,7 @@ func (s *bookingService) checkAutoExpire(booking *models.Booking) {
 	if booking == nil || database.DB == nil {
 		return
 	}
-	if booking.Status != "PENDING_PAYMENT" || booking.CreatedAt.IsZero() || time.Since(booking.CreatedAt) <= models.PaymentWindow {
+	if booking.Status != "PENDING_PAYMENT" || booking.CreatedAt.IsZero() || time.Now().Before(models.PaymentDeadline(booking)) {
 		return
 	}
 
@@ -105,7 +106,7 @@ func (s *bookingService) checkAutoExpire(booking *models.Booking) {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&expired, booking.ID).Error; err != nil {
 			return err
 		}
-		if expired.Status != "PENDING_PAYMENT" || expired.CreatedAt.IsZero() || time.Since(expired.CreatedAt) <= models.PaymentWindow {
+		if expired.Status != "PENDING_PAYMENT" || expired.CreatedAt.IsZero() || time.Now().Before(models.PaymentDeadline(&expired)) {
 			return nil
 		}
 		expired.Status = "EXPIRED"
@@ -329,6 +330,10 @@ func creditAvailableBalanceTx(tx *gorm.DB, providerID uint, amount, heldReductio
 	return nil
 }
 
+// Customer mungkin sudah mentransfer; membatalkan saat bukti diperiksa akan
+// menghasilkan refund 0 padahal dana bisa jadi sudah diterima.
+var errPaymentUnderReview = errors.New("bukti transfer sedang diperiksa admin. Pembatalan dapat diajukan setelah pembayaran diverifikasi")
+
 func validateProviderStatusTransition(current, next string, tripEndDate time.Time, now time.Time) error {
 	switch next {
 	case "CONFIRMED":
@@ -339,11 +344,16 @@ func validateProviderStatusTransition(current, next string, tripEndDate time.Tim
 		// RESCHEDULE_OFFERED ikut diizinkan: tawaran jadwal pengganti yang
 		// ditolak pelanggan atau tidak dijawab sampai tanggal berangkat harus
 		// dapat dialihkan ke proses pengembalian dana.
-		if current != "PENDING_PAYMENT" && current != models.StatusPaymentReview && current != "PAID" && current != "CONFIRMED" && current != models.StatusRescheduleOffered {
+		// Booking yang belum terverifikasi dibayar tidak terlihat oleh provider
+		// dan tidak boleh ia batalkan.
+		if current != "PAID" && current != "CONFIRMED" && current != models.StatusRescheduleOffered {
 			return fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", current)
 		}
 	case "CANCELLED_BY_CUSTOMER":
-		if current != "PENDING_PAYMENT" && current != models.StatusPaymentReview && current != "PAID" && current != "CONFIRMED" {
+		if current == models.StatusPaymentReview {
+			return errPaymentUnderReview
+		}
+		if current != "PENDING_PAYMENT" && current != "PAID" && current != "CONFIRMED" {
 			return fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", current)
 		}
 	case "RESCHEDULE_OFFERED":
@@ -371,7 +381,10 @@ func (s *bookingService) CancelBookingByCustomer(id uint, customerID uint) (*mod
 	if err := database.DB.Where("id = ? AND customer_id = ?", id, customerID).First(&booking).Error; err != nil {
 		return nil, fmt.Errorf("booking tidak ditemukan")
 	}
-	if booking.Status != "PENDING_PAYMENT" && booking.Status != models.StatusPaymentReview && booking.Status != "PAID" && booking.Status != "CONFIRMED" {
+	if booking.Status == models.StatusPaymentReview {
+		return nil, errPaymentUnderReview
+	}
+	if booking.Status != "PENDING_PAYMENT" && booking.Status != "PAID" && booking.Status != "CONFIRMED" {
 		return nil, fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", booking.Status)
 	}
 	return s.UpdateBookingStatus(booking.ID, booking.ProviderID, "CANCELLED_BY_CUSTOMER")
@@ -551,6 +564,7 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		return err
 	}
 
+	s.sendNotificationsAndEmails(booking, "", models.StatusPendingPayment)
 	return nil
 }
 
@@ -570,7 +584,7 @@ func (s *bookingService) SubmitPaymentProof(bookingID uint, proofPath string) (*
 			return &BookingInputError{Message: "bukti transfer hanya dapat dikirim untuk booking yang menunggu pembayaran"}
 		}
 		now := time.Now()
-		if booking.CreatedAt.IsZero() || !now.Before(booking.CreatedAt.Add(models.PaymentWindow)) {
+		if booking.CreatedAt.IsZero() || !now.Before(models.PaymentDeadline(&booking)) {
 			booking.Status = models.StatusExpired
 			if err := tx.Save(&booking).Error; err != nil {
 				return err
@@ -613,9 +627,16 @@ func (s *bookingService) ReviewManualPayment(bookingID uint, adminID uint, req *
 			return &BookingInputError{Message: "booking tidak sedang menunggu konfirmasi pembayaran"}
 		}
 		now := time.Now()
+		notes := strings.TrimSpace(req.Notes)
+		if req.Decision == "REJECTED" && len([]rune(notes)) < 4 {
+			return &BookingInputError{Message: "alasan penolakan wajib diisi agar customer tahu apa yang harus diperbaiki"}
+		}
+		if req.Decision == "APPROVED" && !booking.TripDate.IsZero() && !now.Before(booking.TripDate) {
+			return &BookingInputError{Message: "tanggal trip sudah lewat; tolak bukti ini dan proses dana yang diterima sebagai refund"}
+		}
 		booking.PaymentReviewedAt = &now
 		booking.PaymentReviewedBy = &adminID
-		booking.PaymentReviewNotes = strings.TrimSpace(req.Notes)
+		booking.PaymentReviewNotes = notes
 
 		if req.Decision == "APPROVED" {
 			booking.Status = models.StatusPaid
@@ -624,9 +645,9 @@ func (s *bookingService) ReviewManualPayment(bookingID uint, adminID uint, req *
 			if err := recordFinanceOnPaymentTx(tx, &booking); err != nil {
 				return err
 			}
-		} else if !now.Before(booking.CreatedAt.Add(models.PaymentWindow)) {
-			booking.Status = models.StatusExpired
 		} else {
+			// PaymentReviewedAt yang baru diisi memperpanjang batas bayar minimal
+			// RejectedProofReuploadWindow (lihat models.PaymentDeadline).
 			booking.Status = models.StatusPendingPayment
 			booking.PaymentReviewDeadline = nil
 		}
@@ -1038,12 +1059,24 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 			notifType = NotifTypePayment
 			title = "Bukti Pembayaran Dikirim"
 			msgCustomer = fmt.Sprintf("Bukti transfer pesanan #%s (%s) sudah diterima dan menunggu konfirmasi admin maksimal 1×24 jam.", b.BookingCode, packageName)
+			if s.emailService != nil {
+				sendEmail(s.emailService.SendPaymentProofReceivedEmail(&b))
+			}
 
 		case models.StatusPendingPayment:
+			notifType = NotifTypePayment
 			if oldS == models.StatusPaymentReview {
-				notifType = NotifTypePayment
 				title = "Bukti Pembayaran Ditolak"
 				msgCustomer = fmt.Sprintf("Bukti transfer pesanan #%s belum dapat dikonfirmasi. Silakan periksa catatan admin dan unggah bukti baru sebelum waktu pembayaran berakhir.", b.BookingCode)
+				if s.emailService != nil {
+					sendEmail(s.emailService.SendPaymentProofRejectedEmail(&b, models.PaymentDeadline(&b)))
+				}
+			} else if oldS == "" {
+				title = "Pesanan Dibuat, Menunggu Pembayaran"
+				msgCustomer = fmt.Sprintf("Pesanan #%s (%s) dibuat. Transfer sesuai tagihan dan unggah bukti sebelum batas waktu.", b.BookingCode, packageName)
+				if s.emailService != nil {
+					sendEmail(s.emailService.SendManualPaymentInstructionEmail(&b, packageName, models.PaymentDeadline(&b)))
+				}
 			}
 		case models.StatusConfirmed:
 			title = "Pesanan Dikonfirmasi"

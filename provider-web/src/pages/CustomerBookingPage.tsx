@@ -9,6 +9,7 @@ import {
   getMeetingPointCoordinates,
   MeetingPointMap,
 } from '../components/MeetingPointMap';
+import { fetchCheckoutConfig } from '../utils/checkoutConfig';
 
 // Tanggal hari ini (zona waktu lokal) dalam format YYYY-MM-DD untuk validasi tanggal lahir
 const getTodayIso = () => {
@@ -37,6 +38,11 @@ interface Participant {
 export const CustomerBookingPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, customerProfile, setBookingFormData, bookingFormData, openAuthModal } = useNavigation();
   const { showAlert } = useCustomAlert();
+  // Biaya layanan dari backend agar total di sini sama dengan tagihan akhir.
+  const [serviceFee, setServiceFee] = useState<number | null>(null);
+  useEffect(() => {
+    fetchCheckoutConfig().then((cfg) => setServiceFee(cfg.serviceFee)).catch(() => setServiceFee(null));
+  }, []);
 
   const currentPackageId = selectedPackageForDetail?.id;
   const activeFormData = (bookingFormData && String(bookingFormData.packageId) === String(currentPackageId)) ? bookingFormData : null;
@@ -165,7 +171,7 @@ export const CustomerBookingPage: React.FC = () => {
   const meetingPointCoordinates = getMeetingPointCoordinates(pkg);
   const selectedAddOns = pkg.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
-  const totalCost = (pkg.price * guestsCount) + addOnsTotal;
+  const totalCost = (pkg.price * guestsCount) + addOnsTotal + (serviceFee || 0);
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -705,8 +711,13 @@ export const CustomerBookingPage: React.FC = () => {
                 </div>
               ))}
 
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b' }}>
+                <span>Biaya layanan</span>
+                <span>{serviceFee === null ? 'dihitung di langkah berikutnya' : formatIDR(serviceFee)}</span>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '800', color: '#0f172a', borderTop: '1px solid #e2e8f0', paddingTop: '12px', marginTop: '4px' }}>
-                <span>Total Pembayaran</span>
+                <span>{serviceFee === null ? 'Subtotal' : 'Total Pembayaran'}</span>
                 <span>{formatIDR(totalCost)}</span>
               </div>
             </div>

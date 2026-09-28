@@ -253,9 +253,21 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   useEffect(() => { providerProfileRef.current = providerProfile; }, [providerProfile]);
   useEffect(() => { customerProfileRef.current = customerProfile; }, [customerProfile]);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
-  const [selectedPackageForDetail, setSelectedPackageForDetail] = useState<any>(null);
+  const [selectedPackageForDetail, setSelectedPackageForDetailState] = useState<any>(null);
+  // Ref diperbarui sinkron agar navigateTo yang dipanggil tepat setelah setter
+  // dapat menaruh id paket/kode booking di URL (bisa di-refresh & dibagikan).
+  const selectedPackageRef = useRef<any>(null);
+  const setSelectedPackageForDetail = useCallback((pkg: any) => {
+    selectedPackageRef.current = pkg;
+    setSelectedPackageForDetailState(pkg);
+  }, []);
   const [selectedProviderId, setSelectedProviderId] = useState<number | null>(null);
-  const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<any>(null);
+  const [selectedBookingForInvoice, setSelectedBookingForInvoiceState] = useState<any>(null);
+  const selectedBookingRef = useRef<any>(null);
+  const setSelectedBookingForInvoice = useCallback((booking: any) => {
+    selectedBookingRef.current = booking;
+    setSelectedBookingForInvoiceState(booking);
+  }, []);
 
   const [searchParams, setSearchParams] = useState({
     destination: '',
@@ -328,7 +340,14 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     // Transisi membuat halaman lama tetap tampil sampai chunk halaman baru
     // siap, sehingga fallback Suspense tidak menutup layar tiap pindah menu.
     startTransition(() => setRoute(newRoute));
-    const targetHash = getHashFromRoute(newRoute);
+    let targetHash = getHashFromRoute(newRoute);
+    const packageId = selectedPackageRef.current?.id;
+    const bookingCode = selectedBookingRef.current?.bookingCode;
+    if (newRoute === 'paket-detail' && packageId) {
+      targetHash += `?id=${encodeURIComponent(String(packageId))}`;
+    } else if (newRoute === 'halaman-pembayaran' && bookingCode) {
+      targetHash += `?code=${encodeURIComponent(String(bookingCode))}`;
+    }
     if (window.location.hash !== targetHash) {
       window.location.hash = targetHash;
     }
@@ -411,6 +430,12 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       // baru. Respons lamanya tidak boleh membatalkan sesi yang lebih baru.
       if (!requestIsCurrent()) return null;
       console.error('Failed to fetch profile:', err);
+      // Gangguan jaringan/server sementara tidak boleh mengeluarkan pengguna;
+      // sesi hanya dihapus bila server menyatakan token tidak berlaku.
+      const sessionRejected = err?.status === 401 || err?.status === 403;
+      if (!sessionRejected) {
+        return isProviderRoute ? providerProfileRef.current : customerProfileRef.current;
+      }
       if (isProviderRoute) {
         setProviderProfile(null);
         if (tokenUsed && getProviderToken() === tokenUsed) removeProviderToken();
@@ -640,6 +665,17 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       password: '',
     });
     sessionStorage.removeItem('tementrip_auth_return_to');
+    // Data pribadi pengguna sebelumnya tidak boleh tersisa di perangkat bersama.
+    setBookingFormData(null);
+    setSelectedBookingForInvoice(null);
+    try {
+      sessionStorage.removeItem('tripkita_recent_guest_booking');
+      localStorage.removeItem('tripkita_customer_wishlist');
+      localStorage.removeItem('tripkita_my_bookings');
+      window.dispatchEvent(new CustomEvent('tripkita_wishlist_updated', { detail: [] }));
+    } catch {
+      // Penyimpanan browser dapat diblokir; logout tetap dilanjutkan.
+    }
     setIsLogoutConfirmOpen(false);
     navigateTo(destination);
   };

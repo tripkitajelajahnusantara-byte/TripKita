@@ -122,6 +122,7 @@ const AppContent: React.FC = () => {
     if (privateProviderRoutes.includes(route)) {
       const hasProviderToken = typeof window !== 'undefined' && getProviderToken();
       if (!hasProviderToken) {
+        rememberReturnTo();
         navigateTo('provider-login');
         return;
       }
@@ -148,10 +149,12 @@ const AppContent: React.FC = () => {
       }
     }
 
-    const privateCustomerRoutes = ['riwayat-booking', 'pengaturan', 'rencana-trip'];
+    // 'riwayat-booking' sengaja publik: tamu melacak pesanan dengan kode booking.
+    const privateCustomerRoutes = ['pengaturan', 'rencana-trip'];
     if (privateCustomerRoutes.includes(route)) {
       const hasCustomerToken = typeof window !== 'undefined' && getCustomerToken();
       if (!hasCustomerToken || !customerProfile) {
+        rememberReturnTo();
         navigateTo('masuk');
       }
     }
@@ -361,6 +364,21 @@ function App() {
       </CustomAlertProvider>
     </ErrorBoundary>
   );
+}
+
+
+// Simpan halaman yang diminta agar setelah login pengguna kembali ke sana
+// (redirectAfterAuth membaca kunci yang sama).
+function rememberReturnTo() {
+  if (typeof window === 'undefined') return;
+  const hash = window.location.hash;
+  if (hash.startsWith('#/') && !hash.startsWith('#//')) {
+    try {
+      sessionStorage.setItem('tementrip_auth_return_to', hash);
+    } catch {
+      // abaikan
+    }
+  }
 }
 
 export default App;

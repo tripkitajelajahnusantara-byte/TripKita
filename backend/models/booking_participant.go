@@ -6,6 +6,24 @@ import "time"
 // Setelah lewat, booking yang belum mengirim bukti dibatalkan oleh job.
 const PaymentWindow = 24 * time.Hour
 
+// RejectedProofReuploadWindow adalah waktu minimal yang selalu dimiliki customer
+// untuk mentransfer/mengunggah ulang setelah admin menolak bukti. Tanpa ini,
+// lamanya admin memeriksa ikut memakan batas bayar dan penolakan dapat langsung
+// membuat booking kedaluwarsa tanpa kesempatan memperbaiki bukti.
+const RejectedProofReuploadWindow = 6 * time.Hour
+
+// PaymentDeadline mengembalikan batas akhir pembayaran booking PENDING_PAYMENT:
+// 24 jam sejak dibuat, diperpanjang bila bukti sebelumnya ditolak admin.
+func PaymentDeadline(b *Booking) time.Time {
+	deadline := b.CreatedAt.Add(PaymentWindow)
+	if b.PaymentReviewedAt != nil {
+		if extended := b.PaymentReviewedAt.Add(RejectedProofReuploadWindow); extended.After(deadline) {
+			deadline = extended
+		}
+	}
+	return deadline
+}
+
 // CancellationFullRefundWindow adalah batas minimal pembatalan customer untuk
 // memperoleh refund penuh. Dipakai backend sebagai sumber kebenaran kebijakan.
 const CancellationFullRefundWindow = 7 * 24 * time.Hour

@@ -137,6 +137,21 @@ const getPendingProfileChanges = (provider: ProviderAdminData) => [
   ['TikTok', provider.tiktok, provider.pendingTiktok],
 ].filter(([, active, pending]) => (active || '') !== (pending || '')) as Array<[string, string | undefined, string | undefined]>;
 
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  PENDING_PAYMENT: 'Menunggu Transfer',
+  PAYMENT_REVIEW: 'Menunggu Verifikasi',
+  PAID: 'Lunas',
+  CONFIRMED: 'Dikonfirmasi Mitra',
+  COMPLETED: 'Selesai',
+  EXPIRED: 'Kedaluwarsa',
+  FAILED: 'Gagal',
+  CANCELLED_BY_CUSTOMER: 'Dibatalkan Customer',
+  CANCELLED_BY_PROVIDER: 'Dibatalkan Mitra',
+  REFUND_REQUIRED: 'Perlu Refund',
+  REFUNDED: 'Sudah Direfund',
+  RESCHEDULE_OFFERED: 'Tawaran Jadwal Ulang',
+};
+
 export const AdminDashboardPage: React.FC = () => {
   const { providerProfile, logout, navigateTo } = useNavigation();
   const [providers, setProviders] = useState<ProviderAdminData[]>([]);
@@ -203,6 +218,13 @@ export const AdminDashboardPage: React.FC = () => {
   // Booking states for manual payments
   const [adminBookings, setAdminBookings] = useState<any[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
+  // Verifikasi pembayaran manual: filter tabel dan modal keputusan admin.
+  const [paymentFilter, setPaymentFilter] = useState<'review' | 'all'>('review');
+  const [paymentReviewTarget, setPaymentReviewTarget] = useState<{ booking: any; decision: 'APPROVED' | 'REJECTED' } | null>(null);
+  const [paymentReviewNotes, setPaymentReviewNotes] = useState('');
+  const [paymentReviewError, setPaymentReviewError] = useState('');
+  const [proofPreview, setProofPreview] = useState<{ url: string; isPdf: boolean } | null>(null);
+  const [proofPreviewLoading, setProofPreviewLoading] = useState(false);
 
   // Admin Payout States
   const [adminPayouts, setAdminPayouts] = useState<any[]>([]);
@@ -304,7 +326,12 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const adminName = providerProfile?.picName || 'Administrator';
-  const adminEmail = providerProfile?.email || 'admin@tripkita.id';
+  const adminEmail = providerProfile?.email || '';
+  const visiblePaymentBookings = paymentFilter === 'review'
+    ? adminBookings
+      .filter((b) => b.status === 'PAYMENT_REVIEW')
+      .sort((a, b) => new Date(a.paymentReviewDeadline || 0).getTime() - new Date(b.paymentReviewDeadline || 0).getTime())
+    : adminBookings;
 
   const fetchProviders = async () => {
     setLoading(true);
@@ -353,29 +380,56 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const handlePaymentReview = async (booking: any, decision: 'APPROVED' | 'REJECTED') => {
+  const closePaymentReview = () => {
+    if (proofPreview) URL.revokeObjectURL(proofPreview.url);
+    setProofPreview(null);
+    setPaymentReviewTarget(null);
+    setPaymentReviewNotes('');
+    setPaymentReviewError('');
+  };
+
+  const openPaymentReview = async (booking: any, decision: 'APPROVED' | 'REJECTED') => {
     if (actionBusy) return;
-    const notes = decision === 'REJECTED'
-      ? window.prompt('Masukkan alasan penolakan agar customer dapat memperbaiki bukti transfer:', '')
-      : window.prompt('Catatan konfirmasi (opsional):', 'Pembayaran sudah diterima di rekening TemenTrip');
-    if (notes === null) return;
-    if (decision === 'REJECTED' && notes.trim().length < 4) {
-      setError('Alasan penolakan minimal 4 karakter.');
+    setPaymentReviewTarget({ booking, decision });
+    setPaymentReviewNotes('');
+    setPaymentReviewError('');
+    setProofPreview(null);
+    if (!booking.paymentProof) return;
+    setProofPreviewLoading(true);
+    try {
+      const url = await getProtectedDocumentURL('admin', booking.paymentProof);
+      setProofPreview({ url, isPdf: /\.pdf$/i.test(booking.paymentProof) });
+    } catch (err: any) {
+      setPaymentReviewError(err.message || 'Bukti transfer tidak dapat dimuat.');
+    } finally {
+      setProofPreviewLoading(false);
+    }
+  };
+
+  const submitPaymentReview = async () => {
+    if (!paymentReviewTarget || actionBusy) return;
+    const { booking, decision } = paymentReviewTarget;
+    const notes = paymentReviewNotes.trim();
+    if (decision === 'REJECTED' && notes.length < 4) {
+      setPaymentReviewError('Tulis alasan penolakan (minimal 4 karakter) agar customer tahu apa yang harus diperbaiki.');
       return;
     }
-    if (decision === 'APPROVED' && !window.confirm(`Konfirmasi pembayaran ${booking.bookingCode} sebesar ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(booking.totalPrice)}?`)) return;
     await runAction(`payment-${booking.id}-${decision}`, async () => {
       setError('');
       setSuccessMsg('');
+      setPaymentReviewError('');
       try {
         await request(`/admin/bookings/${booking.id}/payment-review`, {
           method: 'POST',
-          body: JSON.stringify({ decision, notes: notes.trim() }),
+          body: JSON.stringify({ decision, notes }),
         });
-        setSuccessMsg(decision === 'APPROVED' ? `Pembayaran ${booking.bookingCode} disetujui dan booking diteruskan ke provider.` : `Bukti ${booking.bookingCode} ditolak. Customer dapat mengunggah ulang selama batas pembayaran aktif.`);
+        setSuccessMsg(decision === 'APPROVED'
+          ? `Pembayaran ${booking.bookingCode} disetujui dan booking diteruskan ke provider.`
+          : `Bukti ${booking.bookingCode} ditolak. Customer diberi waktu unggah ulang minimal 6 jam.`);
+        closePaymentReview();
         await fetchAdminBookings();
       } catch (err: any) {
-        setError(err.message || 'Konfirmasi pembayaran gagal disimpan.');
+        setPaymentReviewError(err.message || 'Konfirmasi pembayaran gagal disimpan.');
       }
     });
   };
@@ -995,6 +1049,26 @@ export const AdminDashboardPage: React.FC = () => {
             ) : activeView === 'kelola-pembayaran' ? (
               /* View 4: Verifikasi pembayaran transfer manual */
               <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
+                <div role="tablist" aria-label="Filter pembayaran" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                  {([
+                    ['review', `Menunggu Verifikasi (${adminBookings.filter((b) => b.status === 'PAYMENT_REVIEW').length})`],
+                    ['all', 'Semua Transaksi'],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={paymentFilter === key}
+                      onClick={() => setPaymentFilter(key)}
+                      style={{ padding: '8px 14px', borderRadius: 999, border: '1px solid', borderColor: paymentFilter === key ? '#0284c7' : 'var(--color-border)', background: paymentFilter === key ? '#e0f2fe' : '#fff', color: paymentFilter === key ? '#0369a1' : 'var(--color-text-medium)', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <button type="button" onClick={() => fetchAdminBookings()} disabled={bookingsLoading} style={{ marginLeft: 'auto', padding: '8px 14px', borderRadius: 999, border: '1px solid var(--color-border)', background: '#fff', fontWeight: 600, cursor: 'pointer' }}>
+                    Muat Ulang
+                  </button>
+                </div>
                 <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
                   {bookingsLoading ? (
                     <SkeletonTable rows={6} columns={6} label="Memuat data booking" />
@@ -1013,20 +1087,20 @@ export const AdminDashboardPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {adminBookings.length > 0 ? (
-                          adminBookings.map((b) => {
+                        {visiblePaymentBookings.length > 0 ? (
+                          visiblePaymentBookings.map((b) => {
                             return (
                               <tr key={b.id}>
                                 <td><strong>{b.bookingCode}</strong></td>
                                 <td>
                                   <div style={{ fontWeight: '600' }}>{b.customerName}</div>
-                                  <div style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>Initial: {b.customerInitial}</div>
+                                  {b.customerPhone && <div style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>{b.customerPhone}</div>}
                                 </td>
                                 <td>{b.packageDetails?.name || 'Paket Wisata'}</td>
                                 <td><strong style={{ color: '#00a896' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(b.totalPrice)}</strong></td>
                                 <td>{b.paymentMethod}</td>
                                 <td>
-                                  <span className={`status-badge-inline ${b.status.toLowerCase()}`}>{b.status}</span>
+                                  <span className={`status-badge-inline ${b.status.toLowerCase()}`}>{PAYMENT_STATUS_LABELS[b.status] || b.status}</span>
                                 </td>
                                 <td>
                                   {b.paymentProof ? (
@@ -1042,8 +1116,8 @@ export const AdminDashboardPage: React.FC = () => {
                                 <td>
                                   {b.status === 'PAYMENT_REVIEW' ? (
                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                      <button disabled={actionBusy} onClick={() => handlePaymentReview(b, 'APPROVED')} style={{ border: 0, background: '#10b981', color: '#fff', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: 'pointer' }}>Setujui</button>
-                                      <button disabled={actionBusy} onClick={() => handlePaymentReview(b, 'REJECTED')} style={{ border: '1px solid #ef4444', background: '#fff', color: '#dc2626', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: 'pointer' }}>Tolak</button>
+                                      <button disabled={actionBusy} onClick={() => openPaymentReview(b, 'APPROVED')} style={{ border: 0, background: '#10b981', color: '#fff', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: 'pointer' }}>Setujui</button>
+                                      <button disabled={actionBusy} onClick={() => openPaymentReview(b, 'REJECTED')} style={{ border: '1px solid #ef4444', background: '#fff', color: '#dc2626', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: 'pointer' }}>Tolak</button>
                                     </div>
                                   ) : <span style={{ color: '#94a3b8' }}>—</span>}
                                 </td>
@@ -1053,7 +1127,7 @@ export const AdminDashboardPage: React.FC = () => {
                         ) : (
                           <tr>
                             <td colSpan={8} className="empty-table-state" style={{ padding: '40px 0' }}>
-                              Tidak ada data transaksi pembayaran saat ini.
+                              {paymentFilter === 'review' ? 'Tidak ada bukti transfer yang menunggu verifikasi.' : 'Tidak ada data transaksi pembayaran saat ini.'}
                             </td>
                           </tr>
                         )}
@@ -1061,6 +1135,74 @@ export const AdminDashboardPage: React.FC = () => {
                     </table>
                   )}
                 </div>
+
+                {paymentReviewTarget && (() => {
+                  const b = paymentReviewTarget.booking;
+                  const isApprove = paymentReviewTarget.decision === 'APPROVED';
+                  const busy = actionBusy;
+                  const amount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(b.totalPrice);
+                  const rejectPresets = ['Nominal transfer tidak sesuai tagihan', 'Bukti transfer tidak terbaca/buram', 'Dana belum masuk ke rekening TemenTrip', 'Rekening tujuan bukan rekening TemenTrip'];
+                  return (
+                    <div role="dialog" aria-modal="true" aria-labelledby="payment-review-title" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+                      <div style={{ backgroundColor: '#ffffff', borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto' }}>
+                        <h2 id="payment-review-title" style={{ margin: '0 0 4px', fontSize: '18px' }}>{isApprove ? 'Setujui Pembayaran' : 'Tolak Bukti Transfer'}</h2>
+                        <p style={{ margin: '0 0 14px', fontSize: '13px', color: 'var(--color-text-medium)' }}>
+                          <strong>{b.bookingCode}</strong> · {b.customerName} · {b.packageDetails?.name || '—'}
+                        </p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, fontSize: 13, marginBottom: 14 }}>
+                          <div><span style={{ color: 'var(--color-text-light)' }}>Nominal tagihan</span><br /><strong style={{ fontSize: 16 }}>{amount}</strong></div>
+                          <div><span style={{ color: 'var(--color-text-light)' }}>Bukti dikirim</span><br /><strong>{b.paymentProofSubmittedAt ? new Date(b.paymentProofSubmittedAt).toLocaleString('id-ID') : '—'}</strong></div>
+                          <div><span style={{ color: 'var(--color-text-light)' }}>Tanggal trip</span><br /><strong>{b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID') : '—'}</strong></div>
+                        </div>
+
+                        <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, minHeight: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 14, background: '#f8fafc' }}>
+                          {proofPreviewLoading ? (
+                            <span style={{ color: 'var(--color-text-light)', fontSize: 13 }}><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memuat bukti transfer...</span>
+                          ) : proofPreview ? (
+                            proofPreview.isPdf
+                              ? <iframe src={proofPreview.url} title="Bukti transfer" style={{ width: '100%', height: 360, border: 0 }} />
+                              : <a href={proofPreview.url} target="_blank" rel="noopener noreferrer" title="Buka ukuran penuh"><img src={proofPreview.url} alt="Bukti transfer" style={{ maxWidth: '100%', maxHeight: 360, display: 'block' }} /></a>
+                          ) : (
+                            <span style={{ color: 'var(--color-text-light)', fontSize: 13 }}>Bukti transfer tidak tersedia.</span>
+                          )}
+                        </div>
+
+                        {isApprove ? (
+                          <p style={{ fontSize: 13, background: '#ecfdf5', color: '#065f46', padding: 10, borderRadius: 8, margin: '0 0 12px' }}>
+                            Pastikan dana <strong>{amount}</strong> sudah benar-benar masuk ke rekening TemenTrip. Setelah disetujui, booking diteruskan ke mitra dan saldo mitra tercatat.
+                          </p>
+                        ) : (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                            {rejectPresets.map((preset) => (
+                              <button key={preset} type="button" onClick={() => setPaymentReviewNotes(preset)} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 999, border: '1px solid #fecaca', background: paymentReviewNotes === preset ? '#fee2e2' : '#fff', color: '#b91c1c', cursor: 'pointer' }}>
+                                {preset}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }} htmlFor="payment-review-notes">
+                          {isApprove ? 'Catatan (opsional, terlihat oleh customer)' : 'Alasan penolakan (dikirim ke customer)'}
+                        </label>
+                        <textarea
+                          id="payment-review-notes"
+                          value={paymentReviewNotes}
+                          onChange={(e) => setPaymentReviewNotes(e.target.value)}
+                          maxLength={500}
+                          rows={3}
+                          placeholder={isApprove ? 'Boleh dikosongkan' : 'Jelaskan apa yang perlu diperbaiki customer'}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, border: '1px solid var(--color-border)', fontFamily: 'inherit', fontSize: 13 }}
+                        />
+                        {paymentReviewError && <div className="alert-message error-alert" style={{ marginTop: 10 }}>{paymentReviewError}</div>}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+                          <button type="button" className="back-form-btn" onClick={closePaymentReview} disabled={busy} style={{ width: 'auto', padding: '10px 18px' }}>Batal</button>
+                          <button type="button" className="submit-form-btn" onClick={submitPaymentReview} disabled={busy} style={{ width: 'auto', padding: '10px 18px', background: isApprove ? '#10b981' : '#dc2626' }}>
+                            {busy ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : isApprove ? 'Setujui Pembayaran' : 'Tolak Bukti'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             ) : activeView === 'administrasi-refund' ? (
               /* View 3: Administrasi Refund Panel */
@@ -1242,7 +1384,7 @@ export const AdminDashboardPage: React.FC = () => {
                                 <td style={{ fontWeight: '700', color: '#0f172a' }}>#{p.id}</td>
                                 <td>
                                   <strong style={{ display: 'block', fontSize: '13.5px', color: '#0f172a' }}>
-                                    {p.provider?.businessName || 'Wisata Nusantara'}
+                                    {p.provider?.businessName || '(mitra tidak ditemukan)'}
                                   </strong>
                                   <span style={{ fontSize: '12px', color: '#64748b' }}>{p.provider?.email}</span>
                                 </td>
@@ -1476,7 +1618,7 @@ export const AdminDashboardPage: React.FC = () => {
                                 </td>
                                 <td>
                                   <span className={`status-pill-small ${hasPendingProviderReview(p) ? 'pending' : p.status.toLowerCase()}`}>
-                                    {p.status === 'PENDING' ? 'Akun Baru' : hasPendingProviderReview(p) ? 'Menunggu Perubahan' : p.status === 'APPROVED' ? 'Approved' : 'Rejected'}
+                                    {p.status === 'PENDING' ? 'Akun Baru' : hasPendingProviderReview(p) ? 'Menunggu Perubahan' : p.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
                                   </span>
                                 </td>
                                 <td>
@@ -1536,7 +1678,7 @@ export const AdminDashboardPage: React.FC = () => {
                     <h3>{selectedProvider.businessName}</h3>
                     <p>{selectedProvider.businessCategory}</p>
                     <span className={`drawer-status-badge ${hasPendingProviderReview(selectedProvider) ? 'pending' : selectedProvider.status.toLowerCase()}`}>
-                      {selectedProvider.status === 'PENDING' ? 'Akun Menunggu Persetujuan' : hasPendingProviderReview(selectedProvider) ? 'Perubahan Menunggu Persetujuan' : selectedProvider.status === 'APPROVED' ? 'Approved' : 'Rejected'}
+                      {selectedProvider.status === 'PENDING' ? 'Akun Menunggu Persetujuan' : hasPendingProviderReview(selectedProvider) ? 'Perubahan Menunggu Persetujuan' : selectedProvider.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
                     </span>
                   </div>
                 </div>
@@ -1895,23 +2037,23 @@ export const AdminDashboardPage: React.FC = () => {
                   {selectedProvider.status === 'PENDING' ? (
                     <>
                       <button className="action-btn approve-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-APPROVED'} onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED')}>
-                        {pendingAction === 'status-APPROVED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyetujui...</> : 'Approve Provider'}
+                        {pendingAction === 'status-APPROVED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyetujui...</> : 'Setujui Mitra'}
                       </button>
                       <button className="action-btn reject-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-REJECTED'} onClick={() => handleUpdateStatus(selectedProvider.id, 'REJECTED')}>
-                        {pendingAction === 'status-REJECTED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menolak...</> : 'Reject Provider'}
+                        {pendingAction === 'status-REJECTED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menolak...</> : 'Tolak Mitra'}
                       </button>
                     </>
                   ) : selectedProvider.status === 'APPROVED' ? (
                     <button className="action-btn disable-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-PENDING'} onClick={() => handleUpdateStatus(selectedProvider.id, 'PENDING', 'Verifikasi ditangguhkan oleh Administrator.')}>
-                      {pendingAction === 'status-PENDING' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menonaktifkan...</> : 'Disable Provider'}
+                      {pendingAction === 'status-PENDING' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menonaktifkan...</> : 'Tangguhkan Mitra'}
                     </button>
                   ) : (
                     <button className="action-btn approve-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-APPROVED'} onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED', 'Mitra diaktifkan kembali oleh Administrator.')}>
-                      {pendingAction === 'status-APPROVED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyetujui...</> : 'Approve Provider'}
+                      {pendingAction === 'status-APPROVED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyetujui...</> : 'Setujui Mitra'}
                     </button>
                   )}
                   <button className="action-btn delete-btn" disabled={actionBusy} aria-busy={pendingAction === 'delete'} onClick={() => handleDeleteProvider(selectedProvider.id)}>
-                    {pendingAction === 'delete' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menonaktifkan...</> : 'Delete Provider'}
+                    {pendingAction === 'delete' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menonaktifkan...</> : 'Nonaktifkan Permanen'}
                   </button>
                 </div>
 

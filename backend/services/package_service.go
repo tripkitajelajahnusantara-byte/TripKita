@@ -43,7 +43,23 @@ func NewPackageService(repo repositories.PackageRepository, providerRepo reposit
 	return &packageService{repo: repo, providerRepo: providerRepo, dateRepo: dateRepo}
 }
 
+func validatePackagePhotos(image, images string) error {
+	refs := append(strings.Split(images, ","), image)
+	if len(strings.Split(images, ",")) > 20 {
+		return packageValidationErrorf("foto paket maksimal 20")
+	}
+	for _, ref := range refs {
+		if !packagePhotoRefIsValid(ref) {
+			return packageValidationErrorf("foto paket harus diunggah melalui formulir foto paket")
+		}
+	}
+	return nil
+}
+
 func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackageRequest) (*models.Package, error) {
+	if err := validatePackagePhotos(req.Image, req.Images); err != nil {
+		return nil, err
+	}
 	if err := validateMeetingPointCoordinates(req.MeetingPointLat, req.MeetingPointLng, req.Status == "Aktif"); err != nil {
 		return nil, err
 	}
@@ -326,6 +342,9 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	}
 	if req.Itinerary != "" {
 		pkg.Itinerary = req.Itinerary
+	}
+	if err := validatePackagePhotos(req.Image, req.Images); err != nil {
+		return nil, err
 	}
 	if req.Image != "" {
 		pkg.Image = req.Image

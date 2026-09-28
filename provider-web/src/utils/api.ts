@@ -11,10 +11,6 @@ const isSameOriginApiPath = !!configuredApiBaseURL
   && configuredApiBaseURL.startsWith('/')
   && !configuredApiBaseURL.startsWith('//');
 
-if (!configuredApiBaseURL && !isLocalBrowser) {
-  throw new Error('VITE_API_BASE_URL wajib diisi dengan URL absolut backend pada deployment');
-}
-
 if (configuredApiBaseURL && !isSameOriginApiPath) {
   let parsedApiURL: URL;
   try {
@@ -27,8 +23,18 @@ if (configuredApiBaseURL && !isSameOriginApiPath) {
   }
 }
 
+// Tanpa VITE_API_BASE_URL: di browser lokal (Vite dev server) API diasumsikan
+// berjalan pada host yang sama port 8080, selain itu memakai path satu origin
+// /api/v1 di belakang reverse proxy (lihat README).
+function defaultApiBaseURL(): string {
+  if (typeof window !== 'undefined' && isLocalBrowser) {
+    return `${window.location.protocol}//${window.location.hostname}:8080/api/v1`;
+  }
+  return '/api/v1';
+}
+
 export const API_BASE_URL = (
-  configuredApiBaseURL || 'http://localhost:8080/api/v1'
+  configuredApiBaseURL || defaultApiBaseURL()
 ).replace(/\/+$/, '');
 
 export function getProviderToken(): string | null {

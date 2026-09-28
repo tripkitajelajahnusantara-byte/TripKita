@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { request } from './api';
 
 export interface CheckoutConfig {
@@ -29,4 +30,29 @@ export async function fetchCheckoutConfig(): Promise<CheckoutConfig> {
     throw new Error('Konfigurasi checkout dari server tidak valid.');
   }
   return { serviceFee, paymentWindowSeconds, adminReviewWindowSeconds, manualPayment, cancellationRefundDays };
+}
+
+// Satu permintaan dibagi semua komponen yang hanya butuh angka kebijakan.
+let sharedConfigPromise: Promise<CheckoutConfig> | null = null;
+function getSharedCheckoutConfig(): Promise<CheckoutConfig> {
+  if (!sharedConfigPromise) {
+    sharedConfigPromise = fetchCheckoutConfig().catch((err) => {
+      sharedConfigPromise = null;
+      throw err;
+    });
+  }
+  return sharedConfigPromise;
+}
+
+/** Batas hari pembatalan untuk refund penuh dari backend; null selama/ bila gagal dimuat. */
+export function useCancellationRefundDays(): number | null {
+  const [days, setDays] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    getSharedCheckoutConfig()
+      .then((cfg) => { if (active) setDays(cfg.cancellationRefundDays); })
+      .catch(() => { /* teks memakai kalimat umum */ });
+    return () => { active = false; };
+  }, []);
+  return days;
 }

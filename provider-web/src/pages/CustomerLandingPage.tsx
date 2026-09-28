@@ -10,6 +10,7 @@ import { SkeletonCards } from '../components/Skeleton';
 
 import heroImage from '../assets/hero.jpg';
 
+import { useCancellationRefundDays } from '../utils/checkoutConfig';
 interface TripPackage {
   id: number;
   providerId: number;
@@ -65,6 +66,7 @@ const getTodayIsoDate = () => {
 };
 
 export const CustomerLandingPage: React.FC = () => {
+  const refundDays = useCancellationRefundDays();
   const { navigateTo, setSelectedPackageForDetail, setSearchParams } = useNavigation();
   const [packages, setPackages] = useState<TripPackage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -962,7 +964,7 @@ export const CustomerLandingPage: React.FC = () => {
               <RotateCcw size={24} />
             </div>
             <strong style={{ fontSize: '14px', color: '#0f172a' }}>Aturan refund jelas</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Batal paling lambat 7 hari sebelum trip, atau trip dibatalkan mitra: dana kembali penuh</span>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{refundDays ? `Batal paling lambat ${refundDays} hari sebelum trip` : 'Batal sesuai batas kebijakan refund'}, atau trip dibatalkan mitra: dana kembali penuh</span>
           </div>
 
           {/* Item 3 */}

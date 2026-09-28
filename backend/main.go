@@ -9,6 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// Data zona waktu disertakan dalam binary karena image produksi belum
+	// tentu memiliki tzdata.
+	_ "time/tzdata"
 
 	"tripkita-provider/config"
 	"tripkita-provider/database"
@@ -24,6 +27,18 @@ const shutdownTimeout = 20 * time.Second
 func main() {
 	log.SetFlags(log.LstdFlags | log.LUTC)
 
+	// Aturan bisnis (tanggal "hari ini", job H-3 pukul 00:01, jam di email)
+	// mengacu pada waktu Indonesia, bukan zona server/container (umumnya UTC).
+	timezone := os.Getenv("APP_TIMEZONE")
+	if timezone == "" {
+		timezone = "Asia/Jakarta"
+	}
+	if loc, err := time.LoadLocation(timezone); err != nil {
+		log.Fatalf("APP_TIMEZONE tidak valid: %v", err)
+	} else {
+		time.Local = loc
+	}
+
 	// 1. Load Configurations
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -37,6 +52,12 @@ func main() {
 
 	// 2. Initialize Database
 	database.ConnectDB(cfg)
+
+	// Foto paket lama yang tersimpan sebagai dokumen privat dipindahkan ke foto
+	// publik agar tetap tampil; aman dijalankan berulang.
+	if err := services.MigrateLegacyPackagePhotos(database.DB, cfg.DocumentUploadDir()); err != nil {
+		log.Printf("[Migrasi Foto] gagal: %v", err)
+	}
 
 	// 3. Bangun seluruh service sekali, lalu pakai bersama oleh router dan job.
 	container := services.NewContainer(database.DB, cfg)

@@ -28,6 +28,10 @@ func validProductionEnv() map[string]string {
 		"SMTP_PASS":            "mailer-password",
 		"SMTP_FROM":            "no-reply@example.com",
 		"UPLOAD_DIR":           filepath.Join(os.TempDir(), "tripkita-uploads"),
+
+		"MANUAL_PAYMENT_BANK_NAME":      "BCA",
+		"MANUAL_PAYMENT_ACCOUNT_NUMBER": "1234567890",
+		"MANUAL_PAYMENT_ACCOUNT_HOLDER": "PT Contoh Wisata",
 	}
 }
 
@@ -43,6 +47,7 @@ func loadWith(t *testing.T, env map[string]string) (*Config, error) {
 		"WEATHER_API_KEY", "WEATHER_API_BASE_URL",
 		"RUN_MIGRATIONS", "SEED_DB", "ENABLE_DEV_MOCKS", "ENABLE_BACKGROUND_JOBS",
 		"ENABLE_AUTOMATIC_PAYOUT", "UPLOAD_DIR", "RAILWAY_VOLUME_MOUNT_PATH",
+		"MANUAL_PAYMENT_BANK_NAME", "MANUAL_PAYMENT_ACCOUNT_NUMBER", "MANUAL_PAYMENT_ACCOUNT_HOLDER",
 	} {
 		t.Setenv(key, "")
 	}
@@ -88,7 +93,7 @@ func TestProductionRejectsUnsafeValues(t *testing.T) {
 	}{
 		{"jwt secret terlalu pendek", func(e map[string]string) { e["JWT_SECRET"] = "pendek" }, "JWT_SECRET"},
 		{"jwt secret mudah ditebak", func(e map[string]string) { e["JWT_SECRET"] = strings.Repeat("ab", 20) }, "JWT_SECRET"},
-		{"nilai contoh belum diganti", func(e map[string]string) { e["IPAYMU_API_KEY"] = "replace-with-key" }, "nilai contoh"},
+		{"nilai contoh belum diganti", func(e map[string]string) { e["SMTP_PASS"] = "replace-with-password" }, "nilai contoh"},
 		{"database tanpa TLS", func(e map[string]string) {
 			e["DATABASE_URL"] = "postgres://u:p@db.example.com:5432/tripkita?sslmode=disable"
 		}, "TLS"},
@@ -101,8 +106,8 @@ func TestProductionRejectsUnsafeValues(t *testing.T) {
 		}, "GOOGLE_REDIRECT_URI"},
 		{"origin memakai path", func(e map[string]string) { e["ALLOWED_ORIGINS"] = "https://app.example.com/app" }, "ALLOWED_ORIGINS"},
 		{"smtp from bukan email", func(e map[string]string) { e["SMTP_FROM"] = "Tim TemenTrip" }, "SMTP_FROM"},
-		{"ipaymu api key kosong", func(e map[string]string) { e["IPAYMU_API_KEY"] = "" }, "IPAYMU_API_KEY"},
-		{"ipaymu production memakai sandbox", func(e map[string]string) { e["IPAYMU_BASE_URL"] = "https://sandbox.ipaymu.com/api/v2" }, "IPAYMU_BASE_URL"},
+		{"rekening pembayaran manual kosong", func(e map[string]string) { e["MANUAL_PAYMENT_ACCOUNT_NUMBER"] = "" }, "MANUAL_PAYMENT_ACCOUNT_NUMBER"},
+		{"nama bank pembayaran manual kosong", func(e map[string]string) { e["MANUAL_PAYMENT_BANK_NAME"] = "" }, "MANUAL_PAYMENT_BANK_NAME"},
 		{"payout otomatis belum terintegrasi", func(e map[string]string) { e["ENABLE_AUTOMATIC_PAYOUT"] = "true" }, "ENABLE_AUTOMATIC_PAYOUT"},
 		{"upload dir kosong", func(e map[string]string) { e["UPLOAD_DIR"] = "" }, "UPLOAD_DIR"},
 		{"upload dir relatif", func(e map[string]string) { e["UPLOAD_DIR"] = "uploads" }, "path absolut"},

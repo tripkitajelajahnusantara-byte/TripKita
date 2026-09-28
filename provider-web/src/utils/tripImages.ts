@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './api';
+
 // Centralized categories & trip types synced across Web Customer, Web Provider, and Admin
 export const OFFICIAL_CATEGORIES = [
   "City Tour",
@@ -51,6 +53,50 @@ export function getHighlightsForPackage(pkg: HighlightSource, limit: number = 3)
   return highlights;
 }
 
+const BACKEND_ORIGIN = API_BASE_URL.replace(/\/api\/v1$/, '');
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2']);
+
+// Mengubah nilai foto dari database menjadi URL yang dapat dimuat browser.
+// Path relatif ("/uploads/x.jpg") dilengkapi origin backend aktif. URL absolut
+// yang tersimpan dengan host lokal (unggahan lama saat development) diarahkan
+// ulang ke backend aktif agar tidak pernah memuat localhost di deployment.
+// Teks yang bukan URL/path gambar dibuang.
+export function resolveMediaUrl(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return '';
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      if (LOCAL_HOSTNAMES.has(parsed.hostname) && parsed.pathname.startsWith('/uploads/')) {
+        return `${BACKEND_ORIGIN}${parsed.pathname}`;
+      }
+    } catch {
+      return '';
+    }
+    return trimmed;
+  }
+  if (trimmed.startsWith('//')) return '';
+  if (trimmed.startsWith('/') || trimmed.startsWith('uploads/') || trimmed.startsWith('storage/') || /\.(jpe?g|png|webp|gif)$/i.test(trimmed)) {
+    return trimmed.startsWith('/') ? `${BACKEND_ORIGIN}${trimmed}` : `${BACKEND_ORIGIN}/${trimmed}`;
+  }
+  return '';
+}
+
+// Semua foto paket (sudah di-resolve), urut sesuai unggahan mitra.
+export function getTripImages(pkg: { images?: unknown; image?: unknown; imageUrl?: unknown } | null | undefined): string[] {
+  if (!pkg) return [];
+  for (const source of [pkg.images, pkg.image, pkg.imageUrl]) {
+    const candidates: unknown[] = Array.isArray(source)
+      ? source
+      : (typeof source === 'string' ? source.split(',') : []);
+    const resolved = candidates.map(resolveMediaUrl).filter(Boolean);
+    if (resolved.length > 0) return resolved;
+  }
+  return [];
+}
+
 // Foto utama paket dari unggahan mitra. Mengembalikan '' bila belum ada foto
 // (pemanggil wajib menampilkan placeholder, bukan foto stok).
 export function getTripImage(id?: any, _name: string = '', _category: string = '', uploadedImage?: unknown): string {
@@ -64,9 +110,8 @@ export function getTripImage(id?: any, _name: string = '', _category: string = '
     : (typeof source === 'string' ? source.split(',') : []);
 
   for (const candidate of candidates) {
-    if (typeof candidate !== 'string') continue;
-    const trimmed = candidate.trim();
-    if (trimmed && trimmed !== 'undefined' && trimmed !== 'null') return trimmed;
+    const resolved = resolveMediaUrl(candidate);
+    if (resolved) return resolved;
   }
   return '';
 }

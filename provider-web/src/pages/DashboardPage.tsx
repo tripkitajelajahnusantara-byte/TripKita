@@ -16,6 +16,8 @@ import type { Booking } from '../types';
 import { request } from '../utils/api';
 import { SkeletonTableRows } from '../components/Skeleton';
 import { TripDepartureAlert } from '../components/TripDepartureAlert';
+import { TripImage } from '../components/TripImage';
+import { getTripImage } from '../utils/tripImages';
 
 interface DashboardStats {
   totalPackages: number;
@@ -28,7 +30,7 @@ interface DashboardStats {
 }
 
 export const DashboardPage: React.FC = () => {
-  const { providerProfile, navigateTo } = useNavigation();
+  const { providerProfile, navigateTo, setEditingPackageId } = useNavigation();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('Semua');
   const [isLoading, setIsLoading] = useState(true);
@@ -77,21 +79,17 @@ export const DashboardPage: React.FC = () => {
         }
 
         if (packagesRes.status === 'fulfilled' && Array.isArray(packagesRes.value)) {
-          const sortedPackages = packagesRes.value
-            .sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))
+          // Terpopuler = paling banyak dipesan; rating hanya pemecah seri.
+          const sortedPackages = [...packagesRes.value]
+            .sort((a: any, b: any) => ((b.quotaUsed || 0) - (a.quotaUsed || 0)) || ((b.rating || 0) - (a.rating || 0)))
             .slice(0, 3)
             .map((pkg: any) => ({
+              id: pkg.id,
               name: pkg.name,
               location: pkg.destination ? (pkg.destination.split(',').pop()?.trim() || pkg.destination) : 'Indonesia',
-              rating: pkg.rating || 5.0,
+              rating: Number(pkg.rating) > 0 ? Number(pkg.rating) : null,
               bookings: pkg.quotaUsed || 0,
-              img: (pkg.name || '').toLowerCase().includes('bromo')
-                ? 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=80&q=80'
-                : (pkg.name || '').toLowerCase().includes('baduy')
-                ? 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=80&q=80'
-                : (pkg.name || '').toLowerCase().includes('bandung')
-                ? 'https://images.unsplash.com/photo-1584810359583-96fc3448beaa?auto=format&fit=crop&w=80&q=80'
-                : 'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?auto=format&fit=crop&w=80&q=80',
+              img: getTripImage(pkg),
             }));
           setPopularPackages(sortedPackages);
 
@@ -206,8 +204,8 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
             <div className="card-bottom">
-              <h3>{stats ? stats.rating.toFixed(2) : '...'}</h3>
-              <p>Rating Provider</p>
+              <h3>{stats ? (Number(stats.rating) > 0 ? Number(stats.rating).toFixed(1) : '–') : '...'}</h3>
+              <p>{stats && !(Number(stats.rating) > 0) ? 'Rating (belum ada ulasan)' : 'Rating Provider'}</p>
             </div>
           </div>
         </section>
@@ -301,7 +299,7 @@ export const DashboardPage: React.FC = () => {
             <div className="quick-actions-card">
               <h3>Aksi Cepat</h3>
               <div className="action-links-list">
-                <button type="button" className="action-item" onClick={() => navigateTo('tambah-paket')}>
+                <button type="button" className="action-item" onClick={() => { setEditingPackageId(null); navigateTo('tambah-paket'); }}>
                   <span>Tambah Paket Baru</span>
                   <ChevronRight size={16} />
                 </button>
@@ -320,12 +318,31 @@ export const DashboardPage: React.FC = () => {
             <div className="popular-packages-card">
               <h3>Paket Terpopuler</h3>
               <div className="packages-list">
-                {popularPackages.map((p, i) => (
-                  <div key={i} className="popular-package-item">
-                    <img src={p.img} alt={p.name} />
+                {!isLoading && popularPackages.length === 0 && (
+                  <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
+                    Belum ada paket.{' '}
+                    <button type="button" onClick={() => { setEditingPackageId(null); navigateTo('tambah-paket'); }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--color-accent)', fontWeight: 600, cursor: 'pointer' }}>
+                      Buat paket pertama Anda
+                    </button>
+                  </div>
+                )}
+                {popularPackages.map((p) => (
+                  <div key={p.id} className="popular-package-item">
+                    <TripImage
+                      src={p.img}
+                      alt={p.name}
+                      placeholderIconSize={18}
+                      placeholderShowText={false}
+                      style={{ width: 44, height: 44, borderRadius: 'var(--radius-sm)', objectFit: 'cover', flexShrink: 0 }}
+                    />
                     <div className="pack-details">
                       <h4>{p.name}</h4>
-                      <p style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{p.location} · <Star size={13} aria-hidden="true" /> {p.rating}</p>
+                      <p style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {p.location} ·{' '}
+                        {p.rating !== null
+                          ? <><Star size={13} aria-hidden="true" /> {p.rating.toFixed(1)}</>
+                          : 'Belum ada ulasan'}
+                      </p>
                     </div>
                     <span className="pack-bookings">{p.bookings} booking</span>
                   </div>

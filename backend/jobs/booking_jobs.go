@@ -22,16 +22,31 @@ func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 	cutoff := time.Now().Add(-models.PaymentWindow)
 	var candidates []models.Booking
 	if err := r.db.WithContext(ctx).Select("id", "xendit_invoice_id", "ipaymu_transaction_id").
-		Where("status = ? AND created_at < ?", models.StatusPendingPayment, cutoff).
+		Where("status = ? AND created_at < ? AND (payment_reviewed_at IS NULL OR payment_reviewed_at < ?)",
+			models.StatusPendingPayment, cutoff, time.Now().Add(-models.RejectedProofReuploadWindow)).
 		Find(&candidates).Error; err != nil {
 		log.Printf("[Auto Expire] Gagal mencari booking kedaluwarsa: %v", err)
 		return
 	}
 
-	expired := 0
+	expired, settled, deferred := 0, 0, 0
 	for _, candidate := range candidates {
 		if ctx.Err() != nil {
 			return
+		}
+
+		// Booking dari masa payment gateway (sebelum transfer manual) bisa saja
+		// sudah dibayar tetapi webhook-nya tidak pernah diterima. Pastikan dulu
+		// ke gateway; bila tidak dapat dipastikan, tahan untuk diperiksa operator.
+		if strings.TrimSpace(candidate.IPaymuTransactionID) != "" || strings.TrimSpace(candidate.XenditInvoiceID) != "" {
+			switch r.checkInvoiceBeforeExpiry(candidate) {
+			case invoiceSettled:
+				settled++
+				continue
+			case invoiceUnverified:
+				deferred++
+				continue
+			}
 		}
 
 		if err := r.container.BookingService.ExpirePendingBooking(candidate.ID, cutoff); err != nil {
@@ -45,6 +60,12 @@ func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 
 	if expired > 0 {
 		log.Printf("[Auto Expire] %d booking kedaluwarsa dan kuota dilepas.", expired)
+	}
+	if settled > 0 {
+		log.Printf("[Auto Expire] %d booking payment gateway lama diselesaikan: pembayaran terkonfirmasi meski webhook tidak diterima.", settled)
+	}
+	if deferred > 0 {
+		log.Printf("[Auto Expire] %d booking payment gateway lama ditahan: status pembayaran belum dapat dipastikan, periksa manual di dashboard gateway.", deferred)
 	}
 }
 

@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare, AlertTriangle } from 'lucide-react';
-import { API_BASE_URL, request } from '../utils/api';
+import { request } from '../utils/api';
 import { TravelokaCalendarModal } from '../components/TravelokaCalendarModal';
 import { TripImage, PhotoPlaceholder } from '../components/TripImage';
+import { getTripImages } from '../utils/tripImages';
 import { Skeleton } from '../components/Skeleton';
 import {
   formatMeetingPointCoordinates,
@@ -72,6 +73,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const totalReviewPages = Math.ceil(reviewsList.length / reviewsPerPage);
   const currentReviews = reviewsList.slice((reviewPage - 1) * reviewsPerPage, reviewPage * reviewsPerPage);
 
+  const [deepLinkError, setDeepLinkError] = useState('');
+
   // Auto load package from URL hash deep-link (e.g. #/paket-detail?id=3)
   useEffect(() => {
     const hash = window.location.hash;
@@ -79,17 +82,13 @@ export const CustomerPackageDetailPage: React.FC = () => {
     if (match && match[1]) {
       const targetId = Number(match[1]);
       if (!selectedPackageForDetail || Number(selectedPackageForDetail.id) !== targetId) {
-        if (API_BASE_URL) {
-          fetch(`${API_BASE_URL}/public/packages`)
-            .then(res => res.json())
-            .then(data => {
-              if (Array.isArray(data)) {
-                const found = data.find((p: any) => Number(p.id) === targetId);
-                if (found) setSelectedPackageForDetail(found);
-              }
-            })
-            .catch(() => {});
-        }
+        request('/public/packages')
+          .then((data: any) => {
+            const found = Array.isArray(data) ? data.find((p: any) => Number(p.id) === targetId) : null;
+            if (found) setSelectedPackageForDetail(found);
+            else setDeepLinkError('Paket tidak ditemukan atau sudah tidak aktif.');
+          })
+          .catch((err: any) => setDeepLinkError(err?.message || 'Paket belum dapat dimuat.'));
       }
     }
   }, []);
@@ -217,35 +216,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const totalQuotaMax = Math.max(0, Number(pkg.quotaMax) || 0);
 
   // Hanya foto asli yang diunggah mitra; tidak ada foto stok pengganti
-  const getGalleryImages = (): string[] => {
-    const formatUrl = (url: string) => {
-      if (!url) return '';
-      const trimmed = url.trim();
-      if (!trimmed) return '';
-      if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
-        return trimmed;
-      }
-      // If it looks like a valid relative path or image file extension
-      if (trimmed.startsWith('/') || trimmed.startsWith('uploads/') || trimmed.startsWith('storage/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(trimmed)) {
-        const baseUrl = API_BASE_URL.replace('/api/v1', '');
-        return trimmed.startsWith('/') ? `${baseUrl}${trimmed}` : `${baseUrl}/${trimmed}`;
-      }
-      // Filter out non-URL junk text like "Sub 2", "Main preview", "thumb", etc.
-      return '';
-    };
-
-    let rawList: string[] = [];
-    if (Array.isArray((pkg as any)?.images)) {
-      rawList = (pkg as any).images.map((img: any) => (typeof img === 'string' ? formatUrl(img) : '')).filter(Boolean);
-    } else if ((pkg as any)?.images && typeof (pkg as any).images === 'string' && (pkg as any).images.trim() !== '') {
-      rawList = (pkg as any).images.split(',').map((s: string) => formatUrl(s)).filter(Boolean);
-    } else if ((pkg as any)?.image && typeof (pkg as any).image === 'string' && (pkg as any).image.trim() !== '') {
-      const formatted = formatUrl((pkg as any).image);
-      if (formatted) rawList = [formatted];
-    }
-
-    return rawList;
-  };
+  const getGalleryImages = (): string[] => getTripImages(pkg as any);
 
   const photos = (() => {
     let images: string[] = [];
@@ -288,6 +259,18 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const openTripDeparture = isOpenTrip ? getOpenTripDeparture() : null;
   const hasUpcomingDeparture = !!openTripDeparture && openTripDeparture.startIso > todayIso;
   const openTripUnavailable = isOpenTrip && !hasUpcomingDeparture;
+
+  if (!selectedPackageForDetail && (deepLinkError || !/[?&]id=\d+/.test(window.location.hash))) {
+    return (
+      <div className="container" style={{ maxWidth: '560px', margin: '0 auto', padding: '80px 20px', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '22px', marginBottom: '8px' }}>Paket tidak dapat ditampilkan</h1>
+        <p style={{ color: '#64748b' }}>{deepLinkError || 'Paket belum dipilih. Silakan cari paket wisata terlebih dahulu.'}</p>
+        <button type="button" className="btn btn-primary" onClick={() => navigateTo('cari-trip')} style={{ marginTop: '16px' }}>
+          Cari Paket Wisata
+        </button>
+      </div>
+    );
+  }
 
   if (!selectedPackageForDetail) {
     return (

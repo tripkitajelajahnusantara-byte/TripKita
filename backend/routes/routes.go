@@ -55,10 +55,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 	departureCtrl := controllers.NewDepartureController(c.DepartureService)
 	tripPlanCtrl := controllers.NewTripPlanController(c.TripPlanService)
 
-	// Dokumen verifikasi tidak boleh menjadi file publik di production.
-	if !cfg.IsProduction() {
-		r.Static("/uploads", cfg.DocumentUploadDir())
-	}
+	// Direktori unggahan tidak pernah disajikan utuh di environment mana pun:
+	// hanya foto paket ("pkg_") yang publik. Dokumen verifikasi dan bukti
+	// transfer tetap lewat endpoint /provider|/admin/documents berotorisasi.
+	r.GET("/uploads/:filename", uploadCtrl.ServePackagePhoto)
 
 	// API Group
 	apiV1 := r.Group("/api/v1")
@@ -122,6 +122,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			// Packages
 			packages := provider.Group("/packages")
 			{
+				// Satu paket butuh 3-20 foto, jadi batasnya lebih longgar dari dokumen.
+				packages.POST("/photos", middleware.RateLimit(60, time.Hour), uploadCtrl.UploadPackagePhoto)
 				packages.POST("", packageCtrl.Create)
 				packages.GET("", packageCtrl.GetAll)
 				packages.GET("/:id", packageCtrl.GetByID)

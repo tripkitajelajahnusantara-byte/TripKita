@@ -58,7 +58,11 @@ func (ctrl *BookingController) GetCustomerBookings(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, bookings)
+	views := make([]bookingWithDeadline, len(bookings))
+	for i := range bookings {
+		views[i] = withPaymentDeadline(&bookings[i])
+	}
+	c.JSON(http.StatusOK, views)
 }
 
 func (ctrl *BookingController) GetPublicStatus(c *gin.Context) {
@@ -87,11 +91,34 @@ func (ctrl *BookingController) GetPublicStatus(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Booking tidak ditemukan"})
 			return
 		}
-		c.JSON(http.StatusOK, booking)
+		c.JSON(http.StatusOK, withPaymentDeadline(booking))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	c.JSON(http.StatusOK, guestBookingView(booking))
+}
+
+// bookingWithDeadline menambahkan batas bayar yang dihitung server supaya
+// frontend tidak menebak dari createdAt (batas dapat diperpanjang setelah
+// bukti ditolak admin).
+type bookingWithDeadline struct {
+	*models.Booking
+	PaymentDeadline *time.Time `json:"paymentDeadline,omitempty"`
+}
+
+func withPaymentDeadline(booking *models.Booking) bookingWithDeadline {
+	view := bookingWithDeadline{Booking: booking}
+	if booking.Status == models.StatusPendingPayment && !booking.CreatedAt.IsZero() {
+		deadline := models.PaymentDeadline(booking)
+		view.PaymentDeadline = &deadline
+	}
+	return view
+}
+
+// guestBookingView adalah tampilan booking tamu yang sengaja disamarkan: kode
+// booking tidak boleh cukup untuk membaca email, telepon, atau data peserta.
+func guestBookingView(booking *models.Booking) gin.H {
+	view := gin.H{
 		"bookingCode":             booking.BookingCode,
 		"status":                  booking.Status,
 		"createdAt":               booking.CreatedAt,
@@ -103,7 +130,11 @@ func (ctrl *BookingController) GetPublicStatus(c *gin.Context) {
 		"paymentReviewDeadline":   booking.PaymentReviewDeadline,
 		"paymentReviewNotes":      booking.PaymentReviewNotes,
 		"packageDetails":          gin.H{"name": booking.Package.Name},
-	})
+	}
+	if booking.Status == models.StatusPendingPayment && !booking.CreatedAt.IsZero() {
+		view["paymentDeadline"] = models.PaymentDeadline(booking)
+	}
+	return view
 }
 
 func (ctrl *BookingController) UpdateStatus(c *gin.Context) {
@@ -187,6 +218,12 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 
 	if req.PackageID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "packageId wajib diisi"})
+		return
+	}
+	// Tanpa rekening tujuan customer tidak dapat membayar, sehingga booking
+	// hanya akan menahan kuota selama 24 jam tanpa guna.
+	if strings.TrimSpace(ctrl.cfg.ManualPaymentAccountNumber) == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Pembayaran sedang tidak tersedia. Silakan hubungi admin TemenTrip."})
 		return
 	}
 
@@ -313,7 +350,11 @@ func (ctrl *BookingController) SubmitPaymentProof(c *gin.Context) {
 		respondInternalError(c, "mengirim bukti pembayaran", err)
 		return
 	}
-	c.JSON(http.StatusOK, updated)
+	if updated.CustomerID == nil || *updated.CustomerID == 0 {
+		c.JSON(http.StatusOK, guestBookingView(updated))
+		return
+	}
+	c.JSON(http.StatusOK, withPaymentDeadline(updated))
 }
 
 func (ctrl *BookingController) ReviewManualPayment(c *gin.Context) {

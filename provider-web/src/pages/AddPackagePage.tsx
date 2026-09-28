@@ -16,10 +16,11 @@ import {
   LoaderCircle
 } from 'lucide-react';
 
-import { request, API_BASE_URL } from '../utils/api';
+import { request } from '../utils/api';
 import { PackageDateManager } from '../components/PackageDateManager';
 import { PROVINCES } from '../utils/locationData';
-import { OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
+import { OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES, resolveMediaUrl } from '../utils/tripImages';
+import { TripImage } from '../components/TripImage';
 import { useActionLock } from '../utils/useActionLock';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import {
@@ -51,6 +52,22 @@ function LocationPicker({ position, onSelect }: {
 
 export const CATEGORIES = OFFICIAL_CATEGORIES;
 export const TRIP_TYPES = OFFICIAL_TRIP_TYPES;
+
+// Foto lama bisa tersimpan sebagai URL absolut ber-host lokal (mis. saat
+// development). Ubah menjadi path "/uploads/..." agar tidak ikut tersimpan ulang.
+function toStoredPhotoPath(raw: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    if (['localhost', '127.0.0.1', '0.0.0.0'].includes(parsed.hostname) && parsed.pathname.startsWith('/uploads/')) {
+      return parsed.pathname;
+    }
+  } catch {
+    // Bukan URL absolut: sudah berupa path.
+  }
+  return trimmed;
+}
 
 export const AddPackagePage: React.FC = () => {
   const { navigateTo, editingPackageId } = useNavigation();
@@ -136,33 +153,28 @@ export const AddPackagePage: React.FC = () => {
   }, [duration]);
 
   // Itinerary states
+  // Paket baru dimulai kosong: contoh hanya muncul sebagai placeholder agar
+  // tidak ikut terpublikasi sebagai janji yang tidak ditawarkan mitra.
   const [itineraries, setItineraries] = useState<{ day: number; activities: { time: string; title: string }[] }[]>([
-    { day: 1, activities: [{ time: '08:00 - 10:00', title: 'Penjemputan di Meeting Point' }, { time: '12:00 - 13:00', title: 'Makan Siang' }] }
+    { day: 1, activities: [] }
   ]);
   const [newActivityTime, setNewActivityTime] = useState('');
   const [newActivityTitle, setNewActivityTitle] = useState('');
   const [selectedItineraryDay, setSelectedItineraryDay] = useState(1);
 
   // Facilities states
-  const [includedFacilities, setIncludedFacilities] = useState<string[]>([
-    'Transportasi AC AC/PP',
-    'Makan sesuai program',
-    'Tiket masuk objek wisata',
-    'Pemandu wisata profesional'
-  ]);
-  const [excludedFacilities, setExcludedFacilities] = useState<string[]>([
-    'Pengeluaran pribadi',
-    'Tiket penerbangan ke meeting point',
-    'Tipping guide & driver'
-  ]);
+  const [includedFacilities, setIncludedFacilities] = useState<string[]>([]);
+  const [excludedFacilities, setExcludedFacilities] = useState<string[]>([]);
+  // Mode edit: bila data paket gagal dimuat, penyimpanan dikunci supaya form
+  // kosong tidak menimpa paket asli.
+  const [packageLoadError, setPackageLoadError] = useState('');
+  const [packageLoadAttempt, setPackageLoadAttempt] = useState(0);
   const [newIncludedFacility, setNewIncludedFacility] = useState('');
   const [newExcludedFacility, setNewExcludedFacility] = useState('');
 
   // Photos states
-  const [packagePhotos, setPackagePhotos] = useState<string[]>([
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=400&q=80'
-  ]);
+  // Paket baru dimulai tanpa foto: mitra wajib mengunggah foto aslinya sendiri.
+  const [packagePhotos, setPackagePhotos] = useState<string[]>([]);
   const isUploadingPhoto = pending === 'photos';
 
   const steps = [
@@ -211,18 +223,21 @@ export const AddPackagePage: React.FC = () => {
             }
           }
           if (pkg.images) {
-            const splitImgs = pkg.images.split(',').filter(Boolean);
+            const splitImgs = pkg.images.split(',').map(toStoredPhotoPath).filter(Boolean);
             if (splitImgs.length > 0) setPackagePhotos(splitImgs);
           } else if (pkg.image) {
-            setPackagePhotos([pkg.image]);
+            const single = toStoredPhotoPath(pkg.image);
+            if (single) setPackagePhotos([single]);
           }
-        } catch (err) {
+          setPackageLoadError('');
+        } catch (err: any) {
           console.error('Failed to load package details:', err);
+          setPackageLoadError(err?.message || 'Data paket gagal dimuat.');
         }
       }
     }
     loadPackage();
-  }, [editingPackageId]);
+  }, [editingPackageId, packageLoadAttempt]);
 
   // Itinerary helper actions
   const handleAddActivity = (day: number) => {
@@ -312,16 +327,14 @@ export const AddPackagePage: React.FC = () => {
 
           const formData = new FormData();
           formData.append('file', file);
-          const res = await request('/provider/upload', {
+          const res = await request('/provider/packages/photos', {
             method: 'POST',
             body: formData,
           });
-          if (res && res.documentPath) {
-            const baseUrl = API_BASE_URL.replace('/api/v1', '');
-            const fullPhotoUrl = res.documentPath.startsWith('http') 
-              ? res.documentPath 
-              : `${baseUrl}${res.documentPath}`;
-            newPhotos.push(fullPhotoUrl);
+          // Simpan path relatif dari server; origin backend ditambahkan saat
+          // ditampilkan sehingga database tidak terikat host tertentu.
+          if (res && res.photoPath) {
+            newPhotos.push(res.photoPath);
           }
         }
       } catch (err: any) {
@@ -395,6 +408,11 @@ export const AddPackagePage: React.FC = () => {
 	  return;
 	}
 
+    if (editingPackageId && packageLoadError) {
+      showAlert({ title: 'Data Paket Belum Termuat', message: 'Muat ulang data paket terlebih dahulu agar perubahan tidak menimpa paket dengan data kosong.', type: 'warning' });
+      return;
+    }
+
     if (status === 'publish') {
       if (!packageName.trim()) {
 		showValidation('Nama paket wisata wajib diisi sebelum paket dipublikasikan.', 'info');
@@ -458,6 +476,14 @@ export const AddPackagePage: React.FC = () => {
       }
       if (startDate < todayStr) {
 		showValidation('Tanggal mulai keberangkatan tidak boleh menggunakan tanggal yang sudah lewat.', 'pricing');
+        return;
+      }
+      if (!itineraries.some((day) => day.activities.length > 0)) {
+		showValidation('Tambahkan minimal satu kegiatan pada itinerary sebelum paket dipublikasikan.', 'itinerary');
+        return;
+      }
+      if (includedFacilities.length === 0) {
+		showValidation('Tambahkan minimal satu fasilitas yang termasuk dalam paket.', 'facilities');
         return;
       }
       if (packagePhotos.length < 3) {
@@ -594,6 +620,13 @@ export const AddPackagePage: React.FC = () => {
             </button>
           </div>
         </header>
+
+        {editingPackageId && packageLoadError && (
+          <div role="alert" style={{ margin: '0 0 16px', padding: '12px 16px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <span><strong>Data paket gagal dimuat.</strong> {packageLoadError} Penyimpanan dikunci sampai data termuat.</span>
+            <button type="button" className="action-outline-btn" onClick={() => setPackageLoadAttempt((n) => n + 1)}>Coba Lagi</button>
+          </div>
+        )}
 
         {/* Wizard Form Layout Split */}
         <div className="add-pkg-split">
@@ -789,7 +822,7 @@ export const AddPackagePage: React.FC = () => {
                                 className="delete-activity-btn" 
                                 onClick={() => handleDeleteActivity(selectedItineraryDay, idx)}
                               >
-                                <Trash2 size={12} />
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </div>
@@ -808,7 +841,7 @@ export const AddPackagePage: React.FC = () => {
                         />
                         <input 
                           type="text" 
-                          placeholder="Deskripsi aktivitas atau destinasi" 
+                          placeholder="Kegiatan, contoh: Penjemputan di titik kumpul" 
                           value={newActivityTitle}
                           onChange={(e) => setNewActivityTitle(e.target.value)}
                         />
@@ -845,7 +878,7 @@ export const AddPackagePage: React.FC = () => {
                     <div className="add-facility-input-row">
                       <input 
                         type="text" 
-                        placeholder="Tambah fasilitas termasuk..." 
+                        placeholder="Contoh: Transportasi AC PP, makan 3x, tiket masuk" 
                         value={newIncludedFacility}
                         onChange={(e) => setNewIncludedFacility(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFacility('included'))}
@@ -867,7 +900,7 @@ export const AddPackagePage: React.FC = () => {
                     <div className="add-facility-input-row">
                       <input 
                         type="text" 
-                        placeholder="Tambah fasilitas tidak termasuk..." 
+                        placeholder="Contoh: Pengeluaran pribadi, tip pemandu" 
                         value={newExcludedFacility}
                         onChange={(e) => setNewExcludedFacility(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFacility('excluded'))}
@@ -1114,11 +1147,14 @@ export const AddPackagePage: React.FC = () => {
                   <div className="photos-gallery-grid">
                     {packagePhotos.map((url, idx) => (
                       <div key={idx} className="gallery-photo-card">
-                        <img src={url} alt={`Gallery ${idx + 1}`} onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80'; }} />
+                        <TripImage src={resolveMediaUrl(url)} alt={`Foto paket ${idx + 1}`} placeholderIconSize={20} placeholderShowText={false} />
+                        {idx === 0 && <span className="gallery-cover-badge">Sampul</span>}
                         <button 
                           type="button"
                           className="delete-photo-btn"
                           onClick={() => handleDeletePhoto(idx)}
+                          aria-label={`Hapus foto ${idx + 1}`}
+                          title="Hapus foto"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -1694,12 +1730,30 @@ export const AddPackagePage: React.FC = () => {
           object-fit: cover;
         }
 
+        .gallery-cover-badge {
+          position: absolute;
+          left: 8px;
+          bottom: 8px;
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.75);
+          color: #ffffff;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        @media (max-width: 640px) {
+          .photos-gallery-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
         .delete-photo-btn {
           position: absolute;
           top: 8px;
           right: 8px;
-          width: 24px;
-          height: 24px;
+          width: 32px;
+          height: 32px;
           border-radius: 50%;
           background: rgba(255, 255, 255, 0.9);
           border: 1px solid var(--color-border);

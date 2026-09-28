@@ -52,7 +52,7 @@ const getWhatsAppURL = (phone?: string): string | null => {
 // konstanta ini hanya dipakai selama konfigurasi belum termuat.
 const DEFAULT_PAYMENT_WINDOW_SECONDS = 24 * 60 * 60;
 
-const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; label?: string; onExpire?: () => void }> = ({ createdAt, windowSeconds, label = 'Batas Transfer', onExpire }) => {
+const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; deadlineAt?: string; label?: string; onExpire?: () => void }> = ({ createdAt, windowSeconds, deadlineAt, label = 'Batas Transfer', onExpire }) => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const onExpireRef = useRef(onExpire);
 
@@ -61,11 +61,12 @@ const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; labe
   }, [onExpire]);
 
   useEffect(() => {
-    if (!createdAt) return;
-    const createdMs = new Date(createdAt).getTime();
-    if (!Number.isFinite(createdMs) || createdMs <= 0) return;
+    const serverDeadlineMs = deadlineAt ? new Date(deadlineAt).getTime() : NaN;
+    const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
+    if (!Number.isFinite(serverDeadlineMs) && (!Number.isFinite(createdMs) || createdMs <= 0)) return;
 
-    const expireMs = createdMs + windowSeconds * 1000;
+    // Batas dari server diutamakan karena diperpanjang setelah bukti ditolak.
+    const expireMs = Number.isFinite(serverDeadlineMs) ? serverDeadlineMs : createdMs + windowSeconds * 1000;
 
     const updateTimer = () => {
       const diff = Math.max(0, Math.floor((expireMs - Date.now()) / 1000));
@@ -242,13 +243,23 @@ export const CustomerHistoryPage: React.FC = () => {
       setTrackedBooking(data);
     } catch (err: any) {
       console.error(err);
-      setTrackingError('Kode booking tidak ditemukan. Mohon masukkan Kode Booking secara lengkap dan tepat (contoh: TK-2824-1889).');
+      if (err?.status === 404) {
+        setTrackingError('Kode booking tidak ditemukan. Masukkan kode secara lengkap, contoh: TK-20260928-AB12CD34.');
+      } else if (err?.status === 401 || err?.status === 403) {
+        setTrackingError('Pesanan ini terhubung ke akun TemenTrip. Silakan masuk dengan akun pemesan untuk melihatnya.');
+      } else {
+        setTrackingError(err?.message || 'Status booking belum dapat dimuat. Coba lagi beberapa saat.');
+      }
     } finally {
       setTrackingLoading(false);
     }
   };
 
-  const isBookingExpired = (createdAt?: string) => {
+  const isBookingExpired = (createdAt?: string, paymentDeadline?: string) => {
+    if (paymentDeadline) {
+      const deadlineMs = new Date(paymentDeadline).getTime();
+      if (Number.isFinite(deadlineMs)) return Date.now() > deadlineMs;
+    }
     if (!createdAt) return false;
     const createdTime = new Date(createdAt).getTime();
     if (isNaN(createdTime)) return false;
@@ -442,7 +453,7 @@ export const CustomerHistoryPage: React.FC = () => {
             Lacak Tiket Pesanan Anda
           </h2>
           <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
-            Ingin mencari pesanan Anda yang hilang? Masukkan Kode Booking (Contoh: TK-2824-xxxx) di bawah ini.
+            Ingin mencari pesanan Anda yang hilang? Masukkan Kode Booking (Contoh: TK-20260928-XXXXXXXX) di bawah ini.
           </p>
 
           <form onSubmit={handleTrackTicket} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -654,7 +665,7 @@ export const CustomerHistoryPage: React.FC = () => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {bookings.map((booking, idx) => {
-              const isExpired = booking.status === 'EXPIRED' || (booking.status === 'PENDING_PAYMENT' && isBookingExpired(booking.createdAt));
+              const isExpired = booking.status === 'EXPIRED' || (booking.status === 'PENDING_PAYMENT' && isBookingExpired(booking.createdAt, (booking as any).paymentDeadline));
               const badge = getStatusBadge(isExpired ? 'EXPIRED' : booking.status);
               const tripName = booking.packageDetails?.name || booking.packageName || 'Paket Wisata Nusantara';
               const formattedTripDate = new Date(booking.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -810,9 +821,15 @@ export const CustomerHistoryPage: React.FC = () => {
                       /* ACTIVE PENDING PAYMENT BANNER */
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Informasi Transfer Manual:</strong>
-                          <CountdownTimer createdAt={booking.createdAt} windowSeconds={paymentWindowSeconds} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
+                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Menunggu Pembayaran</strong>
+                          <CountdownTimer createdAt={booking.createdAt} deadlineAt={(booking as any).paymentDeadline} windowSeconds={paymentWindowSeconds} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
                         </div>
+
+                        {booking.paymentReviewNotes && (
+                          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', lineHeight: 1.5 }}>
+                            <strong>Bukti transfer sebelumnya ditolak admin:</strong> {booking.paymentReviewNotes}. Silakan unggah ulang bukti yang benar.
+                          </div>
+                        )}
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
                           Silakan transfer sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> lalu unggah bukti pembayaran sebelum countdown berakhir.
@@ -825,7 +842,7 @@ export const CustomerHistoryPage: React.FC = () => {
                               <div><span style={{ color: '#64748b' }}>Kategori:</span> <strong>{booking.packageDetails.category}</strong></div>
                             )}
                             <div><span style={{ color: '#64748b' }}>Tujuan Trip:</span> <strong>{booking.packageDetails?.destination || tripName}</strong></div>
-                            <div><span style={{ color: '#64748b' }}>Nama Pemesan:</span> <strong>{booking.customerName || (customerProfile as any)?.name || 'Pelanggan TripKita'}</strong></div>
+                            <div><span style={{ color: '#64748b' }}>Nama Pemesan:</span> <strong>{booking.customerName || (customerProfile as any)?.name || 'Pelanggan'}</strong></div>
                           </div>
 
                           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>

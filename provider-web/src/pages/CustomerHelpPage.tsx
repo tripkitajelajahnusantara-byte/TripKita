@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useCancellationRefundDays } from '../utils/checkoutConfig';
 import { 
   HelpCircle, 
   CreditCard, 
@@ -19,6 +20,7 @@ interface FAQItem {
 }
 
 export const CustomerHelpPage: React.FC = () => {
+  const refundDays = useCancellationRefundDays();
   const [activeCategory, setActiveCategory] = useState<string>('semua');
   const [openFaqId, setOpenFaqId] = useState<string | null>('faq-1');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -44,13 +46,13 @@ export const CustomerHelpPage: React.FC = () => {
     },
     {
       id: 'faq-4',
-      category: 'grup-wa',
+      category: 'pemesanan',
       question: 'Bagaimana cara menghubungi provider setelah pembayaran?',
       answer: 'Masuk ke akun Anda lalu buka riwayat booking. Setelah pembayaran terkonfirmasi, tombol "Hubungi Provider" akan tersedia bila provider memiliki nomor WhatsApp aktif.'
     },
     {
       id: 'faq-5',
-      category: 'tiket',
+      category: 'pemesanan',
       question: 'Bagaimana jika saya tidak sengaja lupa atau kehilangan Kode Booking?',
       answer: 'Masuk ke akun Anda untuk melihat semua e-voucher dan riwayat transaksi. Anda juga bisa menghubungi kami melalui email tripkitajelajahnusantara@gmail.com.'
     },
@@ -62,7 +64,7 @@ export const CustomerHelpPage: React.FC = () => {
     },
     {
       id: 'faq-7',
-      category: 'keamanan',
+      category: 'pembayaran',
       question: 'Bagaimana pembayaran saya diproses?',
       answer: 'Setelah transfer, unggah bukti pembayaran sebelum countdown berakhir. Status berubah menjadi Menunggu Konfirmasi Admin dan wajib diperiksa maksimal 1×24 jam. Status dapat dipantau melalui Cek Booking.'
     },
@@ -70,7 +72,9 @@ export const CustomerHelpPage: React.FC = () => {
       id: 'faq-8',
       category: 'refund',
       question: 'Bagaimana jika saya ingin membatalkan pesanan?',
-      answer: 'Jika Anda membatalkan paling lambat 7 hari sebelum tanggal trip, pembayaran dikembalikan penuh. Pembatalan kurang dari 7 hari sebelum trip tidak mendapat refund.'
+      answer: refundDays
+        ? `Jika Anda membatalkan paling lambat ${refundDays} hari sebelum tanggal trip, pembayaran dikembalikan penuh. Pembatalan kurang dari ${refundDays} hari sebelum trip tidak mendapat refund.`
+        : 'Pembatalan sebelum batas waktu kebijakan refund mendapat pengembalian penuh; setelah batas itu tidak mendapat refund. Detail batasnya tertera di halaman konfirmasi pesanan.'
     }
   ];
 

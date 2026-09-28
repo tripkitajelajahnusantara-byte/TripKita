@@ -73,6 +73,16 @@ Frontend membaca `VITE_API_BASE_URL` saat build. Bila kosong, aplikasi memakai
 `/api/v1` pada host non-localhost, sehingga cocok untuk deployment di belakang
 reverse proxy.
 
+## Foto paket dan dokumen
+
+Foto paket diunggah lewat `POST /api/v1/provider/packages/photos`, disimpan sebagai
+`pkg_<acak>.jpg|png`, dan disajikan publik di `/uploads/<nama>`. Selain berkas `pkg_`,
+isi direktori unggahan tidak pernah disajikan publik: dokumen verifikasi mitra dan
+bukti transfer (`doc_`) hanya dapat dibuka lewat `/provider/documents` atau
+`/admin/documents`. Saat startup, foto paket lama yang masih tersimpan sebagai `doc_`
+disalin menjadi `pkg_` (kecuali berkas yang juga tercatat sebagai dokumen privat) dan
+URL absolut ber-host di database ditulis ulang menjadi path relatif.
+
 ## Alur uang
 
 Pelanggan membayar **penuh di muka** melalui satu invoice Xendit; tidak ada uang muka parsial.

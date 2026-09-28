@@ -14,7 +14,7 @@ import {
 } from '../components/MeetingPointMap';
 
 export const CustomerConfirmationPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, bookingFormData, setSelectedBookingForInvoice } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, bookingFormData, setBookingFormData, setSelectedBookingForInvoice } = useNavigation();
   const { showAlert } = useCustomAlert();
   // POST /public/bookings membuat pesanan baru; kunci berbasis ref mencegah
   // klik ganda di tick yang sama membuat dua booking dan dua tagihan.
@@ -197,11 +197,9 @@ export const CustomerConfirmationPage: React.FC = () => {
         paymentMethod: response.paymentMethod || 'Transfer Bank Manual'
       };
 
-      // Save into local history
-      const existingHistoryStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-      const history = JSON.parse(existingHistoryStr);
-      history.unshift(bookingObj);
-      localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
+      // Riwayat lokal lama tidak pernah dibaca dan menumpuk data pemesan di
+      // perangkat bersama, jadi dibersihkan; invoice cukup memakai sessionStorage.
+      localStorage.removeItem('tripkita_my_bookings');
       sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
 	  // Booking telah dibuat dan kuota langsung ditahan selama 24 jam.
@@ -209,6 +207,8 @@ export const CustomerConfirmationPage: React.FC = () => {
 	  setRedirecting(true);
 	  setSelectedBookingForInvoice(bookingObj);
 	  navigateTo('halaman-pembayaran');
+	  // Data form dikosongkan agar tombol Back tidak dapat membuat booking kedua.
+	  setBookingFormData(null);
 
     } catch (err: any) {
       console.error('[Booking Error]', err);

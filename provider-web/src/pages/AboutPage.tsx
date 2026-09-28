@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCancellationRefundDays } from '../utils/checkoutConfig';
 import { 
   Heart, 
   Lightbulb, 
@@ -9,6 +10,7 @@ import {
 } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
+  const refundDays = useCancellationRefundDays();
   const values = [
     { icon: <Heart size={20} color="#ef4444" />, title: 'Keterbukaan', desc: 'Harga, jadwal, dan aturan refund ditampilkan sebelum Anda membayar. Ulasan hanya bisa ditulis oleh peserta yang sudah menyelesaikan trip.' },
     { icon: <Lightbulb size={20} color="#0284c7" />, title: 'Kemudahan', desc: 'Mitra mengelola paket, kuota, dan jadwal dari satu dasbor, sehingga tidak perlu mencatat pesanan secara manual.' },
@@ -95,7 +97,7 @@ export const AboutPage: React.FC = () => {
             <ul>
               <li>Menyediakan alat sederhana bagi mitra untuk mengelola paket, kuota, dan jadwal.</li>
               <li>Memverifikasi setiap mitra sebelum paketnya bisa dipesan.</li>
-              <li>Menerapkan aturan refund yang sama untuk semua pesanan: pembatalan paling lambat 7 hari sebelum trip atau pembatalan oleh mitra, dana kembali penuh.</li>
+              <li>Menerapkan aturan refund yang sama untuk semua pesanan: pembatalan {refundDays ? `paling lambat ${refundDays} hari sebelum trip` : 'sebelum batas waktu kebijakan refund'} atau pembatalan oleh mitra, dana kembali penuh.</li>
               <li>Mendorong lebih banyak orang berwisata di dalam negeri.</li>
             </ul>
           </div>
