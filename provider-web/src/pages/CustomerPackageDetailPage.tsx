@@ -328,20 +328,21 @@ export const CustomerPackageDetailPage: React.FC = () => {
       try {
         const parsed = JSON.parse(pkg.itinerary);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const list: { day: string; title: string; desc: string }[] = [];
+          const days: { day: string; activities: { time: string; title: string; desc: string }[] }[] = [];
           parsed.forEach((item: any) => {
             const dayLabel = `Hari ${item.day}`;
             if (Array.isArray(item.activities)) {
-              item.activities.forEach((act: any) => {
-                list.push({
-                  day: dayLabel,
-                  title: act.time ? `${act.time} — ${act.title}` : act.title,
-                  desc: act.description || ''
-                });
-              });
+              const activities = item.activities
+                .map((act: any) => ({
+                  time: String(act?.time || '').trim(),
+                  title: String(act?.title || '').trim(),
+                  desc: String(act?.description || '').trim(),
+                }))
+                .filter((act: { title: string }) => act.title);
+              if (activities.length > 0) days.push({ day: dayLabel, activities });
             }
           });
-          if (list.length > 0) return list;
+          if (days.length > 0) return days;
         }
       } catch {
         // ignore
@@ -693,16 +694,46 @@ export const CustomerPackageDetailPage: React.FC = () => {
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {displayItinerary.length === 0 && <p style={{ color: '#64748b', margin: 0 }}>Itinerary belum dilengkapi oleh provider.</p>}
-                {displayItinerary.map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                    <span style={{ backgroundColor: '#e0f2fe', color: '#007bff', fontSize: '12px', fontWeight: '700', padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
-                      {item.day}
+                {displayItinerary.map((day, dayIndex) => (
+                  <section
+                    key={`${day.day}-${dayIndex}`}
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '16px',
+                      alignItems: 'start',
+                      padding: '16px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      backgroundColor: '#f8fafc',
+                    }}
+                  >
+                    <span style={{ backgroundColor: '#e0f2fe', color: '#007bff', fontSize: '12px', fontWeight: '800', padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                      {day.day}
                     </span>
-                    <div>
-                      <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block', marginBottom: '2px' }}>{item.title}</strong>
-                      <span style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.5', display: 'block' }}>{item.desc}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 280px', minWidth: 0 }}>
+                      {day.activities.map((activity, activityIndex) => (
+                        <div
+                          key={`${day.day}-${activityIndex}`}
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '12px',
+                            padding: activityIndex === 0 ? '0 0 12px' : '12px 0',
+                            borderTop: activityIndex === 0 ? 'none' : '1px solid #e2e8f0',
+                          }}
+                        >
+                          <strong style={{ fontSize: '12.5px', color: '#0284c7', lineHeight: '1.5', flex: '0 0 105px' }}>
+                            {activity.time || 'Waktu fleksibel'}
+                          </strong>
+                          <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+                            <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block', lineHeight: '1.5' }}>{activity.title}</strong>
+                            {activity.desc && <span style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.5', display: 'block', marginTop: '2px' }}>{activity.desc}</span>}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  </section>
                 ))}
               </div>
             </div>

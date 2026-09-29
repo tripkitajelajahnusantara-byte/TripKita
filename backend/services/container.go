@@ -29,6 +29,7 @@ type Container struct {
 	PackageService   PackageService
 	IPaymuService    IPaymuService
 	WeatherService   WeatherService
+	GeocodingService GeocodingService
 	BookingService   BookingService
 	DashService      DashboardService
 	PayoutService    PayoutService
@@ -53,6 +54,7 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 	notifService := NewNotificationService(db)
 	ipaymuService := NewIPaymuService(cfg)
 	weatherService := NewWeatherService(cfg)
+	geocodingService := NewGeocodingService(cfg)
 
 	bookingService := NewBookingService(bookingRepo, packageRepo, ipaymuService, emailService, notifService)
 
@@ -72,6 +74,7 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 		NotifService:     notifService,
 		IPaymuService:    ipaymuService,
 		WeatherService:   weatherService,
+		GeocodingService: geocodingService,
 		AuthService:      NewAuthService(db, providerRepo, cfg, emailService, notifService),
 		AdminService:     NewAdminService(db, providerRepo, notifService, emailService),
 		PackageService:   NewPackageService(packageRepo, providerRepo, packageDateRepo),

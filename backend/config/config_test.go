@@ -44,7 +44,7 @@ func loadWith(t *testing.T, env map[string]string) (*Config, error) {
 		"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
 		"IPAYMU_VA", "IPAYMU_API_KEY", "IPAYMU_BASE_URL", "IPAYMU_CALLBACK_URL", "IPAYMU_RETURN_URL", "IPAYMU_CANCEL_URL",
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM",
-		"WEATHER_API_KEY", "WEATHER_API_BASE_URL",
+		"WEATHER_API_KEY", "WEATHER_API_BASE_URL", "GEOCODING_API_BASE_URL",
 		"RUN_MIGRATIONS", "SEED_DB", "ENABLE_DEV_MOCKS", "ENABLE_BACKGROUND_JOBS",
 		"ENABLE_AUTOMATIC_PAYOUT", "UPLOAD_DIR", "RAILWAY_VOLUME_MOUNT_PATH",
 		"MANUAL_PAYMENT_BANK_NAME", "MANUAL_PAYMENT_ACCOUNT_NUMBER", "MANUAL_PAYMENT_ACCOUNT_HOLDER",
@@ -98,6 +98,7 @@ func TestProductionRejectsUnsafeValues(t *testing.T) {
 			e["DATABASE_URL"] = "postgres://u:p@db.example.com:5432/tripkita?sslmode=disable"
 		}, "TLS"},
 		{"frontend bukan https", func(e map[string]string) { e["FRONTEND_URL"] = "http://app.example.com" }, "HTTPS"},
+		{"geocoder bukan https", func(e map[string]string) { e["GEOCODING_API_BASE_URL"] = "http://geocoder.example.com" }, "GEOCODING_API_BASE_URL"},
 		{"redirect google beda origin", func(e map[string]string) {
 			e["GOOGLE_REDIRECT_URI"] = "https://other-api.example.com/api/v1/public/auth/google/callback"
 		}, "BACKEND_URL"},
@@ -170,6 +171,28 @@ func TestDevelopmentDefaultsStayUsable(t *testing.T) {
 	}
 	if cfg.WeatherAPIBaseURL != "https://api.weatherapi.com/v1" {
 		t.Errorf("WEATHER_API_BASE_URL default tidak sesuai: %s", cfg.WeatherAPIBaseURL)
+	}
+	if cfg.GeocodingAPIBaseURL != "https://nominatim.openstreetmap.org" {
+		t.Errorf("GEOCODING_API_BASE_URL default tidak sesuai: %s", cfg.GeocodingAPIBaseURL)
+	}
+}
+
+func TestSMTPFromDefaultsToAuthenticatedUser(t *testing.T) {
+	cfg, err := loadWith(t, map[string]string{
+		"APP_ENV":     "development",
+		"DB_HOST":     "localhost",
+		"DB_USER":     "u",
+		"DB_PASSWORD": "p",
+		"DB_NAME":     "d",
+		"JWT_SECRET":  "9f2b7c41ae6d05938bd14c7ea2f6091d",
+		"SMTP_USER":   "mailer@example.com",
+		"SMTP_PASS":   "app-password",
+	})
+	if err != nil {
+		t.Fatalf("konfigurasi development ditolak: %v", err)
+	}
+	if cfg.SMTPFrom != "mailer@example.com" {
+		t.Fatalf("SMTP_FROM=%q, ingin fallback ke SMTP_USER", cfg.SMTPFrom)
 	}
 }
 

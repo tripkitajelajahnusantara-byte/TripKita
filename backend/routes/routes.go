@@ -54,6 +54,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 	notifCtrl := controllers.NewNotificationController(c.NotifService)
 	departureCtrl := controllers.NewDepartureController(c.DepartureService)
 	tripPlanCtrl := controllers.NewTripPlanController(c.TripPlanService)
+	geocodingCtrl := controllers.NewGeocodingController(c.GeocodingService)
 
 	// Direktori unggahan tidak pernah disajikan utuh di environment mana pun:
 	// hanya foto paket ("pkg_") yang publik. Dokumen verifikasi dan bukti
@@ -119,6 +120,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 		provider := apiV1.Group("/provider")
 		provider.Use(middleware.AuthMiddleware(db, cfg), middleware.ProviderRequired())
 		{
+			// Pencarian dilakukan hanya setelah tindakan eksplisit pengguna dan
+			// dibatasi agar tidak berubah menjadi autocomplete geocoder publik.
+			provider.GET("/geocode", middleware.RateLimit(20, time.Minute), geocodingCtrl.Search)
+
 			// Packages
 			packages := provider.Group("/packages")
 			{

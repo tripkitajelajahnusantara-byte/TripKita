@@ -11,6 +11,15 @@ import 'package:customer_mobile/widgets/common.dart';
 
 const _genders = ['Laki-laki', 'Perempuan'];
 
+int _ageOnDate(DateTime birthDate, DateTime onDate) {
+  var age = onDate.year - birthDate.year;
+  if (onDate.month < birthDate.month ||
+      (onDate.month == birthDate.month && onDate.day < birthDate.day)) {
+    age--;
+  }
+  return age;
+}
+
 /// Form data pemesan & peserta, padanan `CustomerBookingPage` di web.
 class BookingScreen extends StatefulWidget {
   final BookingDraft draft;
@@ -44,7 +53,8 @@ class _BookingScreenState extends State<BookingScreen> {
     _bookerName.text = profile?.name ?? '';
     _bookerEmail.text = profile?.email ?? '';
     _bookerPhone.text = profile?.whatsapp ?? '';
-    if (profile?.birthDate.isNotEmpty == true && parseIsoDate(profile!.birthDate) != null) {
+    if (profile?.birthDate.isNotEmpty == true &&
+        parseIsoDate(profile!.birthDate) != null) {
       _bookerBirthDate = profile.birthDate.substring(0, 10);
     }
     if (_genders.contains(profile?.gender)) _bookerGender = profile!.gender;
@@ -60,9 +70,16 @@ class _BookingScreenState extends State<BookingScreen> {
       }
       return Participant();
     });
-    _nameCtrls = [for (final p in _participants) TextEditingController(text: p.name)];
-    _phoneCtrls = [for (final p in _participants) TextEditingController(text: p.phone)];
-    _medicalCtrls = [for (final p in _participants) TextEditingController(text: p.medicalHistory)];
+    _nameCtrls = [
+      for (final p in _participants) TextEditingController(text: p.name)
+    ];
+    _phoneCtrls = [
+      for (final p in _participants) TextEditingController(text: p.phone)
+    ];
+    _medicalCtrls = [
+      for (final p in _participants)
+        TextEditingController(text: p.medicalHistory)
+    ];
 
     _bookerName.addListener(_syncFirstParticipant);
     _bookerPhone.addListener(_syncFirstParticipant);
@@ -78,7 +95,14 @@ class _BookingScreenState extends State<BookingScreen> {
 
   @override
   void dispose() {
-    for (final c in [_bookerName, _bookerEmail, _bookerPhone, ..._nameCtrls, ..._phoneCtrls, ..._medicalCtrls]) {
+    for (final c in [
+      _bookerName,
+      _bookerEmail,
+      _bookerPhone,
+      ..._nameCtrls,
+      ..._phoneCtrls,
+      ..._medicalCtrls
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -114,6 +138,9 @@ class _BookingScreenState extends State<BookingScreen> {
 
   bool _validate() {
     final errors = <String, String>{};
+    final tripDate = parseIsoDate(widget.draft.startDate);
+    final minAge = widget.draft.package.minAge;
+    final maxAge = widget.draft.package.maxAge;
     void put(String key, String? message) {
       if (message != null) errors[key] = message;
     }
@@ -121,22 +148,41 @@ class _BookingScreenState extends State<BookingScreen> {
     put('bookerName', validateBookerName(_bookerName.text));
     final email = _bookerEmail.text.trim();
     if (email.isEmpty || validateEmail(email) != null) {
-      errors['bookerEmail'] = 'Format email tidak valid (contoh: pemesan@gmail.com).';
+      errors['bookerEmail'] =
+          'Format email tidak valid (contoh: pemesan@gmail.com).';
     }
     put('bookerPhone', validateBookerPhone(_bookerPhone.text));
     final birth = parseIsoDate(_bookerBirthDate);
     if (birth == null) {
       errors['bookerBirthDate'] = 'Tanggal lahir wajib diisi.';
     } else if (birth.isAfter(DateTime.now())) {
-      errors['bookerBirthDate'] = 'Tanggal lahir tidak boleh berada di masa depan.';
+      errors['bookerBirthDate'] =
+          'Tanggal lahir tidak boleh berada di masa depan.';
     }
-    if (!_genders.contains(_bookerGender)) errors['bookerGender'] = 'Jenis kelamin wajib dipilih.';
+    if (!_genders.contains(_bookerGender))
+      errors['bookerGender'] = 'Jenis kelamin wajib dipilih.';
     for (var i = 0; i < _participants.length; i++) {
       final p = _participants[i];
       put('p_name_$i', validateParticipantName(p.name, i + 1));
       put('p_phone_$i', validateParticipantPhone(p.phone, i + 1));
-      if (!_genders.contains(p.gender)) errors['p_gender_$i'] = 'Jenis kelamin Peserta ${i + 1} wajib dipilih.';
-      if (parseIsoDate(p.birthDate) == null) errors['p_birth_$i'] = 'Tanggal lahir Peserta ${i + 1} wajib diisi.';
+      if (!_genders.contains(p.gender))
+        errors['p_gender_$i'] = 'Jenis kelamin Peserta ${i + 1} wajib dipilih.';
+      final participantBirthDate = parseIsoDate(p.birthDate);
+      if (participantBirthDate == null) {
+        errors['p_birth_$i'] = 'Tanggal lahir Peserta ${i + 1} wajib diisi.';
+      } else if (participantBirthDate.isAfter(DateTime.now())) {
+        errors['p_birth_$i'] =
+            'Tanggal lahir Peserta ${i + 1} tidak boleh berada di masa depan.';
+      } else if (tripDate != null) {
+        final age = _ageOnDate(participantBirthDate, tripDate);
+        if (minAge > 0 && age < minAge) {
+          errors['p_birth_$i'] =
+              'Peserta ${i + 1} berusia $age tahun saat trip; usia minimum paket $minAge tahun.';
+        } else if (maxAge > 0 && age > maxAge) {
+          errors['p_birth_$i'] =
+              'Peserta ${i + 1} berusia $age tahun saat trip; usia maksimum paket $maxAge tahun.';
+        }
+      }
     }
     setState(() => _errors = errors);
     return errors.isEmpty;
@@ -148,7 +194,8 @@ class _BookingScreenState extends State<BookingScreen> {
       await showNoticeDialog(
         context,
         title: 'Periksa Form',
-        message: 'Terdapat data yang belum sesuai kriteria. Silakan periksa pesan peringatan di form.',
+        message:
+            'Terdapat data yang belum sesuai kriteria. Silakan periksa pesan peringatan di form.',
         isError: true,
       );
       return;
@@ -178,110 +225,160 @@ class _BookingScreenState extends State<BookingScreen> {
           _buildSummaryCard(),
           const SizedBox(height: 16),
           SectionCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              const Text('1. Data Pemesan (Kontak Utama)',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
-              if (loggedIn) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: AppColors.successBg, borderRadius: BorderRadius.circular(30)),
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.check_circle_outline, size: 13, color: AppColors.success),
-                      SizedBox(width: 4),
-                      Text('Terisi Otomatis (Akun Anda)',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.success)),
-                    ]),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('1. Data Pemesan (Kontak Utama)',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textDark)),
+                  if (loggedIn) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                            color: AppColors.successBg,
+                            borderRadius: BorderRadius.circular(30)),
+                        child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_circle_outline,
+                                  size: 13, color: AppColors.success),
+                              SizedBox(width: 4),
+                              Text('Terisi Otomatis (Akun Anda)',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.success)),
+                            ]),
+                      ),
+                    ),
+                  ],
+                  const Divider(height: 24),
+                  const FieldLabel('Nama Lengkap Pemesan', required: true),
+                  TextField(
+                    controller: _bookerName,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      hintText: 'Masukkan nama pemesan (hanya huruf)...',
+                      prefixIcon: const Icon(Icons.person_outline,
+                          size: 18, color: AppColors.textLight),
+                      errorText: _errors['bookerName'],
+                    ),
                   ),
-                ),
-              ],
-              const Divider(height: 24),
-              const FieldLabel('Nama Lengkap Pemesan', required: true),
-              TextField(
-                controller: _bookerName,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  hintText: 'Masukkan nama pemesan (hanya huruf)...',
-                  prefixIcon: const Icon(Icons.person_outline, size: 18, color: AppColors.textLight),
-                  errorText: _errors['bookerName'],
-                ),
-              ),
-              const SizedBox(height: 14),
-              const FieldLabel('Alamat Email', required: true),
-              TextField(
-                controller: _bookerEmail,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'Email untuk pengiriman tiket...',
-                  prefixIcon: const Icon(Icons.mail_outline, size: 18, color: AppColors.textLight),
-                  errorText: _errors['bookerEmail'],
-                ),
-              ),
-              const SizedBox(height: 14),
-              const FieldLabel('Nomor WhatsApp / HP', required: true),
-              TextField(
-                controller: _bookerPhone,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  hintText: 'Contoh: 081234567890...',
-                  prefixIcon: const Icon(Icons.phone_outlined, size: 18, color: AppColors.textLight),
-                  errorText: _errors['bookerPhone'],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    const FieldLabel('Tanggal Lahir', required: true),
-                    _DateField(
-                      value: _bookerBirthDate,
-                      error: _errors['bookerBirthDate'],
-                      onTap: () async {
-                        final picked = await _pickBirthDate(_bookerBirthDate);
-                        if (picked != null) {
-                          setState(() => _bookerBirthDate = picked);
-                          _syncFirstParticipant();
-                        }
-                      },
+                  const SizedBox(height: 14),
+                  const FieldLabel('Alamat Email', required: true),
+                  TextField(
+                    controller: _bookerEmail,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      hintText: 'Email untuk pengiriman tiket...',
+                      prefixIcon: const Icon(Icons.mail_outline,
+                          size: 18, color: AppColors.textLight),
+                      errorText: _errors['bookerEmail'],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const FieldLabel('Nomor WhatsApp / HP', required: true),
+                  TextField(
+                    controller: _bookerPhone,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      hintText: 'Contoh: 081234567890...',
+                      prefixIcon: const Icon(Icons.phone_outlined,
+                          size: 18, color: AppColors.textLight),
+                      errorText: _errors['bookerPhone'],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const FieldLabel('Tanggal Lahir', required: true),
+                            _DateField(
+                              value: _bookerBirthDate,
+                              error: _errors['bookerBirthDate'],
+                              onTap: () async {
+                                final picked =
+                                    await _pickBirthDate(_bookerBirthDate);
+                                if (picked != null) {
+                                  setState(() => _bookerBirthDate = picked);
+                                  _syncFirstParticipant();
+                                }
+                              },
+                            ),
+                          ]),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const FieldLabel('Jenis Kelamin', required: true),
+                            DropdownButtonFormField<String>(
+                              value: _genders.contains(_bookerGender)
+                                  ? _bookerGender
+                                  : null,
+                              isExpanded: true,
+                              hint: const Text('Pilih'),
+                              decoration: InputDecoration(
+                                  errorText: _errors['bookerGender']),
+                              items: [
+                                for (final g in _genders)
+                                  DropdownMenuItem(value: g, child: Text(g))
+                              ],
+                              onChanged: (v) {
+                                setState(
+                                    () => _bookerGender = v ?? _bookerGender);
+                                _syncFirstParticipant();
+                              },
+                            ),
+                          ]),
                     ),
                   ]),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    const FieldLabel('Jenis Kelamin', required: true),
-                    DropdownButtonFormField<String>(
-                      value: _genders.contains(_bookerGender) ? _bookerGender : null,
-                      isExpanded: true,
-                      hint: const Text('Pilih'),
-                      decoration: InputDecoration(errorText: _errors['bookerGender']),
-                      items: [for (final g in _genders) DropdownMenuItem(value: g, child: Text(g))],
-                      onChanged: (v) {
-                        setState(() => _bookerGender = v ?? _bookerGender);
-                        _syncFirstParticipant();
-                      },
-                    ),
-                  ]),
-                ),
-              ]),
-            ]),
+                ]),
           ),
           const SizedBox(height: 16),
           SectionCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text('2. Data Peserta Trip (${_participants.length} Orang)',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark)),
-              const SizedBox(height: 6),
-              const Text('Lengkapi nama, nomor HP, dan jenis kelamin seluruh peserta yang akan berangkat.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-              const SizedBox(height: 16),
-              for (var i = 0; i < _participants.length; i++) ...[
-                _buildParticipant(i),
-                if (i < _participants.length - 1) const SizedBox(height: 14),
-              ],
-            ]),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('2. Data Peserta Trip (${_participants.length} Orang)',
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textDark)),
+                  const SizedBox(height: 6),
+                  const Text(
+                      'Lengkapi nama, nomor HP, dan jenis kelamin seluruh peserta yang akan berangkat.',
+                      style:
+                          TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                  if (widget.draft.package.minAge > 0 ||
+                      widget.draft.package.maxAge > 0) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Batas usia saat tanggal perjalanan: '
+                      '${widget.draft.package.minAge > 0 ? '${widget.draft.package.minAge} tahun' : 'tanpa minimum'}–'
+                      '${widget.draft.package.maxAge > 0 ? '${widget.draft.package.maxAge} tahun' : 'tanpa maksimum'}.',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFB45309)),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  for (var i = 0; i < _participants.length; i++) ...[
+                    _buildParticipant(i),
+                    if (i < _participants.length - 1)
+                      const SizedBox(height: 14),
+                  ],
+                ]),
           ),
           const SizedBox(height: 16),
           const InfoBanner(
@@ -289,10 +386,12 @@ class _BookingScreenState extends State<BookingScreen> {
             color: Color(0xFFB45309),
             textColor: Color(0xFFB45309),
             border: Color(0xFFFEF3C7),
-            message: 'Data peserta yang diisi akan digunakan oleh mitra travel untuk asuransi dan pendaftaran.',
+            message:
+                'Data peserta yang diisi akan digunakan oleh mitra travel untuk asuransi dan pendaftaran.',
           ),
           const SizedBox(height: 20),
-          PrimaryButton(label: 'Lanjut ke Konfirmasi Pemesanan', onPressed: _submit),
+          PrimaryButton(
+              label: 'Lanjut ke Konfirmasi Pemesanan', onPressed: _submit),
         ],
       ),
     );
@@ -302,12 +401,23 @@ class _BookingScreenState extends State<BookingScreen> {
     final d = widget.draft;
     return SectionCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Rincian Pemesanan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+        const Text('Rincian Pemesanan',
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textDark)),
         const Divider(height: 22),
         Text(d.package.category.toUpperCase(),
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.accent)),
         const SizedBox(height: 4),
-        Text(d.package.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+        Text(d.package.name,
+            style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark)),
         const SizedBox(height: 8),
         _iconLine(Icons.calendar_today_outlined, d.scheduleLabel),
         const SizedBox(height: 4),
@@ -315,7 +425,8 @@ class _BookingScreenState extends State<BookingScreen> {
         const Divider(height: 22),
         PriceRow('Harga (${d.guests}x)', formatIDR(d.packageTotal)),
         const Divider(height: 14),
-        PriceRow('Total Pembayaran', formatIDR(d.packageTotal), emphasize: true),
+        PriceRow('Total Pembayaran', formatIDR(d.packageTotal),
+            emphasize: true),
       ]),
     );
   }
@@ -323,7 +434,10 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget _iconLine(IconData icon, String text) => Row(children: [
         Icon(icon, size: 15, color: AppColors.textLight),
         const SizedBox(width: 6),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.textMedium))),
+        Expanded(
+            child: Text(text,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textMedium))),
       ]);
 
   Widget _buildParticipant(int i) {
@@ -337,7 +451,11 @@ class _BookingScreenState extends State<BookingScreen> {
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Peserta ${i + 1}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.accent)),
+        Text('Peserta ${i + 1}',
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: AppColors.accent)),
         if (i == 0) ...[
           const SizedBox(height: 8),
           Material(
@@ -352,7 +470,10 @@ class _BookingScreenState extends State<BookingScreen> {
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: const EdgeInsets.only(right: 8),
               title: const Text('Peserta 1 sama dengan Pemesan',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark)),
               onChanged: (v) {
                 setState(() => _sameAsBooker = v ?? false);
                 _syncFirstParticipant();
@@ -389,39 +510,49 @@ class _BookingScreenState extends State<BookingScreen> {
         const SizedBox(height: 12),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              const FieldLabel('Jenis Kelamin', required: true),
-              DropdownButtonFormField<String>(
-                value: _genders.contains(p.gender) ? p.gender : null,
-                isExpanded: true,
-                hint: const Text('Pilih'),
-                decoration: InputDecoration(
-                  fillColor: locked ? AppColors.divider : Colors.white,
-                  errorText: _errors['p_gender_$i'],
-                ),
-                items: [for (final g in _genders) DropdownMenuItem(value: g, child: Text(g))],
-                onChanged: locked ? null : (v) => setState(() => p.gender = v ?? p.gender),
-              ),
-            ]),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const FieldLabel('Jenis Kelamin', required: true),
+                  DropdownButtonFormField<String>(
+                    value: _genders.contains(p.gender) ? p.gender : null,
+                    isExpanded: true,
+                    hint: const Text('Pilih'),
+                    decoration: InputDecoration(
+                      fillColor: locked ? AppColors.divider : Colors.white,
+                      errorText: _errors['p_gender_$i'],
+                    ),
+                    items: [
+                      for (final g in _genders)
+                        DropdownMenuItem(value: g, child: Text(g))
+                    ],
+                    onChanged: locked
+                        ? null
+                        : (v) => setState(() => p.gender = v ?? p.gender),
+                  ),
+                ]),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              const FieldLabel('Tanggal Lahir Peserta', required: true),
-              _DateField(
-                value: p.birthDate,
-                enabled: !locked,
-                error: _errors['p_birth_$i'],
-                onTap: () async {
-                  final picked = await _pickBirthDate(p.birthDate);
-                  if (picked != null) setState(() => p.birthDate = picked);
-                },
-              ),
-            ]),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const FieldLabel('Tanggal Lahir Peserta', required: true),
+                  _DateField(
+                    value: p.birthDate,
+                    enabled: !locked,
+                    error: _errors['p_birth_$i'],
+                    onTap: () async {
+                      final picked = await _pickBirthDate(p.birthDate);
+                      if (picked != null) setState(() => p.birthDate = picked);
+                    },
+                  ),
+                ]),
           ),
         ]),
         const SizedBox(height: 12),
-        const FieldLabel('Riwayat Penyakit & Alergi', hint: '(Maks. 255 Karakter, opsional)'),
+        const FieldLabel('Riwayat Penyakit & Alergi',
+            hint: '(Maks. 255 Karakter, opsional)'),
         TextField(
           controller: _medicalCtrls[i],
           maxLength: 255,
@@ -442,7 +573,11 @@ class _DateField extends StatelessWidget {
   final bool enabled;
   final String? error;
 
-  const _DateField({required this.value, required this.onTap, this.enabled = true, this.error});
+  const _DateField(
+      {required this.value,
+      required this.onTap,
+      this.enabled = true,
+      this.error});
 
   @override
   Widget build(BuildContext context) {
@@ -453,10 +588,13 @@ class _DateField extends StatelessWidget {
         decoration: InputDecoration(
           fillColor: enabled ? Colors.white : AppColors.divider,
           errorText: error,
-          suffixIcon: const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.textLight),
+          suffixIcon: const Icon(Icons.calendar_today_outlined,
+              size: 16, color: AppColors.textLight),
         ),
         child: Text(
-          parseIsoDate(value) == null ? 'Pilih tanggal' : formatDateShort(parseIsoDate(value)),
+          parseIsoDate(value) == null
+              ? 'Pilih tanggal'
+              : formatDateShort(parseIsoDate(value)),
           style: const TextStyle(fontSize: 14, color: AppColors.textDark),
         ),
       ),

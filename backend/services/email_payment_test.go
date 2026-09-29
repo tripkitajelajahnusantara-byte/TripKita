@@ -81,6 +81,27 @@ func TestEveryCustomerTransactionOutcomeBuildsAnEmail(t *testing.T) {
 	}
 }
 
+func TestEmailFallsBackToSMTPUserAsSender(t *testing.T) {
+	booking := &models.Booking{
+		BookingCode: "TK-SENDER", CustomerName: "Pelanggan Uji", CustomerEmail: "customer@example.com",
+	}
+	email := NewEmailService(&config.Config{
+		SMTPHost: "smtp.example.test", SMTPPort: "587", SMTPUser: "mailer@example.com", SMTPPass: "pass",
+	}, NewPDFService())
+
+	var envelopeFrom string
+	email.mailSender = func(addr string, auth smtp.Auth, from string, to []string, message []byte) error {
+		envelopeFrom = from
+		return nil
+	}
+	if err := email.SendPaymentFailedEmail(booking); err != nil {
+		t.Fatal(err)
+	}
+	if envelopeFrom != "mailer@example.com" {
+		t.Fatalf("envelope sender=%q, ingin fallback ke SMTP_USER", envelopeFrom)
+	}
+}
+
 func TestRefundReceiptUsesRefundEntitlementNotOrderTotal(t *testing.T) {
 	booking := &models.Booking{
 		BookingCode: "TK-REFUND-AMOUNT", CustomerName: "Pelanggan Uji",

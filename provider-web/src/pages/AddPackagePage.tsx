@@ -13,7 +13,8 @@ import {
   CheckCircle,
   XCircle,
   UploadCloud,
-  LoaderCircle
+  LoaderCircle,
+  Search
 } from 'lucide-react';
 
 import { request } from '../utils/api';
@@ -34,6 +35,13 @@ import {
 /** Open Trip berangkat bersama pada jadwal tetap; tipe lain eksklusif per tanggal. */
 function isOpenTripType(tripType: string): boolean {
   return tripType.toLowerCase().replace(/\s+/g, '') === 'opentrip';
+}
+
+function suggestedMinimumGuests(tripType: string): string {
+  if (tripType === 'Honeymoon' || tripType === 'Private Trip') return '2';
+  if (tripType === 'Family') return '3';
+  if (tripType === 'Corporate') return '10';
+  return '1';
 }
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -97,7 +105,8 @@ export const AddPackagePage: React.FC = () => {
   const [meetPoint, setMeetPoint] = useState('');
   const [mapPosition, setMapPosition] = useState<MeetingPointCoordinates | null>(null);
   const [description, setDescription] = useState('');
-  const [minGuests, setMinGuests] = useState('');
+  const [minGuests, setMinGuests] = useState('1');
+  const [useMinimumBooking, setUseMinimumBooking] = useState(false);
   const [maxGuests, setMaxGuests] = useState('');
   const [minAge, setMinAge] = useState('');
   const [maxAge, setMaxAge] = useState('');
@@ -110,6 +119,7 @@ export const AddPackagePage: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [schedule, setSchedule] = useState('');
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const requiresMinimumQuota = isOpenTripType(tripType);
   // Unggah foto dan simpan paket berbagi satu kunci: paket tidak boleh disimpan
   // selagi foto masih diunggah (foto baru belum masuk payload), dan sebaliknya.
@@ -209,7 +219,6 @@ export const AddPackagePage: React.FC = () => {
           const savedCoordinates = getMeetingPointCoordinates(pkg);
           if (savedCoordinates) {
             setMapPosition(savedCoordinates);
-            setMeetPoint(formatMeetingPointCoordinates(savedCoordinates));
           }
           setPrice(pkg.price ? String(pkg.price) : '');
           const loadedTripType = pkg.tripType || TRIP_TYPES[0] || '';
@@ -220,7 +229,9 @@ export const AddPackagePage: React.FC = () => {
           if (pkg.startDate) setStartDate(pkg.startDate);
           if (pkg.endDate) setEndDate(pkg.endDate);
           if (pkg.duration) setDuration(String(pkg.duration));
-          if (pkg.minGuests) setMinGuests(String(pkg.minGuests));
+          const loadedMinGuests = Math.max(1, Number(pkg.minGuests) || 1);
+          setMinGuests(String(loadedMinGuests));
+          setUseMinimumBooking(loadedMinGuests > 1);
           if (pkg.maxGuests) setMaxGuests(String(pkg.maxGuests));
           if (pkg.minAge) setMinAge(String(pkg.minAge));
           if (pkg.maxAge) setMaxAge(String(pkg.maxAge));
@@ -380,13 +391,49 @@ export const AddPackagePage: React.FC = () => {
     setPackagePhotos(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const handleAddressSearch = async () => {
+    const address = meetPoint.trim();
+    if (address.length < 3) {
+      showValidation('Masukkan alamat titik kumpul minimal 3 karakter sebelum mencari lokasi.', 'info');
+      return;
+    }
+    if (isSearchingLocation) return;
+
+    const addressLower = address.toLowerCase();
+    const queryParts = [address];
+    if (location && !addressLower.includes(location.toLowerCase())) queryParts.push(location);
+    if (!addressLower.includes('indonesia')) queryParts.push('Indonesia');
+    const query = queryParts.join(', ');
+    setIsSearchingLocation(true);
+    try {
+      const result = await request(`/provider/geocode?q=${encodeURIComponent(query)}`);
+      const coordinates = {
+        lat: Number(result?.latitude),
+        lng: Number(result?.longitude),
+      };
+      if (!Number.isFinite(coordinates.lat) || !Number.isFinite(coordinates.lng)) {
+        throw new Error('Koordinat alamat tidak valid.');
+      }
+      setMapPosition(coordinates);
+    } catch (err: unknown) {
+      showAlert({
+        title: 'Lokasi Tidak Ditemukan',
+        message: err instanceof Error ? err.message : 'Alamat belum dapat ditemukan. Tambahkan nama jalan, kota, atau provinsi.',
+        type: 'warning',
+        confirmText: 'Perbaiki Alamat',
+      });
+    } finally {
+      setIsSearchingLocation(false);
+    }
+  };
+
   const handleSubmit = async (status: 'draft' | 'publish') => {
     if (isBusy) return;
 
 	const priceValue = price === '' ? Number.NaN : Number(price);
 	const qMin = quotaMin === '' ? Number.NaN : Number(quotaMin);
 	const qMax = quotaMax === '' ? Number.NaN : Number(quotaMax);
-	const minG = minGuests === '' ? Number.NaN : Number(minGuests);
+	const minG = useMinimumBooking ? (minGuests === '' ? Number.NaN : Number(minGuests)) : 1;
 	const maxG = maxGuests === '' ? Number.NaN : Number(maxGuests);
 	const durationValue = Number(duration);
 	const minAgeValue = minAge === '' ? 0 : Number(minAge);
@@ -411,7 +458,7 @@ export const AddPackagePage: React.FC = () => {
 	  ['Harga', price, priceValue],
 	  ['Kuota minimal', quotaMin, qMin],
 	  ['Kuota maksimal', quotaMax, qMax],
-	  ['Minimum peserta', minGuests, minG],
+	  ['Minimum peserta', useMinimumBooking ? minGuests : '1', minG],
 	  ['Maksimum peserta', maxGuests, maxG],
 	] as const;
 	const invalidPricing = enteredPricingValues.find(([label, raw, value]) =>
@@ -482,7 +529,7 @@ export const AddPackagePage: React.FC = () => {
 		showValidation(`Kuota maksimal (${qMax}) tidak boleh lebih kecil dari kuota minimal (${qMin}).`, 'pricing');
         return;
       }
-      if (isNaN(minG) || minG < 1) {
+      if (useMinimumBooking && (isNaN(minG) || minG < 1)) {
 		showValidation('Minimum peserta per pemesanan minimal 1 orang.', 'pricing');
         return;
       }
@@ -715,15 +762,7 @@ export const AddPackagePage: React.FC = () => {
                         const val = e.target.value;
                         setTripType(val);
                         setQuotaMin(isOpenTripType(val) ? (quotaMin || '1') : '');
-                        if (val === 'Honeymoon' || val === 'Private Trip') {
-                          setMinGuests('2');
-                        } else if (val === 'Family') {
-                          setMinGuests('3');
-                        } else if (val === 'Corporate') {
-                          setMinGuests('10');
-                        } else {
-                          setMinGuests('1');
-                        }
+                        setMinGuests(useMinimumBooking ? suggestedMinimumGuests(val) : '1');
                       }}
                     >
                       {TRIP_TYPES.map(tt => (
@@ -753,7 +792,10 @@ export const AddPackagePage: React.FC = () => {
                     <MapPin size={16} className="field-icon" />
                     <select 
                       value={location} 
-                      onChange={(e) => setLocation(e.target.value)}
+                      onChange={(e) => {
+                        setLocation(e.target.value);
+                        setMapPosition(null);
+                      }}
                       className="input-indent"
                     >
                       <option value="" disabled>Pilih provinsi destinasi</option>
@@ -765,8 +807,40 @@ export const AddPackagePage: React.FC = () => {
                 </div>
 
                 <div className="input-group">
-                  <label>Koordinat Titik Kumpul *</label>
-                  <p style={{fontSize: '12.5px', color: '#64748b', marginBottom: '8px', marginTop: '-4px'}}>Klik posisi tepat di peta. Sistem menyimpan latitude dan longitude agar pin tidak berubah atau hilang.</p>
+                  <label>Alamat Titik Kumpul *</label>
+                  <p style={{fontSize: '12.5px', color: '#64748b', marginBottom: '8px', marginTop: '-4px'}}>Masukkan alamat lengkap, lalu tekan Cari Lokasi. Pin akan berpindah otomatis dan masih dapat disesuaikan dengan klik pada peta.</p>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch', marginBottom: '12px' }}>
+                    <input
+                      type="text"
+                      value={meetPoint}
+                      maxLength={255}
+                      onChange={(e) => {
+                        setMeetPoint(e.target.value);
+                        setMapPosition(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void handleAddressSearch();
+                        }
+                      }}
+                      placeholder="Contoh: Stasiun Bandung, Kebonjeruk, Kota Bandung"
+                      aria-label="Alamat titik kumpul"
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => void handleAddressSearch()}
+                      disabled={isSearchingLocation}
+                      aria-busy={isSearchingLocation}
+                      style={{ minWidth: '132px', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '7px' }}
+                    >
+                      {isSearchingLocation
+                        ? <><LoaderCircle size={15} className="btn-spinner" aria-hidden="true" /> Mencari...</>
+                        : <><Search size={15} aria-hidden="true" /> Cari Lokasi</>}
+                    </button>
+                  </div>
                   <div style={{ height: '250px', width: '100%', marginBottom: '12px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', zIndex: 1 }}>
                     <MapContainer center={mapPosition ? [mapPosition.lat, mapPosition.lng] : [-0.7893, 113.9213]} zoom={mapPosition ? 16 : 4} style={{ height: '100%', width: '100%', zIndex: 1 }}>
                       <TileLayer
@@ -778,18 +852,16 @@ export const AddPackagePage: React.FC = () => {
                         position={mapPosition}
                         onSelect={(coordinates) => {
                           setMapPosition(coordinates);
-                          setMeetPoint(formatMeetingPointCoordinates(coordinates));
                         }}
                       />
                     </MapContainer>
                   </div>
-                  <input 
-                    type="text" 
-                    value={meetPoint} 
-                    readOnly
-                    placeholder="Klik peta untuk memilih koordinat"
-                    aria-label="Latitude dan longitude titik kumpul"
-                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      Koordinat: <strong style={{ color: '#334155' }}>{mapPosition ? formatMeetingPointCoordinates(mapPosition) : 'belum dipilih'}</strong>
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>Pencarian alamat © OpenStreetMap contributors</span>
+                  </div>
                 </div>
 
                 <div className="input-group">
@@ -1055,33 +1127,54 @@ export const AddPackagePage: React.FC = () => {
                   />
                 </div>
 
-                <div className="input-row-2">
-                  <div className="input-group">
-                    <label>Minimum Peserta (per Booking)</label>
-                    <input 
-                      type="number" 
-                      min="1"
-                      value={minGuests} 
-                      onChange={(e) => setMinGuests(e.target.value)}
-                      placeholder="2"
+                <div className="input-group" style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '9px', cursor: 'pointer', width: 'fit-content' }}>
+                    <input
+                      type="checkbox"
+                      checked={useMinimumBooking}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setUseMinimumBooking(checked);
+                        setMinGuests(checked ? suggestedMinimumGuests(tripType) : '1');
+                      }}
+                      style={{ width: '16px', height: '16px', margin: 0 }}
                     />
-                    {parseInt(minGuests, 10) < 1 && (
-                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                        ⚠️ Minimum peserta per pemesanan minimal 1
-                      </span>
-                    )}
-                  </div>
-                  <div className="input-group">
+                    Terapkan minimum peserta per booking
+                  </label>
+                  <span style={{ color: '#64748b', fontSize: '12px', marginTop: '5px' }}>
+                    Jika tidak dicentang, pelanggan dapat memesan mulai dari 1 orang.
+                  </span>
+                </div>
+
+                <div className="input-row-2">
+                  {useMinimumBooking && (
+                    <div className="input-group">
+                      <label>Minimum Peserta (per Booking)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={minGuests}
+                        onChange={(e) => setMinGuests(e.target.value)}
+                        placeholder="2"
+                      />
+                      {parseInt(minGuests, 10) < 1 && (
+                        <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                          ⚠️ Minimum peserta per pemesanan minimal 1
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="input-group" style={!useMinimumBooking ? { gridColumn: '1 / -1' } : undefined}>
                     <label>Maksimum Peserta (per Booking)</label>
                     <input 
                       type="number" 
-                      min={minGuests || "1"}
+                      min={useMinimumBooking ? (minGuests || "1") : "1"}
                       max={quotaMax || undefined}
                       value={maxGuests} 
                       onChange={(e) => setMaxGuests(e.target.value)}
                       placeholder="12"
                     />
-                    {parseInt(maxGuests, 10) < parseInt(minGuests, 10) ? (
+                    {parseInt(maxGuests, 10) < (useMinimumBooking ? parseInt(minGuests, 10) : 1) ? (
                       <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
                         ⚠️ Maksimum peserta ({maxGuests}) harus &gt;= minimum peserta ({minGuests})
                       </span>

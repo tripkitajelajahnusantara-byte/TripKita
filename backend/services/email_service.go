@@ -7,6 +7,7 @@ import (
 	"html"
 	"log"
 	"mime"
+	"net/mail"
 	"net/smtp"
 	"strings"
 	"time"
@@ -471,15 +472,28 @@ func (s *EmailService) SendProviderPlatformFeeChangedEmail(provider *models.Prov
 }
 
 func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfBytes []byte, pdfFilename string) error {
-	smtpUser := s.cfg.SMTPUser
+	smtpUser := strings.TrimSpace(s.cfg.SMTPUser)
 	smtpPass := s.cfg.SMTPPass
-	smtpHost := s.cfg.SMTPHost
-	smtpPort := s.cfg.SMTPPort
-	fromAddr := s.cfg.SMTPFrom
+	smtpHost := strings.TrimSpace(s.cfg.SMTPHost)
+	smtpPort := strings.TrimSpace(s.cfg.SMTPPort)
+	fromAddr := strings.TrimSpace(s.cfg.SMTPFrom)
+	if fromAddr == "" {
+		fromAddr = smtpUser
+	}
 
-	if smtpUser == "" || smtpPass == "" || smtpHost == "" {
+	if smtpUser == "" || smtpPass == "" || smtpHost == "" || smtpPort == "" || fromAddr == "" {
 		return fmt.Errorf("konfigurasi SMTP belum lengkap; email tidak dikirim")
 	}
+	fromMailbox, err := mail.ParseAddress(fromAddr)
+	if err != nil || fromMailbox.Address == "" || strings.ContainsAny(fromMailbox.Address, "\r\n") {
+		return fmt.Errorf("alamat pengirim SMTP tidak valid")
+	}
+	toMailbox, err := mail.ParseAddress(strings.TrimSpace(to))
+	if err != nil || toMailbox.Address == "" || strings.ContainsAny(toMailbox.Address, "\r\n") {
+		return fmt.Errorf("alamat penerima email tidak valid")
+	}
+	fromAddr = fromMailbox.Address
+	to = toMailbox.Address
 
 	auth := smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
 
@@ -524,7 +538,7 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 	if mailSender == nil {
 		mailSender = smtp.SendMail
 	}
-	err := mailSender(addr, auth, fromAddr, []string{to}, bodyBuf.Bytes())
+	err = mailSender(addr, auth, fromAddr, []string{to}, bodyBuf.Bytes())
 	if err != nil {
 		log.Printf("[EmailService] SMTP dispatch failed: %v\n", err)
 		return err

@@ -235,6 +235,14 @@ export const AdminDashboardPage: React.FC = () => {
   // verifikasi, payout, nonaktifkan) agar klik berulang tidak mengirim
   // permintaan ganda dan tombol lain tidak bisa dipakai selama proses berjalan.
   const { pending: pendingAction, isBusy: actionBusy, run: runAction } = useActionLock();
+  // Verifikasi pembayaran memakai kunci tersendiri. Aksi admin lain (misalnya
+  // dialog upload bukti payout yang masih terbuka) tidak boleh membuat tombol
+  // Setujui/Tolak pembayaran ikut tidak dapat diklik.
+  const {
+    pending: pendingPaymentAction,
+    isBusy: paymentActionBusy,
+    run: runPaymentAction,
+  } = useActionLock();
 
   const fetchAdminPayouts = async () => {
     setPayoutLoading(true);
@@ -392,8 +400,8 @@ export const AdminDashboardPage: React.FC = () => {
     setPaymentReviewError('');
   };
 
-  const openPaymentReview = async (booking: any, decision: 'APPROVED' | 'REJECTED') => {
-    if (actionBusy) return;
+  const openPaymentReview = (booking: any, decision: 'APPROVED' | 'REJECTED') => {
+    if (paymentActionBusy) return;
     setPaymentReviewTarget({ booking, decision });
     setPaymentReviewNotes('');
     setPaymentReviewError('');
@@ -402,29 +410,33 @@ export const AdminDashboardPage: React.FC = () => {
     const requestId = ++proofRequestRef.current;
     if (!booking.paymentProof) return;
     setProofPreviewLoading(true);
-    try {
-      const url = await getProtectedDocumentURL('admin', booking.paymentProof);
-      if (requestId !== proofRequestRef.current) {
-        URL.revokeObjectURL(url);
-        return;
-      }
-      setProofPreview({ url, isPdf: /\.pdf$/i.test(booking.paymentProof) });
-    } catch (err: any) {
-      if (requestId === proofRequestRef.current) setPaymentReviewError(err.message || 'Bukti transfer tidak dapat dimuat.');
-    } finally {
-      if (requestId === proofRequestRef.current) setProofPreviewLoading(false);
-    }
+    // Preview dimuat tanpa menahan event klik atau tombol keputusan. Admin
+    // tetap dapat bertindak bila browser gagal merender PDF/gambar.
+    getProtectedDocumentURL('admin', booking.paymentProof)
+      .then((url) => {
+        if (requestId !== proofRequestRef.current) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        setProofPreview({ url, isPdf: /\.pdf$/i.test(booking.paymentProof) });
+      })
+      .catch((err: any) => {
+        if (requestId === proofRequestRef.current) setPaymentReviewError(err.message || 'Bukti transfer tidak dapat dimuat.');
+      })
+      .finally(() => {
+        if (requestId === proofRequestRef.current) setProofPreviewLoading(false);
+      });
   };
 
   const submitPaymentReview = async () => {
-    if (!paymentReviewTarget || actionBusy) return;
+    if (!paymentReviewTarget || paymentActionBusy) return;
     const { booking, decision } = paymentReviewTarget;
     const notes = paymentReviewNotes.trim();
     if (decision === 'REJECTED' && notes.length < 4) {
       setPaymentReviewError('Tulis alasan penolakan (minimal 4 karakter) agar customer tahu apa yang harus diperbaiki.');
       return;
     }
-    await runAction(`payment-${booking.id}-${decision}`, async () => {
+    await runPaymentAction(`payment-${booking.id}-${decision}`, async () => {
       setError('');
       setSuccessMsg('');
       setPaymentReviewError('');
@@ -1126,8 +1138,8 @@ export const AdminDashboardPage: React.FC = () => {
                                 <td>
                                   {b.status === 'PAYMENT_REVIEW' ? (
                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                      <button disabled={actionBusy} onClick={() => openPaymentReview(b, 'APPROVED')} style={{ border: 0, background: '#10b981', color: '#fff', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: 'pointer' }}>Setujui</button>
-                                      <button disabled={actionBusy} onClick={() => openPaymentReview(b, 'REJECTED')} style={{ border: '1px solid #ef4444', background: '#fff', color: '#dc2626', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: 'pointer' }}>Tolak</button>
+                                      <button type="button" disabled={paymentActionBusy} onClick={() => openPaymentReview(b, 'APPROVED')} style={{ border: 0, background: '#10b981', color: '#fff', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: paymentActionBusy ? 'not-allowed' : 'pointer' }}>Setujui</button>
+                                      <button type="button" disabled={paymentActionBusy} onClick={() => openPaymentReview(b, 'REJECTED')} style={{ border: '1px solid #ef4444', background: '#fff', color: '#dc2626', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: paymentActionBusy ? 'not-allowed' : 'pointer' }}>Tolak</button>
                                     </div>
                                   ) : <span style={{ color: '#94a3b8' }}>—</span>}
                                 </td>
@@ -1149,7 +1161,7 @@ export const AdminDashboardPage: React.FC = () => {
                 {paymentReviewTarget && (() => {
                   const b = paymentReviewTarget.booking;
                   const isApprove = paymentReviewTarget.decision === 'APPROVED';
-                  const busy = actionBusy;
+                  const busy = paymentActionBusy;
                   const amount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(b.totalPrice);
                   const rejectPresets = ['Nominal transfer tidak sesuai tagihan', 'Bukti transfer tidak terbaca/buram', 'Dana belum masuk ke rekening TemenTrip', 'Rekening tujuan bukan rekening TemenTrip'];
                   return (
@@ -1206,7 +1218,7 @@ export const AdminDashboardPage: React.FC = () => {
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
                           <button type="button" className="back-form-btn" onClick={closePaymentReview} disabled={busy} style={{ width: 'auto', padding: '10px 18px' }}>Batal</button>
                           <button type="button" className="submit-form-btn" onClick={submitPaymentReview} disabled={busy} style={{ width: 'auto', padding: '10px 18px', background: isApprove ? '#10b981' : '#dc2626' }}>
-                            {busy ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : isApprove ? 'Setujui Pembayaran' : 'Tolak Bukti'}
+                            {pendingPaymentAction ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : isApprove ? 'Setujui Pembayaran' : 'Tolak Bukti'}
                           </button>
                         </div>
                       </div>

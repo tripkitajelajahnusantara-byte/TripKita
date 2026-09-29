@@ -46,6 +46,7 @@ type Config struct {
 	SMTPFrom                   string
 	WeatherAPIKey              string
 	WeatherAPIBaseURL          string
+	GeocodingAPIBaseURL        string
 	AllowedOrigins             []string
 	TrustedProxies             []string
 	EnableDevMocks             bool
@@ -110,6 +111,7 @@ func LoadConfig() (*Config, error) {
 		SMTPFrom:                   getEnv("SMTP_FROM", ""),
 		WeatherAPIKey:              getEnv("WEATHER_API_KEY", ""),
 		WeatherAPIBaseURL:          strings.TrimRight(getEnv("WEATHER_API_BASE_URL", "https://api.weatherapi.com/v1"), "/"),
+		GeocodingAPIBaseURL:        strings.TrimRight(getEnv("GEOCODING_API_BASE_URL", "https://nominatim.openstreetmap.org"), "/"),
 		AllowedOrigins:             splitCSV(getEnv("ALLOWED_ORIGINS", getEnv("FRONTEND_URL", "http://localhost:5173"))),
 		TrustedProxies:             splitCSV(getEnv("TRUSTED_PROXIES", "")),
 		EnableDevMocks:             getBoolEnv("ENABLE_DEV_MOCKS", false) && !isProduction,
@@ -119,6 +121,13 @@ func LoadConfig() (*Config, error) {
 		DBMaxOpenConns:             getIntEnv("DB_MAX_OPEN_CONNS", 25),
 		DBMaxIdleConns:             getIntEnv("DB_MAX_IDLE_CONNS", 10),
 		EnableAutoPayout:           getBoolEnv("ENABLE_AUTOMATIC_PAYOUT", false),
+	}
+	// Umumnya akun SMTP juga merupakan alamat pengirim. Sebelumnya deployment
+	// yang sudah mengisi user/password tetapi belum menambah SMTP_FROM tetap
+	// bisa hidup di mode non-production, lalu seluruh email gagal saat runtime
+	// karena envelope sender kosong.
+	if strings.TrimSpace(cfg.SMTPFrom) == "" {
+		cfg.SMTPFrom = strings.TrimSpace(cfg.SMTPUser)
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -165,6 +174,10 @@ func (c *Config) Validate() error {
 	weatherURL, err := url.Parse(c.WeatherAPIBaseURL)
 	if err != nil || weatherURL.Scheme != "https" || weatherURL.Host == "" {
 		return fmt.Errorf("WEATHER_API_BASE_URL wajib berupa URL HTTPS yang valid")
+	}
+	geocodingURL, err := url.Parse(c.GeocodingAPIBaseURL)
+	if err != nil || geocodingURL.Scheme != "https" || geocodingURL.Host == "" {
+		return fmt.Errorf("GEOCODING_API_BASE_URL wajib berupa URL HTTPS yang valid")
 	}
 	if c.DatabaseURL == "" && (c.DBHost == "" || c.DBUser == "" || c.DBPass == "" || c.DBName == "") {
 		return fmt.Errorf("konfigurasi database belum lengkap")

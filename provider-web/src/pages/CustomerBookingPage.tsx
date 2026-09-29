@@ -17,13 +17,41 @@ const getTodayIso = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
-// Mengembalikan pesan error tanggal lahir, atau '' jika valid (tidak di masa depan & >= 1900-01-01)
-const getBirthDateError = (value: string, label: string) => {
+const parseIsoDateParts = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return { year, month, day };
+};
+
+const ageOnDate = (birthDate: string, tripDate: string) => {
+  const birth = parseIsoDateParts(birthDate);
+  const trip = parseIsoDateParts(tripDate);
+  if (!birth || !trip) return null;
+  let age = trip.year - birth.year;
+  if (trip.month < birth.month || (trip.month === birth.month && trip.day < birth.day)) age -= 1;
+  return age;
+};
+
+// Mengembalikan pesan error tanggal lahir, termasuk batas usia paket bila
+// tanggal perjalanan sudah dipilih.
+const getBirthDateError = (value: string, label: string, tripDate = '', minAge = 0, maxAge = 0) => {
   if (!value) return `Tanggal lahir ${label} wajib diisi.`;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || isNaN(new Date(value).getTime()) || value < '1900-01-01') {
+  if (!parseIsoDateParts(value) || value < '1900-01-01') {
     return `Tanggal lahir ${label} tidak valid.`;
   }
   if (value > getTodayIso()) return `Tanggal lahir ${label} tidak boleh berada di masa depan.`;
+  const age = ageOnDate(value, tripDate);
+  if (age !== null && minAge > 0 && age < minAge) {
+    return `${label} berusia ${age} tahun saat trip; usia minimum paket ${minAge} tahun.`;
+  }
+  if (age !== null && maxAge > 0 && age > maxAge) {
+    return `${label} berusia ${age} tahun saat trip; usia maksimum paket ${maxAge} tahun.`;
+  }
   return '';
 };
 
@@ -168,6 +196,9 @@ export const CustomerBookingPage: React.FC = () => {
   }
 
   const pkg = selectedPackageForDetail;
+  const selectedTripDate = pkg.bookingDate || (parseIsoDateParts(pkg.schedule || '') ? pkg.schedule : '');
+  const packageMinAge = Number(pkg.minAge) > 0 ? Number(pkg.minAge) : 0;
+  const packageMaxAge = Number(pkg.maxAge) > 0 ? Number(pkg.maxAge) : 0;
   const meetingPointCoordinates = getMeetingPointCoordinates(pkg);
   const selectedAddOns = pkg.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
@@ -237,7 +268,13 @@ export const CustomerBookingPage: React.FC = () => {
         newErrors[`p_gender_${idx}`] = `Jenis kelamin Peserta ${idx + 1} wajib dipilih.`;
       }
 
-      const birthDateError = getBirthDateError(p.tanggalLahir, `Peserta ${idx + 1}`);
+      const birthDateError = getBirthDateError(
+        p.tanggalLahir,
+        `Peserta ${idx + 1}`,
+        selectedTripDate,
+        packageMinAge,
+        packageMaxAge,
+      );
       if (birthDateError) {
         newErrors[`p_tanggalLahir_${idx}`] = birthDateError;
       }
@@ -477,6 +514,11 @@ export const CustomerBookingPage: React.FC = () => {
               </h2>
               <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 20px 0' }}>
                 Lengkapi nama, nomor HP, dan jenis kelamin seluruh peserta yang akan berangkat.
+                {(packageMinAge > 0 || packageMaxAge > 0) && (
+                  <span style={{ display: 'block', marginTop: 6, color: '#b45309', fontWeight: 700 }}>
+                    Batas usia saat tanggal perjalanan: {packageMinAge > 0 ? `${packageMinAge} tahun` : 'tanpa minimum'}–{packageMaxAge > 0 ? `${packageMaxAge} tahun` : 'tanpa maksimum'}.
+                  </span>
+                )}
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

@@ -676,33 +676,44 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
   Widget _buildItinerary() {
     final items = _pkg.itinerary;
+    final groupedItems = <String, List<ItineraryItem>>{};
+    for (final item in items) {
+      groupedItems.putIfAbsent(item.day, () => <ItineraryItem>[]).add(item);
+    }
     return SectionCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const SectionHeading('Rencana Perjalanan (Itinerary)'),
         const SizedBox(height: 14),
         if (items.isEmpty)
           const Text('Itinerary belum dilengkapi oleh provider.', style: TextStyle(color: AppColors.textMuted)),
-        for (final item in items)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        for (final day in groupedItems.entries)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(6)),
-                child: Text(item.day,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(7)),
+                child: Text(day.key,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.accent)),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(item.title,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                  if (item.description.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(item.description, style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5)),
-                  ],
-                ]),
-              ),
+              const SizedBox(height: 10),
+              for (var index = 0; index < day.value.length; index++) ...[
+                if (index > 0) const Divider(height: 22, color: Color(0xFFE2E8F0)),
+                Text(day.value[index].title,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                if (day.value[index].description.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(day.value[index].description,
+                      style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5)),
+                ],
+              ],
             ]),
           ),
       ]),

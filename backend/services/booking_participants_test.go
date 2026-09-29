@@ -73,3 +73,55 @@ func TestNormalizeBookingParticipantsRequiresOnePerGuest(t *testing.T) {
 		t.Fatalf("jumlah peserta yang tidak sama dengan jumlah tamu harus ditolak, didapat %v", err)
 	}
 }
+
+func TestValidateParticipantAgesUsesTripDate(t *testing.T) {
+	tripDate := time.Date(2027, time.March, 10, 0, 0, 0, 0, time.UTC)
+	pkg := &models.Package{MinAge: 18, MaxAge: 65}
+
+	cases := []struct {
+		name      string
+		birthDate string
+		wantError bool
+	}{
+		{name: "ulang tahun tepat saat trip", birthDate: "2009-03-10"},
+		{name: "sehari sebelum cukup umur", birthDate: "2009-03-11", wantError: true},
+		{name: "tepat usia maksimum", birthDate: "1962-03-10"},
+		{name: "melewati usia maksimum", birthDate: "1961-03-10", wantError: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			booking := &models.Booking{
+				TripDate: tripDate,
+				Participants: []models.BookingParticipant{{
+					BirthDate: tc.birthDate,
+				}},
+			}
+			err := validateParticipantAges(booking, pkg)
+			if tc.wantError && err == nil {
+				t.Fatal("usia di luar batas seharusnya ditolak")
+			}
+			if !tc.wantError && err != nil {
+				t.Fatalf("usia pada batas yang diizinkan ditolak: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateParticipantAgesAllowsUnboundedLegacyPackage(t *testing.T) {
+	booking := &models.Booking{
+		TripDate:     time.Date(2027, time.January, 1, 0, 0, 0, 0, time.UTC),
+		Participants: []models.BookingParticipant{{BirthDate: "2020-01-01"}},
+	}
+	if err := validateParticipantAges(booking, &models.Package{}); err != nil {
+		t.Fatalf("paket lama tanpa batas usia seharusnya tetap diterima: %v", err)
+	}
+}
+
+func TestValidateParticipantAgesCannotBeBypassedWithoutParticipants(t *testing.T) {
+	booking := &models.Booking{TripDate: time.Date(2027, time.January, 1, 0, 0, 0, 0, time.UTC)}
+	var inputErr *BookingInputError
+	if err := validateParticipantAges(booking, &models.Package{MinAge: 18, MaxAge: 65}); !errors.As(err, &inputErr) {
+		t.Fatalf("paket berbatas usia tanpa data peserta harus ditolak, didapat %v", err)
+	}
+}

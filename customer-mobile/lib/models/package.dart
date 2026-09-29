@@ -8,7 +8,8 @@ class ItineraryItem {
   final String title;
   final String description;
 
-  const ItineraryItem({required this.day, required this.title, required this.description});
+  const ItineraryItem(
+      {required this.day, required this.title, required this.description});
 }
 
 /// Paket wisata sesuai respons `GET /public/packages` (lihat
@@ -31,6 +32,8 @@ class TripPackage {
   final int duration;
   final int minGuests;
   final int maxGuests;
+  final int minAge;
+  final int maxAge;
   final String status;
   final double rating;
   final String description;
@@ -64,6 +67,8 @@ class TripPackage {
     this.duration = 1,
     this.minGuests = 1,
     this.maxGuests = 0,
+    this.minAge = 0,
+    this.maxAge = 0,
     this.status = 'Aktif',
     this.rating = 0,
     this.description = '',
@@ -77,9 +82,11 @@ class TripPackage {
   });
 
   factory TripPackage.fromJson(Map<String, dynamic> json) {
-    int asInt(Object? v, [int fallback = 0]) => v is num ? v.toInt() : int.tryParse('$v') ?? fallback;
+    int asInt(Object? v, [int fallback = 0]) =>
+        v is num ? v.toInt() : int.tryParse('$v') ?? fallback;
     String asString(Object? v) => v is String ? v : (v == null ? '' : '$v');
-    List<String> asStringList(Object? v) => v is List ? v.map((e) => '$e').toList() : const [];
+    List<String> asStringList(Object? v) =>
+        v is List ? v.map((e) => '$e').toList() : const [];
 
     final provider = json['provider'];
     var providerId = asInt(json['providerId']);
@@ -104,6 +111,8 @@ class TripPackage {
       duration: asInt(json['duration'], 1),
       minGuests: asInt(json['minGuests'], 1),
       maxGuests: asInt(json['maxGuests']),
+      minAge: asInt(json['minAge']),
+      maxAge: asInt(json['maxAge']),
       status: asString(json['status']),
       rating: (json['rating'] is num) ? (json['rating'] as num).toDouble() : 0,
       description: asString(json['description']),
@@ -135,6 +144,8 @@ class TripPackage {
         'duration': duration,
         'minGuests': minGuests,
         'maxGuests': maxGuests,
+        'minAge': minAge,
+        'maxAge': maxAge,
         'status': status,
         'rating': rating,
         'description': description,
@@ -156,7 +167,10 @@ class TripPackage {
     return seats < 0 ? 0 : seats;
   }
 
-  bool get isActive => status.isEmpty || status == 'Aktif' || status.toLowerCase() == 'published';
+  bool get isActive =>
+      status.isEmpty ||
+      status == 'Aktif' ||
+      status.toLowerCase() == 'published';
 
   /// Daftar foto paket yang valid. Path relatif dilengkapi dengan origin
   /// backend, teks lain yang bukan URL dibuang (mengikuti web).
@@ -168,13 +182,15 @@ class TripPackage {
       final looksLikePath = url.startsWith('/') ||
           url.startsWith('uploads/') ||
           url.startsWith('storage/') ||
-          RegExp(r'\.(jpg|jpeg|png|webp|gif)$', caseSensitive: false).hasMatch(url);
+          RegExp(r'\.(jpg|jpeg|png|webp|gif)$', caseSensitive: false)
+              .hasMatch(url);
       if (!looksLikePath) return '';
       final origin = AppConfig.backendOrigin;
       return url.startsWith('/') ? '$origin$url' : '$origin/$url';
     }
 
-    final fromImages = imagesRaw.split(',').map(normalize).where((u) => u.isNotEmpty).toList();
+    final fromImages =
+        imagesRaw.split(',').map(normalize).where((u) => u.isNotEmpty).toList();
     if (fromImages.isNotEmpty) return fromImages;
     final single = normalize(image);
     return single.isEmpty ? const [] : [single];

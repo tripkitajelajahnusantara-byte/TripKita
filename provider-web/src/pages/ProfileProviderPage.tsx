@@ -139,6 +139,19 @@ export const ProfileProviderPage: React.FC = () => {
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [activeUploadField, setActiveUploadField] = useState<string | null>(null);
+  const [viewingDocumentField, setViewingDocumentField] = useState<string | null>(null);
+
+  const handleViewDocument = async (fieldName: string, path: string) => {
+    if (!path || viewingDocumentField) return;
+    setViewingDocumentField(fieldName);
+    try {
+      await openProtectedDocument('provider', path);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Dokumen tidak dapat dibuka');
+    } finally {
+      setViewingDocumentField(null);
+    }
+  };
 
   const triggerUpload = (fieldName: string) => {
     // Jangan membuka pemilih berkas baru selama unggahan lain masih berjalan,
@@ -198,6 +211,8 @@ export const ProfileProviderPage: React.FC = () => {
     const isPending = !!pendingPath || status === 'PENDING';
     const isRejected = status === 'REJECTED';
     const isUploadingThis = isUploading && activeUploadField === fieldName;
+    const isViewingThis = viewingDocumentField === fieldName;
+    const isViewingAny = viewingDocumentField !== null;
     // Tautan "Ganti" dinonaktifkan secara visual selama ada proses lain berjalan.
     const replaceLinkStyle: React.CSSProperties = {
       color: 'var(--color-text-medium)',
@@ -207,6 +222,30 @@ export const ProfileProviderPage: React.FC = () => {
       opacity: isBusy && !isUploadingThis ? 0.5 : 1,
     };
     const replaceLinkLabel = isUploadingThis ? 'Mengunggah...' : 'Ganti';
+    const renderViewButton = (path: string | undefined) => (
+      <button
+        type="button"
+        disabled={!path || isViewingAny}
+        onClick={() => path && void handleViewDocument(fieldName, path)}
+        aria-busy={isViewingThis}
+        style={{
+          color: 'var(--color-accent)',
+          fontWeight: 600,
+          fontSize: '9px',
+          border: 0,
+          background: 'transparent',
+          cursor: !path || isViewingAny ? 'wait' : 'pointer',
+          padding: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          opacity: !path || (isViewingAny && !isViewingThis) ? 0.5 : 1,
+        }}
+      >
+        {isViewingThis && <LoaderCircle size={11} className="btn-spinner" aria-hidden="true" />}
+        {isViewingThis ? 'Membuka...' : 'Lihat'}
+      </button>
+    );
 
     if (!activePath && !pendingPath) {
       return (
@@ -236,7 +275,7 @@ export const ProfileProviderPage: React.FC = () => {
             <span style={{ color: '#10b981' }}>Terverifikasi</span>
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <button type="button" disabled={!activePath} onClick={() => openProtectedDocument('provider', activePath || '').catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
+            {renderViewButton(activePath)}
             <span onClick={() => triggerUpload(fieldName)} aria-disabled={isBusy} style={replaceLinkStyle}>{replaceLinkLabel}</span>
           </div>
         </div>
@@ -255,7 +294,7 @@ export const ProfileProviderPage: React.FC = () => {
             {pendingPath ? 'Review Berkas Baru' : 'Menunggu Verifikasi'}
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <button type="button" onClick={() => openProtectedDocument('provider', pendingPath || activePath || '').catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
+            {renderViewButton(pendingPath || activePath)}
             {activePath && (
               <span onClick={() => triggerUpload(fieldName)} aria-disabled={isBusy} style={replaceLinkStyle}>{replaceLinkLabel}</span>
             )}
@@ -279,7 +318,7 @@ export const ProfileProviderPage: React.FC = () => {
           )}
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
             {activePath && (
-              <button type="button" onClick={() => openProtectedDocument('provider', activePath).catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
+              renderViewButton(activePath)
             )}
             <span onClick={() => triggerUpload(fieldName)} aria-disabled={isBusy} style={replaceLinkStyle}>{replaceLinkLabel}</span>
           </div>

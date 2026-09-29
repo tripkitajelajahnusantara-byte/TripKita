@@ -509,6 +509,12 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		if booking.Guests <= 0 || (pkg.MinGuests > 0 && booking.Guests < pkg.MinGuests) || (pkg.MaxGuests > 0 && booking.Guests > pkg.MaxGuests) {
 			return &BookingInputError{Message: "jumlah peserta tidak valid"}
 		}
+		// Batas usia adalah aturan paket, sehingga harus ditegakkan lagi di
+		// backend. Validasi di web/mobile hanya membantu UX dan dapat dilewati
+		// oleh request langsung atau aplikasi versi lama.
+		if err := validateParticipantAges(booking, &pkg); err != nil {
+			return err
+		}
 		tripDay := booking.TripDate.Format("2006-01-02")
 		todayStr := time.Now().Format("2006-01-02")
 		if pkg.StartDate != "" && pkg.StartDate >= todayStr && tripDay < pkg.StartDate {
@@ -715,6 +721,45 @@ func normalizeBookingParticipants(booking *models.Booking) error {
 		}
 		if len(p.MedicalNotes) > 255 {
 			return &BookingInputError{Message: label + ": riwayat penyakit maksimal 255 karakter"}
+		}
+	}
+	return nil
+}
+
+// ageOnDate menghitung usia penuh pada tanggal perjalanan (bukan pada hari
+// checkout). Dengan demikian peserta yang baru berulang tahun sebelum hari
+// keberangkatan dinilai menggunakan usia yang benar.
+func ageOnDate(birthDate, onDate time.Time) int {
+	age := onDate.Year() - birthDate.Year()
+	if onDate.Month() < birthDate.Month() || (onDate.Month() == birthDate.Month() && onDate.Day() < birthDate.Day()) {
+		age--
+	}
+	return age
+}
+
+func validateParticipantAges(booking *models.Booking, pkg *models.Package) error {
+	if booking == nil || pkg == nil {
+		return nil
+	}
+	if len(booking.Participants) == 0 {
+		if pkg.MinAge > 0 || pkg.MaxAge > 0 {
+			return &BookingInputError{Message: "data tanggal lahir peserta wajib diisi untuk memeriksa batas usia paket"}
+		}
+		return nil
+	}
+	for i := range booking.Participants {
+		birthDate, err := time.Parse("2006-01-02", booking.Participants[i].BirthDate)
+		if err != nil {
+			// Format rinci sudah ditangani normalizeBookingParticipants; guard ini
+			// menjaga fungsi tetap aman bila dipakai terpisah.
+			return &BookingInputError{Message: fmt.Sprintf("Peserta %d: tanggal lahir tidak valid", i+1)}
+		}
+		age := ageOnDate(birthDate, booking.TripDate)
+		if pkg.MinAge > 0 && age < pkg.MinAge {
+			return &BookingInputError{Message: fmt.Sprintf("Peserta %d berusia %d tahun pada tanggal perjalanan; usia minimum paket adalah %d tahun", i+1, age, pkg.MinAge)}
+		}
+		if pkg.MaxAge > 0 && age > pkg.MaxAge {
+			return &BookingInputError{Message: fmt.Sprintf("Peserta %d berusia %d tahun pada tanggal perjalanan; usia maksimum paket adalah %d tahun", i+1, age, pkg.MaxAge)}
 		}
 	}
 	return nil
