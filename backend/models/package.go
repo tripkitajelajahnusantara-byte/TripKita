@@ -17,7 +17,7 @@ type Package struct {
 	Category           string         `gorm:"size:100;default:''" json:"category"`
 	TripType           string         `gorm:"size:100;default:''" json:"tripType"`
 	Price              int64          `gorm:"not null" json:"price"`
-	QuotaMin           int            `gorm:"default:1" json:"quotaMin"`
+	QuotaMin           int            `gorm:"default:0" json:"quotaMin"`
 	QuotaUsed          int            `gorm:"default:0" json:"quotaUsed"`
 	QuotaMax           int            `gorm:"not null" json:"quotaMax"`
 	StartDate          string         `gorm:"size:50" json:"startDate"`

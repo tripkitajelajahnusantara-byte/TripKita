@@ -39,6 +39,16 @@ func packageValidationErrorf(format string, args ...interface{}) error {
 	return &PackageValidationError{Message: fmt.Sprintf(format, args...)}
 }
 
+// quotaMinimumForTripType memastikan ambang minimum keberangkatan hanya
+// dimiliki Open Trip. Paket lain tetap memiliki kapasitas (quota_max), tetapi
+// batas minimal pesanannya diatur terpisah melalui min_guests.
+func quotaMinimumForTripType(tripType string, requested int) int {
+	if !models.IsOpenTrip(tripType) {
+		return 0
+	}
+	return requested
+}
+
 func NewPackageService(repo repositories.PackageRepository, providerRepo repositories.ProviderRepository, dateRepo repositories.PackageDateRepository) PackageService {
 	return &packageService{repo: repo, providerRepo: providerRepo, dateRepo: dateRepo}
 }
@@ -63,6 +73,7 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 	if err := validateMeetingPointCoordinates(req.MeetingPointLat, req.MeetingPointLng, req.Status == "Aktif"); err != nil {
 		return nil, err
 	}
+	req.QuotaMin = quotaMinimumForTripType(req.TripType, req.QuotaMin)
 	if req.Price < 0 || req.QuotaMin < 0 || req.QuotaMax < 0 || req.Duration < 0 || req.MinGuests < 0 || req.MaxGuests < 0 || req.MinAge < 0 || req.MaxAge < 0 {
 		return nil, packageValidationErrorf("harga, kuota, durasi, jumlah peserta, dan umur tidak boleh bernilai negatif")
 	}
@@ -75,10 +86,7 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 	if req.QuotaMax <= 0 {
 		return nil, packageValidationErrorf("kuota maksimal harus lebih besar dari 0")
 	}
-	if req.QuotaMin <= 0 {
-		req.QuotaMin = 1
-	}
-	if req.QuotaMax < req.QuotaMin {
+	if models.IsOpenTrip(req.TripType) && req.QuotaMin > 0 && req.QuotaMax < req.QuotaMin {
 		return nil, packageValidationErrorf("kuota maksimal (%d) tidak boleh lebih kecil dari kuota minimal (%d)", req.QuotaMax, req.QuotaMin)
 	}
 	if req.MaxGuests > 0 && req.MinGuests > req.MaxGuests {
@@ -153,6 +161,9 @@ func (s *packageService) GetAllPublic() ([]models.Package, error) {
 // attachDates melengkapi daftar paket dengan tanggal keberangkatannya dalam satu
 // query, bukan satu query per paket.
 func (s *packageService) attachDates(packages []models.Package) ([]models.Package, error) {
+	for i := range packages {
+		packages[i].QuotaMin = quotaMinimumForTripType(packages[i].TripType, packages[i].QuotaMin)
+	}
 	if s.dateRepo == nil || len(packages) == 0 {
 		return packages, nil
 	}
@@ -238,7 +249,12 @@ func (s *packageService) GetPublicProviderProfile(id uint) (*models.PublicProvid
 }
 
 func (s *packageService) GetPackageByID(id uint, providerID uint) (*models.Package, error) {
-	return s.repo.FindByIDAndProvider(id, providerID)
+	pkg, err := s.repo.FindByIDAndProvider(id, providerID)
+	if err != nil {
+		return nil, err
+	}
+	pkg.QuotaMin = quotaMinimumForTripType(pkg.TripType, pkg.QuotaMin)
+	return pkg, nil
 }
 
 func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.UpdatePackageRequest) (*models.Package, error) {
@@ -271,7 +287,8 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	if req.TripType != nil {
 		pkg.TripType = strings.TrimSpace(*req.TripType)
 	}
-	if (req.Price != nil && *req.Price < 0) || (req.QuotaMin != nil && *req.QuotaMin < 0) ||
+	if (req.Price != nil && *req.Price < 0) ||
+		(req.QuotaMin != nil && models.IsOpenTrip(pkg.TripType) && *req.QuotaMin < 0) ||
 		(req.QuotaMax != nil && *req.QuotaMax < 0) || (req.Duration != nil && *req.Duration < 0) ||
 		(req.MinGuests != nil && *req.MinGuests < 0) || (req.MaxGuests != nil && *req.MaxGuests < 0) ||
 		(req.MinAge != nil && *req.MinAge < 0) || (req.MaxAge != nil && *req.MaxAge < 0) {
@@ -286,13 +303,14 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	if req.Price != nil {
 		pkg.Price = *req.Price
 	}
-	if req.QuotaMin != nil {
+	if req.QuotaMin != nil && models.IsOpenTrip(pkg.TripType) {
 		pkg.QuotaMin = *req.QuotaMin
 	}
+	pkg.QuotaMin = quotaMinimumForTripType(pkg.TripType, pkg.QuotaMin)
 	if req.QuotaMax != nil {
 		pkg.QuotaMax = *req.QuotaMax
 	}
-	if pkg.QuotaMax < pkg.QuotaMin && pkg.QuotaMax > 0 {
+	if models.IsOpenTrip(pkg.TripType) && pkg.QuotaMax < pkg.QuotaMin && pkg.QuotaMax > 0 {
 		return nil, packageValidationErrorf("kuota maksimal (%d) tidak boleh lebih kecil dari kuota minimal (%d)", pkg.QuotaMax, pkg.QuotaMin)
 	}
 	if req.StartDate != nil {
@@ -381,8 +399,11 @@ func validateActivePackage(pkg *models.Package) error {
 	if pkg.Duration <= 0 {
 		return packageValidationErrorf("durasi paket aktif minimal 1 hari")
 	}
-	if pkg.QuotaMin <= 0 || pkg.QuotaMax <= 0 || pkg.QuotaMax < pkg.QuotaMin {
-		return packageValidationErrorf("kuota paket aktif harus valid dan minimal 1 peserta")
+	if pkg.QuotaMax <= 0 {
+		return packageValidationErrorf("kuota maksimal paket aktif harus minimal 1 peserta")
+	}
+	if models.IsOpenTrip(pkg.TripType) && (pkg.QuotaMin <= 0 || pkg.QuotaMax < pkg.QuotaMin) {
+		return packageValidationErrorf("kuota minimal Open Trip harus valid, minimal 1 peserta, dan tidak melebihi kuota maksimal")
 	}
 	if pkg.MinGuests <= 0 || pkg.MaxGuests <= 0 || pkg.MinGuests > pkg.MaxGuests || pkg.MaxGuests > pkg.QuotaMax {
 		return packageValidationErrorf("batas peserta per booking tidak valid")

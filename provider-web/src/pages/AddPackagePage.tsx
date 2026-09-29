@@ -110,6 +110,7 @@ export const AddPackagePage: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [schedule, setSchedule] = useState('');
+  const requiresMinimumQuota = isOpenTripType(tripType);
   // Unggah foto dan simpan paket berbagi satu kunci: paket tidak boleh disimpan
   // selagi foto masih diunggah (foto baru belum masuk payload), dan sebaliknya.
   const { pending, isBusy, run } = useActionLock();
@@ -211,7 +212,8 @@ export const AddPackagePage: React.FC = () => {
             setMeetPoint(formatMeetingPointCoordinates(savedCoordinates));
           }
           setPrice(pkg.price ? String(pkg.price) : '');
-          if (pkg.quotaMin) setQuotaMin(String(pkg.quotaMin));
+          const loadedTripType = pkg.tripType || TRIP_TYPES[0] || '';
+          setQuotaMin(isOpenTripType(loadedTripType) && pkg.quotaMin ? String(pkg.quotaMin) : '');
           setQuotaMax(pkg.quotaMax ? String(pkg.quotaMax) : '');
           if (pkg.category) setCategory(pkg.category);
           if (pkg.tripType) setTripType(pkg.tripType);
@@ -412,7 +414,11 @@ export const AddPackagePage: React.FC = () => {
 	  ['Minimum peserta', minGuests, minG],
 	  ['Maksimum peserta', maxGuests, maxG],
 	] as const;
-	const invalidPricing = enteredPricingValues.find(([, raw, value]) => raw !== '' && (!Number.isFinite(value) || !Number.isInteger(value) || value < 0));
+	const invalidPricing = enteredPricingValues.find(([label, raw, value]) =>
+	  (label !== 'Kuota minimal' || requiresMinimumQuota) &&
+	  raw !== '' &&
+	  (!Number.isFinite(value) || !Number.isInteger(value) || value < 0)
+	);
 	if (invalidPricing) {
 	  showValidation(`${invalidPricing[0]} harus berupa bilangan bulat dan tidak boleh bernilai minus.`, 'pricing');
 	  return;
@@ -464,7 +470,7 @@ export const AddPackagePage: React.FC = () => {
 		showValidation('Durasi paket wajib diisi dan minimal 1 hari.', 'info');
         return;
       }
-      if (isNaN(qMin) || qMin < 1) {
+      if (requiresMinimumQuota && (isNaN(qMin) || qMin < 1)) {
 		showValidation('Kuota minimal wajib diisi dan minimal 1 peserta.', 'pricing');
         return;
       }
@@ -472,7 +478,7 @@ export const AddPackagePage: React.FC = () => {
 		showValidation('Kuota maksimal harus lebih besar dari 0, misalnya 15.', 'pricing');
         return;
       }
-      if (qMax < qMin) {
+      if (requiresMinimumQuota && qMax < qMin) {
 		showValidation(`Kuota maksimal (${qMax}) tidak boleh lebih kecil dari kuota minimal (${qMin}).`, 'pricing');
         return;
       }
@@ -529,7 +535,9 @@ export const AddPackagePage: React.FC = () => {
           category: category,
           tripType: tripType,
 		  price: Number.isFinite(priceValue) ? priceValue : 0,
-          quotaMin: Number.isFinite(qMin) ? qMin : 0,
+          // Kuota minimum adalah ambang keberangkatan bersama dan hanya berlaku
+          // untuk Open Trip. Tipe lain memakai minimum peserta per booking.
+          quotaMin: requiresMinimumQuota && Number.isFinite(qMin) ? qMin : 0,
           quotaMax: Number.isFinite(qMax) ? qMax : 0,
           startDate: startDate,
           endDate: endDate,
@@ -565,6 +573,7 @@ export const AddPackagePage: React.FC = () => {
 		// mengharuskan hasil tersimpan sama dengan payload yang dinyatakan sukses.
 		if (!savedPackage?.id || savedPackage.status !== dbStatus || savedPackage.name !== payload.name ||
 		    savedPackage.category !== payload.category || savedPackage.tripType !== payload.tripType ||
+		    Number(savedPackage.quotaMin) !== payload.quotaMin ||
 		    Number(savedPackage.duration) !== payload.duration ||
 		    (mapPosition && (
 		      !Number.isFinite(Number(savedPackage.meetingPointLatitude)) ||
@@ -705,17 +714,14 @@ export const AddPackagePage: React.FC = () => {
                       onChange={(e) => {
                         const val = e.target.value;
                         setTripType(val);
+                        setQuotaMin(isOpenTripType(val) ? (quotaMin || '1') : '');
                         if (val === 'Honeymoon' || val === 'Private Trip') {
-                          setQuotaMin('2');
                           setMinGuests('2');
                         } else if (val === 'Family') {
-                          setQuotaMin('3');
                           setMinGuests('3');
                         } else if (val === 'Corporate') {
-                          setQuotaMin('10');
                           setMinGuests('10');
                         } else {
-                          setQuotaMin('1');
                           setMinGuests('1');
                         }
                       }}
@@ -933,7 +939,7 @@ export const AddPackagePage: React.FC = () => {
             {activeStep === 'pricing' && (
               <div className="form-section-body animate-fade-in">
                 <h3>Jadwal & Harga</h3>
-                <p className="section-subtitle">Lengkapi detail harga, kuota, jadwal keberangkatan, dan batas peserta</p>
+                <p className="section-subtitle">Lengkapi detail harga, kapasitas, jadwal keberangkatan, dan batas peserta</p>
                 
                 <div className="input-row-3">
                   <div className="input-group">
@@ -947,26 +953,28 @@ export const AddPackagePage: React.FC = () => {
                       placeholder="Contoh: 1200000"
                     />
                   </div>
-                  <div className="input-group">
-                    <label>Kuota Minimal (Min. 1) *</label>
-                    <input 
-                      type="number" 
-                      min="1"
-                      value={quotaMin} 
-                      onChange={(e) => setQuotaMin(e.target.value)}
-                      placeholder="Contoh: 14"
-                    />
-                    {parseInt(quotaMin, 10) < 1 && (
-                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                        ⚠️ Kuota minimal harus lebih besar dari 0 (minimal 1)
-                      </span>
-                    )}
-                  </div>
+                  {requiresMinimumQuota && (
+                    <div className="input-group">
+                      <label>Kuota Minimal Open Trip (Min. 1) *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={quotaMin}
+                        onChange={(e) => setQuotaMin(e.target.value)}
+                        placeholder="Contoh: 14"
+                      />
+                      {parseInt(quotaMin, 10) < 1 && (
+                        <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                          ⚠️ Kuota minimal harus lebih besar dari 0 (minimal 1)
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="input-group">
                     <label>Kuota Maksimal *</label>
                     <input 
                       type="number" 
-                      min={quotaMin || "1"}
+                      min={requiresMinimumQuota ? (quotaMin || "1") : "1"}
                       value={quotaMax} 
                       onChange={(e) => setQuotaMax(e.target.value)}
                       placeholder="Contoh: 15"
@@ -975,7 +983,7 @@ export const AddPackagePage: React.FC = () => {
                       <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
                         ⚠️ Kuota maksimal tidak boleh 0 atau minus
                       </span>
-                    ) : parseInt(quotaMax, 10) < parseInt(quotaMin, 10) ? (
+                    ) : requiresMinimumQuota && parseInt(quotaMax, 10) < parseInt(quotaMin, 10) ? (
                       <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
                         ⚠️ Kuota maksimal ({quotaMax}) harus &gt;= kuota minimal ({quotaMin})
                       </span>

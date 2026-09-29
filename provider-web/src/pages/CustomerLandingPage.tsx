@@ -733,7 +733,7 @@ export const CustomerLandingPage: React.FC = () => {
                             fontWeight: '700' 
                           }}
                         >
-                          {pkg.tripType} • Min {pkg.quotaMin || 2} Orang
+                          {pkg.tripType} • Min {Math.max(1, Number(pkg.minGuests) || 1)} Orang
                         </span>
                       </div>
 
@@ -875,7 +875,7 @@ export const CustomerLandingPage: React.FC = () => {
                             fontWeight: '700' 
                           }}
                         >
-                          {pkg.tripType} • Min {pkg.quotaMin} Orang
+                          {pkg.tripType} • Min {Math.max(1, Number(pkg.minGuests) || 1)} Orang
                         </span>
                       </div>
 

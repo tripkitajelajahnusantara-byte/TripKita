@@ -29,6 +29,8 @@ void main() {
       });
 
       expect(pkg.isOpenTrip, isFalse);
+      expect(pkg.quotaMin, 0);
+      expect(pkg.minRequiredGuests, 2);
       expect(pkg.availableSeats, 6);
       expect(pkg.photos.length, 2);
       expect(pkg.photos.first, endsWith('/uploads/a.jpg'));

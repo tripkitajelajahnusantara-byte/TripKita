@@ -136,6 +136,10 @@ func ConnectDB(cfg *config.Config) {
 		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_guests INTEGER DEFAULT 10;`)
 		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_age INTEGER DEFAULT 0;`)
 		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_age INTEGER DEFAULT 100;`)
+		// Kuota minimum adalah aturan keberangkatan bersama khusus Open Trip.
+		// Data lama tipe lain dinolkan agar API, database, dan formulir konsisten.
+		execMigration(`UPDATE packages SET quota_min = 0 WHERE LOWER(REGEXP_REPLACE(TRIM(COALESCE(trip_type, '')), '\s+', '', 'g')) <> 'opentrip';`)
+		execMigration(`ALTER TABLE packages ALTER COLUMN quota_min SET DEFAULT 0;`)
 		execMigration(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT;`)
 		execMigration(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT;`)
 
@@ -637,6 +641,18 @@ func SeedDatabase() {
 	}
 
 	for i := range pkgs {
+		// Fixture lama memakai quota_min sebagai minimum pemesanan untuk semua
+		// tipe. Pertahankan maksud tersebut di min_guests, lalu kosongkan
+		// quota_min pada paket selain Open Trip.
+		if !models.IsOpenTrip(pkgs[i].TripType) {
+			if pkgs[i].MinGuests <= 0 {
+				pkgs[i].MinGuests = pkgs[i].QuotaMin
+				if pkgs[i].MinGuests <= 0 {
+					pkgs[i].MinGuests = 1
+				}
+			}
+			pkgs[i].QuotaMin = 0
+		}
 		var existing models.Package
 		if err := DB.Where("name = ?", pkgs[i].Name).First(&existing).Error; err != nil {
 			if errCreate := DB.Create(&pkgs[i]).Error; errCreate != nil {
@@ -941,6 +957,15 @@ func EnsureAllTestProvidersAndSeats() {
 	}
 
 	for _, p := range packagesToEnsure {
+		if !models.IsOpenTrip(p.TripType) {
+			if p.MinGuests <= 0 {
+				p.MinGuests = p.QuotaMin
+				if p.MinGuests <= 0 {
+					p.MinGuests = 1
+				}
+			}
+			p.QuotaMin = 0
+		}
 		var existing models.Package
 		if err := DB.Where("name = ?", p.Name).First(&existing).Error; err != nil {
 			DB.Create(&p)
@@ -950,6 +975,7 @@ func EnsureAllTestProvidersAndSeats() {
 				"trip_type":   p.TripType,
 				"quota_min":   p.QuotaMin,
 				"quota_max":   p.QuotaMax,
+				"min_guests":  p.MinGuests,
 				"price":       p.Price,
 				"category":    p.Category,
 				"destination": p.Destination,

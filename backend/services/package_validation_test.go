@@ -54,6 +54,28 @@ func TestValidateActivePackageAcceptsValidValues(t *testing.T) {
 	}
 }
 
+func TestQuotaMinimumOnlyAppliesToOpenTrip(t *testing.T) {
+	if got := quotaMinimumForTripType("Private Trip", 8); got != 0 {
+		t.Fatalf("kuota minimum non-Open-Trip harus dinolkan, got %d", got)
+	}
+	if got := quotaMinimumForTripType(" open   trip ", 8); got != 8 {
+		t.Fatalf("kuota minimum Open Trip harus dipertahankan, got %d", got)
+	}
+
+	nonOpenTrip := validActivePackage()
+	nonOpenTrip.TripType = "Private Trip"
+	nonOpenTrip.QuotaMin = 0
+	if err := validateActivePackage(nonOpenTrip); err != nil {
+		t.Fatalf("paket non-Open-Trip tanpa kuota minimum harus valid: %v", err)
+	}
+
+	openTrip := validActivePackage()
+	openTrip.QuotaMin = 0
+	if err := validateActivePackage(openTrip); err == nil || !strings.Contains(err.Error(), "kuota minimal Open Trip") {
+		t.Fatalf("Open Trip tanpa kuota minimum harus ditolak, got %v", err)
+	}
+}
+
 func TestUpdatePackageRequestDistinguishesZeroFromOmitted(t *testing.T) {
 	var withZero models.UpdatePackageRequest
 	if err := json.Unmarshal([]byte(`{"price":0,"duration":0,"category":""}`), &withZero); err != nil {

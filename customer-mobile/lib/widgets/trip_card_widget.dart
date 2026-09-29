@@ -39,7 +39,7 @@ class TripCardTone {
 
 String tripBadgeLabel(TripPackage pkg) {
   if (pkg.isOpenTrip) return pkg.tripType.isNotEmpty ? '${pkg.tripType} • ${pkg.category}' : pkg.category;
-  return '${pkg.tripType} • Min ${pkg.quotaMin} Orang';
+  return '${pkg.tripType} • Min ${pkg.minRequiredGuests} Orang';
 }
 
 String ratingLabel(TripPackage pkg) => pkg.rating > 0 ? pkg.rating.toStringAsFixed(1) : 'Baru';
