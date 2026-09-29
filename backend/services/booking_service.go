@@ -26,6 +26,7 @@ type BookingService interface {
 	CreateBooking(booking *models.Booking) error
 	SubmitPaymentProof(bookingID uint, proofPath string) (*models.Booking, error)
 	ReviewManualPayment(bookingID uint, adminID uint, req *models.ReviewManualPaymentRequest) (*models.Booking, error)
+	ResendBookingEmail(bookingID uint) error
 	CancelBookingByCustomer(id uint, customerID uint) (*models.Booking, error)
 	UpdateStatusByWebhook(transactionID string, referenceID string, paymentStatus string, paymentMethod string, amount int64, currency string) error
 	GetRefunds() ([]models.Booking, error)
@@ -81,6 +82,10 @@ func (e *BookingInputError) Error() string { return e.Message }
 type BookingGatewayError struct{ Message string }
 
 func (e *BookingGatewayError) Error() string { return e.Message }
+
+type BookingEmailError struct{ Message string }
+
+func (e *BookingEmailError) Error() string { return e.Message }
 
 func NewBookingService(repo repositories.BookingRepository, packageRepo repositories.PackageRepository, ipaymuService IPaymuService, emailService *EmailService, notifService *NotificationService) BookingService {
 	return &bookingService{
@@ -675,6 +680,46 @@ func (s *bookingService) ReviewManualPayment(bookingID uint, adminID uint, req *
 	return &booking, nil
 }
 
+// ResendBookingEmail memberi admin jalur pemulihan eksplisit setelah gangguan
+// SMTP. Pengiriman dilakukan sinkron agar UI dapat menampilkan hasil sebenarnya,
+// bukan sekadar menganggap goroutine email berhasil dijadwalkan.
+func (s *bookingService) ResendBookingEmail(bookingID uint) error {
+	if s.emailService == nil {
+		return &BookingEmailError{Message: "Layanan email belum dikonfigurasi."}
+	}
+	var booking models.Booking
+	if err := database.DB.Preload("Package").First(&booking, bookingID).Error; err != nil {
+		return &BookingInputError{Message: "booking tidak ditemukan"}
+	}
+
+	var err error
+	switch booking.Status {
+	case models.StatusPendingPayment:
+		err = s.emailService.SendManualPaymentInstructionEmail(&booking, booking.Package.Name, models.PaymentDeadline(&booking))
+	case models.StatusPaymentReview:
+		err = s.emailService.SendPaymentProofReceivedEmail(&booking)
+	case models.StatusPaid, models.StatusConfirmed, models.StatusCompleted:
+		err = s.emailService.SendPaymentSuccessEmail(&booking, &booking.Package)
+	case models.StatusPaymentFailed:
+		err = s.emailService.SendPaymentFailedEmail(&booking)
+	case models.StatusExpired:
+		err = s.emailService.SendExpiredEmail(&booking)
+	case models.StatusCancelledByCustomer, models.StatusCancelledByProvider:
+		err = s.emailService.SendCancelledEmail(&booking)
+	case models.StatusRefundRequired:
+		err = s.emailService.SendRefundPendingEmail(&booking)
+	case models.StatusRefunded:
+		err = s.emailService.SendRefundEmail(&booking)
+	default:
+		return &BookingInputError{Message: "email untuk status booking ini belum dapat dikirim ulang"}
+	}
+	if err != nil {
+		log.Printf("[Email] Pengiriman ulang booking %s gagal: %v", booking.BookingCode, err)
+		return &BookingEmailError{Message: emailFailureHint(err)}
+	}
+	return nil
+}
+
 // paymentAcceptanceEnd adalah batas terakhir bukti dapat dikirim/disetujui:
 // akhir perjalanan (atau 24 jam setelah tanggal trip untuk data lama).
 func paymentAcceptanceEnd(b *models.Booking) time.Time {
@@ -1096,8 +1141,8 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 				if s.notifService != nil {
 					_ = s.notifService.NotifyAdmins(
 						"Pengiriman Email Transaksi Gagal",
-						fmt.Sprintf("Email status %s untuk pesanan #%s gagal dikirim dan perlu ditindaklanjuti.", newS, b.BookingCode),
-						NotifTypeGeneral,
+						fmt.Sprintf("Email status %s untuk pesanan #%s gagal dikirim. %s", newS, b.BookingCode, emailFailureHint(err)),
+						NotifTypePayment,
 						"/admin/bookings",
 					)
 				}

@@ -186,6 +186,25 @@ func (c *Config) Validate() error {
 		(strings.TrimSpace(c.ManualPaymentBankName) == "" || strings.TrimSpace(c.ManualPaymentAccountHolder) == "") {
 		return fmt.Errorf("MANUAL_PAYMENT_BANK_NAME dan MANUAL_PAYMENT_ACCOUNT_HOLDER wajib diisi bersama MANUAL_PAYMENT_ACCOUNT_NUMBER")
 	}
+	// Begitu salah satu kredensial SMTP diisi, jangan izinkan konfigurasi semu
+	// berjalan. Sebelumnya APP_ENV yang lupa disetel membuat nilai contoh lolos,
+	// lalu kegagalan baru terlihat setelah customer benar-benar booking.
+	if strings.TrimSpace(c.SMTPUser) != "" || strings.TrimSpace(c.SMTPPass) != "" || strings.TrimSpace(c.SMTPFrom) != "" {
+		if strings.TrimSpace(c.SMTPUser) == "" || strings.TrimSpace(c.SMTPPass) == "" || strings.TrimSpace(c.SMTPFrom) == "" {
+			return fmt.Errorf("SMTP_USER, SMTP_PASS, dan SMTP_FROM wajib diisi lengkap")
+		}
+		lowerPass := strings.ToLower(strings.TrimSpace(c.SMTPPass))
+		if strings.Contains(lowerPass, "your-") || strings.Contains(lowerPass, "your_") || strings.Contains(lowerPass, "replace-with") || strings.Contains(lowerPass, "app-password") {
+			return fmt.Errorf("SMTP_PASS masih berupa nilai contoh; isi App Password SMTP yang valid")
+		}
+		if err := validatePort("SMTP_PORT", c.SMTPPort); err != nil {
+			return err
+		}
+		fromAddress, err := mail.ParseAddress(c.SMTPFrom)
+		if err != nil || fromAddress.Address != c.SMTPFrom || strings.ContainsAny(c.SMTPFrom, "\r\n") {
+			return fmt.Errorf("SMTP_FROM wajib berupa satu alamat email yang valid")
+		}
+	}
 	if !c.IsProduction() {
 		return nil
 	}

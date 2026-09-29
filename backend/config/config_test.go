@@ -186,13 +186,30 @@ func TestSMTPFromDefaultsToAuthenticatedUser(t *testing.T) {
 		"DB_NAME":     "d",
 		"JWT_SECRET":  "9f2b7c41ae6d05938bd14c7ea2f6091d",
 		"SMTP_USER":   "mailer@example.com",
-		"SMTP_PASS":   "app-password",
+		"SMTP_PASS":   "valid-secret-1234",
 	})
 	if err != nil {
 		t.Fatalf("konfigurasi development ditolak: %v", err)
 	}
 	if cfg.SMTPFrom != "mailer@example.com" {
 		t.Fatalf("SMTP_FROM=%q, ingin fallback ke SMTP_USER", cfg.SMTPFrom)
+	}
+}
+
+func TestDevelopmentRejectsPlaceholderSMTPPassword(t *testing.T) {
+	_, err := loadWith(t, map[string]string{
+		"APP_ENV":     "development",
+		"DB_HOST":     "localhost",
+		"DB_USER":     "u",
+		"DB_PASSWORD": "p",
+		"DB_NAME":     "d",
+		"JWT_SECRET":  "9f2b7c41ae6d05938bd14c7ea2f6091d",
+		"SMTP_USER":   "mailer@example.com",
+		"SMTP_PASS":   "your-16-digit-app-password",
+		"SMTP_FROM":   "mailer@example.com",
+	})
+	if err == nil || !strings.Contains(err.Error(), "App Password SMTP") {
+		t.Fatalf("SMTP placeholder seharusnya ditolak dengan petunjuk yang jelas, dapat %v", err)
 	}
 }
 

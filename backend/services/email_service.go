@@ -2,13 +2,18 @@ package services
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"html"
+	"io"
 	"log"
 	"mime"
+	"net"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"strings"
 	"time"
 
@@ -26,7 +31,6 @@ func NewEmailService(cfg *config.Config, pdfService *PDFService) *EmailService {
 	return &EmailService{
 		cfg:        cfg,
 		pdfService: pdfService,
-		mailSender: smtp.SendMail,
 	}
 }
 
@@ -484,6 +488,14 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 	if smtpUser == "" || smtpPass == "" || smtpHost == "" || smtpPort == "" || fromAddr == "" {
 		return fmt.Errorf("konfigurasi SMTP belum lengkap; email tidak dikirim")
 	}
+	// Google menampilkan app password dalam kelompok empat karakter. Spasi
+	// tampilan yang ikut tersalin membuat AUTH gagal walau kredensial benar.
+	if strings.EqualFold(smtpHost, "smtp.gmail.com") {
+		smtpPass = strings.ReplaceAll(smtpPass, " ", "")
+	}
+	if smtpPass == "" {
+		return fmt.Errorf("konfigurasi SMTP belum lengkap; email tidak dikirim")
+	}
 	fromMailbox, err := mail.ParseAddress(fromAddr)
 	if err != nil || fromMailbox.Address == "" || strings.ContainsAny(fromMailbox.Address, "\r\n") {
 		return fmt.Errorf("alamat pengirim SMTP tidak valid")
@@ -535,10 +547,17 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 
 	addr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
 	mailSender := s.mailSender
-	if mailSender == nil {
-		mailSender = smtp.SendMail
+	if mailSender != nil {
+		err = mailSender(addr, auth, fromAddr, []string{to}, bodyBuf.Bytes())
+	} else {
+		err = sendSMTPMessage(addr, smtpHost, smtpPort, auth, fromAddr, []string{to}, bodyBuf.Bytes())
+		if err != nil && isTransientSMTPError(err) {
+			// Satu retry pendek cukup untuk gangguan koneksi sesaat tanpa membuat
+			// goroutine email menggantung lama atau berpotensi mengirim berulang.
+			time.Sleep(750 * time.Millisecond)
+			err = sendSMTPMessage(addr, smtpHost, smtpPort, auth, fromAddr, []string{to}, bodyBuf.Bytes())
+		}
 	}
-	err = mailSender(addr, auth, fromAddr, []string{to}, bodyBuf.Bytes())
 	if err != nil {
 		log.Printf("[EmailService] SMTP dispatch failed: %v\n", err)
 		return err
@@ -546,6 +565,113 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 
 	log.Printf("[EmailService] Email dispatched successfully")
 	return nil
+}
+
+// sendSMTPMessage mendukung SMTP STARTTLS (umumnya port 587) dan implicit TLS
+// (port 465). smtp.SendMail dari standard library hanya menangani STARTTLS,
+// sehingga konfigurasi provider yang memakai 465 sebelumnya selalu gagal.
+func sendSMTPMessage(addr, host, port string, auth smtp.Auth, from string, recipients []string, message []byte) error {
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	var (
+		client *smtp.Client
+		conn   net.Conn
+		err    error
+	)
+
+	tlsConfig := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+	if port == "465" {
+		conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	} else {
+		conn, err = dialer.Dial("tcp", addr)
+	}
+	if err != nil {
+		return fmt.Errorf("gagal terhubung ke server SMTP: %w", err)
+	}
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
+
+	client, err = smtp.NewClient(conn, host)
+	if err != nil {
+		_ = conn.Close()
+		return fmt.Errorf("server SMTP tidak dapat digunakan: %w", err)
+	}
+	defer client.Close()
+
+	if port != "465" {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(tlsConfig); err != nil {
+				return fmt.Errorf("negosiasi TLS SMTP gagal: %w", err)
+			}
+		} else {
+			return fmt.Errorf("server SMTP tidak menawarkan STARTTLS; gunakan port 465 untuk implicit TLS")
+		}
+	}
+	if auth != nil {
+		if ok, _ := client.Extension("AUTH"); !ok {
+			return fmt.Errorf("server SMTP tidak mendukung autentikasi")
+		}
+		if err := client.Auth(auth); err != nil {
+			return fmt.Errorf("autentikasi SMTP gagal: %w", err)
+		}
+	}
+	if err := client.Mail(from); err != nil {
+		return fmt.Errorf("alamat pengirim ditolak server SMTP: %w", err)
+	}
+	for _, recipient := range recipients {
+		if err := client.Rcpt(recipient); err != nil {
+			return fmt.Errorf("alamat penerima ditolak server SMTP: %w", err)
+		}
+	}
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("server SMTP menolak isi email: %w", err)
+	}
+	if _, err := w.Write(message); err != nil {
+		_ = w.Close()
+		return fmt.Errorf("gagal mengirim isi email: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("server SMTP gagal menyelesaikan email: %w", err)
+	}
+	if err := client.Quit(); err != nil {
+		return fmt.Errorf("server SMTP menutup koneksi dengan error: %w", err)
+	}
+	return nil
+}
+
+func isTransientSMTPError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var protocolErr *textproto.Error
+	if errors.As(err, &protocolErr) {
+		return protocolErr.Code >= 400 && protocolErr.Code < 500
+	}
+	var networkErr net.Error
+	if errors.As(err, &networkErr) {
+		return networkErr.Timeout() || networkErr.Temporary()
+	}
+	return errors.Is(err, io.EOF) || strings.Contains(strings.ToLower(err.Error()), "connection reset")
+}
+
+func emailFailureHint(err error) string {
+	if err == nil {
+		return "Tidak ada error."
+	}
+	message := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(message, "konfigurasi smtp belum lengkap"):
+		return "Konfigurasi SMTP belum lengkap. Periksa SMTP_HOST, SMTP_PORT, SMTP_USER, dan SMTP_PASS."
+	case strings.Contains(message, "autentikasi smtp"):
+		return "Autentikasi SMTP ditolak. Untuk Gmail gunakan App Password, bukan password akun biasa."
+	case strings.Contains(message, "tls") || strings.Contains(message, "terhubung") || strings.Contains(message, "timeout"):
+		return "Koneksi aman ke server email gagal. Periksa host, port 587/465, dan akses jaringan deployment."
+	case strings.Contains(message, "alamat pengirim"):
+		return "Alamat pengirim ditolak. Samakan SMTP_FROM dengan SMTP_USER atau alias yang diizinkan provider email."
+	case strings.Contains(message, "alamat penerima"):
+		return "Alamat email customer ditolak oleh server email."
+	default:
+		return "Server email menolak pengiriman. Periksa log backend untuk detail teknis."
+	}
 }
 
 // SendOpenTripQuotaAlertEmail memberi tahu mitra bahwa kuota minimal satu

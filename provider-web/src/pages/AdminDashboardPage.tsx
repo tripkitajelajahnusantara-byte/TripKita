@@ -321,7 +321,9 @@ export const AdminDashboardPage: React.FC = () => {
         setActiveView('administrasi-refund');
         break;
       case 'PAYMENT':
+		setPaymentFilter('all');
         setActiveView('kelola-pembayaran');
+		fetchAdminBookings();
         break;
       case 'REGISTRATION':
       case 'ACCOUNT':
@@ -400,6 +402,20 @@ export const AdminDashboardPage: React.FC = () => {
     setPaymentReviewError('');
   };
 
+  useEffect(() => {
+    if (!paymentReviewTarget) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !paymentActionBusy) closePaymentReview();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [paymentReviewTarget, paymentActionBusy]);
+
   const openPaymentReview = (booking: any, decision: 'APPROVED' | 'REJECTED') => {
     if (paymentActionBusy) return;
     setPaymentReviewTarget({ booking, decision });
@@ -452,6 +468,20 @@ export const AdminDashboardPage: React.FC = () => {
         await fetchAdminBookings();
       } catch (err: any) {
         setPaymentReviewError(err.message || 'Konfirmasi pembayaran gagal disimpan.');
+      }
+    });
+  };
+
+  const resendBookingEmail = async (booking: any) => {
+    if (!booking || paymentActionBusy) return;
+    await runPaymentAction(`email-${booking.id}`, async () => {
+      setError('');
+      setSuccessMsg('');
+      try {
+        await request(`/admin/bookings/${booking.id}/resend-email`, { method: 'POST' });
+        setSuccessMsg(`Email status booking ${booking.bookingCode} berhasil dikirim ulang ke ${booking.customerEmail || 'customer'}.`);
+      } catch (err: any) {
+        setError(err.message || 'Email belum dapat dikirim ulang. Periksa konfigurasi SMTP backend.');
       }
     });
   };
@@ -1136,12 +1166,17 @@ export const AdminDashboardPage: React.FC = () => {
                                   )}
                                 </td>
                                 <td>
-                                  {b.status === 'PAYMENT_REVIEW' ? (
-                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                      <button type="button" disabled={paymentActionBusy} onClick={() => openPaymentReview(b, 'APPROVED')} style={{ border: 0, background: '#10b981', color: '#fff', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: paymentActionBusy ? 'not-allowed' : 'pointer' }}>Setujui</button>
-                                      <button type="button" disabled={paymentActionBusy} onClick={() => openPaymentReview(b, 'REJECTED')} style={{ border: '1px solid #ef4444', background: '#fff', color: '#dc2626', borderRadius: 7, padding: '7px 10px', fontWeight: 700, cursor: paymentActionBusy ? 'not-allowed' : 'pointer' }}>Tolak</button>
-                                    </div>
-                                  ) : <span style={{ color: '#94a3b8' }}>—</span>}
+                                  <div className="payment-table-actions">
+                                    {b.status === 'PAYMENT_REVIEW' && (
+                                      <div>
+                                        <button type="button" disabled={paymentActionBusy} onClick={() => openPaymentReview(b, 'APPROVED')} className="payment-table-approve"><CheckCircle2 size={14} /> Setujui</button>
+                                        <button type="button" disabled={paymentActionBusy} onClick={() => openPaymentReview(b, 'REJECTED')} className="payment-table-reject"><XCircle size={14} /> Tolak</button>
+                                      </div>
+                                    )}
+                                    <button type="button" disabled={paymentActionBusy} onClick={() => resendBookingEmail(b)} className="payment-table-email" title="Kirim ulang email sesuai status booking saat ini">
+                                      {pendingPaymentAction === `email-${b.id}` ? <><LoaderCircle size={13} className="btn-spinner" /> Mengirim...</> : 'Kirim Ulang Email'}
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -1165,62 +1200,92 @@ export const AdminDashboardPage: React.FC = () => {
                   const amount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(b.totalPrice);
                   const rejectPresets = ['Nominal transfer tidak sesuai tagihan', 'Bukti transfer tidak terbaca/buram', 'Dana belum masuk ke rekening TemenTrip', 'Rekening tujuan bukan rekening TemenTrip'];
                   return (
-                    <div role="dialog" aria-modal="true" aria-labelledby="payment-review-title" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-                      <div style={{ backgroundColor: '#ffffff', borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto' }}>
-                        <h2 id="payment-review-title" style={{ margin: '0 0 4px', fontSize: '18px' }}>{isApprove ? 'Setujui Pembayaran' : 'Tolak Bukti Transfer'}</h2>
-                        <p style={{ margin: '0 0 14px', fontSize: '13px', color: 'var(--color-text-medium)' }}>
-                          <strong>{b.bookingCode}</strong> · {b.customerName} · {b.packageDetails?.name || '—'}
-                        </p>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, fontSize: 13, marginBottom: 14 }}>
-                          <div><span style={{ color: 'var(--color-text-light)' }}>Nominal tagihan</span><br /><strong style={{ fontSize: 16 }}>{amount}</strong></div>
-                          <div><span style={{ color: 'var(--color-text-light)' }}>Bukti dikirim</span><br /><strong>{b.paymentProofSubmittedAt ? new Date(b.paymentProofSubmittedAt).toLocaleString('id-ID') : '—'}</strong></div>
-                          <div><span style={{ color: 'var(--color-text-light)' }}>Tanggal trip</span><br /><strong>{b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID') : '—'}</strong></div>
-                        </div>
-
-                        <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, minHeight: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 14, background: '#f8fafc' }}>
-                          {proofPreviewLoading ? (
-                            <span style={{ color: 'var(--color-text-light)', fontSize: 13 }}><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memuat bukti transfer...</span>
-                          ) : proofPreview ? (
-                            proofPreview.isPdf
-                              ? <iframe src={proofPreview.url} title="Bukti transfer" style={{ width: '100%', height: 360, border: 0 }} />
-                              : <a href={proofPreview.url} target="_blank" rel="noopener noreferrer" title="Buka ukuran penuh"><img src={proofPreview.url} alt="Bukti transfer" style={{ maxWidth: '100%', maxHeight: 360, display: 'block' }} /></a>
-                          ) : (
-                            <span style={{ color: 'var(--color-text-light)', fontSize: 13 }}>Bukti transfer tidak tersedia.</span>
-                          )}
-                        </div>
-
-                        {isApprove ? (
-                          <p style={{ fontSize: 13, background: '#ecfdf5', color: '#065f46', padding: 10, borderRadius: 8, margin: '0 0 12px' }}>
-                            Pastikan dana <strong>{amount}</strong> sudah benar-benar masuk ke rekening TemenTrip. Setelah disetujui, booking diteruskan ke mitra dan saldo mitra tercatat.
-                          </p>
-                        ) : (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                            {rejectPresets.map((preset) => (
-                              <button key={preset} type="button" onClick={() => setPaymentReviewNotes(preset)} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 999, border: '1px solid #fecaca', background: paymentReviewNotes === preset ? '#fee2e2' : '#fff', color: '#b91c1c', cursor: 'pointer' }}>
-                                {preset}
-                              </button>
-                            ))}
+                    <div className="payment-review-overlay" role="dialog" aria-modal="true" aria-labelledby="payment-review-title" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) closePaymentReview(); }}>
+                      <div className="payment-review-dialog">
+                        <header className="payment-review-header">
+                          <div>
+                            <span className={`payment-review-mode ${isApprove ? 'approve' : 'reject'}`}>
+                              {isApprove ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                              {isApprove ? 'Konfirmasi dana masuk' : 'Minta perbaikan bukti'}
+                            </span>
+                            <h2 id="payment-review-title">{isApprove ? 'Setujui pembayaran?' : 'Tolak bukti transfer?'}</h2>
+                            <p><strong>{b.bookingCode}</strong> · {b.customerName}</p>
                           </div>
-                        )}
-                        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }} htmlFor="payment-review-notes">
-                          {isApprove ? 'Catatan (opsional, terlihat oleh customer)' : 'Alasan penolakan (dikirim ke customer)'}
-                        </label>
-                        <textarea
-                          id="payment-review-notes"
-                          value={paymentReviewNotes}
-                          onChange={(e) => setPaymentReviewNotes(e.target.value)}
-                          maxLength={500}
-                          rows={3}
-                          placeholder={isApprove ? 'Boleh dikosongkan' : 'Jelaskan apa yang perlu diperbaiki customer'}
-                          style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, border: '1px solid var(--color-border)', fontFamily: 'inherit', fontSize: 13 }}
-                        />
-                        {paymentReviewError && <div className="alert-message error-alert" style={{ marginTop: 10 }}>{paymentReviewError}</div>}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-                          <button type="button" className="back-form-btn" onClick={closePaymentReview} disabled={busy} style={{ width: 'auto', padding: '10px 18px' }}>Batal</button>
-                          <button type="button" className="submit-form-btn" onClick={submitPaymentReview} disabled={busy} style={{ width: 'auto', padding: '10px 18px', background: isApprove ? '#10b981' : '#dc2626' }}>
-                            {pendingPaymentAction ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : isApprove ? 'Setujui Pembayaran' : 'Tolak Bukti'}
-                          </button>
+                          <button type="button" className="payment-review-close" onClick={closePaymentReview} disabled={busy} aria-label="Tutup dialog"><X size={20} /></button>
+                        </header>
+
+                        <div className="payment-review-body">
+                          <section className="payment-proof-column" aria-label="Bukti transfer">
+                            <div className="payment-section-heading">
+                              <div><strong>Bukti transfer</strong><span>Periksa nominal dan rekening tujuan</span></div>
+                              {proofPreview && <a href={proofPreview.url} target="_blank" rel="noopener noreferrer">Buka penuh</a>}
+                            </div>
+                            <div className="payment-proof-frame">
+                              {proofPreviewLoading ? (
+                                <span className="payment-proof-state"><LoaderCircle size={18} className="btn-spinner" aria-hidden="true" /> Memuat bukti transfer...</span>
+                              ) : proofPreview ? (
+                                proofPreview.isPdf
+                                  ? <iframe src={proofPreview.url} title="Bukti transfer" />
+                                  : <a href={proofPreview.url} target="_blank" rel="noopener noreferrer" title="Buka ukuran penuh"><img src={proofPreview.url} alt="Bukti transfer" /></a>
+                              ) : (
+                                <span className="payment-proof-state">Bukti transfer tidak tersedia.</span>
+                              )}
+                            </div>
+                          </section>
+
+                          <section className="payment-decision-column" aria-label="Keputusan pembayaran">
+                            <div className="payment-summary-grid">
+                              <div className="payment-summary-primary"><span>Nominal tagihan</span><strong>{amount}</strong></div>
+                              <div><span>Tanggal trip</span><strong>{b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</strong></div>
+                              <div><span>Bukti dikirim</span><strong>{b.paymentProofSubmittedAt ? new Date(b.paymentProofSubmittedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</strong></div>
+                              <div><span>Paket</span><strong>{b.packageDetails?.name || 'Paket Wisata'}</strong></div>
+                            </div>
+
+                            <div className={`payment-decision-notice ${isApprove ? 'approve' : 'reject'}`}>
+                              {isApprove ? <CheckCircle2 size={19} /> : <XCircle size={19} />}
+                              <div>
+                                <strong>{isApprove ? 'Pastikan dana benar-benar sudah masuk' : 'Customer akan diminta mengunggah ulang'}</strong>
+                                <span>{isApprove ? 'Booking diteruskan ke mitra dan saldo mitra langsung tercatat.' : 'Pilih alasan yang jelas agar customer tahu apa yang harus diperbaiki.'}</span>
+                              </div>
+                            </div>
+
+                            {!isApprove && (
+                              <div className="payment-reject-presets">
+                                <span>Alasan cepat</span>
+                                <div>
+                                  {rejectPresets.map((preset) => (
+                                    <button key={preset} type="button" onClick={() => setPaymentReviewNotes(preset)} className={paymentReviewNotes === preset ? 'selected' : ''}>{preset}</button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <label className="payment-review-notes-label" htmlFor="payment-review-notes">
+                              {isApprove ? 'Catatan untuk customer' : 'Alasan penolakan'}
+                              <span>{isApprove ? 'Opsional' : 'Wajib, minimal 4 karakter'}</span>
+                            </label>
+                            <textarea
+                              id="payment-review-notes"
+                              value={paymentReviewNotes}
+                              onChange={(e) => setPaymentReviewNotes(e.target.value)}
+                              maxLength={500}
+                              rows={4}
+                              placeholder={isApprove ? 'Contoh: Pembayaran sudah kami terima. (boleh dikosongkan)' : 'Jelaskan alasan bukti belum dapat diterima...'}
+                            />
+                            <div className="payment-notes-count">{paymentReviewNotes.length}/500</div>
+                            {paymentReviewError && <div className="alert-message error-alert payment-review-error">{paymentReviewError}</div>}
+                          </section>
                         </div>
+
+                        <footer className="payment-review-footer">
+                          <span>Keputusan akan langsung memperbarui status booking.</span>
+                          <div>
+                            <button type="button" className="back-form-btn" onClick={closePaymentReview} disabled={busy}>Batal</button>
+                            <button type="button" className={`payment-decision-submit ${isApprove ? 'approve' : 'reject'}`} onClick={submitPaymentReview} disabled={busy}>
+                              {pendingPaymentAction ? <><LoaderCircle size={16} className="btn-spinner" aria-hidden="true" /> Memproses...</> : isApprove ? <><CheckCircle2 size={16} /> Ya, Setujui Pembayaran</> : <><XCircle size={16} /> Tolak & Minta Bukti Baru</>}
+                            </button>
+                          </div>
+                        </footer>
                       </div>
                     </div>
                   );
@@ -2390,6 +2455,229 @@ export const AdminDashboardPage: React.FC = () => {
         .admin-layout .approve-action-btn:disabled {
           cursor: not-allowed;
           opacity: 0.55;
+        }
+
+        .payment-table-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+        .payment-table-actions > div { display: flex; flex-wrap: wrap; gap: 6px; }
+        .payment-table-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 32px; padding: 6px 9px; border-radius: 7px; font-size: 11px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+        .payment-table-actions button:disabled { cursor: not-allowed; opacity: 0.55; }
+        .payment-table-approve { color: #ffffff; background: #059669; border: 1px solid #059669; }
+        .payment-table-approve:hover:not(:disabled) { background: #047857; border-color: #047857; }
+        .payment-table-reject { color: #b91c1c; background: #ffffff; border: 1px solid #fca5a5; }
+        .payment-table-reject:hover:not(:disabled) { background: #fef2f2; }
+        .payment-table-email { min-height: 28px !important; padding: 4px 8px !important; color: #0369a1; background: #f0f9ff; border: 1px solid #bae6fd; }
+        .payment-table-email:hover:not(:disabled) { background: #e0f2fe; border-color: #7dd3fc; }
+
+        .payment-review-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 10000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: rgba(15, 23, 42, 0.68);
+          backdrop-filter: blur(3px);
+        }
+
+        .payment-review-dialog {
+          width: min(980px, 100%);
+          max-height: calc(100vh - 48px);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 18px;
+          box-shadow: 0 28px 70px rgba(15, 23, 42, 0.3);
+        }
+
+        .payment-review-header {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 20px;
+          padding: 20px 24px 17px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .payment-review-mode {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 7px;
+          padding: 4px 9px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+        }
+
+        .payment-review-mode.approve { color: #047857; background: #d1fae5; }
+        .payment-review-mode.reject { color: #b91c1c; background: #fee2e2; }
+        .payment-review-header h2 { margin: 0; color: #0f172a; font-size: 21px; line-height: 1.25; }
+        .payment-review-header p { margin: 5px 0 0; color: #64748b; font-size: 13px; }
+
+        .payment-review-close {
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          width: 36px;
+          height: 36px;
+          padding: 0;
+          color: #64748b;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          cursor: pointer;
+        }
+
+        .payment-review-close:hover:not(:disabled) { color: #0f172a; background: #f1f5f9; }
+
+        .payment-review-body {
+          min-height: 0;
+          display: grid;
+          grid-template-columns: minmax(0, 1.12fr) minmax(330px, 0.88fr);
+          gap: 0;
+          overflow: auto;
+        }
+
+        .payment-proof-column,
+        .payment-decision-column { min-width: 0; padding: 20px 24px; }
+        .payment-proof-column { background: #f8fafc; border-right: 1px solid #e2e8f0; }
+
+        .payment-section-heading {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+
+        .payment-section-heading div { display: flex; flex-direction: column; gap: 2px; }
+        .payment-section-heading strong { color: #0f172a; font-size: 14px; }
+        .payment-section-heading span { color: #64748b; font-size: 11px; }
+        .payment-section-heading a { flex: 0 0 auto; color: #0284c7; font-size: 12px; font-weight: 800; text-decoration: none; }
+
+        .payment-proof-frame {
+          height: clamp(260px, 45vh, 430px);
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          background: #e2e8f0;
+          border: 1px solid #cbd5e1;
+          border-radius: 12px;
+        }
+
+        .payment-proof-frame > a { width: 100%; height: 100%; display: grid; place-items: center; }
+        .payment-proof-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+        .payment-proof-frame iframe { width: 100%; height: 100%; border: 0; background: #ffffff; }
+        .payment-proof-state { display: inline-flex; align-items: center; gap: 8px; color: #64748b; font-size: 13px; }
+
+        .payment-summary-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 9px;
+          margin-bottom: 13px;
+        }
+
+        .payment-summary-grid > div {
+          min-width: 0;
+          padding: 10px 11px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+        }
+
+        .payment-summary-grid span { display: block; margin-bottom: 3px; color: #64748b; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+        .payment-summary-grid strong { display: block; overflow: hidden; color: #1e293b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+        .payment-summary-grid .payment-summary-primary { grid-column: 1 / -1; background: #eff6ff; border-color: #bfdbfe; }
+        .payment-summary-grid .payment-summary-primary strong { color: #0369a1; font-size: 20px; }
+
+        .payment-decision-notice {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          margin-bottom: 13px;
+          padding: 11px 12px;
+          border: 1px solid;
+          border-radius: 10px;
+        }
+
+        .payment-decision-notice svg { flex: 0 0 auto; margin-top: 1px; }
+        .payment-decision-notice div { display: flex; flex-direction: column; gap: 2px; }
+        .payment-decision-notice strong { font-size: 12px; }
+        .payment-decision-notice span { font-size: 11px; line-height: 1.45; }
+        .payment-decision-notice.approve { color: #065f46; background: #ecfdf5; border-color: #a7f3d0; }
+        .payment-decision-notice.reject { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+
+        .payment-reject-presets > span { display: block; margin-bottom: 6px; color: #475569; font-size: 11px; font-weight: 800; }
+        .payment-reject-presets > div { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .payment-reject-presets button { padding: 6px 8px; color: #9f1239; background: #fff; border: 1px solid #fecdd3; border-radius: 7px; font-size: 10px; font-weight: 700; cursor: pointer; }
+        .payment-reject-presets button:hover,
+        .payment-reject-presets button.selected { background: #ffe4e6; border-color: #fb7185; }
+
+        .payment-review-notes-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; color: #334155; font-size: 12px; font-weight: 800; }
+        .payment-review-notes-label span { color: #94a3b8; font-size: 10px; font-weight: 600; }
+        .payment-decision-column textarea { width: 100%; min-height: 82px; resize: vertical; box-sizing: border-box; padding: 10px 11px; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 9px; outline: none; font: inherit; font-size: 12px; line-height: 1.45; }
+        .payment-decision-column textarea:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12); }
+        .payment-notes-count { margin-top: 3px; color: #94a3b8; font-size: 10px; text-align: right; }
+        .payment-review-error { margin: 9px 0 0; }
+
+        .payment-review-footer {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 14px 24px;
+          background: #ffffff;
+          border-top: 1px solid #e2e8f0;
+        }
+
+        .payment-review-footer > span { color: #64748b; font-size: 11px; }
+        .payment-review-footer > div { display: flex; align-items: center; gap: 9px; }
+        .payment-review-footer .back-form-btn { width: auto; min-height: 40px; padding: 9px 17px; }
+
+        .payment-decision-submit {
+          min-height: 40px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 9px 17px;
+          color: #ffffff;
+          border: 0;
+          border-radius: 9px;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+          box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+        }
+
+        .payment-decision-submit.approve { background: #059669; }
+        .payment-decision-submit.approve:hover:not(:disabled) { background: #047857; }
+        .payment-decision-submit.reject { background: #dc2626; }
+        .payment-decision-submit.reject:hover:not(:disabled) { background: #b91c1c; }
+        .payment-decision-submit:disabled,
+        .payment-review-close:disabled { cursor: not-allowed; opacity: 0.55; }
+
+        @media (max-width: 780px) {
+          .payment-review-overlay { align-items: flex-end; padding: 0; }
+          .payment-review-dialog { width: 100%; max-height: 96vh; border-radius: 18px 18px 0 0; }
+          .payment-review-header { padding: 17px 18px 14px; }
+          .payment-review-header h2 { font-size: 18px; }
+          .payment-review-body { display: block; }
+          .payment-proof-column,
+          .payment-decision-column { padding: 16px 18px; }
+          .payment-proof-column { border-right: 0; border-bottom: 1px solid #e2e8f0; }
+          .payment-proof-frame { height: min(34vh, 300px); }
+          .payment-review-footer { align-items: stretch; flex-direction: column; padding: 12px 18px 16px; }
+          .payment-review-footer > span { display: none; }
+          .payment-review-footer > div { display: grid; grid-template-columns: 0.7fr 1.3fr; }
+          .payment-decision-submit { padding-inline: 12px; }
         }
 
         /* Stats Row */

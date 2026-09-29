@@ -211,3 +211,12 @@ pastikan `ENABLE_BACKGROUND_JOBS=true`. Tanpa API key, backend tetap berjalan te
 job prakiraan dilewati; booking dan payout tidak diubah. Pada production, jalankan juga
 `backend/database/migrations/014_weather_advisories.sql` dan
 `backend/database/migrations/015_provider_balance_debt.sql` sebelum deploy backend baru.
+
+## Pencarian alamat titik kumpul
+
+Form paket mencari alamat melalui proxy backend agar hasil dapat di-cache dan laju
+permintaan dapat dibatasi. Default-nya memakai
+`GEOCODING_API_BASE_URL=https://nominatim.openstreetmap.org`; variabel ini dapat
+diarahkan ke instance Nominatim lain tanpa mengubah aplikasi web. Pencarian hanya
+dikirim setelah provider menekan tombol **Cari Lokasi** atau Enter, bukan sebagai
+autocomplete pada setiap ketikan.

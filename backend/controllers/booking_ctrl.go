@@ -386,6 +386,29 @@ func (ctrl *BookingController) ReviewManualPayment(c *gin.Context) {
 	c.JSON(http.StatusOK, booking)
 }
 
+func (ctrl *BookingController) ResendBookingEmail(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID booking tidak valid"})
+		return
+	}
+	if err := ctrl.service.ResendBookingEmail(uint(id)); err != nil {
+		var inputErr *services.BookingInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+			return
+		}
+		var emailErr *services.BookingEmailError
+		if errors.As(err, &emailErr) {
+			c.JSON(http.StatusBadGateway, gin.H{"error": emailErr.Message})
+			return
+		}
+		respondInternalError(c, "mengirim ulang email booking", err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Email status booking berhasil dikirim ulang"})
+}
+
 func (ctrl *BookingController) CustomerCancelBooking(c *gin.Context) {
 	customerID, exists := c.Get("provider_id")
 	if !exists {

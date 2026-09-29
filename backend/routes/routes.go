@@ -187,6 +187,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			admin.POST("/refunds/:id/complete", bookingCtrl.CompleteRefund)
 			admin.GET("/bookings", bookingCtrl.AdminListBookings)
 			admin.POST("/bookings/:id/payment-review", bookingCtrl.ReviewManualPayment)
+			admin.POST("/bookings/:id/resend-email", middleware.RateLimit(20, time.Hour), bookingCtrl.ResendBookingEmail)
 
 			// Admin Payout management
 			admin.GET("/payouts", payoutCtrl.AdminGetAllPayouts)
