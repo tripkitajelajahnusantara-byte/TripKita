@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigation } from '../context/NavigationContext';
 import { 
   Users, 
@@ -226,6 +227,13 @@ export const AdminDashboardPage: React.FC = () => {
   const [proofPreview, setProofPreview] = useState<{ url: string; isPdf: boolean } | null>(null);
   const [proofPreviewLoading, setProofPreviewLoading] = useState(false);
   const proofRequestRef = React.useRef(0);
+  // Kunci scroll halaman selama modal verifikasi terbuka.
+  useEffect(() => {
+    if (!paymentReviewTarget) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
+  }, [paymentReviewTarget]);
 
   // Admin Payout States
   const [adminPayouts, setAdminPayouts] = useState<any[]>([]);
@@ -1200,7 +1208,7 @@ export const AdminDashboardPage: React.FC = () => {
                   const amount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(b.totalPrice);
                   const rejectPresets = ['Nominal transfer tidak sesuai tagihan', 'Bukti transfer tidak terbaca/buram', 'Dana belum masuk ke rekening TemenTrip', 'Rekening tujuan bukan rekening TemenTrip'];
                   return (
-                    <div className="payment-review-overlay" role="dialog" aria-modal="true" aria-labelledby="payment-review-title" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) closePaymentReview(); }}>
+                    createPortal(<div className="payment-review-overlay" role="dialog" aria-modal="true" aria-labelledby="payment-review-title" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) closePaymentReview(); }}>
                       <div className="payment-review-dialog">
                         <header className="payment-review-header">
                           <div>
@@ -1287,7 +1295,7 @@ export const AdminDashboardPage: React.FC = () => {
                           </div>
                         </footer>
                       </div>
-                    </div>
+                    </div>, document.body)
                   );
                 })()}
               </div>

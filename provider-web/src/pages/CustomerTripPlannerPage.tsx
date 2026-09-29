@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
+import { filterCustomerVisiblePackages } from '../utils/publicPackages';
 import { useActionLock } from '../utils/useActionLock';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
@@ -363,7 +364,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
       request('/public/packages')
         .then((data: any) => {
           const apiList: PackageItem[] = Array.isArray(data) ? data : (data?.data || []);
-          const active = apiList.filter(p => !p.status || p.status === 'Aktif');
+          const active = filterCustomerVisiblePackages(apiList);
           setMatchingPackages(filterMatchingPackages(active, activePlan.destination));
         })
         .catch(err => {

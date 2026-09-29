@@ -11,6 +11,7 @@ import { SkeletonCards } from '../components/Skeleton';
 import heroImage from '../assets/hero.jpg';
 
 import { useCancellationRefundDays } from '../utils/checkoutConfig';
+import { filterCustomerVisiblePackages } from '../utils/publicPackages';
 interface TripPackage {
   id: number;
   providerId: number;
@@ -104,9 +105,7 @@ export const CustomerLandingPage: React.FC = () => {
     try {
       const data = await request('/public/packages');
       const list: TripPackage[] = Array.isArray(data) ? data : [];
-      return { list: list.filter((p: TripPackage) =>
-        !p.status || p.status === 'Aktif' || p.status === 'Published' || p.status === 'published'
-      ), error: '' };
+      return { list: filterCustomerVisiblePackages(list), error: '' };
     } catch (err: unknown) {
       console.error('Failed to load packages:', err);
       return { list: [], error: err instanceof Error && err.message ? err.message : 'Gagal memuat paket wisata.' };

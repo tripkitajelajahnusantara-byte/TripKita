@@ -11,7 +11,7 @@ import (
 type PackageRepository interface {
 	Create(pkg *models.Package) error
 	FindAllByProvider(providerID uint) ([]models.Package, error)
-	FindAllPublic() ([]models.Package, error)
+	FindAllPublic(today string) ([]models.Package, error)
 	FindByIDAndProvider(id uint, providerID uint) (*models.Package, error)
 	FindByID(id uint) (*models.Package, error)
 	Update(pkg *models.Package) error
@@ -39,11 +39,15 @@ func (r *packageRepository) FindAllByProvider(providerID uint) ([]models.Package
 	return packages, err
 }
 
-func (r *packageRepository) FindAllPublic() ([]models.Package, error) {
+func (r *packageRepository) FindAllPublic(today string) ([]models.Package, error) {
 	var packages []models.Package
 	err := r.db.
 		Joins("JOIN providers ON providers.id = packages.provider_id").
-		Where("packages.status = ? AND providers.role = ? AND providers.status = ? AND providers.is_verified = ?", "Aktif", "PROVIDER", "APPROVED", true).
+		Where(`packages.status = ?
+			AND packages.end_date >= ?
+			AND providers.role = ?
+			AND providers.status = ?
+			AND providers.is_verified = ?`, "Aktif", today, "PROVIDER", "APPROVED", true).
 		Order("packages.id desc").
 		Find(&packages).Error
 	return packages, err

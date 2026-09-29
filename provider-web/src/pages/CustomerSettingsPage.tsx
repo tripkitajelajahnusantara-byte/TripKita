@@ -8,6 +8,7 @@ import { TripImage } from '../components/TripImage';
 import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin, LoaderCircle } from 'lucide-react';
 import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
 import { isValidIndonesianMobilePhone } from '../utils/phone';
+import { filterCustomerVisiblePackages } from '../utils/publicPackages';
 
 export const CustomerSettingsPage: React.FC = () => {
   const { customerProfile, setCustomerProfile, navigateTo, setSelectedPackageForDetail } = useNavigation();
@@ -40,16 +41,32 @@ export const CustomerSettingsPage: React.FC = () => {
   }, [customerProfile]);
 
   useEffect(() => {
-    const loadWishlist = () => {
+    let cancelled = false;
+    const loadWishlist = async () => {
       try {
         const storedWishlist = localStorage.getItem('tripkita_customer_wishlist');
-        if (storedWishlist) {
-          setWishlistItems(JSON.parse(storedWishlist));
-        } else {
+        const storedItems = storedWishlist ? JSON.parse(storedWishlist) : [];
+        if (!Array.isArray(storedItems) || storedItems.length === 0) {
           setWishlistItems([]);
+          return;
         }
+
+        // Favorit berisi snapshot lokal. Cocokkan ID-nya dengan katalog
+        // publik terbaru agar paket kedaluwarsa/provider nonaktif ikut hilang.
+        const publicPackages = await request('/public/packages');
+        const visibleById = new Map(
+          filterCustomerVisiblePackages(Array.isArray(publicPackages) ? publicPackages : [])
+            .map((pkg: any) => [Number(pkg.id), pkg])
+        );
+        const currentItems = storedItems
+          .map((item: any) => visibleById.get(Number(item.id)))
+          .filter(Boolean);
+        if (cancelled) return;
+        setWishlistItems(currentItems);
+        localStorage.setItem('tripkita_customer_wishlist', JSON.stringify(currentItems));
       } catch (e) {
         console.error(e);
+        if (!cancelled) setWishlistItems([]);
       }
     };
 
@@ -69,7 +86,10 @@ export const CustomerSettingsPage: React.FC = () => {
       console.error(e);
     }
 
-    return () => window.removeEventListener('tripkita_wishlist_updated', loadWishlist);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('tripkita_wishlist_updated', loadWishlist);
+    };
   }, []);
 
   const handleSaveProfile = async (e: React.FormEvent) => {

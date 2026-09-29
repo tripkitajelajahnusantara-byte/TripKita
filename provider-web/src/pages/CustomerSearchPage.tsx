@@ -7,6 +7,7 @@ import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 import { ShareModal } from '../components/ShareModal';
 import { TripImage } from '../components/TripImage';
 import { Skeleton } from '../components/Skeleton';
+import { filterCustomerVisiblePackages } from '../utils/publicPackages';
 
 interface TripPackage {
   id: number;
@@ -59,7 +60,7 @@ export const CustomerSearchPage: React.FC = () => {
     try {
       const data = await request('/public/packages');
       const list: TripPackage[] = Array.isArray(data) ? data : [];
-      return { list: list.filter((p: TripPackage) => p.status === 'Aktif'), error: '' };
+      return { list: filterCustomerVisiblePackages(list), error: '' };
     } catch (err: unknown) {
       console.error('Failed to load search packages:', err);
       return { list: [], error: err instanceof Error && err.message ? err.message : 'Gagal memuat daftar paket wisata.' };

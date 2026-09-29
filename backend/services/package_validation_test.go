@@ -20,6 +20,25 @@ func validActivePackage() *models.Package {
 	}
 }
 
+func TestFilterCurrentPublicPackagesHidesExpiredAndInvalidDates(t *testing.T) {
+	today := "2026-09-29"
+	packages := []models.Package{
+		{ID: 1, Status: "Aktif", TripType: "Private Trip", EndDate: "2026-09-28"},
+		{ID: 2, Status: "Aktif", TripType: "Private Trip", EndDate: today},
+		{ID: 3, Status: "Aktif", TripType: "Private Trip", EndDate: "2026-10-01"},
+		{ID: 4, Status: "Nonaktif", TripType: "Private Trip", EndDate: "2026-10-01"},
+		{ID: 5, Status: "Aktif", TripType: "Private Trip", EndDate: ""},
+		{ID: 6, Status: "Aktif", TripType: "Private Trip", EndDate: "tanggal-salah"},
+		{ID: 7, Status: "Aktif", TripType: "Open Trip", StartDate: "2026-09-28", EndDate: "2026-10-01"},
+		{ID: 8, Status: "Aktif", TripType: "Open Trip", StartDate: today, EndDate: "2026-10-01"},
+	}
+
+	visible := filterCurrentPublicPackages(packages, today)
+	if len(visible) != 3 || visible[0].ID != 2 || visible[1].ID != 3 || visible[2].ID != 8 {
+		t.Fatalf("paket publik yang tersisa tidak sesuai: %+v", visible)
+	}
+}
+
 func TestValidateActivePackageRejectsPKG02Values(t *testing.T) {
 	tests := []struct {
 		name   string

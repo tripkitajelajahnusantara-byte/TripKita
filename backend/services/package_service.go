@@ -151,11 +151,42 @@ func (s *packageService) GetAllPackages(providerID uint) ([]models.Package, erro
 }
 
 func (s *packageService) GetAllPublic() ([]models.Package, error) {
-	packages, err := s.repo.FindAllPublic()
+	today, _ := models.AvailabilityWindow(time.Now())
+	packages, err := s.repo.FindAllPublic(today)
 	if err != nil {
 		return nil, err
 	}
+	// Pertahanan kedua untuk implementasi repository lain dan data legacy:
+	// respons publik tidak pernah membawa paket tanpa tanggal akhir valid atau
+	// paket yang seluruh periodenya sudah lewat.
+	packages = filterCurrentPublicPackages(packages, today)
 	return s.attachDates(packages)
+}
+
+func filterCurrentPublicPackages(packages []models.Package, today string) []models.Package {
+	visible := make([]models.Package, 0, len(packages))
+	for _, pkg := range packages {
+		startDate := strings.TrimSpace(pkg.StartDate)
+		endDate := strings.TrimSpace(pkg.EndDate)
+		if pkg.Status != "Aktif" || len(endDate) != len("2006-01-02") || endDate < today {
+			continue
+		}
+		if _, err := time.Parse("2006-01-02", endDate); err != nil {
+			continue
+		}
+		// Open Trip memiliki jadwal keberangkatan tetap. Setelah tanggal mulai
+		// lewat, paket tidak lagi dapat dibeli walaupun tanggal akhirnya belum lewat.
+		if models.IsOpenTrip(pkg.TripType) {
+			if len(startDate) != len("2006-01-02") || startDate < today {
+				continue
+			}
+			if _, err := time.Parse("2006-01-02", startDate); err != nil {
+				continue
+			}
+		}
+		visible = append(visible, pkg)
+	}
+	return visible
 }
 
 // attachDates melengkapi daftar paket dengan tanggal keberangkatannya dalam satu

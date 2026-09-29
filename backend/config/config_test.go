@@ -48,6 +48,7 @@ func loadWith(t *testing.T, env map[string]string) (*Config, error) {
 		"RUN_MIGRATIONS", "SEED_DB", "ENABLE_DEV_MOCKS", "ENABLE_BACKGROUND_JOBS",
 		"ENABLE_AUTOMATIC_PAYOUT", "UPLOAD_DIR", "RAILWAY_VOLUME_MOUNT_PATH",
 		"MANUAL_PAYMENT_BANK_NAME", "MANUAL_PAYMENT_ACCOUNT_NUMBER", "MANUAL_PAYMENT_ACCOUNT_HOLDER",
+		"EMAIL_API_PROVIDER", "EMAIL_API_KEY", "EMAIL_FROM",
 	} {
 		t.Setenv(key, "")
 	}
@@ -231,5 +232,26 @@ func TestManualPaymentAccountRequiresBankAndHolder(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "MANUAL_PAYMENT_BANK_NAME") {
 		t.Fatalf("rekening tanpa nama bank seharusnya ditolak, dapat %v", err)
+	}
+}
+
+func TestProductionAcceptsEmailAPIWithoutSMTP(t *testing.T) {
+	env := validProductionEnv()
+	delete(env, "SMTP_USER")
+	delete(env, "SMTP_PASS")
+	env["EMAIL_API_PROVIDER"] = "brevo"
+	env["EMAIL_API_KEY"] = "xkeysib-test-key"
+	env["EMAIL_FROM"] = "no-reply@example.com"
+	cfg, err := loadWith(t, env)
+	if err != nil {
+		t.Fatalf("production dengan API email seharusnya valid: %v", err)
+	}
+	if !cfg.UsesEmailAPI() || cfg.SMTPFrom != "no-reply@example.com" {
+		t.Fatalf("konfigurasi API email tidak terbaca: provider=%q from=%q", cfg.EmailAPIProvider, cfg.SMTPFrom)
+	}
+
+	env["EMAIL_API_KEY"] = ""
+	if _, err := loadWith(t, env); err == nil || !strings.Contains(err.Error(), "EMAIL_API_KEY") {
+		t.Fatalf("API email tanpa key seharusnya ditolak, dapat %v", err)
 	}
 }

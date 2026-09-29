@@ -44,18 +44,22 @@ type Config struct {
 	SMTPUser                   string
 	SMTPPass                   string
 	SMTPFrom                   string
-	WeatherAPIKey              string
-	WeatherAPIBaseURL          string
-	GeocodingAPIBaseURL        string
-	AllowedOrigins             []string
-	TrustedProxies             []string
-	EnableDevMocks             bool
-	RunMigrations              bool
-	SeedDatabase               bool
-	EnableJobs                 bool
-	DBMaxOpenConns             int
-	DBMaxIdleConns             int
-	EnableAutoPayout           bool
+	// EmailAPIProvider mengirim email lewat API HTTPS (port 443) alih-alih SMTP.
+	// Diperlukan di platform yang memblokir SMTP keluar, mis. Railway non-Pro.
+	EmailAPIProvider    string
+	EmailAPIKey         string
+	WeatherAPIKey       string
+	WeatherAPIBaseURL   string
+	GeocodingAPIBaseURL string
+	AllowedOrigins      []string
+	TrustedProxies      []string
+	EnableDevMocks      bool
+	RunMigrations       bool
+	SeedDatabase        bool
+	EnableJobs          bool
+	DBMaxOpenConns      int
+	DBMaxIdleConns      int
+	EnableAutoPayout    bool
 }
 
 func LoadConfig() (*Config, error) {
@@ -108,7 +112,9 @@ func LoadConfig() (*Config, error) {
 		SMTPPort:                   getEnv("SMTP_PORT", "587"),
 		SMTPUser:                   getEnv("SMTP_USER", ""),
 		SMTPPass:                   getEnv("SMTP_PASS", ""),
-		SMTPFrom:                   getEnv("SMTP_FROM", ""),
+		SMTPFrom:                   getEnv("EMAIL_FROM", getEnv("SMTP_FROM", "")),
+		EmailAPIProvider:           strings.ToLower(strings.TrimSpace(getEnv("EMAIL_API_PROVIDER", ""))),
+		EmailAPIKey:                strings.TrimSpace(getEnv("EMAIL_API_KEY", "")),
 		WeatherAPIKey:              getEnv("WEATHER_API_KEY", ""),
 		WeatherAPIBaseURL:          strings.TrimRight(getEnv("WEATHER_API_BASE_URL", "https://api.weatherapi.com/v1"), "/"),
 		GeocodingAPIBaseURL:        strings.TrimRight(getEnv("GEOCODING_API_BASE_URL", "https://nominatim.openstreetmap.org"), "/"),
@@ -137,6 +143,9 @@ func LoadConfig() (*Config, error) {
 }
 
 func (c *Config) IsProduction() bool { return c.AppEnv == "production" }
+
+// UsesEmailAPI bernilai true bila email dikirim lewat API HTTPS (Brevo/Resend).
+func (c *Config) UsesEmailAPI() bool { return c.EmailAPIProvider != "" }
 
 func (c *Config) DocumentUploadDir() string {
 	if strings.TrimSpace(c.UploadDir) == "" {
@@ -186,10 +195,24 @@ func (c *Config) Validate() error {
 		(strings.TrimSpace(c.ManualPaymentBankName) == "" || strings.TrimSpace(c.ManualPaymentAccountHolder) == "") {
 		return fmt.Errorf("MANUAL_PAYMENT_BANK_NAME dan MANUAL_PAYMENT_ACCOUNT_HOLDER wajib diisi bersama MANUAL_PAYMENT_ACCOUNT_NUMBER")
 	}
+	switch c.EmailAPIProvider {
+	case "", "brevo", "resend":
+	default:
+		return fmt.Errorf("EMAIL_API_PROVIDER hanya mendukung brevo atau resend")
+	}
+	if c.UsesEmailAPI() {
+		if c.EmailAPIKey == "" {
+			return fmt.Errorf("EMAIL_API_KEY wajib diisi bila EMAIL_API_PROVIDER dipakai")
+		}
+		fromAddress, err := mail.ParseAddress(c.SMTPFrom)
+		if err != nil || fromAddress.Address != c.SMTPFrom || strings.ContainsAny(c.SMTPFrom, "\r\n") {
+			return fmt.Errorf("EMAIL_FROM (atau SMTP_FROM) wajib berupa satu alamat email pengirim yang valid")
+		}
+	}
 	// Begitu salah satu kredensial SMTP diisi, jangan izinkan konfigurasi semu
 	// berjalan. Sebelumnya APP_ENV yang lupa disetel membuat nilai contoh lolos,
 	// lalu kegagalan baru terlihat setelah customer benar-benar booking.
-	if strings.TrimSpace(c.SMTPUser) != "" || strings.TrimSpace(c.SMTPPass) != "" || strings.TrimSpace(c.SMTPFrom) != "" {
+	if !c.UsesEmailAPI() && (strings.TrimSpace(c.SMTPUser) != "" || strings.TrimSpace(c.SMTPPass) != "" || strings.TrimSpace(c.SMTPFrom) != "") {
 		if strings.TrimSpace(c.SMTPUser) == "" || strings.TrimSpace(c.SMTPPass) == "" || strings.TrimSpace(c.SMTPFrom) == "" {
 			return fmt.Errorf("SMTP_USER, SMTP_PASS, dan SMTP_FROM wajib diisi lengkap")
 		}
@@ -224,10 +247,12 @@ func (c *Config) Validate() error {
 		"GOOGLE_REDIRECT_URI":           c.GoogleRedirectURI,
 		"FRONTEND_URL":                  c.FrontendURL,
 		"BACKEND_URL":                   c.BackendURL,
-		"SMTP_HOST":                     c.SMTPHost,
-		"SMTP_USER":                     c.SMTPUser,
-		"SMTP_PASS":                     c.SMTPPass,
 		"SMTP_FROM":                     c.SMTPFrom,
+	}
+	if !c.UsesEmailAPI() {
+		required["SMTP_HOST"] = c.SMTPHost
+		required["SMTP_USER"] = c.SMTPUser
+		required["SMTP_PASS"] = c.SMTPPass
 	}
 	productionSecrets := map[string]string{
 		"DATABASE_URL":         c.DatabaseURL,
@@ -248,8 +273,10 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("%s wajib diisi pada production", key)
 		}
 	}
-	if err := validatePort("SMTP_PORT", c.SMTPPort); err != nil {
-		return err
+	if !c.UsesEmailAPI() {
+		if err := validatePort("SMTP_PORT", c.SMTPPort); err != nil {
+			return err
+		}
 	}
 	fromAddress, err := mail.ParseAddress(c.SMTPFrom)
 	if err != nil || fromAddress.Address != c.SMTPFrom || strings.ContainsAny(c.SMTPFrom, "\r\n") {

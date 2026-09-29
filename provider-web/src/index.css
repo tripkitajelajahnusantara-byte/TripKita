@@ -112,12 +112,16 @@ button {
   to { opacity: 1; transform: scale(1); }
 }
 
+/* fill-mode "backwards" (bukan "forwards"): setelah animasi selesai elemen
+   tidak menyimpan transform. Transform yang tertinggal menjadikan elemen itu
+   acuan position: fixed, sehingga modal di dalamnya terkurung di kartu konten
+   dan terpotong alih-alih menutupi seluruh layar. */
 .animate-fade-in {
-  animation: fadeIn var(--transition-normal) forwards;
+  animation: fadeIn var(--transition-normal) backwards;
 }
 
 .animate-fade-in-scale {
-  animation: fadeInScale var(--transition-normal) forwards;
+  animation: fadeInScale var(--transition-normal) backwards;
 }
 
 /* Shimmer skeleton (components/Skeleton.tsx) */

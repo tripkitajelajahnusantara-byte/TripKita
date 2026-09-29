@@ -11,6 +11,7 @@ import (
 	"log"
 	"mime"
 	"net"
+	"net/http"
 	"net/mail"
 	"net/smtp"
 	"net/textproto"
@@ -22,9 +23,11 @@ import (
 )
 
 type EmailService struct {
-	cfg        *config.Config
-	pdfService *PDFService
-	mailSender func(string, smtp.Auth, string, []string, []byte) error
+	cfg                 *config.Config
+	pdfService          *PDFService
+	mailSender          func(string, smtp.Auth, string, []string, []byte) error
+	httpClient          *http.Client
+	apiEndpointOverride string
 }
 
 func NewEmailService(cfg *config.Config, pdfService *PDFService) *EmailService {
@@ -476,6 +479,13 @@ func (s *EmailService) SendProviderPlatformFeeChangedEmail(provider *models.Prov
 }
 
 func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfBytes []byte, pdfFilename string) error {
+	if s.cfg.UsesEmailAPI() {
+		err := s.sendViaAPI(to, subject, htmlBody, pdfBytes, pdfFilename)
+		if err == nil {
+			log.Printf("[EmailService] Email dispatched via %s API", s.cfg.EmailAPIProvider)
+		}
+		return err
+	}
 	smtpUser := strings.TrimSpace(s.cfg.SMTPUser)
 	smtpPass := s.cfg.SMTPPass
 	smtpHost := strings.TrimSpace(s.cfg.SMTPHost)
@@ -551,7 +561,9 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 		err = mailSender(addr, auth, fromAddr, []string{to}, bodyBuf.Bytes())
 	} else {
 		err = sendSMTPMessage(addr, smtpHost, smtpPort, auth, fromAddr, []string{to}, bodyBuf.Bytes())
-		if err != nil && isTransientSMTPError(err) {
+		// Koneksi yang tidak pernah tersambung (port SMTP diblokir) tidak
+		// diulang: hasilnya pasti sama dan hanya memperlama permintaan.
+		if err != nil && isTransientSMTPError(err) && !strings.Contains(err.Error(), "gagal terhubung ke server SMTP") {
 			// Satu retry pendek cukup untuk gangguan koneksi sesaat tanpa membuat
 			// goroutine email menggantung lama atau berpotensi mengirim berulang.
 			time.Sleep(750 * time.Millisecond)
@@ -571,7 +583,7 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 // (port 465). smtp.SendMail dari standard library hanya menangani STARTTLS,
 // sehingga konfigurasi provider yang memakai 465 sebelumnya selalu gagal.
 func sendSMTPMessage(addr, host, port string, auth smtp.Auth, from string, recipients []string, message []byte) error {
-	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	dialer := &net.Dialer{Timeout: 8 * time.Second}
 	var (
 		client *smtp.Client
 		conn   net.Conn
@@ -587,7 +599,7 @@ func sendSMTPMessage(addr, host, port string, auth smtp.Auth, from string, recip
 	if err != nil {
 		return fmt.Errorf("gagal terhubung ke server SMTP: %w", err)
 	}
-	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
 
 	client, err = smtp.NewClient(conn, host)
 	if err != nil {
@@ -663,6 +675,14 @@ func emailFailureHint(err error) string {
 		return "Konfigurasi SMTP belum lengkap. Periksa SMTP_HOST, SMTP_PORT, SMTP_USER, dan SMTP_PASS."
 	case strings.Contains(message, "autentikasi smtp"):
 		return "Autentikasi SMTP ditolak. Untuk Gmail gunakan App Password, bukan password akun biasa."
+	case strings.Contains(message, "autentikasi api email"):
+		return "API key email ditolak. Periksa EMAIL_API_KEY dan pastikan alamat pengirim (EMAIL_FROM) sudah diverifikasi di Brevo/Resend."
+	case strings.Contains(message, "api email") && strings.Contains(message, "menolak"):
+		return "Layanan email menolak pengiriman. Pastikan alamat pengirim (EMAIL_FROM) sudah diverifikasi dan kuota harian belum habis."
+	case strings.Contains(message, "api email"):
+		return "Layanan email tidak dapat dihubungi. Coba lagi beberapa saat."
+	case strings.Contains(message, "gagal terhubung ke server smtp"):
+		return "Server tidak dapat membuka koneksi SMTP (umumnya port SMTP diblokir hosting, mis. Railway non-Pro). Gunakan EMAIL_API_PROVIDER=brevo dengan EMAIL_API_KEY."
 	case strings.Contains(message, "tls") || strings.Contains(message, "terhubung") || strings.Contains(message, "timeout"):
 		return "Koneksi aman ke server email gagal. Periksa host, port 587/465, dan akses jaringan deployment."
 	case strings.Contains(message, "alamat pengirim"):

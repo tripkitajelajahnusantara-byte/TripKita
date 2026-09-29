@@ -5,6 +5,7 @@ import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
 import { Skeleton, SkeletonCards } from '../components/Skeleton';
 import { ArrowLeft, MapPin, Star, Package, MessageSquare, Award } from 'lucide-react';
+import { filterCustomerVisiblePackages } from '../utils/publicPackages';
 
 interface TripPackage {
   id: number;
@@ -81,7 +82,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
           request('/public/packages')
         ]);
         const filtered = Array.isArray(allPkgs)
-          ? allPkgs.filter((p: TripPackage) => p.providerId === selectedProviderId)
+          ? filterCustomerVisiblePackages(allPkgs as TripPackage[]).filter((p: TripPackage) => p.providerId === selectedProviderId)
           : [];
         const reviewResponses = await Promise.all(
           filtered.map((pkg: TripPackage) => request(`/public/reviews/package/${pkg.id}`).catch(() => []))

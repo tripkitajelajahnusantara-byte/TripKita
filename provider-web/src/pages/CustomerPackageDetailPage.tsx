@@ -12,6 +12,7 @@ import {
   getMeetingPointCoordinates,
   MeetingPointMap,
 } from '../components/MeetingPointMap';
+import { isCustomerVisiblePackage } from '../utils/publicPackages';
 
 // Format tanggal lokal ke YYYY-MM-DD (tanpa pergeseran zona waktu UTC)
 const toLocalIsoDate = (d: Date) =>
@@ -74,24 +75,55 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const currentReviews = reviewsList.slice((reviewPage - 1) * reviewsPerPage, reviewPage * reviewsPerPage);
 
   const [deepLinkError, setDeepLinkError] = useState('');
+  const selectedPackageId = Number(selectedPackageForDetail?.id) || 0;
+  const [availabilityCheckPending, setAvailabilityCheckPending] = useState(true);
 
-  // Auto load package from URL hash deep-link (e.g. #/paket-detail?id=3)
+  // Selalu cocokkan paket terpilih dengan katalog publik terbaru. Dengan ini
+  // objek lama di NavigationContext tidak dapat mempertahankan paket yang
+  // tanggalnya lewat atau provider-nya baru saja dinonaktifkan admin.
   useEffect(() => {
     const hash = window.location.hash;
     const match = hash.match(/id=(\d+)/);
-    if (match && match[1]) {
-      const targetId = Number(match[1]);
-      if (!selectedPackageForDetail || Number(selectedPackageForDetail.id) !== targetId) {
-        request('/public/packages')
-          .then((data: any) => {
-            const found = Array.isArray(data) ? data.find((p: any) => Number(p.id) === targetId) : null;
-            if (found) setSelectedPackageForDetail(found);
-            else setDeepLinkError('Paket tidak ditemukan atau sudah tidak aktif.');
-          })
-          .catch((err: any) => setDeepLinkError(err?.message || 'Paket belum dapat dimuat.'));
-      }
+    const targetId = match?.[1] ? Number(match[1]) : selectedPackageId;
+    if (!targetId) {
+      setAvailabilityCheckPending(false);
+      return;
     }
-  }, []);
+    let cancelled = false;
+    setAvailabilityCheckPending(true);
+    setDeepLinkError('');
+    request('/public/packages')
+      .then((data: any) => {
+        if (cancelled) return;
+        const found = Array.isArray(data)
+          ? data.find((p: any) => Number(p.id) === targetId && isCustomerVisiblePackage(p))
+          : null;
+        if (found) {
+          const preservedBookingDate = Number(selectedPackageForDetail?.id) === targetId
+            ? selectedPackageForDetail?.bookingDate
+            : '';
+          setSelectedPackageForDetail({ ...found, ...(preservedBookingDate ? { bookingDate: preservedBookingDate } : {}) });
+        } else {
+          setSelectedPackageForDetail(null);
+          setDeepLinkError('Paket tidak tersedia, tanggal perjalanannya sudah lewat, atau provider sedang dinonaktifkan.');
+        }
+      })
+      .catch((err: any) => {
+        if (!cancelled) {
+          // Fail closed: snapshot paket lama tidak boleh tetap tampil ketika
+          // status publik terbarunya gagal diverifikasi.
+          setSelectedPackageForDetail(null);
+          setDeepLinkError(err?.message || 'Paket belum dapat dimuat.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAvailabilityCheckPending(false);
+      });
+    return () => { cancelled = true; };
+    // ID menjadi satu-satunya pemicu; pembaruan objek paket dengan ID sama
+    // tidak boleh membuat permintaan berulang tanpa akhir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPackageId]);
 
   useEffect(() => {
     const pkg = selectedPackageForDetail;
@@ -259,7 +291,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const hasUpcomingDeparture = !!openTripDeparture && openTripDeparture.startIso > todayIso;
   const openTripUnavailable = isOpenTrip && !hasUpcomingDeparture;
 
-  if (!selectedPackageForDetail && (deepLinkError || !/[?&]id=\d+/.test(window.location.hash))) {
+  if (!availabilityCheckPending && !selectedPackageForDetail && (deepLinkError || !/[?&]id=\d+/.test(window.location.hash))) {
     return (
       <div className="container" style={{ maxWidth: '560px', margin: '0 auto', padding: '80px 20px', textAlign: 'center' }}>
         <h1 style={{ fontSize: '22px', marginBottom: '8px' }}>Paket tidak dapat ditampilkan</h1>
@@ -271,7 +303,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
     );
   }
 
-  if (!selectedPackageForDetail) {
+  if (availabilityCheckPending || !selectedPackageForDetail) {
     return (
       <div className="container" style={{ maxWidth: '1120px', margin: '0 auto', padding: '20px', textAlign: 'center' }}>
         <span className="sr-only" role="status" aria-live="polite">Memuat detail paket wisata</span>
