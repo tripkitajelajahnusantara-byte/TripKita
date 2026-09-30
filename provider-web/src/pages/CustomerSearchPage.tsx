@@ -445,7 +445,7 @@ export const CustomerSearchPage: React.FC = () => {
                         </span>
                         <span style={{ color: '#cbd5e1' }}>|</span>
                         <span style={{ color: availableSeats < 5 ? '#ef4444' : '#10b981', fontWeight: '700' }}>
-                          {availableSeats > 0 ? `Sisa ${availableSeats} seat` : 'Kuota habis'}
+                          {pkg.tripType === 'Open Trip' ? (availableSeats > 0 ? `Sisa ${availableSeats} seat` : 'Kuota habis') : 'Pilih tanggal tersedia'}
                         </span>
                       </div>
 

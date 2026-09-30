@@ -3,6 +3,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { ArrowLeft, Calendar, MapPin, CheckCircle2, XCircle, Users, Layers, ChevronLeft, ChevronRight, X, PlusCircle, Star, MessageSquare, AlertTriangle } from 'lucide-react';
 import { request } from '../utils/api';
+import { addDays, formatTripRange, jakartaToday, rangeAvailable, threeMonthLimit, tripEndDate, validDate } from '../utils/tripDates';
 import { TravelokaCalendarModal } from '../components/TravelokaCalendarModal';
 import { TripImage, PhotoPlaceholder } from '../components/TripImage';
 import { getTripImages } from '../utils/tripImages';
@@ -166,7 +167,9 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const activeMeetingPoint = getSpecificMeetingPoint(pkg);
   const activeMeetingPointCoordinates = getMeetingPointCoordinates(pkg);
 
+  const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
   const formatDateIndoFull = (dateStr: string) => {
+    if (!isOpenTrip) return formatTripRange(dateStr);
     if (!dateStr) return 'Pilih Tanggal';
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
@@ -174,23 +177,15 @@ export const CustomerPackageDetailPage: React.FC = () => {
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  const getH7MinDateIso = () => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return toLocalIsoDate(d);
-  };
-
-  const h7MinDateStr = getH7MinDateIso();
-  const todayIso = toLocalIsoDate(new Date());
-
-  const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
+  const todayIso = isOpenTrip ? toLocalIsoDate(new Date()) : jakartaToday();
+  const h7MinDateStr = addDays(todayIso, 7);
 
   // Periode paket yang diatur mitra (YYYY-MM-DD). Backend menolak tanggal trip di luar periode ini.
   const pkgStartIso = normalizeIsoDate(pkg.startDate);
   const pkgEndIso = normalizeIsoDate(pkg.endDate);
   // Paket selain Open Trip: tanggal paling awal = max(H+7, tanggal mulai paket), paling akhir = tanggal akhir paket
   const periodMinDateIso = pkgStartIso && pkgStartIso > h7MinDateStr ? pkgStartIso : h7MinDateStr;
-  const periodMaxDateIso = pkgEndIso;
+  const periodMaxDateIso = pkgEndIso && pkgEndIso < threeMonthLimit(todayIso) ? pkgEndIso : threeMonthLimit(todayIso);
 
   const minRequiredGuests = Math.max(1, Number(pkg.minGuests) || 1);
 
@@ -198,21 +193,15 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
 
 
-  const [customStartDate, setCustomStartDate] = useState<string>(
-    pkg.bookingDate && pkg.bookingDate.length === 10 && pkg.bookingDate >= periodMinDateIso ? pkg.bookingDate : periodMinDateIso
-  );
-
-  const [customEndDate, setCustomEndDate] = useState<string>(customStartDate);
-
-  // Saat paket dimuat belakangan (refresh / tautan ?id=), tanggal default
-  // dihitung ulang dari periode paket yang sebenarnya.
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   useEffect(() => {
-    if (!pkg.id) return;
-    const initialDate = pkg.bookingDate && pkg.bookingDate.length === 10 && pkg.bookingDate >= periodMinDateIso ? pkg.bookingDate : periodMinDateIso;
-    setCustomStartDate(initialDate);
-    setCustomEndDate(initialDate);
+    const chosen = validDate(pkg.bookingDate) ? pkg.bookingDate : '';
+    setCustomStartDate(chosen);
+    setCustomEndDate(chosen ? tripEndDate(chosen, pkg.duration) : '');
+    // Only restore explicit choices; never invent a date for an unavailable day.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pkg.id]);
+  }, [pkg.id, pkg.bookingDate]);
 
   const currentPkgBookedDates: string[] = Array.isArray(pkg.bookedDates) && pkg.bookedDates.length > 0
     ? pkg.bookedDates
@@ -223,14 +212,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const currentPkgAvailableDates: string[] = Array.isArray(pkg.availableDates)
     ? pkg.availableDates
     : [];
-  const restrictsDates = currentPkgAvailableDates.length > 0;
-  const isSelectedDateClosed =
-    !isOpenTrip && restrictsDates && !!customStartDate && !currentPkgAvailableDates.includes(customStartDate);
-
-  // Tanggal mulai di luar periode paket (sebelum startDate atau setelah endDate)
-  const isDateOutsidePeriod = !isOpenTrip && !!customStartDate && (
-    (!!pkgStartIso && customStartDate < pkgStartIso) || (!!pkgEndIso && customStartDate > pkgEndIso)
-  );
+  const isSelectedDateClosed = !isOpenTrip && !rangeAvailable(customStartDate, customEndDate, periodMinDateIso, periodMaxDateIso, currentPkgAvailableDates, currentPkgBookedDates);
+  const isDateOutsidePeriod = !isOpenTrip && !!customStartDate && (customStartDate < periodMinDateIso || customEndDate > periodMaxDateIso);
 
   const getBookedDatesInSelectedRange = (startIso: string, endIso: string, bookedList: string[]) => {
     if (!startIso || !endIso) return [];
@@ -337,7 +320,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
   }
 
   const totalQuotaUsed = Math.max(0, Number(pkg.quotaUsed) || 0);
-  const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
+  const availableSeats = isOpenTrip ? Math.max(0, totalQuotaMax - totalQuotaUsed) : Math.min(totalQuotaMax, Number(pkg.maxGuests) || totalQuotaMax);
 
   // Pemesanan diblokir bila jadwal/tanggal tidak valid
   const dateBlocked = isOpenTrip
@@ -461,7 +444,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
     // Open Trip: kirim tanggal mulai keberangkatan yang ditetapkan mitra
     const finalBookingDate = isOpenTrip
       ? (openTripDeparture?.startIso || '')
-      : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`;
+      : customStartDate;
     
     if (!finalBookingDate) {
       showAlert({ type: 'warning', title: 'Pilih Tanggal Keberangkatan', message: 'Silakan pilih tanggal keberangkatan terlebih dahulu.' });
@@ -472,6 +455,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
       ...pkg,
       bookingGuests: guestsCount,
       bookingDate: finalBookingDate,
+      ...(!isOpenTrip ? { bookingEndDate: customEndDate } : {}),
       selectedAddOns: selectedAddOnObjects
     };
     setSelectedPackageForDetail(updatedPkg);
@@ -1286,7 +1270,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
                     <span>Jumlah Peserta</span>
                     <span style={{ color: availableSeats > 0 && guestsCount <= availableSeats ? '#10b981' : '#ef4444', fontWeight: '800' }}>
-                      {availableSeats <= 0 
+                      {!isOpenTrip ? `Maks. ${availableSeats} orang / booking` : availableSeats <= 0
                         ? 'Sisa 0 seat' 
                         : guestsCount > availableSeats 
                         ? `Melebihi Kuota (${availableSeats} seat)` 

@@ -223,6 +223,7 @@ interface NavigationContextType {
   bookingFormData: {
     packageId?: number | string;
     tripDate?: string;
+    tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -230,6 +231,7 @@ interface NavigationContextType {
   setBookingFormData: React.Dispatch<React.SetStateAction<{
     packageId?: number | string;
     tripDate?: string;
+    tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -289,6 +291,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [bookingFormData, setBookingFormDataState] = useState<{
     packageId?: number | string;
     tripDate?: string;
+    tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -304,6 +307,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const setBookingFormData: React.Dispatch<React.SetStateAction<{
     packageId?: number | string;
     tripDate?: string;
+    tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;

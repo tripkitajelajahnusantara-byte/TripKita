@@ -13,24 +13,19 @@ import {
   CheckCircle,
   XCircle,
   UploadCloud,
-  LoaderCircle,
-  Search
+  LoaderCircle
 } from 'lucide-react';
 
 import { request } from '../utils/api';
-import { PackageDateManager } from '../components/PackageDateManager';
+import { AvailabilityCalendar } from '../components/AvailabilityCalendar';
+import { addDays, jakartaToday, threeMonthLimit, tripEndDate, rangeAvailable } from '../utils/tripDates';
 import { PROVINCES } from '../utils/locationData';
 import { OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES, resolveMediaUrl } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
 import { useActionLock } from '../utils/useActionLock';
 import { useCustomAlert } from '../components/CustomAlertModal';
-import {
-  formatMeetingPointCoordinates,
-  getMeetingPointCoordinates,
-  meetingPointPinIcon,
-  MeetingPointMapViewport,
-  type MeetingPointCoordinates,
-} from '../components/MeetingPointMap';
+import { getMeetingPointCoordinates, type MeetingPointCoordinates } from '../components/MeetingPointMap';
+import { MeetingPointPicker } from '../components/MeetingPointPicker';
 
 /** Open Trip berangkat bersama pada jadwal tetap; tipe lain eksklusif per tanggal. */
 function isOpenTripType(tripType: string): boolean {
@@ -43,21 +38,6 @@ function suggestedMinimumGuests(tripType: string): string {
   if (tripType === 'Corporate') return '10';
   return '1';
 }
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-
-function LocationPicker({ position, onSelect }: {
-  position: MeetingPointCoordinates | null;
-  onSelect: (position: MeetingPointCoordinates) => void;
-}) {
-  useMapEvents({
-    click(e) {
-      onSelect({ lat: e.latlng.lat, lng: e.latlng.lng });
-    },
-  });
-  return position === null ? null : <Marker position={[position.lat, position.lng]} icon={meetingPointPinIcon} />;
-}
-
 export const CATEGORIES = OFFICIAL_CATEGORIES;
 export const TRIP_TYPES = OFFICIAL_TRIP_TYPES;
 
@@ -112,14 +92,16 @@ export const AddPackagePage: React.FC = () => {
   const [maxAge, setMaxAge] = useState('');
 
   // New fields mapping to backend
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = isOpenTripType(tripType) ? new Date().toISOString().split('T')[0] : jakartaToday();
+  const latestDate = threeMonthLimit(todayStr);
   const [price, setPrice] = useState('');
   const [quotaMin, setQuotaMin] = useState('');
   const [quotaMax, setQuotaMax] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [bookedPackageDates, setBookedPackageDates] = useState<string[]>([]);
+  const [availabilityDates, setAvailabilityDates] = useState<string[]>([]);
   const [schedule, setSchedule] = useState('');
-  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const requiresMinimumQuota = isOpenTripType(tripType);
   // Unggah foto dan simpan paket berbagi satu kunci: paket tidak boleh disimpan
   // selagi foto masih diunggah (foto baru belum masuk payload), dan sebaliknya.
@@ -150,7 +132,7 @@ export const AddPackagePage: React.FC = () => {
 
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
-    if (val) {
+    if (val && isOpenTripType(tripType)) {
       const durNum = parseInt(duration, 10) || 1;
       const d = new Date(val);
       if (!isNaN(d.getTime())) {
@@ -163,7 +145,7 @@ export const AddPackagePage: React.FC = () => {
   };
 
   React.useEffect(() => {
-    if (startDate) {
+    if (startDate && isOpenTripType(tripType)) {
       const durNum = parseInt(duration, 10) || 1;
       const d = new Date(startDate);
       if (!isNaN(d.getTime())) {
@@ -228,6 +210,14 @@ export const AddPackagePage: React.FC = () => {
           if (pkg.tripType) setTripType(pkg.tripType);
           if (pkg.startDate) setStartDate(pkg.startDate);
           if (pkg.endDate) setEndDate(pkg.endDate);
+          setBookedPackageDates(Array.isArray(pkg.bookedDates) ? pkg.bookedDates : []);
+          if (!isOpenTripType(loadedTripType)) {
+            const configured: string[] = (pkg.configuredDates || pkg.availableDates || []).filter((day: string) => day >= jakartaToday());
+            configured.sort();
+            setAvailabilityDates(configured);
+            setStartDate(configured[0] || '');
+            setEndDate(configured[configured.length - 1] || '');
+          }
           if (pkg.duration) setDuration(String(pkg.duration));
           const loadedMinGuests = Math.max(1, Number(pkg.minGuests) || 1);
           setMinGuests(String(loadedMinGuests));
@@ -269,6 +259,18 @@ export const AddPackagePage: React.FC = () => {
     }
     loadPackage();
   }, [editingPackageId, packageLoadAttempt]);
+
+  React.useEffect(() => {
+    if (editingPackageId || requiresMinimumQuota) return;
+    let cancelled = false;
+    request('/provider/packages').then((packages) => {
+      if (!cancelled && Array.isArray(packages)) {
+        const busy: string[] = packages.filter(pkg => !isOpenTripType(pkg.tripType || '')).flatMap(pkg => pkg.bookedDates || []);
+        setBookedPackageDates([...new Set(busy)].sort());
+      }
+    }).catch(error => console.error('Gagal memuat availability provider:', error));
+    return () => { cancelled = true; };
+  }, [editingPackageId, requiresMinimumQuota]);
 
   // Itinerary helper actions
   const handleAddActivity = (day: number) => {
@@ -389,42 +391,6 @@ export const AddPackagePage: React.FC = () => {
 
   const handleDeletePhoto = (idx: number) => {
     setPackagePhotos(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleAddressSearch = async () => {
-    const address = meetPoint.trim();
-    if (address.length < 3) {
-      showValidation('Masukkan alamat titik kumpul minimal 3 karakter sebelum mencari lokasi.', 'info');
-      return;
-    }
-    if (isSearchingLocation) return;
-
-    const addressLower = address.toLowerCase();
-    const queryParts = [address];
-    if (location && !addressLower.includes(location.toLowerCase())) queryParts.push(location);
-    if (!addressLower.includes('indonesia')) queryParts.push('Indonesia');
-    const query = queryParts.join(', ');
-    setIsSearchingLocation(true);
-    try {
-      const result = await request(`/provider/geocode?q=${encodeURIComponent(query)}`);
-      const coordinates = {
-        lat: Number(result?.latitude),
-        lng: Number(result?.longitude),
-      };
-      if (!Number.isFinite(coordinates.lat) || !Number.isFinite(coordinates.lng)) {
-        throw new Error('Koordinat alamat tidak valid.');
-      }
-      setMapPosition(coordinates);
-    } catch (err: unknown) {
-      showAlert({
-        title: 'Lokasi Tidak Ditemukan',
-        message: err instanceof Error ? err.message : 'Alamat belum dapat ditemukan. Tambahkan nama jalan, kota, atau provinsi.',
-        type: 'warning',
-        confirmText: 'Perbaiki Alamat',
-      });
-    } finally {
-      setIsSearchingLocation(false);
-    }
   };
 
   const handleSubmit = async (status: 'draft' | 'publish') => {
@@ -568,10 +534,16 @@ export const AddPackagePage: React.FC = () => {
       }
     }
 
+    if (!isOpenTripType(tripType) && (!availabilityDates.length || availabilityDates.some(day => day < todayStr || day > latestDate) ||
+      !availabilityDates.some(day => rangeAvailable(day, tripEndDate(day, durationValue || 1), todayStr, latestDate, availabilityDates)))) {
+      showValidation('Buka tanggal availability maksimal tiga bulan ke depan. Sediakan setidaknya satu periode yang cukup untuk durasi perjalanan.', 'pricing');
+      return;
+    }
+
     await run(status, async () => {
       try {
         const dbStatus = status === 'draft' ? 'Draft' : 'Aktif';
-        const finalSchedule = schedule.trim() || (startDate && endDate ? `${startDate} s/d ${endDate} (${duration} Hari)` : 'Jadwal Fleksibel');
+        const finalSchedule = isOpenTripType(tripType) ? (schedule.trim() || (startDate && endDate ? `${startDate} s/d ${endDate} (${duration} Hari)` : 'Jadwal Fleksibel')) : 'Sesuai kalender availability';
 
         const payload = {
           name: packageName,
@@ -588,6 +560,7 @@ export const AddPackagePage: React.FC = () => {
           quotaMax: Number.isFinite(qMax) ? qMax : 0,
           startDate: startDate,
           endDate: endDate,
+          ...(!isOpenTripType(tripType) ? { availableDates: availabilityDates } : {}),
           schedule: finalSchedule,
 		  duration: duration === '' ? 1 : durationValue,
           minGuests: Number.isFinite(minG) ? minG : 0,
@@ -760,13 +733,19 @@ export const AddPackagePage: React.FC = () => {
                       value={tripType} 
                       onChange={(e) => {
                         const val = e.target.value;
+                        if (isOpenTripType(val) !== isOpenTripType(tripType)) {
+                          setStartDate('');
+                          setEndDate('');
+                          setSchedule('');
+                          setAvailabilityDates([]);
+                        }
                         setTripType(val);
                         setQuotaMin(isOpenTripType(val) ? (quotaMin || '1') : '');
                         setMinGuests(useMinimumBooking ? suggestedMinimumGuests(val) : '1');
                       }}
                     >
                       {TRIP_TYPES.map(tt => (
-                        <option key={tt} value={tt}>{tt}</option>
+                        <option key={tt} value={tt}>{tt === 'Family' || tt === 'Corporate' ? `${tt} Trip` : tt}</option>
                       ))}
                     </select>
                   </div>
@@ -808,60 +787,7 @@ export const AddPackagePage: React.FC = () => {
 
                 <div className="input-group">
                   <label>Alamat Titik Kumpul *</label>
-                  <p style={{fontSize: '12.5px', color: '#64748b', marginBottom: '8px', marginTop: '-4px'}}>Masukkan alamat lengkap, lalu tekan Cari Lokasi. Pin akan berpindah otomatis dan masih dapat disesuaikan dengan klik pada peta.</p>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch', marginBottom: '12px' }}>
-                    <input
-                      type="text"
-                      value={meetPoint}
-                      maxLength={255}
-                      onChange={(e) => {
-                        setMeetPoint(e.target.value);
-                        setMapPosition(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          void handleAddressSearch();
-                        }
-                      }}
-                      placeholder="Contoh: Stasiun Bandung, Kebonjeruk, Kota Bandung"
-                      aria-label="Alamat titik kumpul"
-                      style={{ flex: 1 }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => void handleAddressSearch()}
-                      disabled={isSearchingLocation}
-                      aria-busy={isSearchingLocation}
-                      style={{ minWidth: '132px', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '7px' }}
-                    >
-                      {isSearchingLocation
-                        ? <><LoaderCircle size={15} className="btn-spinner" aria-hidden="true" /> Mencari...</>
-                        : <><Search size={15} aria-hidden="true" /> Cari Lokasi</>}
-                    </button>
-                  </div>
-                  <div style={{ height: '250px', width: '100%', marginBottom: '12px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', zIndex: 1 }}>
-                    <MapContainer center={mapPosition ? [mapPosition.lat, mapPosition.lng] : [-0.7893, 113.9213]} zoom={mapPosition ? 16 : 4} style={{ height: '100%', width: '100%', zIndex: 1 }}>
-                      <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      {mapPosition && <MeetingPointMapViewport position={mapPosition} zoom={16} />}
-                      <LocationPicker
-                        position={mapPosition}
-                        onSelect={(coordinates) => {
-                          setMapPosition(coordinates);
-                        }}
-                      />
-                    </MapContainer>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '12px', color: '#64748b' }}>
-                      Koordinat: <strong style={{ color: '#334155' }}>{mapPosition ? formatMeetingPointCoordinates(mapPosition) : 'belum dipilih'}</strong>
-                    </span>
-                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>Pencarian alamat © OpenStreetMap contributors</span>
-                  </div>
+                  <MeetingPointPicker address={meetPoint} position={mapPosition} onAddressChange={setMeetPoint} onSelect={setMapPosition} />
                 </div>
 
                 <div className="input-group">
@@ -1043,7 +969,7 @@ export const AddPackagePage: React.FC = () => {
                     </div>
                   )}
                   <div className="input-group">
-                    <label>Kuota Maksimal *</label>
+                    <label>{requiresMinimumQuota ? 'Kuota Maksimal *' : 'Kapasitas Maksimal per Booking *'}</label>
                     <input 
                       type="number" 
                       min={requiresMinimumQuota ? (quotaMin || "1") : "1"}
@@ -1063,6 +989,7 @@ export const AddPackagePage: React.FC = () => {
                   </div>
                 </div>
 
+                {isOpenTripType(tripType) ? (<>
                 <div className="input-group">
                   <label>Jadwal Keberangkatan (Durasi {duration} Hari) *</label>
                   <div className="input-range-row">
@@ -1101,23 +1028,15 @@ export const AddPackagePage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Paket selain Open Trip berangkat eksklusif per pesanan, jadi
-                    mitra menentukan sendiri tanggal mana yang dibuka. */}
-                {tripType && !isOpenTripType(tripType) && (
+                </>) : (
                   <div className="input-group">
-                    {editingPackageId ? (
-                      <PackageDateManager packageId={Number(editingPackageId)} tripType={tripType} />
-                    ) : (
-                      <div style={{ border: '1px dashed #cbd5e1', borderRadius: '12px', padding: '16px', backgroundColor: '#f8fafc', fontSize: '12.5px', color: '#475569', lineHeight: 1.6 }}>
-                        <strong style={{ color: '#0f172a' }}>Tanggal keberangkatan</strong><br />
-                        Simpan paket ini terlebih dahulu, lalu buka kembali untuk memilih tanggal mana saja yang
-                        dibuka bagi pelanggan (maksimal enam bulan ke depan). Satu tanggal hanya untuk satu pesanan.
-                      </div>
-                    )}
+                    <label>Availability Calendar *</label>
+                    <p style={{fontSize: 13, color: '#64748b'}}>Buka tanggal satu per satu atau beberapa rentang selama tiga bulan ke depan. Customer hanya bisa memesan periode yang seluruh harinya tersedia. Satu periode yang dipesan mengunci provider, berapa pun jumlah pesertanya. Durasi perjalanan {duration || 1} hari; pemesanan minimal H+7 ({addDays(todayStr, 7)}).</p>
+                    <AvailabilityCalendar dates={availabilityDates} min={todayStr} max={latestDate} booked={bookedPackageDates} disabled={isBusy} onChange={(dates) => { setAvailabilityDates(dates); setStartDate(dates[0] || ''); setEndDate(dates[dates.length - 1] || ''); }} />
                   </div>
                 )}
 
-                <div className="input-group">
+                {isOpenTripType(tripType) && <div className="input-group">
                   <label>Keterangan Jadwal Tambahan</label>
                   <input 
                     type="text" 
@@ -1125,7 +1044,7 @@ export const AddPackagePage: React.FC = () => {
                     onChange={(e) => setSchedule(e.target.value)}
                     placeholder="Contoh: 2026-08-01 s/d 2026-08-05 (5 Hari)"
                   />
-                </div>
+                </div>}
 
                 <div className="input-group" style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '9px', cursor: 'pointer', width: 'fit-content' }}>

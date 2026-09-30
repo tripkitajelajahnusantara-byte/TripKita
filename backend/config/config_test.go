@@ -48,7 +48,7 @@ func loadWith(t *testing.T, env map[string]string) (*Config, error) {
 		"RUN_MIGRATIONS", "SEED_DB", "ENABLE_DEV_MOCKS", "ENABLE_BACKGROUND_JOBS",
 		"ENABLE_AUTOMATIC_PAYOUT", "UPLOAD_DIR", "RAILWAY_VOLUME_MOUNT_PATH",
 		"MANUAL_PAYMENT_BANK_NAME", "MANUAL_PAYMENT_ACCOUNT_NUMBER", "MANUAL_PAYMENT_ACCOUNT_HOLDER",
-		"EMAIL_API_PROVIDER", "EMAIL_API_KEY", "EMAIL_FROM",
+		"EMAIL_API_PROVIDER", "EMAIL_API_KEY", "EMAIL_FROM", "BREVO_API_KEY", "RESEND_API_KEY",
 	} {
 		t.Setenv(key, "")
 	}
@@ -253,5 +253,35 @@ func TestProductionAcceptsEmailAPIWithoutSMTP(t *testing.T) {
 	env["EMAIL_API_KEY"] = ""
 	if _, err := loadWith(t, env); err == nil || !strings.Contains(err.Error(), "EMAIL_API_KEY") {
 		t.Fatalf("API email tanpa key seharusnya ditolak, dapat %v", err)
+	}
+}
+
+func TestEmailAPIKeysSelectHTTPSAndIgnoreUnusedSMTPPlaceholder(t *testing.T) {
+	for _, tc := range []struct{ key, value, provider string }{
+		{"BREVO_API_KEY", "xkeysib-valid-test", "brevo"},
+		{"RESEND_API_KEY", "re_valid-test", "resend"},
+		{"EMAIL_API_KEY", "xkeysib-valid-test", "brevo"},
+		{"EMAIL_API_KEY", "re_valid-test", "resend"},
+	} {
+		t.Run(tc.key+tc.provider, func(t *testing.T) {
+			env := validProductionEnv()
+			env[tc.key] = tc.value
+			env["SMTP_PASS"] = "your-16-digit-app-password"
+			cfg, err := loadWith(t, env)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.EmailAPIProvider != tc.provider || cfg.EmailAPIKey != tc.value {
+				t.Fatal("HTTPS transport was not selected")
+			}
+		})
+	}
+}
+
+func TestUnknownEmailAPIKeyCannotFallBackToSMTP(t *testing.T) {
+	env := validProductionEnv()
+	env["EMAIL_API_KEY"] = "unrecognized-key"
+	if _, err := loadWith(t, env); err == nil || !strings.Contains(err.Error(), "EMAIL_API_PROVIDER") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

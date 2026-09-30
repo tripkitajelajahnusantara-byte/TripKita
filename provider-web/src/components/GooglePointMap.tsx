@@ -1,0 +1,50 @@
+import { useEffect, useRef, useState } from 'react';
+import { loadGoogleMaps } from '../utils/googleMaps';
+import type { Coordinates } from '../utils/meetingPointInput';
+
+export function GooglePointMap({ position, onSelect }: { position: Coordinates | null; onSelect: (point: Coordinates) => void }) {
+  const container = useRef<HTMLDivElement>(null);
+  const map = useRef<google.maps.Map | null>(null);
+  const marker = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const selection = useRef({ position, onSelect });
+  const [error, setError] = useState('');
+  useEffect(() => { selection.current = { position, onSelect }; }, [position, onSelect]);
+  useEffect(() => {
+    let cancelled = false;
+    const listeners: google.maps.MapsEventListener[] = [];
+    void (async () => {
+      try {
+        await loadGoogleMaps();
+        const { Map } = await google.maps.importLibrary('maps') as google.maps.MapsLibrary;
+        const { AdvancedMarkerElement } = await google.maps.importLibrary('marker') as google.maps.MarkerLibrary;
+        if (cancelled || !container.current) return;
+        const point = selection.current.position;
+        map.current = new Map(container.current, { center: point ?? { lat: -2.5, lng: 118 }, zoom: point ? 18 : 4, mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID', streetViewControl: false, mapTypeControl: true });
+        marker.current = new AdvancedMarkerElement({ map: map.current, position: point, gmpDraggable: true, title: 'Titik kumpul' });
+        listeners.push(map.current.addListener('click', (event: google.maps.MapMouseEvent) => {
+          if (event.latLng) selection.current.onSelect(event.latLng.toJSON());
+        }));
+        listeners.push(marker.current.addListener('dragend', (event: google.maps.MapMouseEvent) => {
+          if (event.latLng) selection.current.onSelect(event.latLng.toJSON());
+        }));
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Peta tidak dapat dimuat.');
+      }
+    })();
+    return () => {
+      cancelled = true;
+      listeners.forEach(listener => listener.remove());
+      if (marker.current) marker.current.map = null;
+      marker.current = null;
+      map.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (marker.current) marker.current.position = position;
+    if (map.current && position) { map.current.setCenter(position); map.current.setZoom(18); }
+  }, [position]);
+  return <div style={{ height: 300, position: 'relative' }}>
+    <div ref={container} style={{ height: '100%' }} aria-label="Pilih titik kumpul di Google Maps" />
+    {error && <p role="alert" style={{ position: 'absolute', inset: 10, background: '#fff', padding: 16 }}>{error}</p>}
+  </div>;
+}

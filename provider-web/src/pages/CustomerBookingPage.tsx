@@ -1,3 +1,4 @@
+import { formatTripRange, tripEndDate, validDate } from '../utils/tripDates';
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
@@ -196,7 +197,8 @@ export const CustomerBookingPage: React.FC = () => {
   }
 
   const pkg = selectedPackageForDetail;
-  const selectedTripDate = pkg.bookingDate || (parseIsoDateParts(pkg.schedule || '') ? pkg.schedule : '');
+  const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
+  const selectedTripDate = isOpenTrip ? (pkg.bookingDate || (parseIsoDateParts(pkg.schedule || '') ? pkg.schedule : '')) : (validDate(pkg.bookingDate) ? pkg.bookingDate : '');
   const packageMinAge = Number(pkg.minAge) > 0 ? Number(pkg.minAge) : 0;
   const packageMaxAge = Number(pkg.maxAge) > 0 ? Number(pkg.maxAge) : 0;
   const meetingPointCoordinates = getMeetingPointCoordinates(pkg);
@@ -292,10 +294,15 @@ export const CustomerBookingPage: React.FC = () => {
       return;
     }
 
+    if (!isOpenTrip && !validDate(selectedTripDate)) {
+      showAlert({type: 'warning', title: 'Pilih Tanggal', message: 'Kembali ke detail paket dan pilih tanggal pada kalender.'});
+      return;
+    }
     // Save into NavigationContext for Step 5 Confirmation
     setBookingFormData({
       packageId: currentPackageId,
-      tripDate: pkg.bookingDate || pkg.schedule,
+      tripDate: isOpenTrip ? (pkg.bookingDate || pkg.schedule) : selectedTripDate,
+      ...(!isOpenTrip ? { tripEndDate: pkg.bookingEndDate || tripEndDate(selectedTripDate, pkg.duration) } : {}),
       pemesan: {
         nama: pemesanName,
         email: pemesanEmail,
@@ -722,7 +729,7 @@ export const CustomerBookingPage: React.FC = () => {
               </strong>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569' }}>
                 <Calendar size={15} color="#94a3b8" />
-                <span>{pkg.bookingDate || pkg.schedule || 'Jadwal Fleksibel'}</span>
+                <span>{isOpenTrip ? (pkg.bookingDate || pkg.schedule || 'Jadwal Fleksibel') : formatTripRange(pkg.bookingDate, pkg.bookingEndDate)}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569' }}>
                 <Users size={15} color="#94a3b8" />

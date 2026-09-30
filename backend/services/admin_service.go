@@ -134,17 +134,24 @@ func (s *adminService) UpdateProviderStatus(id uint, status string, notes string
 		if provider.Status == status && provider.IsVerified == isVerified {
 			return ErrProviderStatusUnchanged
 		}
+		if provider.DeletedAt != nil && status != "APPROVED" {
+			return errors.New("provider dinonaktifkan; hanya admin dapat memulihkannya melalui persetujuan")
+		}
 
 		if err := tx.Model(&provider).Updates(map[string]interface{}{
 			"status":             status,
 			"verification_notes": notes,
 			"is_verified":        isVerified,
+			"deleted_at":         nil,
 		}).Error; err != nil {
 			return err
 		}
 		// Sesi dicabut dalam transaksi yang sama: bila gagal, status ikut batal
 		// sehingga admin dapat mengulang tanpa terbentur "status sudah sesuai".
 		if !isVerified {
+			if err := tx.Model(&models.Package{}).Where("provider_id = ?", id).Update("status", "Nonaktif").Error; err != nil {
+				return err
+			}
 			if err := authn.RevokeAllProviderSessions(context.Background(), tx, id); err != nil {
 				return err
 			}
@@ -197,9 +204,6 @@ func providerStatusNotification(status, notes string) (string, string) {
 }
 
 func (s *adminService) DeleteProvider(id uint) error {
-	if err := authn.RevokeAllProviderSessions(context.Background(), s.db, id); err != nil {
-		return err
-	}
 	return s.repo.Delete(id)
 }
 

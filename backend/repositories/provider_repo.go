@@ -1,10 +1,13 @@
 package repositories
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"tripkita-provider/authn"
 
 	"tripkita-provider/models"
 )
@@ -65,7 +68,7 @@ func (r *providerRepository) FindPublicByID(id uint) (*models.PublicProviderProf
 				SELECT SUM(b.guests) FROM bookings b
 				WHERE b.provider_id = p.id AND b.status = 'COMPLETED'
 			), 0) AS total_travelers`).
-		Where("p.id = ? AND p.role = ? AND p.status = ? AND p.is_verified = ?", id, "PROVIDER", "APPROVED", true).
+		Where("p.id = ? AND p.role = ? AND p.status = ? AND p.is_verified = ? AND p.deleted_at IS NULL", id, "PROVIDER", "APPROVED", true).
 		Take(&profile).Error
 	if err != nil {
 		return nil, err
@@ -78,7 +81,7 @@ func (r *providerRepository) FindPublicByID(id uint) (*models.PublicProviderProf
 // ikut disimpan: salinan lama yang dibaca sebelum admin menyetujui tidak boleh
 // mengembalikan akun ke PENDING.
 func (r *providerRepository) Update(provider *models.Provider) error {
-	return r.db.Omit("status", "is_verified", "verification_notes", "platform_fee_percent").Save(provider).Error
+	return r.db.Omit("status", "is_verified", "verification_notes", "platform_fee_percent", "deleted_at").Save(provider).Error
 }
 
 func (r *providerRepository) FindAllProviders() ([]models.Provider, error) {
@@ -94,8 +97,17 @@ func (r *providerRepository) Delete(id uint) error {
 	// Financial and booking records are audit data and must never be cascaded away.
 	// The legacy DELETE endpoint therefore performs a reversible deactivation.
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		var provider models.Provider
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND role = ?", id, "PROVIDER").First(&provider).Error; err != nil {
+			return err
+		}
+		if provider.DeletedAt != nil {
+			return nil
+		}
+		now := time.Now()
 		result := tx.Model(&models.Provider{}).Where("id = ? AND role = ?", id, "PROVIDER").Updates(map[string]interface{}{
-			"status":             "REJECTED",
+			"status":             "DISABLED",
+			"deleted_at":         now,
 			"is_verified":        false,
 			"verification_notes": "Akun dinonaktifkan oleh administrator",
 			"updated_at":         time.Now(),
@@ -106,6 +118,9 @@ func (r *providerRepository) Delete(id uint) error {
 		if result.RowsAffected != 1 {
 			return errors.New("provider not found")
 		}
+		if err := authn.RevokeAllProviderSessions(context.Background(), tx, id); err != nil {
+			return err
+		}
 		if err := tx.Model(&models.Package{}).Where("provider_id = ?", id).Updates(map[string]interface{}{
 			"status":     "Nonaktif",
 			"updated_at": time.Now(),
@@ -114,7 +129,7 @@ func (r *providerRepository) Delete(id uint) error {
 		}
 		return tx.Create(&models.ProviderStatusHistory{
 			ProviderID: id,
-			Status:     "REJECTED",
+			Status:     "DISABLED",
 			Notes:      "Akun dinonaktifkan oleh administrator; data transaksi dipertahankan untuk audit.",
 			CreatedAt:  time.Now(),
 		}).Error

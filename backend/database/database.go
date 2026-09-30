@@ -87,6 +87,8 @@ func ConnectDB(cfg *config.Config) {
 			log.Fatalf("Migrasi database gagal: %v", err)
 		}
 		fmt.Println("Migrasi database selesai")
+		execMigration(`UPDATE providers SET status = 'DISABLED', deleted_at = updated_at WHERE status = 'REJECTED' AND deleted_at IS NULL AND verification_notes = 'Akun dinonaktifkan oleh administrator';`)
+		execMigration(`UPDATE packages SET status = 'Nonaktif' WHERE provider_id IN (SELECT id FROM providers WHERE deleted_at IS NOT NULL);`)
 
 		// Provider baru memakai tarif default 15%. Booking menyimpan snapshot
 		// tarif agar perubahan admin tidak mengubah laporan transaksi lama.

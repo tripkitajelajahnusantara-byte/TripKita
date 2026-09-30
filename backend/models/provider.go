@@ -31,6 +31,9 @@ type Provider struct {
 	PlatformFeePercent  int64     `gorm:"not null;default:15" json:"platformFeePercent"`
 	CreatedAt           time.Time `json:"createdAt"`
 	UpdatedAt           time.Time `json:"updatedAt"`
+	// Explicit soft delete keeps the provider available to historical bookings.
+	// Only the admin status endpoint may clear this timestamp.
+	DeletedAt *time.Time `gorm:"index" json:"deletedAt"`
 
 	// New fields: Website, active bank details, NPWP number
 	Website              string     `gorm:"size:255" json:"website"`
@@ -102,6 +105,13 @@ type ProviderStatusHistory struct {
 	Status     string    `gorm:"size:50;not null" json:"status"`
 	Notes      string    `json:"notes"`
 	CreatedAt  time.Time `json:"createdAt"`
+}
+
+func (p *Provider) CanAuthenticate() bool {
+	if p == nil || p.DeletedAt != nil {
+		return false
+	}
+	return p.Status == "APPROVED" || (p.Role == "PROVIDER" && p.Status == "PENDING")
 }
 
 type UpdateProviderStatusRequest struct {

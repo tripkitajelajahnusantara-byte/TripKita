@@ -1,3 +1,4 @@
+import { bookingTimestamp, formatTripRange, validDate } from '../utils/tripDates';
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
@@ -14,7 +15,7 @@ import {
 } from '../components/MeetingPointMap';
 
 export const CustomerConfirmationPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, bookingFormData, setBookingFormData, setSelectedBookingForInvoice } = useNavigation();
+  const { navigateTo, selectedPackageForDetail, bookingFormData, setBookingFormData, setSelectedBookingForInvoice, setSelectedPackageForDetail } = useNavigation();
   const { showAlert } = useCustomAlert();
   // POST /public/bookings membuat pesanan baru; kunci berbasis ref mencegah
   // klik ganda di tick yang sama membuat dua booking dan dua tagihan.
@@ -54,6 +55,23 @@ export const CustomerConfirmationPage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  const [restoring, setRestoring] = useState(!selectedPackageForDetail && !!bookingFormData?.packageId);
+  const [restoreError, setRestoreError] = useState('');
+  useEffect(() => {
+    if (selectedPackageForDetail || !bookingFormData?.packageId) return;
+    let cancelled = false;
+    request('/public/packages').then((packages) => {
+      if (cancelled) return;
+      const found = Array.isArray(packages) ? packages.find(p => Number(p.id) === Number(bookingFormData.packageId)) : null;
+      if (!found) throw new Error('Paket tidak tersedia. Silakan pilih ulang paket dan tanggal.');
+      setSelectedPackageForDetail({ ...found, bookingDate: bookingFormData.tripDate, bookingEndDate: bookingFormData.tripEndDate, bookingGuests: bookingFormData.peserta.length });
+    }).catch(error => { if (!cancelled) setRestoreError(error.message || 'Gagal memuat paket.'); })
+      .finally(() => { if (!cancelled) setRestoring(false); });
+    return () => { cancelled = true; };
+  }, [selectedPackageForDetail, bookingFormData, setSelectedPackageForDetail]);
+
+  if (restoring && !selectedPackageForDetail) return <p role="status" style={{ padding: 40 }}>Memuat pilihan perjalanan...</p>;
+
   // Setelah booking dibuat, data form dikosongkan sementara halaman tagihan
   // masih dimuat; tampilkan status pengalihan, bukan pesan "tidak ditemukan".
   if (redirecting) {
@@ -68,7 +86,7 @@ export const CustomerConfirmationPage: React.FC = () => {
   if (!selectedPackageForDetail || !bookingFormData) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
-        <p>Data pemesanan tidak ditemukan. Silakan isi data pemesan terlebih dahulu.</p>
+        <p>{restoreError || 'Data pemesanan tidak ditemukan. Silakan isi data pemesan terlebih dahulu.'}</p>
         <button onClick={() => navigateTo('beranda')} style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
           Kembali ke Beranda
         </button>
@@ -159,9 +177,12 @@ export const CustomerConfirmationPage: React.FC = () => {
         throw new Error('Tanggal perjalanan tidak terbaca. Silakan kembali ke detail paket dan pilih tanggal lagi.');
       };
 
-      const selectedTripSchedule = bookingFormData?.tripDate || pkg.bookingDate || pkg.schedule || '';
-
-      const parsedTripDate = parseTripDateToFuture(selectedTripSchedule);
+      const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
+      const selectedTripSchedule = bookingFormData.tripDate || pkg.bookingDate || (isOpenTrip ? pkg.schedule : '') || '';
+      if (!isOpenTrip && (!validDate(selectedTripSchedule) || Number(bookingFormData.packageId) !== Number(pkg.id))) {
+        throw new Error('Pilihan tanggal tidak valid untuk paket ini. Kembali ke detail paket dan pilih tanggal pada kalender.');
+      }
+      const tripTimestamp = isOpenTrip ? parseTripDateToFuture(selectedTripSchedule).toISOString() : bookingTimestamp(selectedTripSchedule);
 
 	  const rawPkgId = Number(pkg.id);
 	  if (!Number.isInteger(rawPkgId) || rawPkgId <= 0) {
@@ -175,7 +196,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         customerPhone: pemesan.whatsapp,
         customerInitial: (pemesan.nama || 'P').charAt(0).toUpperCase(),
         guests: guestsCount || 1,
-        tripDate: parsedTripDate.toISOString(),
+        tripDate: tripTimestamp,
         addOnIds: selectedAddOns.map((item: any) => item.id),
         participants: peserta.map((p) => {
           const medical = String(p.riwayatPenyakit || '').trim();
@@ -202,7 +223,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         packageName: pkg.name,
         totalPrice: response.totalPrice,
         guests: guestsCount,
-        tripDate: selectedTripSchedule || parsedTripDate.toISOString().split('T')[0],
+        tripDate: selectedTripSchedule,
         createdAt: response.createdAt || nowIso,
         status: response.status || 'PENDING_PAYMENT',
         paymentMethod: response.paymentMethod || 'Transfer Bank Manual'
@@ -340,7 +361,7 @@ export const CustomerConfirmationPage: React.FC = () => {
               </h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>
                 <Calendar size={14} color="#94a3b8" />
-                <span>{bookingFormData?.tripDate || pkg.bookingDate || pkg.schedule || 'Jadwal Fleksibel'}</span>
+                <span>{!pkg.tripType || pkg.tripType === 'Open Trip' ? (bookingFormData.tripDate || pkg.bookingDate || pkg.schedule || 'Jadwal Fleksibel') : formatTripRange(bookingFormData.tripDate || pkg.bookingDate, bookingFormData.tripEndDate || pkg.bookingEndDate)}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b' }}>
                 <Users size={14} color="#94a3b8" />

@@ -135,6 +135,32 @@ func LoadConfig() (*Config, error) {
 	if strings.TrimSpace(cfg.SMTPFrom) == "" {
 		cfg.SMTPFrom = strings.TrimSpace(cfg.SMTPUser)
 	}
+	// Accept providers' native variable names as well as the shared names.
+	// A supplied API key must never silently fall back to blocked SMTP ports.
+	if cfg.EmailAPIProvider == "" {
+		switch {
+		case strings.HasPrefix(cfg.EmailAPIKey, "xkeysib-"):
+			cfg.EmailAPIProvider = "brevo"
+		case strings.HasPrefix(cfg.EmailAPIKey, "re_"):
+			cfg.EmailAPIProvider = "resend"
+		case cfg.EmailAPIKey != "":
+			return nil, fmt.Errorf("EMAIL_API_PROVIDER wajib diisi untuk EMAIL_API_KEY ini (brevo atau resend)")
+		case getEnv("BREVO_API_KEY", "") != "" && getEnv("RESEND_API_KEY", "") != "":
+			return nil, fmt.Errorf("pilih EMAIL_API_PROVIDER karena BREVO_API_KEY dan RESEND_API_KEY keduanya terisi")
+		case getEnv("BREVO_API_KEY", "") != "":
+			cfg.EmailAPIProvider = "brevo"
+		case getEnv("RESEND_API_KEY", "") != "":
+			cfg.EmailAPIProvider = "resend"
+		}
+	}
+	if cfg.EmailAPIKey == "" {
+		switch cfg.EmailAPIProvider {
+		case "brevo":
+			cfg.EmailAPIKey = getEnv("BREVO_API_KEY", "")
+		case "resend":
+			cfg.EmailAPIKey = getEnv("RESEND_API_KEY", "")
+		}
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -260,7 +286,9 @@ func (c *Config) Validate() error {
 		"JWT_SECRET":           c.JWTSecret,
 		"GOOGLE_CLIENT_ID":     c.GoogleClientID,
 		"GOOGLE_CLIENT_SECRET": c.GoogleClientSecret,
-		"SMTP_PASS":            c.SMTPPass,
+	}
+	if !c.UsesEmailAPI() {
+		productionSecrets["SMTP_PASS"] = c.SMTPPass
 	}
 	for key, value := range productionSecrets {
 		lower := strings.ToLower(value)

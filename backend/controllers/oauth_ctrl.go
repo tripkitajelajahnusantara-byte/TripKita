@@ -250,7 +250,7 @@ func (ctrl *OAuthController) findOrCreateOAuthUser(authType string, profile goog
 	if err != nil {
 		return user, provider, err
 	}
-	if provider.Status == "REJECTED" || (provider.Role != "PROVIDER" && provider.Status != "APPROVED") {
+	if !provider.CanAuthenticate() {
 		return user, provider, errors.New("account is inactive")
 	}
 	return user, provider, nil
@@ -286,7 +286,7 @@ func (ctrl *OAuthController) ExchangeLoginCode(c *gin.Context) {
 		if err := tx.First(&provider, user.ProviderID).Error; err != nil {
 			return err
 		}
-		if provider.Status == "REJECTED" || (provider.Role != "PROVIDER" && provider.Status != "APPROVED") {
+		if !provider.CanAuthenticate() {
 			return errors.New("account inactive")
 		}
 		now := time.Now().UTC()

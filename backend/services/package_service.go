@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -135,6 +136,17 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 		}
 	}
 
+	if !models.IsOpenTrip(pkg.TripType) {
+		dates := req.AvailableDates
+		if len(dates) == 0 {
+			return nil, packageValidationErrorf("pilih tanggal availability sebelum menyimpan paket")
+		}
+		if err := validateOfferedDates(pkg, dates); err != nil {
+			return nil, err
+		}
+		pkg.AvailableDates = dates
+	}
+
 	if err := s.repo.Create(pkg); err != nil {
 		return nil, err
 	}
@@ -151,7 +163,7 @@ func (s *packageService) GetAllPackages(providerID uint) ([]models.Package, erro
 }
 
 func (s *packageService) GetAllPublic() ([]models.Package, error) {
-	today, _ := models.AvailabilityWindow(time.Now())
+	today := time.Now().Format("2006-01-02")
 	packages, err := s.repo.FindAllPublic(today)
 	if err != nil {
 		return nil, err
@@ -234,7 +246,7 @@ func (s *packageService) ListPackageDates(packageID uint, providerID uint) ([]mo
 // SetPackageDates mengganti daftar tanggal yang dibuka mitra.
 //
 // Aturan yang ditegakkan di sini: hanya untuk paket selain Open Trip, tanggal
-// tidak boleh di masa lalu, dan tidak boleh lebih jauh dari enam bulan ke depan.
+// tidak boleh di masa lalu, dan tidak boleh lebih jauh dari tiga bulan ke depan.
 func (s *packageService) SetPackageDates(packageID uint, providerID uint, dates []string) ([]models.PackageDate, error) {
 	pkg, err := s.repo.FindByIDAndProvider(packageID, providerID)
 	if err != nil || pkg == nil {
@@ -257,6 +269,9 @@ func (s *packageService) SetPackageDates(packageID uint, providerID uint, dates 
 		}
 		if date < earliest {
 			return nil, fmt.Errorf("tanggal %s sudah lewat dan tidak dapat dibuka", date)
+		}
+		if date < pkg.StartDate || date > pkg.EndDate {
+			return nil, packageValidationErrorf("tanggal %s berada di luar periode paket", date)
 		}
 		if date > latest {
 			return nil, fmt.Errorf("tanggal %s melebihi batas %d bulan ke depan (maksimal %s)", date, models.AvailabilityHorizonMonths, latest)
@@ -285,7 +300,22 @@ func (s *packageService) GetPackageByID(id uint, providerID uint) (*models.Packa
 		return nil, err
 	}
 	pkg.QuotaMin = quotaMinimumForTripType(pkg.TripType, pkg.QuotaMin)
-	return pkg, nil
+	packages, err := s.attachDates([]models.Package{*pkg})
+	if err != nil {
+		return nil, err
+	}
+	if s.dateRepo != nil && !models.IsOpenTrip(pkg.TripType) {
+		rows, err := s.dateRepo.ListByPackage(pkg.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			if row.Origin == models.PackageDateOriginProvider {
+				packages[0].ConfiguredDates = append(packages[0].ConfiguredDates, row.Date)
+			}
+		}
+	}
+	return &packages[0], nil
 }
 
 func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.UpdatePackageRequest) (*models.Package, error) {
@@ -293,6 +323,7 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	if err != nil {
 		return nil, err
 	}
+	previousStart, previousEnd, previousType := pkg.StartDate, pkg.EndDate, pkg.TripType
 
 	if req.Name != nil {
 		pkg.Name = strings.TrimSpace(*req.Name)
@@ -407,8 +438,25 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 		}
 	}
 
+	if !models.IsOpenTrip(pkg.TripType) && (req.AvailableDates != nil || previousStart != pkg.StartDate || previousEnd != pkg.EndDate || previousType != pkg.TripType) {
+		dates := []string{}
+		if req.AvailableDates != nil {
+			dates = *req.AvailableDates
+		} else {
+			return nil, packageValidationErrorf("sertakan tanggal availability saat mengubah periode atau tipe paket")
+		}
+		if err := validateOfferedDates(pkg, dates); err != nil {
+			return nil, err
+		}
+		pkg.AvailableDates = append([]string{}, dates...)
+	}
+
 	err = s.repo.Update(pkg)
 	if err != nil {
+		var conflict *repositories.AvailabilityConflictError
+		if errors.As(err, &conflict) {
+			return nil, packageValidationErrorf("%s", conflict.Message)
+		}
 		return nil, err
 	}
 
@@ -494,4 +542,26 @@ func (s *packageService) DeletePackage(id uint, providerID uint) error {
 		return err
 	}
 	return s.repo.Delete(pkg)
+}
+
+// A submitted date list is authoritative; an empty list closes all dates.
+func validateOfferedDates(pkg *models.Package, dates []string) error {
+	today, latest := models.AvailabilityWindow(time.Now())
+	if pkg.EndDate > latest {
+		return packageValidationErrorf("periode paket maksimal tiga bulan ke depan (sampai %s)", latest)
+	}
+	start, startErr := time.Parse("2006-01-02", pkg.StartDate)
+	end, endErr := time.Parse("2006-01-02", pkg.EndDate)
+	if startErr != nil || endErr != nil || start.AddDate(0, 0, normalizedTripDuration(pkg.Duration)-1).After(end) {
+		return packageValidationErrorf("rentang tanggal harus cukup untuk seluruh durasi perjalanan")
+	}
+	if len(dates) > models.MaxAvailabilityDates {
+		return packageValidationErrorf("terlalu banyak tanggal")
+	}
+	for _, day := range dates {
+		if _, err := time.Parse("2006-01-02", day); err != nil || day < today || day > latest || day < pkg.StartDate || day > pkg.EndDate {
+			return packageValidationErrorf("tanggal %s di luar periode paket atau batas tiga bulan", day)
+		}
+	}
+	return nil
 }

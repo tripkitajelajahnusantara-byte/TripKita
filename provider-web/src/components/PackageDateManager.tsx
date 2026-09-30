@@ -29,7 +29,7 @@ function toISO(year: number, month: number, day: number): string {
 /**
  * Pengaturan tanggal keberangkatan untuk paket selain Open Trip.
  *
- * Mitra menandai tanggal mana saja yang dibuka, paling jauh enam bulan ke depan.
+ * Mitra menandai tanggal mana saja yang dibuka, paling jauh tiga bulan ke depan.
  * Tanggal yang sudah dikunci pesanan pelanggan ditampilkan terkunci dan tidak
  * dapat ditutup dari sini, karena menutupnya akan membuat pesanan yang sudah
  * dibayar menunjuk jadwal yang tidak lagi diakui paketnya.
@@ -51,7 +51,7 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
     try {
       const data = await request(`/provider/packages/${packageId}/dates`);
       const rows: PackageDate[] = Array.isArray(data?.dates) ? data.dates : [];
-      setSelected(new Set(rows.filter((d) => d.origin === 'PROVIDER' || d.status === 'BOOKED').map((d) => d.date)));
+      setSelected(new Set(rows.filter((d) => d.date >= data.earliestDate && d.date <= data.latestDate && (d.origin === 'PROVIDER' || d.status === 'BOOKED')).map((d) => d.date)));
       setBooked(new Set(rows.filter((d) => d.status === 'BOOKED').map((d) => d.date)));
       setEarliest(data?.earliestDate || '');
       setLatest(data?.latestDate || '');
@@ -69,7 +69,7 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
 
   const months = useMemo(() => {
     const base = new Date();
-    return Array.from({ length: 7 }, (_, i) => {
+    return Array.from({ length: 4 }, (_, i) => {
       const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
       return { year: d.getFullYear(), month: d.getMonth() };
     });
@@ -124,7 +124,7 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
             Tanggal Keberangkatan yang Dibuka
           </h4>
           <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#64748b', lineHeight: 1.6 }}>
-            Pilih tanggal yang boleh dipesan pelanggan untuk paket <strong>{tripType}</strong>, paling jauh enam bulan
+            Pilih tanggal yang boleh dipesan pelanggan untuk paket <strong>{tripType}</strong>, paling jauh tiga bulan
             ke depan{latest && ` (sampai ${latest})`}. Satu tanggal hanya untuk satu pesanan — begitu dipilih pelanggan,
             tanggal itu terkunci otomatis.
           </p>
@@ -186,7 +186,7 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
               type="button"
               onClick={() => toggle(iso)}
               disabled={!!outOfWindow || isBooked || saving}
-              title={isBooked ? 'Sudah dipesan pelanggan; tidak dapat ditutup' : outOfWindow ? 'Di luar jangkauan enam bulan' : undefined}
+              title={isBooked ? 'Sudah dipesan pelanggan; tidak dapat ditutup' : outOfWindow ? 'Di luar jangkauan tiga bulan' : undefined}
               style={{
                 aspectRatio: '1',
                 border: `1px solid ${isBooked ? '#fca5a5' : isOpen ? '#0284c7' : '#e2e8f0'}`,

@@ -49,7 +49,7 @@ interface ProviderAdminData {
   whatsapp: string;
   isVerified: boolean;
   role: string;
-  status: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'FAILED' | 'REJECTED';
+  status: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'FAILED' | 'REJECTED' | 'DISABLED';
   failureCode?: string;
   verificationNotes?: string;
   platformFeePercent: number;
@@ -114,7 +114,7 @@ interface StatusHistoryItem {
   createdAt: string;
 }
 
-const hasPendingProviderReview = (provider: ProviderAdminData) => (
+const hasPendingProviderReview = (provider: ProviderAdminData) => provider.status !== 'DISABLED' && (
   provider.status === 'PENDING' ||
   provider.profileVerificationStatus === 'PENDING' ||
   provider.legalVerificationStatus === 'PENDING' ||
@@ -160,7 +160,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Semua Kategori');
   const [cityFilter, setCityFilter] = useState('Semua Kota');
-  const [statusTab, setStatusTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [statusTab, setStatusTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'DISABLED'>('PENDING');
   
   // Selection & Drawer States
   const [selectedProvider, setSelectedProvider] = useState<ProviderAdminData | null>(null);
@@ -489,7 +489,7 @@ export const AdminDashboardPage: React.FC = () => {
         await request(`/admin/bookings/${booking.id}/resend-email`, { method: 'POST' });
         setSuccessMsg(`Email status booking ${booking.bookingCode} berhasil dikirim ulang ke ${booking.customerEmail || 'customer'}.`);
       } catch (err: any) {
-        setError(err.message || 'Email belum dapat dikirim ulang. Periksa konfigurasi SMTP backend.');
+        setError(err.message || 'Email belum dapat dikirim ulang. Periksa konfigurasi layanan email backend.');
       }
     });
   };
@@ -705,7 +705,7 @@ export const AdminDashboardPage: React.FC = () => {
 
   const handleDeleteProvider = async (id: number) => {
     if (actionBusy) return;
-    if (!window.confirm('Nonaktifkan provider ini? Seluruh paket akan dinonaktifkan, sedangkan booking dan data keuangan tetap disimpan untuk audit.')) {
+    if (!window.confirm('Nonaktifkan provider ini? Seluruh paket disembunyikan dan tidak dapat diaktifkan oleh provider. Hanya admin dapat memulihkan akun. Booking dan data keuangan tetap disimpan.')) {
       return;
     }
 
@@ -943,7 +943,7 @@ export const AdminDashboardPage: React.FC = () => {
       ? pendingReview
       : statusTab === 'APPROVED'
         ? p.status === 'APPROVED' && !pendingReview
-        : p.status === 'REJECTED' && !pendingReview;
+        : p.status === statusTab && !pendingReview;
     
     const matchesCategory = categoryFilter === 'Semua Kategori' || 
       p.businessCategory.toLowerCase() === categoryFilter.toLowerCase();
@@ -1635,6 +1635,9 @@ export const AdminDashboardPage: React.FC = () => {
                     >
                       Provider Ditolak <span className="badge-count red">{stats.rejected}</span>
                     </button>
+                    <button className={`tab-filter-btn ${statusTab === 'DISABLED' ? 'active' : ''}`} onClick={() => setStatusTab('DISABLED')}>
+                      Dinonaktifkan <span className="badge-count red">{providers.filter(p => p.status === 'DISABLED').length}</span>
+                    </button>
                   </div>
 
                   {/* Filter / Search Bar */}
@@ -1713,7 +1716,7 @@ export const AdminDashboardPage: React.FC = () => {
                                 </td>
                                 <td>
                                   <span className={`status-pill-small ${hasPendingProviderReview(p) ? 'pending' : p.status.toLowerCase()}`}>
-                                    {p.status === 'PENDING' ? 'Akun Baru' : hasPendingProviderReview(p) ? 'Menunggu Perubahan' : p.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
+                                    {p.status === 'DISABLED' ? 'Dinonaktifkan' : p.status === 'PENDING' ? 'Akun Baru' : hasPendingProviderReview(p) ? 'Menunggu Perubahan' : p.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
                                   </span>
                                 </td>
                                 <td>
@@ -1773,7 +1776,7 @@ export const AdminDashboardPage: React.FC = () => {
                     <h3>{selectedProvider.businessName}</h3>
                     <p>{selectedProvider.businessCategory}</p>
                     <span className={`drawer-status-badge ${hasPendingProviderReview(selectedProvider) ? 'pending' : selectedProvider.status.toLowerCase()}`}>
-                      {selectedProvider.status === 'PENDING' ? 'Akun Menunggu Persetujuan' : hasPendingProviderReview(selectedProvider) ? 'Perubahan Menunggu Persetujuan' : selectedProvider.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
+                      {selectedProvider.status === 'DISABLED' ? 'Dinonaktifkan' : selectedProvider.status === 'PENDING' ? 'Akun Menunggu Persetujuan' : hasPendingProviderReview(selectedProvider) ? 'Perubahan Menunggu Persetujuan' : selectedProvider.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
                     </span>
                   </div>
                 </div>
@@ -2138,17 +2141,13 @@ export const AdminDashboardPage: React.FC = () => {
                         {pendingAction === 'status-REJECTED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menolak...</> : 'Tolak Mitra'}
                       </button>
                     </>
-                  ) : selectedProvider.status === 'APPROVED' ? (
-                    <button className="action-btn disable-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-PENDING'} onClick={() => handleUpdateStatus(selectedProvider.id, 'PENDING', 'Verifikasi ditangguhkan oleh Administrator.')}>
-                      {pendingAction === 'status-PENDING' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menonaktifkan...</> : 'Tangguhkan Mitra'}
-                    </button>
-                  ) : (
+                  ) : selectedProvider.status !== 'APPROVED' ? (
                     <button className="action-btn approve-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-APPROVED'} onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED', 'Mitra diaktifkan kembali oleh Administrator.')}>
                       {pendingAction === 'status-APPROVED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyetujui...</> : 'Setujui Mitra'}
                     </button>
-                  )}
-                  <button className="action-btn delete-btn" disabled={actionBusy} aria-busy={pendingAction === 'delete'} onClick={() => handleDeleteProvider(selectedProvider.id)}>
-                    {pendingAction === 'delete' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menonaktifkan...</> : 'Nonaktifkan Permanen'}
+                  ) : null}
+                  <button className="action-btn delete-btn" disabled={actionBusy || selectedProvider.status === 'DISABLED'} aria-busy={pendingAction === 'delete'} onClick={() => handleDeleteProvider(selectedProvider.id)}>
+                    {pendingAction === 'delete' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menonaktifkan...</> : 'Nonaktifkan Provider'}
                   </button>
                 </div>
 

@@ -383,10 +383,7 @@ func ensureEmailAvailable(tx *gorm.DB, email string) error {
 }
 
 func loginStatusAllowed(provider *models.Provider) bool {
-	if provider.Role == "PROVIDER" {
-		return provider.Status == "PENDING" || provider.Status == "APPROVED"
-	}
-	return provider.Status == "APPROVED"
+	return provider.CanAuthenticate()
 }
 
 func hashResetToken(secret string, userID uint, token string) string {

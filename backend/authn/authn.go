@@ -217,13 +217,7 @@ func Authenticate(ctx context.Context, db *gorm.DB, token string) (*Principal, e
 }
 
 func accountMayAuthenticate(provider *models.Provider) bool {
-	if provider == nil {
-		return false
-	}
-	if provider.Role == "PROVIDER" {
-		return provider.Status == "PENDING" || provider.Status == "APPROVED"
-	}
-	return provider.Status == "APPROVED"
+	return provider.CanAuthenticate()
 }
 
 func RevokeSession(ctx context.Context, db *gorm.DB, token string) error {
