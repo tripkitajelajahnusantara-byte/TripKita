@@ -9,7 +9,7 @@ import { TripImage, PhotoPlaceholder } from '../components/TripImage';
 import { getTripImages } from '../utils/tripImages';
 import { Skeleton } from '../components/Skeleton';
 import {
-  formatMeetingPointCoordinates,
+  getMeetingPointAddress,
   getMeetingPointCoordinates,
   MeetingPointMap,
 } from '../components/MeetingPointMap';
@@ -157,14 +157,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const pkg = selectedPackageForDetail || {};
 
-  const getSpecificMeetingPoint = (pkgObj: any) => {
-    if (pkgObj && pkgObj.meetingPoint && pkgObj.meetingPoint.trim().length > 3) {
-      return pkgObj.meetingPoint.trim();
-    }
-    return '';
-  };
-
-  const activeMeetingPoint = getSpecificMeetingPoint(pkg);
+  const activeMeetingPoint = getMeetingPointAddress(pkg);
   const activeMeetingPointCoordinates = getMeetingPointCoordinates(pkg);
 
   const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
@@ -853,10 +846,12 @@ export const CustomerPackageDetailPage: React.FC = () => {
               </h2>
               {activeMeetingPointCoordinates ? (
                 <>
-                  <p style={{ fontSize: '14px', color: '#334155', marginBottom: '16px', lineHeight: '1.6' }}>
-                    <MapPin size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />
-                    <strong>{formatMeetingPointCoordinates(activeMeetingPointCoordinates)}</strong>
-                  </p>
+                  {activeMeetingPoint && (
+                    <p style={{ fontSize: '14px', color: '#334155', marginBottom: '16px', lineHeight: '1.6' }}>
+                      <MapPin size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />
+                      <strong>{activeMeetingPoint}</strong>
+                    </p>
+                  )}
                   <MeetingPointMap position={activeMeetingPointCoordinates} height={300} />
                   <a
                     href={`https://www.google.com/maps?q=${activeMeetingPointCoordinates.lat},${activeMeetingPointCoordinates.lng}`}
@@ -868,8 +863,9 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   </a>
                 </>
               ) : activeMeetingPoint ? (
-                <p style={{ fontSize: '14px', color: '#b45309', margin: 0 }}>
-                  Paket lama ini belum memiliki koordinat pin. Provider perlu memilih ulang titik kumpul pada peta.
+                <p style={{ fontSize: '14px', color: '#334155', margin: 0, lineHeight: '1.6' }}>
+                  <MapPin size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />
+                  <strong>{activeMeetingPoint}</strong>
                 </p>
               ) : (
                 <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>Titik kumpul belum dilengkapi oleh provider.</p>

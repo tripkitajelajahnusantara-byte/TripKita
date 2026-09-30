@@ -9,7 +9,7 @@ import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsCont
 import { Skeleton } from '../components/Skeleton';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import {
-  formatMeetingPointCoordinates,
+  getMeetingPointAddress,
   getMeetingPointCoordinates,
   MeetingPointMap,
 } from '../components/MeetingPointMap';
@@ -96,6 +96,7 @@ export const CustomerConfirmationPage: React.FC = () => {
 
   const pkg = selectedPackageForDetail;
   const meetingPointCoordinates = getMeetingPointCoordinates(pkg);
+  const meetingPointAddress = getMeetingPointAddress(pkg);
   const { pemesan, peserta } = bookingFormData;
   const guestsCount = peserta.length;
   const selectedAddOns = pkg.selectedAddOns || bookingFormData?.selectedAddOns || [];
@@ -331,9 +332,11 @@ export const CustomerConfirmationPage: React.FC = () => {
               <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px' }}>
                 Titik Kumpul
               </h2>
-              <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 14px' }}>
-                Koordinat: <strong style={{ color: '#334155' }}>{formatMeetingPointCoordinates(meetingPointCoordinates)}</strong>
-              </p>
+              {meetingPointAddress && (
+                <p style={{ fontSize: '13px', color: '#334155', margin: '0 0 14px', lineHeight: 1.6 }}>
+                  <strong>{meetingPointAddress}</strong>
+                </p>
+              )}
               <MeetingPointMap position={meetingPointCoordinates} height={220} />
               <a
                 href={`https://www.google.com/maps?q=${meetingPointCoordinates.lat},${meetingPointCoordinates.lng}`}

@@ -6,7 +6,7 @@ import { ArrowLeft, User, Mail, Calendar, Users, ShieldAlert, CheckCircle2, Aler
 import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
 import { isValidIndonesianMobilePhone, normalizeIndonesianPhone } from '../utils/phone';
 import {
-  formatMeetingPointCoordinates,
+  getMeetingPointAddress,
   getMeetingPointCoordinates,
   MeetingPointMap,
 } from '../components/MeetingPointMap';
@@ -202,6 +202,7 @@ export const CustomerBookingPage: React.FC = () => {
   const packageMinAge = Number(pkg.minAge) > 0 ? Number(pkg.minAge) : 0;
   const packageMaxAge = Number(pkg.maxAge) > 0 ? Number(pkg.maxAge) : 0;
   const meetingPointCoordinates = getMeetingPointCoordinates(pkg);
+  const meetingPointAddress = getMeetingPointAddress(pkg);
   const selectedAddOns = pkg.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
   const totalCost = (pkg.price * guestsCount) + addOnsTotal + (serviceFee || 0);
@@ -737,13 +738,15 @@ export const CustomerBookingPage: React.FC = () => {
               </div>
             </div>
 
-            {meetingPointCoordinates && (
+            {(meetingPointCoordinates || meetingPointAddress) && (
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginBottom: '18px' }}>
                 <strong style={{ display: 'block', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>Titik Kumpul</strong>
-                <span style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
-                  {formatMeetingPointCoordinates(meetingPointCoordinates)}
-                </span>
-                <MeetingPointMap position={meetingPointCoordinates} height={180} zoom={15} />
+                {meetingPointAddress && (
+                  <span style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '10px', lineHeight: 1.5 }}>
+                    {meetingPointAddress}
+                  </span>
+                )}
+                {meetingPointCoordinates && <MeetingPointMap position={meetingPointCoordinates} height={180} zoom={15} />}
               </div>
             )}
 

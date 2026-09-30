@@ -1487,6 +1487,9 @@ export const AdminDashboardPage: React.FC = () => {
                                   <span style={{ fontWeight: '700', color: '#0369a1' }}>
                                     {p.type === 'DP_50' ? 'Uang Muka (DP 50%)' : 'Pelunasan (50%)'}
                                   </span>
+                                  <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>
+                                    {p.booking?.bookingCode ? `Trip ${p.booking.bookingCode}` : 'Pengajuan gabungan (lama)'}
+                                  </span>
                                 </td>
                                 <td style={{ fontWeight: '800', color: '#0284c7' }}>
                                   {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(p.amount)}
@@ -1536,7 +1539,14 @@ export const AdminDashboardPage: React.FC = () => {
                                       </button>
                                     </div>
                                   ) : (
-                                    <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Telah Diproses</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Telah Diproses</span>
+                                      {p.proofPath && (
+                                        <button type="button" onClick={() => openProtectedDocument('admin', p.proofPath).catch((err) => setError(err.message))} style={{ padding: 0, background: 'none', border: 'none', color: '#0284c7', fontSize: '12px', fontWeight: 700, cursor: 'pointer', textAlign: 'left', textDecoration: 'underline' }}>
+                                          Lihat bukti transfer
+                                        </button>
+                                      )}
+                                    </div>
                                   )}
                                 </td>
                               </tr>

@@ -60,6 +60,9 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 	if req.Type != "DP_50" && req.Type != "PELUNASAN_50" {
 		return nil, errors.New("jenis pencairan tidak valid")
 	}
+	if req.BookingID == nil || *req.BookingID == 0 {
+		return nil, errors.New("pilih booking/trip yang akan dicairkan")
+	}
 
 	// Validate bank details exist
 	bankName := provider.BankName
@@ -97,17 +100,30 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 		if err != nil {
 			return err
 		}
+		stage, found := findBookingPayoutStage(lockedSummary.Bookings, *req.BookingID, req.Type)
+		if !found {
+			return errors.New("booking payout tidak valid")
+		}
+		switch stage.Status {
+		case models.BookingPayoutAvailable:
+		case models.BookingPayoutLocked:
+			return errors.New("pelunasan trip ini baru dapat dicairkan setelah tanggal trip selesai")
+		case models.BookingPayoutRequested:
+			return errors.New("pencairan tahap ini untuk trip tersebut sedang diproses admin")
+		case models.BookingPayoutPaid:
+			return errors.New("tahap pencairan ini untuk trip tersebut sudah dicairkan")
+		default:
+			return errors.New("trip ini tidak memiliki saldo yang dapat dicairkan")
+		}
+		if req.Amount != stage.Remaining {
+			return errors.New("nominal pencairan berubah; muat ulang halaman keuangan lalu ajukan kembali")
+		}
+		// Piutang refund dari transaksi lain tetap harus tertutup lebih dahulu.
 		if req.Type == "PELUNASAN_50" && req.Amount > lockedSummary.AvailablePelunasan {
 			return errors.New("pencairan pelunasan belum tersedia atau saldo tidak mencukupi")
 		}
 		if req.Type == "DP_50" && req.Amount > lockedSummary.AvailableDP {
 			return errors.New("saldo DP belum mencukupi untuk dicairkan")
-		}
-		if req.BookingID != nil {
-			var count int64
-			if err := tx.Model(&models.Booking{}).Where("id = ? AND provider_id = ?", *req.BookingID, providerID).Count(&count).Error; err != nil || count != 1 {
-				return fmt.Errorf("booking payout tidak valid")
-			}
 		}
 		return tx.Create(payout).Error
 	})
@@ -298,6 +314,7 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 		TotalPaidOut:       totalPaidOut,
 		PendingPayout:      pendingPayout,
 		Payouts:            payouts,
+		Bookings:           buildBookingPayouts(bookings, payouts, now),
 		LedgerAvailable:    ledger.Available,
 		LedgerHeld:         ledger.Held,
 		ProviderDebt:       ledger.Debt,
@@ -607,10 +624,23 @@ func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error)
 		}
 	}
 	dpAvailable, settlementAvailable := calculatePayoutAvailability(dpEligible, settlementEligible, dpReserved, settlementReserved)
+	available := settlementAvailable
 	if current.Type == "DP_50" {
-		return dpAvailable, nil
+		available = dpAvailable
 	}
-	return settlementAvailable, nil
+
+	// Pencairan per trip: nominal juga dibatasi sisa hak booking itu sendiri,
+	// misalnya bila booking direfund setelah pengajuan dibuat.
+	if current.BookingID != nil {
+		stage, found := findBookingPayoutStage(buildBookingPayouts(bookings, reserved, now), *current.BookingID, current.Type)
+		if !found || stage.Status == models.BookingPayoutLocked {
+			return 0, nil
+		}
+		if stage.Remaining < available {
+			available = stage.Remaining
+		}
+	}
+	return available, nil
 }
 
 // debitProviderBalanceTx mengurangi saldo tersedia provider saat pencairan

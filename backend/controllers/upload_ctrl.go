@@ -150,6 +150,18 @@ func (ctrl *UploadController) serveDocument(c *gin.Context, providerID *uint) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dokumen tidak dapat diperiksa"})
 		return
 	}
+	if count == 0 {
+		// Bukti transfer pencairan yang diunggah admin boleh dilihat mitra
+		// penerima payout tersebut.
+		payoutQuery := ctrl.db.Model(&models.Payout{}).Where("proof_path = ?", documentPath)
+		if providerID != nil {
+			payoutQuery = payoutQuery.Where("provider_id = ?", *providerID)
+		}
+		if err := payoutQuery.Count(&count).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Dokumen tidak dapat diperiksa"})
+			return
+		}
+	}
 	if count == 0 && providerID == nil {
 		if err := ctrl.db.Model(&models.Booking{}).Where("payment_proof = ?", documentPath).Count(&count).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Dokumen tidak dapat diperiksa"})

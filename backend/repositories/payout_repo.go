@@ -33,7 +33,7 @@ func (r *payoutRepository) GetByProviderID(providerID uint) ([]models.Payout, er
 
 func (r *payoutRepository) GetAll() ([]models.Payout, error) {
 	var payouts []models.Payout
-	err := r.db.Preload("Provider").Order("id desc").Find(&payouts).Error
+	err := r.db.Preload("Provider").Preload("Booking").Order("id desc").Find(&payouts).Error
 	return payouts, err
 }
 

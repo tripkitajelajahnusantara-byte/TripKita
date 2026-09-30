@@ -36,6 +36,15 @@ export const getMeetingPointCoordinates = (pkg: any): MeetingPointCoordinates | 
   return isValidMeetingPointCoordinates(legacyLat, legacyLng) ? { lat: legacyLat, lng: legacyLng } : null;
 };
 
+// Alamat teks titik kumpul untuk customer. Data lama yang menyimpan koordinat
+// di kolom teks tidak dianggap alamat agar customer tidak melihat angka mentah.
+export const getMeetingPointAddress = (pkg: any): string => {
+  const address = String(pkg?.meetingPoint || '').trim();
+  if (!address) return '';
+  if (/^(?:lat\s*:\s*)?-?\d+(?:\.\d+)?\s*[,;]\s*(?:lng\s*:\s*)?-?\d+(?:\.\d+)?$/i.test(address)) return '';
+  return address;
+};
+
 export const formatMeetingPointCoordinates = ({ lat, lng }: MeetingPointCoordinates) =>
   `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 
