@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ type PayoutService interface {
 	RequestPayout(providerID uint, req *models.CreatePayoutRequest) (*models.Payout, error)
 	GetProviderPayoutSummary(providerID uint) (*models.PayoutSummary, error)
 	GetAllPayouts() ([]models.Payout, error)
+	GetPlatformRevenue(from, to time.Time) (*models.PlatformRevenueReport, error)
 	ProcessPayout(payoutID uint, status string, notes string, proofPath string) (*models.Payout, error)
 	HandlePayoutCallback(payoutID string, referenceID string, status string, failureCode string) error
 	ReconcileProcessingPayouts(ctx context.Context)
@@ -332,6 +334,84 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 		ProviderDebt:       ledger.Debt,
 		LedgerConsistent:   ledger.Available == expectedAvailable && ledger.Held == heldSettlement && ledger.Debt == expectedDebt,
 	}, nil
+}
+
+func (s *payoutService) GetPlatformRevenue(from, to time.Time) (*models.PlatformRevenueReport, error) {
+	bookings, err := s.bookingRepo.FindPlatformRevenueBookings(from, to)
+	if err != nil {
+		return nil, err
+	}
+	report := buildPlatformRevenueReport(bookings, time.Now())
+	return &report, nil
+}
+
+// buildPlatformRevenueReport memakai aturan yang sama dengan menu Keuangan
+// mitra: booking yang menghasilkan hak mitra juga menghasilkan potongan
+// platform, dan booking yang direfund penuh tidak menghasilkan keduanya.
+func buildPlatformRevenueReport(bookings []models.Booking, now time.Time) models.PlatformRevenueReport {
+	report := models.PlatformRevenueReport{Months: []models.PlatformRevenueMonth{}, Items: []models.PlatformRevenueItem{}}
+	monthIndex := map[string]int{}
+	for _, b := range bookings {
+		if !bookingGeneratesProviderEarning(b) {
+			continue
+		}
+		split := models.SplitBookingEarning(b.TotalPrice, b.PlatformFeePercent)
+		paidAt := b.CreatedAt
+		if b.PaidAt != nil {
+			paidAt = *b.PaidAt
+		}
+		status := models.PlatformRevenuePending
+		if settlementCanBePaid(b, now) {
+			status = models.PlatformRevenueRealized
+		}
+
+		report.Items = append(report.Items, models.PlatformRevenueItem{
+			BookingID:          b.ID,
+			BookingCode:        b.BookingCode,
+			ProviderID:         b.ProviderID,
+			ProviderName:       b.ProviderName,
+			PackageName:        b.Package.Name,
+			CustomerName:       b.CustomerName,
+			Guests:             b.Guests,
+			BookingStatus:      b.Status,
+			PaidAt:             paidAt,
+			TripDate:           b.TripDate,
+			TripEndDate:        b.TripEndDate,
+			TotalPaid:          b.TotalPrice,
+			PlatformFeePercent: models.NormalizePlatformFeePercent(b.PlatformFeePercent),
+			ServiceFee:         split.ServiceFee,
+			Commission:         split.PlatformFee - split.ServiceFee,
+			PlatformRevenue:    split.PlatformFee,
+			ProviderNet:        split.NetEarning,
+			RevenueStatus:      status,
+		})
+		report.TotalRevenue += split.PlatformFee
+		report.ServiceFeeTotal += split.ServiceFee
+		report.CommissionTotal += split.PlatformFee - split.ServiceFee
+		report.GrossPaid += b.TotalPrice
+		report.ProviderNetTotal += split.NetEarning
+		report.BookingCount++
+
+		month := paidAt.In(models.BookingLocation).Format("2006-01")
+		i, ok := monthIndex[month]
+		if !ok {
+			i = len(report.Months)
+			monthIndex[month] = i
+			report.Months = append(report.Months, models.PlatformRevenueMonth{Month: month})
+		}
+		report.Months[i].Revenue += split.PlatformFee
+		report.Months[i].Bookings++
+		if status == models.PlatformRevenueRealized {
+			report.RealizedRevenue += split.PlatformFee
+			report.Months[i].Realized += split.PlatformFee
+		} else {
+			report.PendingRevenue += split.PlatformFee
+			report.Months[i].Pending += split.PlatformFee
+		}
+	}
+	sort.SliceStable(report.Months, func(i, j int) bool { return report.Months[i].Month > report.Months[j].Month })
+	sort.SliceStable(report.Items, func(i, j int) bool { return report.Items[i].PaidAt.After(report.Items[j].PaidAt) })
+	return report
 }
 
 func bookingGeneratesProviderEarning(booking models.Booking) bool {

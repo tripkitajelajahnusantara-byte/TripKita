@@ -60,6 +60,25 @@ export const MeetingPointMapViewport: React.FC<{
   return null;
 };
 
+/** Area hasil pencarian; bounds berurutan [selatan, utara, barat, timur]. */
+export interface MeetingPointMapFocus extends MeetingPointCoordinates {
+  bounds?: [number, number, number, number];
+}
+
+// Mengarahkan peta ke hasil pencarian tanpa menaruh pin, sehingga pengguna
+// tetap memilih titik kumpul persis sendiri.
+export const MeetingPointMapFocusView: React.FC<{ focus: MeetingPointMapFocus | null }> = ({ focus }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!focus) return;
+    if (focus.bounds) {
+      const [south, north, west, east] = focus.bounds;
+      map.fitBounds([[south, west], [north, east]], { maxZoom: 18 });
+    } else map.setView([focus.lat, focus.lng], 17);
+  }, [map, focus]);
+  return null;
+};
+
 export const MeetingPointMap: React.FC<{
   position: MeetingPointCoordinates;
   height?: number;

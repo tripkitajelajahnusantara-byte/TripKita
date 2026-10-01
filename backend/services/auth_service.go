@@ -48,6 +48,12 @@ type AuthInputError struct{ Message string }
 
 func (e *AuthInputError) Error() string { return e.Message }
 
+// ErrAccountDisabled hanya dikembalikan setelah password terbukti benar,
+// sehingga status akun tidak bocor ke pihak yang tidak mengetahui password.
+// Tanpa pesan ini, akun nonaktif yang baru reset password terlihat seperti
+// password barunya ditolak.
+var ErrAccountDisabled = errors.New("akun ini sedang dinonaktifkan oleh admin TemenTrip. Hubungi tim TemenTrip untuk mengaktifkannya kembali")
+
 func NewAuthService(db *gorm.DB, repo repositories.ProviderRepository, cfg *config.Config, emailService *EmailService, notifService *NotificationService) AuthService {
 	_ = dummyPasswordHash()
 	return &authService{db: db, repo: repo, cfg: cfg, emailService: emailService, notifService: notifService}
@@ -195,6 +201,7 @@ func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 	var user models.User
 	var provider models.Provider
 	invalidCredentials := false
+	accountDisabled := false
 	now := time.Now().UTC()
 	loginErr := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("LOWER(email) = LOWER(?)", req.Email).First(&user).Error; err != nil {
@@ -235,7 +242,7 @@ func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 			return nil
 		}
 		if !loginStatusAllowed(&provider) {
-			invalidCredentials = true
+			accountDisabled = true
 			return nil
 		}
 
@@ -258,6 +265,9 @@ func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 	}
 	if invalidCredentials {
 		return nil, &AuthInputError{Message: "login tidak berhasil; periksa email dan password atau coba lagi nanti"}
+	}
+	if accountDisabled {
+		return nil, ErrAccountDisabled
 	}
 
 	tokenString, err := authn.IssueSession(context.Background(), s.db, user.ID)
@@ -358,7 +368,7 @@ func (s *authService) ResetPassword(email string, otp string, newPassword string
 		return authn.RevokeAllUserSessions(context.Background(), tx, user.ID)
 	})
 	if invalidToken {
-		return &AuthInputError{Message: "invalid or expired reset token"}
+		return &AuthInputError{Message: "kode OTP salah atau sudah kedaluwarsa. Minta kode baru bila perlu"}
 	}
 	return err
 }

@@ -79,12 +79,13 @@ func ProviderRequired() gin.HandlerFunc {
 }
 
 // ProviderAccountRequired opens only onboarding/profile routes while a
-// provider is pending. Operational routes still require full approval.
+// provider is pending or was rejected (to fix documents). Operational routes
+// still require full approval.
 func ProviderAccountRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, roleOK := c.Get("role")
 		status, statusOK := c.Get("account_status")
-		if !roleOK || !statusOK || role != "PROVIDER" || (status != "PENDING" && status != "APPROVED") {
+		if !roleOK || !statusOK || role != "PROVIDER" || (status != "PENDING" && status != "APPROVED" && status != "REJECTED") {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Forbidden: Provider account required"})
 			return
 		}

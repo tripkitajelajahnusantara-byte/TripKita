@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { Check, Upload, ArrowRight, ArrowLeft, LoaderCircle } from 'lucide-react';
+import { Check, Upload, ArrowRight, ArrowLeft, LoaderCircle, CalendarCheck, MapPin } from 'lucide-react';
 import { PROVINCES, CITIES_BY_PROVINCE } from '../utils/locationData';
 import { API_BASE_URL } from '../utils/api';
 
@@ -160,16 +160,143 @@ const REGISTER_PAGE_CSS = `
           min-height: calc(100vh - 80px);
         }
 
+        /* Sticky agar judul dan kartu contoh tetap terlihat saat form panjang di-scroll. */
         .register-sidebar {
-          background: linear-gradient(135deg, rgba(9, 44, 46, 0.96) 0%, rgba(15, 23, 42, 0.94) 100%), 
-                      url('https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1200&q=80');
+          position: sticky;
+          top: 80px;
+          align-self: start;
+          height: calc(100vh - 80px);
+          overflow-y: auto;
+          background:
+            radial-gradient(circle at 90% 10%, rgba(0, 123, 255, 0.22), transparent 45%),
+            linear-gradient(160deg, rgba(9, 44, 46, 0.9) 0%, rgba(15, 23, 42, 0.94) 100%),
+            url('https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1200&q=80');
           background-size: cover;
           background-position: center;
           color: #ffffff;
-          padding: 48px;
+          padding: 36px 48px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
+          gap: 28px;
+        }
+
+        .sidebar-eyebrow {
+          display: inline-block;
+          margin-bottom: 14px;
+          padding: 5px 12px;
+          border-radius: 999px;
+          background: rgba(94, 234, 212, 0.12);
+          border: 1px solid rgba(94, 234, 212, 0.3);
+          color: #5eead4;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .sidebar-preview {
+          margin: 0 0 24px;
+          max-width: 380px;
+        }
+
+        .sidebar-preview-card {
+          display: flex;
+          gap: 14px;
+          padding: 10px;
+          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.96);
+          box-shadow: 0 18px 40px rgba(2, 8, 23, 0.35);
+          color: var(--color-primary-dark);
+        }
+
+        .sidebar-preview-card img {
+          flex-shrink: 0;
+          width: 112px;
+          height: 104px;
+          border-radius: 12px;
+          object-fit: cover;
+        }
+
+        .sidebar-preview-body {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          min-width: 0;
+          padding: 2px 0;
+        }
+
+        .sidebar-preview-chip {
+          align-self: flex-start;
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: var(--color-accent-light);
+          color: #0369a1;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .sidebar-preview-body strong {
+          font-size: 14.5px;
+        }
+
+        .sidebar-preview-body small,
+        .sidebar-preview-row span {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 12px;
+          color: var(--color-text-medium);
+        }
+
+        .sidebar-preview-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px 12px;
+          margin-top: auto;
+        }
+
+        .sidebar-preview-row b {
+          color: var(--color-accent);
+        }
+
+        .sidebar-preview figcaption {
+          margin-top: 8px;
+          font-size: 11.5px;
+          color: rgba(255, 255, 255, 0.55);
+        }
+
+        .sidebar-steps {
+          list-style: none;
+          margin: 0;
+          padding: 16px 0 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.12);
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px 20px;
+          font-size: 13px;
+          color: rgba(255, 255, 255, 0.8);
+        }
+
+        .sidebar-steps li {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .sidebar-steps span {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.12);
+          font-size: 11px;
+          font-weight: 700;
+          color: #ffffff;
+        }
+
+        @media (max-height: 780px) {
+          .sidebar-preview { display: none; }
         }
 
         .sidebar-logo .logo-brand {
@@ -207,12 +334,8 @@ const REGISTER_PAGE_CSS = `
           border-radius: 20px; 
         }
 
-        .sidebar-content {
-          margin-top: 40px;
-        }
-
         .sidebar-title {
-          font-size: 36px;
+          font-size: 34px;
           color: #ffffff;
           line-height: 1.2;
           margin-bottom: 16px;
@@ -223,10 +346,10 @@ const REGISTER_PAGE_CSS = `
         }
 
         .sidebar-subtitle {
-          color: var(--color-text-light);
+          color: rgba(255, 255, 255, 0.72);
           font-size: 14px;
           line-height: 1.6;
-          margin-bottom: 32px;
+          margin-bottom: 24px;
           max-width: 440px;
         }
 
@@ -234,8 +357,7 @@ const REGISTER_PAGE_CSS = `
           list-style: none;
           display: flex;
           flex-direction: column;
-          gap: 16px;
-          margin-bottom: 48px;
+          gap: 12px;
         }
 
         .benefits-checklist li {
@@ -245,10 +367,11 @@ const REGISTER_PAGE_CSS = `
         }
 
         .chk-icon {
+          flex-shrink: 0;
           width: 22px;
           height: 22px;
           border-radius: 50%;
-          background: rgba(0, 168, 150, 0.15);
+          background: rgba(94, 234, 212, 0.14);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -263,6 +386,7 @@ const REGISTER_PAGE_CSS = `
           display: flex;
           align-items: center;
           justify-content: center;
+          min-height: calc(100vh - 80px);
           padding: 48px;
         }
 
@@ -585,6 +709,71 @@ const REGISTER_PAGE_CSS = `
         }
       `;
 
+const SIDEBAR_BENEFITS = [
+  'Pendaftaran gratis, potongan hanya dari transaksi',
+  'Booking dan pembayaran traveler tercatat di satu dashboard',
+  'Pencairan dua tahap: 50% sebelum trip, sisanya setelah trip selesai',
+];
+
+const SIDEBAR_STEPS = ['Isi data usaha', 'Verifikasi dokumen', 'Mulai jual paket'];
+
+// Panel kiri tetap terlihat saat form di-scroll. Kartu paket hanya contoh
+// tampilan dan diberi keterangan agar tidak terbaca sebagai data nyata.
+const RegisterSidebar: React.FC = () => (
+  <aside className="register-sidebar">
+    <div className="sidebar-logo">
+      <span className="logo-brand">
+        <span className="register-logo-surface">
+          <img className="register-brand-logo" src="/tementrip_official_logo.png" alt="TemenTrip" />
+        </span>
+        <span className="logo-badge">Mitra</span>
+      </span>
+    </div>
+
+    <div className="sidebar-content">
+      <span className="sidebar-eyebrow">Daftar gratis</span>
+      <h2 className="sidebar-title">
+        Bawa trip Anda ke <br />
+        <span>lebih banyak traveler</span>
+      </h2>
+      <p className="sidebar-subtitle">
+        Lengkapi data usaha dan dokumen legalitas. Setelah diverifikasi tim TemenTrip, paket Anda siap tayang dan menerima booking.
+      </p>
+
+      <figure className="sidebar-preview">
+        <div className="sidebar-preview-card">
+          <img src="https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=560&q=75" alt="Gunung Bromo saat matahari terbit" />
+          <div className="sidebar-preview-body">
+            <span className="sidebar-preview-chip">Open Trip</span>
+            <strong>Bromo Sunrise 2H1M</strong>
+            <small><MapPin size={12} aria-hidden="true" /> Probolinggo, Jawa Timur</small>
+            <div className="sidebar-preview-row">
+              <span>mulai <b>Rp450.000</b></span>
+              <span><CalendarCheck size={12} aria-hidden="true" /> 9/12 kursi</span>
+            </div>
+          </div>
+        </div>
+        <figcaption>Contoh tampilan paket Anda di TemenTrip</figcaption>
+      </figure>
+
+      <ul className="benefits-checklist">
+        {SIDEBAR_BENEFITS.map((benefit) => (
+          <li key={benefit}>
+            <div className="chk-icon"><Check size={14} color="#5eead4" /></div>
+            <span>{benefit}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <ol className="sidebar-steps">
+      {SIDEBAR_STEPS.map((step, index) => (
+        <li key={step}><span>{index + 1}</span>{step}</li>
+      ))}
+    </ol>
+  </aside>
+);
+
 export const RegisterPage: React.FC = () => {
   const { 
     registerStep, 
@@ -755,27 +944,7 @@ export const RegisterPage: React.FC = () => {
       <div className="register-container animate-fade-in">
         <style>{REGISTER_PAGE_CSS}</style>
         <div className="register-grid-layout">
-          {/* Left Info Sidebar */}
-          <div className="register-sidebar">
-            <div className="sidebar-logo">
-              <span className="logo-brand">
-                <span className="register-logo-surface">
-                  <img className="register-brand-logo" src="/tementrip_official_logo.png" alt="TemenTrip" />
-                </span>
-                <span className="logo-badge">Mitra</span>
-              </span>
-            </div>
-
-            <div className="sidebar-content">
-              <h2 className="sidebar-title">
-                Daftar sebagai <br />
-                <span>mitra TemenTrip</span>
-              </h2>
-              <p className="sidebar-subtitle">
-                Isi data usaha dan unggah dokumen legalitas. Admin TemenTrip memverifikasi akun Anda sebelum paket bisa dipublikasikan.
-              </p>
-            </div>
-          </div>
+          <RegisterSidebar />
 
           {/* Right Success Screen */}
           <div className="register-form-area" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -809,46 +978,7 @@ export const RegisterPage: React.FC = () => {
   return (
     <div className="register-container animate-fade-in">
       <div className="register-grid-layout">
-        {/* Left Info Sidebar */}
-        <div className="register-sidebar">
-          <div className="sidebar-logo">
-            <span className="logo-brand">
-              <span className="register-logo-surface">
-                <img className="register-brand-logo" src="/tementrip_official_logo.png" alt="TemenTrip" />
-              </span>
-              <span className="logo-badge">Mitra</span>
-            </span>
-          </div>
-
-          <div className="sidebar-content">
-            <h2 className="sidebar-title">
-              Daftar sebagai <br />
-              <span>mitra TemenTrip</span>
-            </h2>
-            <p className="sidebar-subtitle">
-              Isi data usaha dan unggah dokumen legalitas. Admin TemenTrip memverifikasi akun Anda sebelum paket bisa dipublikasikan.
-            </p>
-
-            <ul className="benefits-checklist">
-              <li>
-                <div className="chk-icon"><Check size={14} color="#00a896" /></div>
-                <span>Akun diverifikasi admin sebelum paket tayang</span>
-              </li>
-              <li>
-                <div className="chk-icon"><Check size={14} color="#00a896" /></div>
-                <span>Customer transfer dan mengunggah bukti pembayaran</span>
-              </li>
-              <li>
-                <div className="chk-icon"><Check size={14} color="#00a896" /></div>
-                <span>Pencairan dua tahap: DP 50% setelah pembayaran, pelunasan setelah trip selesai</span>
-              </li>
-              <li>
-                <div className="chk-icon"><Check size={14} color="#00a896" /></div>
-                <span>Setiap pencairan ditransfer manual dengan bukti transfer</span>
-              </li>
-            </ul>
-          </div>
-        </div>
+        <RegisterSidebar />
 
         {/* Right Form Container */}
         <div className="register-form-area">

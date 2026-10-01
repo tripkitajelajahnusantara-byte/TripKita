@@ -107,11 +107,14 @@ type ProviderStatusHistory struct {
 	CreatedAt  time.Time `json:"createdAt"`
 }
 
+// CanAuthenticate menentukan siapa yang boleh memiliki sesi. Mitra yang
+// ditolak tetap boleh masuk agar dapat membaca catatan admin dan memperbaiki
+// dokumen; rute operasional tetap mewajibkan status APPROVED.
 func (p *Provider) CanAuthenticate() bool {
 	if p == nil || p.DeletedAt != nil {
 		return false
 	}
-	return p.Status == "APPROVED" || (p.Role == "PROVIDER" && p.Status == "PENDING")
+	return p.Status == "APPROVED" || (p.Role == "PROVIDER" && (p.Status == "PENDING" || p.Status == "REJECTED"))
 }
 
 type UpdateProviderStatusRequest struct {

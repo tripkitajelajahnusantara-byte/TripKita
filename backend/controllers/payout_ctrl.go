@@ -1,10 +1,12 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 	"tripkita-provider/config"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
@@ -145,6 +147,45 @@ func (ctrl *PayoutController) AdminGetAllPayouts(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, payouts)
+}
+
+// AdminGetPlatformRevenue menampilkan penghasilan TemenTrip (biaya layanan +
+// komisi) per booking. Query from/to opsional berformat YYYY-MM-DD (WIB) dan
+// keduanya inklusif.
+func (ctrl *PayoutController) AdminGetPlatformRevenue(c *gin.Context) {
+	from, to, err := parseRevenuePeriod(c.Query("from"), c.Query("to"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	report, err := ctrl.service.GetPlatformRevenue(from, to)
+	if err != nil {
+		respondInternalError(c, "memuat penghasilan platform", err)
+		return
+	}
+	c.JSON(http.StatusOK, report)
+}
+
+func parseRevenuePeriod(fromParam, toParam string) (time.Time, time.Time, error) {
+	var from, to time.Time
+	if fromParam != "" {
+		parsed, err := time.ParseInLocation("2006-01-02", fromParam, models.BookingLocation)
+		if err != nil {
+			return from, to, errors.New("tanggal awal harus berformat YYYY-MM-DD")
+		}
+		from = parsed
+	}
+	if toParam != "" {
+		parsed, err := time.ParseInLocation("2006-01-02", toParam, models.BookingLocation)
+		if err != nil {
+			return from, to, errors.New("tanggal akhir harus berformat YYYY-MM-DD")
+		}
+		to = parsed.AddDate(0, 0, 1)
+	}
+	if !from.IsZero() && !to.IsZero() && !from.Before(to) {
+		return from, to, errors.New("tanggal awal tidak boleh setelah tanggal akhir")
+	}
+	return from, to, nil
 }
 
 type ProcessPayoutRequest struct {

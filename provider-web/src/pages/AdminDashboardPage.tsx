@@ -19,13 +19,15 @@ import {
   ArrowRight,
   DollarSign,
   Wallet,
-  LoaderCircle
+  LoaderCircle,
+  TrendingUp
 } from 'lucide-react';
 import { getProtectedDocumentURL, openProtectedDocument, request } from '../utils/api';
 import { NotificationCenter, type NotificationItem } from '../components/NotificationCenter';
 import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
 import { useActionLock } from '../utils/useActionLock';
 import { Skeleton, SkeletonTable } from '../components/Skeleton';
+import { AdminRevenuePanel } from '../components/AdminRevenuePanel';
 
 
 interface ProviderAdminData {
@@ -156,7 +158,7 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 export const AdminDashboardPage: React.FC = () => {
   const { providerProfile, logout, navigateTo } = useNavigation();
   const [providers, setProviders] = useState<ProviderAdminData[]>([]);
-  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider'>('kelola-provider');
+  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider' | 'penghasilan-platform'>('kelola-provider');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Semua Kategori');
   const [cityFilter, setCityFilter] = useState('Semua Kota');
@@ -227,13 +229,6 @@ export const AdminDashboardPage: React.FC = () => {
   const [proofPreview, setProofPreview] = useState<{ url: string; isPdf: boolean } | null>(null);
   const [proofPreviewLoading, setProofPreviewLoading] = useState(false);
   const proofRequestRef = React.useRef(0);
-  // Kunci scroll halaman selama modal verifikasi terbuka.
-  useEffect(() => {
-    if (!paymentReviewTarget) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previous; };
-  }, [paymentReviewTarget]);
 
   // Admin Payout States
   const [adminPayouts, setAdminPayouts] = useState<any[]>([]);
@@ -410,6 +405,9 @@ export const AdminDashboardPage: React.FC = () => {
     setPaymentReviewError('');
   };
 
+  // Satu-satunya kunci scroll modal verifikasi. Dua effect yang sama-sama
+  // mengunci saling menyimpan "hidden" sebagai nilai awal, sehingga halaman
+  // tetap tidak bisa di-scroll setelah modal ditutup.
   useEffect(() => {
     if (!paymentReviewTarget) return;
     const previousOverflow = document.body.style.overflow;
@@ -1022,6 +1020,12 @@ export const AdminDashboardPage: React.FC = () => {
             >
               <Wallet size={18} /> Pencairan Dana Provider
             </button>
+            <button
+              className={`menu-btn ${activeView === 'penghasilan-platform' ? 'active' : ''}`}
+              onClick={() => { setActiveView('penghasilan-platform'); setSelectedProvider(null); }}
+            >
+              <TrendingUp size={18} /> Penghasilan TemenTrip
+            </button>
           </nav>
         </div>
 
@@ -1070,6 +1074,8 @@ export const AdminDashboardPage: React.FC = () => {
                   ? 'Verifikasi Pembayaran Manual'
                   : activeView === 'pencairan-provider'
                   ? 'Pengajuan Pencairan Dana Provider (Payouts)'
+                  : activeView === 'penghasilan-platform'
+                  ? 'Penghasilan TemenTrip'
                   : 'Pusat Verifikasi Mitra'}
               </h1>
               <p>
@@ -1079,6 +1085,8 @@ export const AdminDashboardPage: React.FC = () => {
                   ? 'Verifikasi bukti transfer manual maksimal 1×24 jam. Booking baru tampil ke provider setelah pembayaran disetujui admin.'
                   : activeView === 'pencairan-provider'
                   ? 'Kelola pengajuan pencairan saldo DP 50% & pelunasan dari mitra provider.'
+                  : activeView === 'penghasilan-platform'
+                  ? 'Biaya layanan dan komisi TemenTrip dari setiap booking berbayar. Booking yang direfund penuh tidak dihitung.'
                   : 'Kelola dan verifikasi semua mitra yang terdaftar di TemenTrip.'}
               </p>
             </div>
@@ -1450,6 +1458,9 @@ export const AdminDashboardPage: React.FC = () => {
                   )}
                 </div>
               </div>
+            ) : activeView === 'penghasilan-platform' ? (
+              /* View 6: Penghasilan TemenTrip */
+              <AdminRevenuePanel />
             ) : activeView === 'pencairan-provider' ? (
               /* View 5: Pengajuan Pencairan Dana Provider */
               <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>

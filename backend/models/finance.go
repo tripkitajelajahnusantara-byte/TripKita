@@ -52,6 +52,7 @@ func NormalizePlatformFeePercent(percent int64) int64 {
 // EarningSplit memerinci satu booking berbayar menjadi bagian platform dan
 // bagian mitra, termasuk pembagian DP dan pelunasan.
 type EarningSplit struct {
+	ServiceFee     int64 // biaya layanan tetap per pesanan, bagian dari PlatformFee
 	PlatformFee    int64 // biaya layanan tetap + komisi
 	NetEarning     int64 // hak mitra setelah potongan platform
 	DPAmount       int64 // separuh hak mitra, dapat diajukan mulai H-3 setelah lunas
@@ -73,6 +74,7 @@ func SplitBookingEarning(totalCustomerPaid int64, platformFeePercent int64) Earn
 	dpAmount := netEarning / 2
 
 	return EarningSplit{
+		ServiceFee: adminFee,
 		// Sisa pembulatan rupiah masuk ke fee platform agar seluruh komponen
 		// selalu tepat menjumlah ke nilai yang dibayar pelanggan.
 		PlatformFee:    totalCustomerPaid - netEarning,

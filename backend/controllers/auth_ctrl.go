@@ -83,6 +83,10 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 
 	res, err := ctrl.service.Login(&req)
 	if err != nil {
+		if errors.Is(err, services.ErrAccountDisabled) {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		var inputErr *services.AuthInputError
 		if errors.As(err, &inputErr) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": inputErr.Error()})

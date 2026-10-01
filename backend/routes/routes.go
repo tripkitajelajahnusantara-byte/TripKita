@@ -191,6 +191,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 
 			// Admin Payout management
 			admin.GET("/payouts", payoutCtrl.AdminGetAllPayouts)
+			admin.GET("/revenue", payoutCtrl.AdminGetPlatformRevenue)
 			admin.PUT("/payouts/:id/process", payoutCtrl.AdminProcessPayout)
 			admin.GET("/payouts/:id/pdf-receipt", payoutCtrl.GetPayoutPDFReceipt)
 		}

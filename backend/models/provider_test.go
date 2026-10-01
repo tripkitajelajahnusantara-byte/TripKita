@@ -19,4 +19,10 @@ func TestSoftDeletedProviderCannotAuthenticate(t *testing.T) {
 	if !(&Provider{Role: "PROVIDER", Status: "PENDING"}).CanAuthenticate() {
 		t.Fatal("pending onboarding blocked")
 	}
+	if !(&Provider{Role: "PROVIDER", Status: "REJECTED"}).CanAuthenticate() {
+		t.Fatal("rejected provider cannot log in to read the admin notes")
+	}
+	if (&Provider{Role: "CUSTOMER", Status: "REJECTED"}).CanAuthenticate() {
+		t.Fatal("rejected customer can log in")
+	}
 }

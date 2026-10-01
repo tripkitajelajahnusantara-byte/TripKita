@@ -20,6 +20,7 @@ type BookingRepository interface {
 	FindAllRefunds() ([]models.Booking, error)
 	FindAllByCustomer(customerID uint) ([]models.Booking, error)
 	FindAll() ([]models.Booking, error)
+	FindPlatformRevenueBookings(from, to time.Time) ([]models.Booking, error)
 	Update(booking *models.Booking) error
 	CountByProvider(providerID uint) (int64, error)
 	CountByStatusAndProvider(status string, providerID uint) (int64, error)
@@ -47,6 +48,27 @@ func (r *bookingRepository) FindAll() ([]models.Booking, error) {
 	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Where("created_at >= ? OR created_at IS NULL", threeMonthsAgo).
 		Order("id desc").Find(&bookings).Error
+	return bookings, err
+}
+
+// FindPlatformRevenueBookings memuat booking berbayar seluruh mitra untuk
+// laporan penghasilan TemenTrip. Periode memakai tanggal pembayaran (atau
+// tanggal booking untuk data lama tanpa paid_at); nilai nol berarti tanpa batas.
+// Status akhir (refund, pembatalan) tetap disaring oleh service.
+func (r *bookingRepository) FindPlatformRevenueBookings(from, to time.Time) ([]models.Booking, error) {
+	var bookings []models.Booking
+	query := r.db.Model(&models.Booking{}).
+		Select("bookings.*, providers.business_name AS provider_name").
+		Joins("JOIN providers ON providers.id = bookings.provider_id").
+		Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Where("(bookings.paid_at IS NOT NULL OR bookings.status IN ?)", []string{models.StatusPaid, models.StatusConfirmed, models.StatusCompleted})
+	if !from.IsZero() {
+		query = query.Where("COALESCE(bookings.paid_at, bookings.created_at) >= ?", from)
+	}
+	if !to.IsZero() {
+		query = query.Where("COALESCE(bookings.paid_at, bookings.created_at) < ?", to)
+	}
+	err := query.Order("COALESCE(bookings.paid_at, bookings.created_at) DESC, bookings.id DESC").Find(&bookings).Error
 	return bookings, err
 }
 

@@ -11,6 +11,7 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // Forgot Password States
@@ -19,6 +20,8 @@ export const LoginPage: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
   const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotError, setForgotError] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
 
@@ -32,7 +35,7 @@ export const LoginPage: React.FC = () => {
     try {
       await request('/public/auth/provider/forgot-password', {
         method: 'POST',
-        body: JSON.stringify({ email: forgotEmail })
+        body: JSON.stringify({ email: forgotEmail.trim() })
       });
       setForgotStep(2);
     } catch (err: any) {
@@ -51,20 +54,33 @@ export const LoginPage: React.FC = () => {
       setForgotError('Password minimal 12 karakter');
       return;
     }
+    // Password baru diketik tanpa terlihat, jadi salah ketik harus ketahuan di
+    // sini, bukan saat login pertama dengan password baru gagal.
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError('Konfirmasi password tidak sama dengan password baru');
+      return;
+    }
     setForgotLoading(true);
     setForgotError('');
     try {
       await request('/public/auth/provider/reset-password', {
         method: 'POST',
-        body: JSON.stringify({ email: forgotEmail, otp: forgotOtp, newPassword: forgotNewPassword })
+        body: JSON.stringify({ email: forgotEmail.trim(), otp: forgotOtp.trim(), newPassword: forgotNewPassword })
       });
-      
-      alert('Password berhasil direset! Silakan login dengan password baru.');
+
+      // Kosongkan password di form login: isian otomatis browser biasanya
+      // masih berisi password lama sehingga login pertama terlihat gagal.
+      setEmail(forgotEmail.trim());
+      setPassword('');
+      setError('');
+      setNotice('Password berhasil diganti. Masuk dengan password baru Anda.');
       setShowForgotModal(false);
       setForgotStep(1);
       setForgotEmail('');
       setForgotOtp('');
       setForgotNewPassword('');
+      setForgotConfirmPassword('');
+      setShowForgotPassword(false);
     } catch (err: any) {
       setForgotError(err.message || 'Kode OTP salah atau sudah kedaluwarsa');
     } finally {
@@ -82,6 +98,7 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     try {
       setError('');
+      setNotice('');
       await login(email, password);
     } catch (err: any) {
       setError(err.message || 'Email atau password salah');
@@ -148,6 +165,7 @@ export const LoginPage: React.FC = () => {
                 <p>{isAdminMode ? 'Masukkan email dan password akun administrator' : 'Masukkan email dan password akun provider Anda'}</p>
               </div>
 
+              {notice && !error && <div className="success-alert" role="status">{notice}</div>}
               {error && <div className="error-alert">{error}</div>}
 
               {/* Email Input Field */}
@@ -173,6 +191,7 @@ export const LoginPage: React.FC = () => {
                     <span className="forgot-password-link" onClick={() => {
                       setForgotStep(1);
                       setForgotError('');
+                      setForgotEmail(email.trim());
                       setShowForgotModal(true);
                     }}>
                       Lupa password?
@@ -293,14 +312,38 @@ export const LoginPage: React.FC = () => {
                     maxLength={6}
                   />
                 </div>
+                <div style={{ marginBottom: '15px' }}>
+                  <label htmlFor="forgot-new-password" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Password Baru</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      id="forgot-new-password"
+                      type={showForgotPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      value={forgotNewPassword}
+                      onChange={e => setForgotNewPassword(e.target.value)}
+                      style={{ width: '100%', padding: '10px 40px 10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                      placeholder="Minimal 12 karakter"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showForgotPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                      onClick={() => setShowForgotPassword(!showForgotPassword)}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '4px' }}
+                    >
+                      {showForgotPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
                 <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Password Baru</label>
-                  <input 
-                    type="password" 
-                    value={forgotNewPassword} 
-                    onChange={e => setForgotNewPassword(e.target.value)}
+                  <label htmlFor="forgot-confirm-password" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Ulangi Password Baru</label>
+                  <input
+                    id="forgot-confirm-password"
+                    type={showForgotPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={forgotConfirmPassword}
+                    onChange={e => setForgotConfirmPassword(e.target.value)}
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
-                    placeholder="Minimal 12 karakter"
+                    placeholder="Ketik ulang password baru"
                   />
                 </div>
                 <button 
@@ -309,6 +352,14 @@ export const LoginPage: React.FC = () => {
                   style={{ width: '100%', padding: '12px', background: '#00a896', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: forgotLoading ? 'not-allowed' : 'pointer' }}
                 >
                   {forgotLoading ? 'Memproses...' : 'Simpan Password Baru'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRequestOtp}
+                  disabled={forgotLoading}
+                  style={{ width: '100%', marginTop: '10px', background: 'none', border: 'none', color: '#007bff', fontSize: '13px', fontWeight: 600, cursor: forgotLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  Kirim ulang kode OTP
                 </button>
               </div>
             )}
@@ -789,6 +840,15 @@ export const LoginPage: React.FC = () => {
         }
 
         /* Error Alert */
+        .success-alert {
+          background-color: #ecfdf5;
+          border: 1px solid #a7f3d0;
+          color: #047857;
+          padding: 12px 16px;
+          border-radius: 12px;
+          font-size: 13px;
+        }
+
         .error-alert {
           background-color: #fef2f2;
           border: 1px solid #fee2e2;

@@ -1764,10 +1764,346 @@ button[aria-busy="true"] {
 }
 
 /* Halaman Jadi Mitra (ProviderLandingPage) */
-.pl-hero-note {
-  margin-top: -24px;
+.pl-hero {
+  background:
+    radial-gradient(circle at 85% 20%, rgba(0, 123, 255, 0.10), transparent 45%),
+    radial-gradient(circle at 10% 90%, rgba(16, 185, 129, 0.08), transparent 40%),
+    linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  overflow: hidden;
+}
+
+.pl-hero .hero-container {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 56px;
+}
+
+.pl-eyebrow {
+  display: inline-block;
+  margin-bottom: 18px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--color-accent-light);
+  color: #0369a1;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pl-hero-points,
+.pl-split-points {
+  list-style: none;
+  margin: -16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 13.5px;
+  color: var(--color-text-medium);
+}
+
+.pl-hero-points li,
+.pl-split-points li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pl-hero-points svg,
+.pl-split-points svg {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+/* Kolase contoh paket di hero */
+.pl-hero-visual {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding-top: 28px;
+}
+
+.pl-hero-card {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14);
+}
+
+.pl-hero-card-media {
+  position: relative;
+  height: 210px;
+}
+
+.pl-hero-card-media img,
+.pl-trip-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pl-chip {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--color-primary-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pl-hero-card-body {
+  padding: 18px 20px 20px;
+}
+
+.pl-hero-card-body h3,
+.pl-trip-body h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  margin-bottom: 4px;
+}
+
+.pl-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
   font-size: 13px;
   color: var(--color-text-medium);
+}
+
+.pl-meta svg {
+  flex-shrink: 0;
+  color: var(--color-text-light);
+}
+
+.pl-hero-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0 16px;
+}
+
+.pl-price {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-medium);
+}
+
+.pl-price strong {
+  font-size: 18px;
+  color: var(--color-accent);
+}
+
+.pl-date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary-light);
+  white-space: nowrap;
+}
+
+.pl-quota-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--color-text-medium);
+}
+
+.pl-quota-head strong {
+  color: var(--color-primary-dark);
+}
+
+.pl-quota-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.pl-quota-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-accent), #38bdf8);
+}
+
+.pl-float {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 250px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
+}
+
+.pl-float strong {
+  display: block;
+  font-size: 13px;
+  color: var(--color-primary-dark);
+}
+
+.pl-float small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--color-text-medium);
+}
+
+.pl-float-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.pl-float-icon-green {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.pl-float-booking {
+  top: 0;
+  right: -40px;
+}
+
+.pl-float-payout {
+  top: 160px;
+  left: -48px;
+}
+
+.pl-visual-note,
+.pl-grid-note {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--color-text-light);
+}
+
+.pl-visual-note {
+  text-align: center;
+}
+
+/* Contoh paket */
+.pl-trip-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.pl-trip {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pl-trip:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.10);
+}
+
+.pl-trip-media {
+  position: relative;
+  height: 170px;
+  background: var(--color-bg-light);
+}
+
+.pl-trip-body {
+  padding: 16px;
+}
+
+.pl-trip-category {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.pl-trip-body h3 {
+  font-size: 15.5px;
+}
+
+.pl-trip-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-medium);
+}
+
+.pl-trip-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pl-trip-foot strong {
+  font-size: 14px;
+  color: var(--color-primary-dark);
+}
+
+/* Alur dana */
+.pl-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 56px;
+  align-items: center;
+}
+
+.pl-split-copy h2 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-primary-dark);
+  margin-bottom: 12px;
+}
+
+.pl-split-copy p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-text-medium);
+  margin-bottom: 20px;
+  max-width: 480px;
+}
+
+.pl-split-points {
+  margin: 0;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.pl-split .pl-flow-card {
+  justify-self: end;
+  max-width: 460px;
 }
 
 .pl-flow-card {
@@ -1862,18 +2198,39 @@ button[aria-busy="true"] {
 
 .pl-section-head p {
   font-size: 15px;
+  line-height: 1.6;
   color: var(--color-text-medium);
 }
 
 .pl-feature-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 32px 40px;
+  gap: 20px;
 }
 
 .pl-feature {
-  padding-top: 16px;
-  border-top: 2px solid var(--color-primary-dark);
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pl-feature:hover {
+  border-color: #bae6fd;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.pl-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: var(--color-accent-light);
+  color: var(--color-accent);
 }
 
 .pl-feature h3 {
@@ -1993,17 +2350,32 @@ button[aria-busy="true"] {
   cursor: pointer;
 }
 
+@media (max-width: 1100px) {
+  .pl-trip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 991px) {
+  .pl-hero .hero-container { grid-template-columns: minmax(0, 1fr); gap: 48px; }
   .pl-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pl-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pl-split { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .pl-split .pl-flow-card { justify-self: stretch; max-width: none; }
 }
 
 @media (max-width: 640px) {
   .pl-section { padding: 48px 0; }
-  .pl-section-head h2 { font-size: 23px; }
+  .pl-section-head h2,
+  .pl-split-copy h2 { font-size: 23px; }
   .pl-feature-grid,
-  .pl-steps { grid-template-columns: 1fr; }
-  .pl-hero-note { margin-top: -16px; }
+  .pl-steps,
+  .pl-trip-grid { grid-template-columns: minmax(0, 1fr); }
+  .pl-hero .hero-actions { flex-direction: column; }
+  .pl-hero .hero-actions button { justify-content: center; }
+  .pl-hero-points { margin-top: -8px; }
+  .pl-hero-card-media { height: 180px; }
+  .pl-float { max-width: 220px; padding: 8px 12px; }
+  .pl-float-booking { right: 8px; }
+  .pl-float-payout { top: 128px; left: 8px; }
 }
 
 .primary-btn {
