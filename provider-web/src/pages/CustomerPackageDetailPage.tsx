@@ -875,7 +875,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Profil Provider Penyelenggara Section */}
             {(() => {
               const pId = Number(pkg.providerId || pkg.provider?.id);
-              const currentProviderName = publicProvider?.businessName || 'Mitra TripKita';
+              const currentProviderName = publicProvider?.businessName || 'Mitra TemenTrip';
               const currentProviderCity = publicProvider?.operationalCity || 'Indonesia';
               const providerRating = publicProvider?.rating || 0;
 

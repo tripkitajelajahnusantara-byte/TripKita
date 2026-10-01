@@ -237,33 +237,33 @@ export const GeneralTermsContent: React.FC<RefundPolicyProps> = ({ cancellationR
       }}
     >
       <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0' }}>
-        SYARAT DAN KETENTUAN PLATFORM TRIPKITA
+        SYARAT DAN KETENTUAN PLATFORM TEMENTRIP
       </h2>
       <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b', lineHeight: '1.6' }}>
-        Ketentuan yang berlaku bagi setiap pengguna platform TripKita. Dengan mengakses, mendaftar, atau menggunakan layanan TripKita, pengguna dianggap telah membaca, memahami, dan menyetujui seluruh ketentuan di bawah ini.
+        Ketentuan yang berlaku bagi setiap pengguna platform TemenTrip. Dengan mengakses, mendaftar, atau menggunakan layanan TemenTrip, pengguna dianggap telah membaca, memahami, dan menyetujui seluruh ketentuan di bawah ini.
       </p>
     </div>
 
     <LegalSection number="1" title="DEFINISI">
       <ul style={{ paddingLeft: '20px', margin: 0 }}>
-        <li><strong>TripKita:</strong> Platform digital beserta pengelola dan sistem pendukungnya.</li>
-        <li><strong>Customer:</strong> Pengguna yang mencari, memesan, atau menggunakan layanan perjalanan melalui TripKita.</li>
+        <li><strong>TemenTrip:</strong> Platform digital beserta pengelola dan sistem pendukungnya.</li>
+        <li><strong>Customer:</strong> Pengguna yang mencari, memesan, atau menggunakan layanan perjalanan melalui TemenTrip.</li>
         <li><strong>Provider:</strong> Pihak penyedia layanan perjalanan yang terdaftar di TemenTrip.</li>
-        <li><strong>Platform:</strong> Situs web, aplikasi, dan sarana digital lain milik TemenTrip / TripKita.</li>
+        <li><strong>Platform:</strong> Situs web, aplikasi, dan sarana digital lain milik TemenTrip.</li>
         <li><strong>Booking:</strong> Pemesanan layanan perjalanan yang dilakukan melalui Platform.</li>
         <li><strong>Force Majeure:</strong> Keadaan darurat di luar kendali wajar para pihak (bencana alam, cuaca ekstrem, dll).</li>
       </ul>
     </LegalSection>
 
-    <LegalSection number="2" title="LAYANAN TRIPKITA">
+    <LegalSection number="2" title="LAYANAN TEMENTRIP">
       <p style={{ margin: '0 0 8px 0' }}>
-        2.1 TripKita menyediakan sarana perantara bagi Customer dan Provider dalam proses pencarian hingga pemesanan trip.
+        2.1 TemenTrip menyediakan sarana perantara bagi Customer dan Provider dalam proses pencarian hingga pemesanan trip.
       </p>
       <p style={{ margin: '0 0 8px 0' }}>
         2.2 Kebenaran dan kelengkapan informasi perjalanan sepenuhnya menjadi tanggung jawab Provider yang mempublikasikannya.
       </p>
       <p style={{ margin: 0 }}>
-        2.3 TripKita berhak membatasi atau menangguhkan akun jika ditemukan aktivitas yang melanggar ketentuan hukum.
+        2.3 TemenTrip berhak membatasi atau menangguhkan akun jika ditemukan aktivitas yang melanggar ketentuan hukum.
       </p>
     </LegalSection>
 
@@ -362,7 +362,7 @@ export const CustomerRegistrationTermsContent: React.FC<RefundPolicyProps> = ({ 
         SYARAT & KETENTUAN PENDAFTARAN CUSTOMER
       </h2>
       <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b' }}>
-        Dokumen persetujuan pendaftaran akun Customer pada platform TemenTrip / TripKita.
+        Dokumen persetujuan pendaftaran akun Customer pada platform TemenTrip.
       </p>
     </div>
 

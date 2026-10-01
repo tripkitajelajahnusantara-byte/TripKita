@@ -187,7 +187,7 @@ export const CustomerSettingsPage: React.FC = () => {
               </div>
               <div>
                 <strong style={{ display: 'block', fontSize: '14.5px', color: '#0f172a' }}>
-                  {namaLengkap || 'Pelanggan TripKita'}
+                  {namaLengkap || 'Pelanggan TemenTrip'}
                 </strong>
                 <span style={{ fontSize: '12px', color: '#64748b' }}>
                   {email || 'Traveler'}
@@ -514,7 +514,7 @@ export const CustomerSettingsPage: React.FC = () => {
                               Ulasan Perjalanan
                             </span>
                             <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: '2px 0 0 0' }}>
-                              {rev.packageName || 'TripKita Package'}
+                              {rev.packageName || 'TemenTrip Package'}
                             </h4>
                           </div>
                           <span style={{ fontSize: '12px', color: '#64748b' }}>

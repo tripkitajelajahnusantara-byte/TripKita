@@ -384,17 +384,17 @@ func (s *EmailService) SendRescheduleEmail(b *models.Booking) error {
 
 // SendResetPasswordEmail sends a 6-digit OTP for password reset
 func (s *EmailService) SendResetPasswordEmail(email string, otp string) error {
-	subject := "TripKita - Kode Reset Password"
+	subject := "TemenTrip - Kode Reset Password"
 
 	htmlBody := fmt.Sprintf(`
 		<h2>Reset Password Anda</h2>
-		<p>Seseorang telah meminta untuk mereset password akun TripKita Anda.</p>
+		<p>Seseorang telah meminta untuk mereset password akun TemenTrip Anda.</p>
 		<p>Gunakan kode 6 digit di bawah ini untuk mereset password Anda. Kode ini berlaku selama 15 menit.</p>
 		<h1 style="color: #00a896; letter-spacing: 5px;">%s</h1>
 		<p>Jika Anda tidak merasa meminta reset password, abaikan email ini.</p>
 		<br/>
 		<p>Salam hangat,</p>
-		<p>Tim TripKita</p>
+		<p>Tim TemenTrip</p>
 	`, otp)
 
 	return s.sendMailWithAttachment(email, subject, htmlBody, nil, "")

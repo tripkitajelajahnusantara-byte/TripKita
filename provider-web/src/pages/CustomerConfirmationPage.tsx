@@ -192,7 +192,7 @@ export const CustomerConfirmationPage: React.FC = () => {
 
       const payload: any = {
 		packageId: rawPkgId,
-        customerName: pemesan.nama || 'Pelanggan TripKita',
+        customerName: pemesan.nama || 'Pelanggan TemenTrip',
         customerEmail: pemesan.email,
         customerPhone: pemesan.whatsapp,
         customerInitial: (pemesan.nama || 'P').charAt(0).toUpperCase(),
@@ -590,7 +590,7 @@ export const CustomerConfirmationPage: React.FC = () => {
       <LegalModalContainer
         isOpen={activeLegalModal === 'cancellation'}
         onClose={() => setActiveLegalModal(null)}
-        title={`Kebijakan Pembatalan H-${cancellationRefundDays ?? '—'} TripKita`}
+        title={`Kebijakan Pembatalan H-${cancellationRefundDays ?? '—'} TemenTrip`}
       >
         <CustomerRegistrationTermsContent cancellationRefundDays={cancellationRefundDays ?? undefined} />
       </LegalModalContainer>
