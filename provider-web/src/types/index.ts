@@ -90,6 +90,8 @@ export interface Booking {
   paymentReviewedAt?: string;
   paymentReviewNotes?: string;
   rawEndDate?: string;
+  rawTripDate?: string;
+  packageId?: number;
   participants?: BookingParticipant[];
   status: 'PENDING_PAYMENT' | 'PAYMENT_REVIEW' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED' | 'RESCHEDULE_OFFERED';
 }

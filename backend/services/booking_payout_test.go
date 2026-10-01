@@ -19,7 +19,7 @@ func uintPtr(v uint) *uint { return &v }
 
 func TestBookingPayoutStagesPerTrip(t *testing.T) {
 	now := time.Now()
-	upcoming := payoutTestBooking(1, now.Add(96*time.Hour), now.Add(120*time.Hour))
+	upcoming := payoutTestBooking(1, now.Add(48*time.Hour), now.Add(96*time.Hour))
 	finished := payoutTestBooking(2, now.Add(-72*time.Hour), now.Add(-24*time.Hour))
 	split := models.SplitBookingEarning(upcoming.TotalPrice, upcoming.PlatformFeePercent)
 
@@ -60,7 +60,7 @@ func TestLegacyAggregatePayoutCoversOldestBookings(t *testing.T) {
 	if dp, _ := findBookingPayoutStage(items, 1, "DP_50"); dp.Status != models.BookingPayoutPaid {
 		t.Fatalf("payout gabungan lama harus menutup booking terlama, got %+v", dp)
 	}
-	if dp, _ := findBookingPayoutStage(items, 2, "DP_50"); dp.Status != models.BookingPayoutAvailable {
-		t.Fatalf("booking berikutnya tetap dapat dicairkan, got %+v", dp)
+	if dp, _ := findBookingPayoutStage(items, 2, "DP_50"); dp.Status != models.BookingPayoutLocked {
+		t.Fatalf("booking berikutnya tetap terkunci sebelum H-3, got %+v", dp)
 	}
 }

@@ -26,12 +26,18 @@ Dari setiap booking berbayar:
 | Komisi platform | 15% dari nilai paket | Rp 104.250 |
 | **Total potongan platform** | komisi + biaya layanan | **Rp 109.250** |
 | **Hak mitra (bersih)** | 85% dari nilai paket | **Rp 590.750** |
-| **DP 50%** | hak mitra ÷ 2 | **Rp 295.375** — cair segera setelah lunas |
+| **DP 50%** | hak mitra ÷ 2 | **Rp 295.375** — dapat diajukan mulai H-3 setelah lunas |
 | **Pelunasan 50%** | sisanya | **Rp 295.375** — ditahan sampai trip selesai |
 
 Rumus ini ada di satu tempat saja, yaitu `models.SplitBookingEarning` pada
 [`backend/models/finance.go`](backend/models/finance.go). Ringkasan keuangan mitra,
 buku besar saldo, dan data seed memakai fungsi yang sama.
+
+**Kapan DP terbuka:** mulai H-3 pukul 00:00 WIB terhadap tanggal mulai trip,
+setelah pembayaran lunas. Sebelum itu tombol **Cairkan DP** tetap terlihat tetapi
+nonaktif, dengan tanggal mulai pencairan. Kredit DP tetap masuk buku besar saat
+pembayaran; `availableDp` pada ringkasan hanya mencakup hak yang sudah memenuhi
+syarat pencairan. `heldDp` menunjukkan DP yang masih menunggu H-3.
 
 **Kapan pelunasan terbuka:** saat `trip_end_date` booking sudah lewat. Job latar
 belakang `AutoCompleteFinishedBookings` mengubah status booking menjadi
@@ -98,7 +104,9 @@ penipuan.
 ### Langkah 3 — Mitra melihat saldo
 
 Buka **Keuangan & Saldo** pada panel mitra. Yang harus Anda lihat untuk data seed
-mitra `partner@wisatanusantara.id` (satu booking Rp 700.000):
+mitra `partner@wisatanusantara.id` (satu booking Rp 700.000) **jika trip sudah
+memasuki H-3**. Jika belum, saldo DP siap cair adalah Rp 0 dan Rp 295.375
+tercatat sebagai DP menunggu H-3:
 
 | Kolom | Nilai |
 | --- | --- |
@@ -111,7 +119,7 @@ mitra `partner@wisatanusantara.id` (satu booking Rp 700.000):
 
 ### Langkah 4 — Mengajukan pencairan DP
 
-1. Tekan **Ajukan Pencairan**, pilih jenis **DP 50%**, lalu kirim.
+1. Pada **Pencairan per Trip**, tekan **Cairkan DP** untuk booking yang telah memasuki H-3, periksa nominal dan rekening di dialog, lalu kirim.
 2. Pengajuan tersimpan dengan status `PENDING`.
 
 Yang harus terjadi seketika:
@@ -121,6 +129,8 @@ Yang harus terjadi seketika:
 - **Lonceng notifikasi admin bertambah satu**, berisi nama mitra, jenis
   pencairan, nominal, dan rekening tujuan.
 
+> Uji negatif: tombol DP sebelum H-3 harus nonaktif dan API harus menolak pengajuan langsung. Jadwal yang diubah ke masa depan harus mengunci ulang DP yang belum dicairkan.
+>
 > Uji negatif: ajukan pencairan DP kedua. Harus ditolak dengan
 > "saldo DP belum mencukupi untuk dicairkan".
 
@@ -169,7 +179,7 @@ Muat ulang **Keuangan & Saldo**. Sekarang:
 | **Pelunasan 50% siap cair** | **Rp 295.375** |
 | Dana ditahan | Rp 0 |
 
-Ulangi Langkah 4–5 dengan jenis **Pelunasan 50%**.
+Ulangi Langkah 4–5 melalui tombol **Cairkan Pelunasan** pada booking tersebut. Sebelum `trip_end_date`, tombol ini dan **Selesaikan Perjalanan** pada daftar booking harus nonaktif. Status `COMPLETED` yang tidak sesuai tanggal tidak boleh membuka pencairan pelunasan lebih awal.
 
 ---
 

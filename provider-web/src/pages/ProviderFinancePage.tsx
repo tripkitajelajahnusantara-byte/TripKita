@@ -8,7 +8,6 @@ import {
   DollarSign, 
   CheckCircle2, 
   AlertCircle, 
-  ArrowUpRight, 
   Building2, 
   HelpCircle,
   TrendingUp,
@@ -16,10 +15,12 @@ import {
   Download,
   FileText,
   LoaderCircle,
-  CalendarDays
+  CalendarDays,
+  RefreshCw
 } from 'lucide-react';
 import { useActionLock } from '../utils/useActionLock';
 import { SkeletonTable } from '../components/Skeleton';
+import { PayoutStageAction } from '../components/PayoutStageAction';
 
 interface PayoutItem {
   id: number;
@@ -44,6 +45,8 @@ interface BookingPayoutStage {
   status: 'AVAILABLE' | 'LOCKED' | 'REQUESTED' | 'PAID' | 'NONE';
   payoutId?: number;
   proofPath?: string;
+  availableAt?: string;
+  blockedReason?: string;
 }
 
 interface BookingPayout {
@@ -69,6 +72,7 @@ interface PayoutSummary {
   availableDp: number;
   availablePelunasan?: number;
   heldSettlement: number;
+  heldDp?: number;
   totalPaidOut: number;
   pendingPayout: number;
   providerDebt: number;
@@ -82,10 +86,11 @@ const formatTripDate = (value: string) =>
 const payoutTypeLabel = (type: PayoutType) => type === 'DP_50' ? 'DP 50%' : 'Pelunasan 50%';
 
 export const ProviderFinancePage: React.FC = () => {
-  const { providerProfile } = useNavigation();
+  const { providerProfile, navigateTo } = useNavigation();
   const { showAlert } = useCustomAlert();
   const [summary, setSummary] = useState<PayoutSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   // Pengajuan pencairan menyangkut uang: kunci berbasis ref mencegah klik ganda
   // cepat membuat dua pengajuan sebelum state sempat ter-render ulang.
   const { isBusy: submitting, run } = useActionLock();
@@ -98,8 +103,11 @@ export const ProviderFinancePage: React.FC = () => {
     try {
       const data = await request('/provider/payouts/summary');
       setSummary(data);
+      setLoadError('');
     } catch (err) {
       console.error('Failed to fetch payout summary:', err);
+      setSummary(null);
+      setLoadError(err instanceof Error ? err.message : 'Saldo belum dapat dimuat. Coba perbarui halaman.');
     } finally {
       setLoading(false);
     }
@@ -173,7 +181,7 @@ export const ProviderFinancePage: React.FC = () => {
       setModalNotice({
         title: 'Belum Dapat Dicairkan',
         message: requestType === 'DP_50'
-          ? 'DP 50% untuk trip ini belum tersedia untuk dicairkan.'
+          ? 'DP 50% tersedia mulai H-3 sebelum trip dimulai, setelah pembayaran lunas.'
           : 'Pelunasan 50% trip ini baru dapat dicairkan setelah tanggal trip selesai.',
         isError: true
       });
@@ -226,7 +234,7 @@ export const ProviderFinancePage: React.FC = () => {
               </h1>
             </div>
             <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-              Pencairan dilakukan per trip: DP 50% setelah booking lunas dan Pelunasan 50% setelah trip selesai, langsung ke rekening bank Mitra Anda.
+              Pencairan dilakukan per trip: DP 50% mulai H-3 setelah pembayaran lunas dan Pelunasan 50% setelah waktu selesai perjalanan, langsung ke rekening bank Mitra Anda.
             </p>
           </div>
 
@@ -252,8 +260,14 @@ export const ProviderFinancePage: React.FC = () => {
           </button>
         </div>
 
+        <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <button type="button" className="btn" disabled={loading || submitting} onClick={fetchSummary} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><RefreshCw size={15} /> {loading ? 'Memuat saldo...' : 'Perbarui saldo'}</button>
+          <span style={{ color: '#64748b', fontSize: 12 }}>Jadwal pencairan menggunakan waktu WIB. Tombol aktif setelah seluruh syarat terpenuhi.</span>
+        </div>
+        {loadError && <p role="alert" style={{ background: '#fef2f2', borderRadius: 10, padding: 14, color: '#b91c1c' }}>{loadError}</p>}
+
         {/* 4 Summary Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
           
           {/* Card 1: Total Pendapatan Bersih Mitra */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '22px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
@@ -286,7 +300,8 @@ export const ProviderFinancePage: React.FC = () => {
             <strong style={{ fontSize: '20px', fontWeight: '800', color: '#0284c7', display: 'block', marginBottom: '4px' }}>
               {formatIDR(summary?.availableDp || 0)}
             </strong>
-            <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '600' }}>Bisa dicairkan awal booking lunas</span>
+            <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '600' }}>Tersedia mulai H-3, setelah pembayaran lunas</span>
+            {(summary?.heldDp || 0) > 0 && <p style={{ margin: '8px 0 0', fontSize: 12, color: '#64748b' }}>Menunggu H-3: {formatIDR(summary?.heldDp || 0)}</p>}
           </div>
 
           {/* Card 3: Saldo Pelunasan 50% (Akhir Trip) */}
@@ -398,43 +413,10 @@ export const ProviderFinancePage: React.FC = () => {
                         const stage = type === 'DP_50' ? b.dp : b.settlement;
                         return (
                           <td key={type} style={{ padding: '14px 12px', minWidth: '170px' }}>
-                            <strong style={{ display: 'block', color: '#0f172a', marginBottom: '6px' }}>{formatIDR(stage.amount)}</strong>
-                            {stage.status === 'AVAILABLE' ? (
-                              <button
-                                onClick={() => {
-                                  if (!isBankConfigured) {
-                                    setModalNotice({
-                                      title: 'Rekening Bank Belum Diatur',
-                                      message: 'Isi data rekening bank tujuan pada menu Profil Provider terlebih dahulu.',
-                                      isError: true
-                                    });
-                                    return;
-                                  }
-                                  setRequestTarget({ booking: b, type });
-                                  setShowRequestModal(true);
-                                }}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 12px', backgroundColor: type === 'DP_50' ? '#0284c7' : '#16a34a', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}
-                              >
-                                <ArrowUpRight size={14} /> Cairkan {formatIDR(stage.remaining)}
-                              </button>
-                            ) : stage.status === 'LOCKED' ? (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#d97706', fontWeight: 600 }}>
-                                <Lock size={13} /> Terbuka setelah {formatTripDate(b.tripEndDate)}
-                              </span>
-                            ) : stage.status === 'REQUESTED' ? (
-                              <span style={{ fontSize: '12px', color: '#d97706', fontWeight: 700 }}>⏳ Menunggu diproses admin</span>
-                            ) : stage.status === 'PAID' ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                                <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 700 }}>✓ Sudah dicairkan</span>
-                                {stage.proofPath && (
-                                  <button type="button" onClick={() => handleViewProof(stage.proofPath!)} style={{ padding: 0, background: 'none', border: 'none', color: '#0284c7', fontSize: '12px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
-                                    Lihat bukti transfer
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <span style={{ fontSize: '12px', color: '#94a3b8' }}>Tidak ada saldo</span>
-                            )}
+                            <PayoutStageAction stage={stage} type={type} bookingId={b.bookingId}
+                              bankConfigured={isBankConfigured} availableBalance={type === 'DP_50' ? summary?.availableDp || 0 : summary?.availablePelunasan || 0} busy={submitting || loading}
+                              onRequest={() => { setRequestTarget({ booking: b, type }); setShowRequestModal(true); }}
+                              onBankSettings={() => navigateTo('profil-provider')} onViewProof={handleViewProof} />
                           </td>
                         );
                       })}

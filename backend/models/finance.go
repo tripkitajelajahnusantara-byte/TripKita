@@ -54,7 +54,7 @@ func NormalizePlatformFeePercent(percent int64) int64 {
 type EarningSplit struct {
 	PlatformFee    int64 // biaya layanan tetap + komisi
 	NetEarning     int64 // hak mitra setelah potongan platform
-	DPAmount       int64 // separuh hak mitra, cair setelah pembayaran lunas
+	DPAmount       int64 // separuh hak mitra, dapat diajukan mulai H-3 setelah lunas
 	SettlementHeld int64 // sisanya, ditahan sampai trip selesai
 }
 

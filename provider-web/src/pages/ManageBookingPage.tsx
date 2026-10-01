@@ -16,6 +16,8 @@ import type { Booking, BookingParticipant } from '../types';
 import { request } from '../utils/api';
 import { SkeletonTableRows } from '../components/Skeleton';
 import { ForceMajeureForm } from '../components/ForceMajeureForm';
+import { useCustomAlert } from '../components/CustomAlertModal';
+import { jakartaToday } from '../utils/tripDates';
 import { useActionLock } from '../utils/useActionLock';
 
 // Format tanggal lahir peserta (YYYY-MM-DD) beserta umur saat ini
@@ -88,6 +90,7 @@ interface DashboardStats {
 
 export const ManageBookingPage: React.FC = () => {
   const { providerProfile } = useNavigation();
+  const { showAlert } = useCustomAlert();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('Semua');
 
@@ -104,12 +107,14 @@ export const ManageBookingPage: React.FC = () => {
   // Status booking yang dibatalkan menentukan isi modal: booking yang belum
   // dibayar tidak punya dana untuk direfund dan tidak dapat di-reschedule.
   const [cancelBookingStatus, setCancelBookingStatus] = useState<string | null>(null);
-  const [cancelActionType, setCancelActionType] = useState<'REFUND' | 'RESCHEDULE' | null>(null);
+  const [cancelActionType, setCancelActionType] = useState<'REFUND' | 'RESCHEDULE' | 'FORCE_MAJEURE' | null>(null);
   const [newRescheduleDate, setNewRescheduleDate] = useState('');
   // Satu kunci untuk semua aksi yang mengubah status booking agar klik ganda
   // atau dua aksi berbeda tidak terkirim bersamaan.
   const { pending, isBusy, run } = useActionLock();
-  const cancelLoading = pending === 'cancel';
+  const [forceMajeureBusy, setForceMajeureBusy] = useState(false);
+  const cancelLoading = pending === 'cancel' || forceMajeureBusy;
+  const cancelBooking = bookings.find(b => b.dbId === cancelBookingId);
   const isUnpaidCancel = cancelBookingStatus === 'PENDING_PAYMENT';
 
   useEffect(() => {
@@ -147,6 +152,8 @@ export const ManageBookingPage: React.FC = () => {
           paidAt: b.paidAt || '',
           paymentUrl: b.paymentUrl,
           rawEndDate: b.tripEndDate,
+          rawTripDate: b.tripDate,
+          packageId: b.packageId || b.packageDetails?.id,
           participants: Array.isArray(b.participants)
             ? [...b.participants].sort((x: BookingParticipant, y: BookingParticipant) => (x.position || 0) - (y.position || 0))
             : [],
@@ -200,7 +207,7 @@ export const ManageBookingPage: React.FC = () => {
   };
 
   const handleSubmitCancel = async () => {
-    if (isBusy || !cancelBookingId || !cancelActionType) return;
+    if (isBusy || forceMajeureBusy || !cancelBookingId || !cancelActionType || cancelActionType === 'FORCE_MAJEURE') return;
     // Validasi dilakukan sebelum mengunci agar tombol tidak sempat berputar.
     if (cancelActionType === 'RESCHEDULE' && !newRescheduleDate) {
       alert('Silakan pilih tanggal reschedule.');
@@ -289,9 +296,6 @@ export const ManageBookingPage: React.FC = () => {
             </button>
           </div>
         </header>
-
-        {/* Pembatalan keberangkatan karena keadaan kahar; seluruh data dari backend. */}
-        <ForceMajeureForm onSubmitted={loadData} />
 
 
         {/* Counters Block */}
@@ -402,41 +406,38 @@ export const ManageBookingPage: React.FC = () => {
                         })()}
                       </td>
                       <td>
-                        <div className="actions-cell">
-                          <button className="action-btn" onClick={() => handleAction('detail', b.id)} title="Lihat Detail Booking">
-                            <Eye size={14} />
+                        <div className="actions-cell" style={{ flexDirection: 'column', alignItems: 'flex-start', minWidth: 165 }}>
+                          <button className="action-btn" style={{ width: 'auto', borderRadius: 8, padding: '6px 10px', gap: 6 }} onClick={() => handleAction('detail', b.id)} title="Lihat Detail Booking">
+                            <Eye size={14} /> Detail
                           </button>
-                          {(b.status === 'CONFIRMED' || b.status === 'PAID') && b.dbId && (
-                            <>
-                              {b.rawEndDate && new Date() >= new Date(b.rawEndDate) ? (
-                                <button
-                                  className="action-btn text-green"
-                                  title="Selesaikan Perjalanan"
-                                  onClick={() => handleAction('complete', b.dbId!)}
-                                  disabled={isBusy}
-                                  aria-busy={pending === `complete-${b.dbId}`}
-                                  style={{ cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy && pending !== `complete-${b.dbId}` ? 0.5 : 1 }}
-                                >
-                                  {pending === `complete-${b.dbId}`
-                                    ? <LoaderCircle size={14} className="btn-spinner" aria-hidden="true" />
-                                    : <Check size={14} />}
-                                </button>
-                              ) : (
-                                <button className="action-btn text-gray" title="Perjalanan belum selesai" style={{ cursor: 'not-allowed', opacity: 0.5 }}>
-                                  <Check size={14} />
-                                </button>
-                              )}
-                            </>
-                          )}
+                          {(b.status === 'CONFIRMED' || b.status === 'PAID') && b.dbId && (() => {
+                            const end = b.rawEndDate ? new Date(b.rawEndDate) : null;
+                            const canComplete = Boolean(end && Number.isFinite(end.getTime()) && Date.now() >= end.getTime());
+                            const hint = canComplete ? 'Tandai perjalanan selesai.' : end && Number.isFinite(end.getTime())
+                              ? `Tersedia setelah ${end.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })} WIB.`
+                              : 'Jadwal selesai belum tersedia. Hubungi admin.';
+                            return <div style={{ display: 'grid', gap: 4, maxWidth: 190 }}>
+                              <button type="button" className={`action-btn ${canComplete ? 'text-green' : 'text-gray'}`}
+                                title={hint} aria-describedby={`complete-${b.dbId}-hint`}
+                                onClick={() => handleAction('complete', b.dbId!)} disabled={!canComplete || isBusy}
+                                aria-busy={pending === `complete-${b.dbId}`}
+                                style={{ width: 'auto', height: 'auto', borderRadius: 8, padding: '8px 10px', gap: 6, fontSize: 12, cursor: !canComplete || isBusy ? 'not-allowed' : 'pointer', opacity: !canComplete || isBusy ? 0.6 : 1 }}>
+                                {pending === `complete-${b.dbId}` ? <LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> : <Check size={14} />}
+                                Selesaikan Perjalanan
+                              </button>
+                              {!canComplete && <small id={`complete-${b.dbId}-hint`} style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4 }}>{hint}</small>}
+                            </div>;
+                          })()}
                           {(b.status === 'CONFIRMED' || b.status === 'PAID' || b.status === 'PENDING_PAYMENT') && b.dbId && (
                             <button
                               className="action-btn text-red"
                               title="Batalkan Pesanan"
+                              aria-label={`Batalkan pesanan ${b.id}`}
                               onClick={() => handleAction('reject', b.dbId!, b.status)}
                               disabled={isBusy}
-                              style={{ cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy ? 0.5 : 1 }}
+                              style={{ width: 'auto', borderRadius: 8, padding: '6px 10px', gap: 6, cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy ? 0.5 : 1 }}
                             >
-                              <X size={14} />
+                              <X size={14} /> Batalkan
                             </button>
                           )}
                         </div>
@@ -767,24 +768,25 @@ export const ManageBookingPage: React.FC = () => {
       {/* Cancel Action Modal */}
       {showCancelModal && (
         <div className="detail-modal-overlay">
-          <div className="detail-modal-card" style={{ maxWidth: '400px', padding: '24px' }}>
+          <div className="detail-modal-card" role="dialog" aria-modal="true" aria-labelledby="cancel-modal-title" style={{ maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
             <div className="modal-header">
-              <h2>Tindakan Pembatalan</h2>
+              <h2 id="cancel-modal-title">Batalkan Pesanan {cancelBooking?.id}</h2>
               {/* Modal tidak boleh ditutup selama permintaan masih diproses. */}
-              <button className="close-modal" onClick={() => setShowCancelModal(false)} disabled={cancelLoading} style={{ cursor: cancelLoading ? 'not-allowed' : 'pointer' }}>✕</button>
+              <button className="close-modal" aria-label="Tutup dialog pembatalan" onClick={() => setShowCancelModal(false)} disabled={cancelLoading} style={{ cursor: cancelLoading ? 'not-allowed' : 'pointer' }}>✕</button>
             </div>
             
             <div style={{ marginBottom: '20px' }}>
               <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
                 {isUnpaidCancel
                   ? 'Pesanan ini belum dibayar pelanggan, sehingga pembatalan tidak memerlukan refund.'
-                  : 'Pilih jenis pembatalan untuk pesanan ini. Anda dapat mengembalikan dana 100% atau menawarkan perubahan tanggal (reschedule).'}
+                  : 'Pilih tindakan untuk pesanan ini: refund penuh, ubah tanggal, atau batalkan keberangkatan karena keadaan kahar (force majeure).'}
               </p>
 
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
                 <button
                   type="button"
                   onClick={() => setCancelActionType('REFUND')}
+                  aria-pressed={cancelActionType === 'REFUND'}
                   disabled={cancelLoading}
                   style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid', borderColor: cancelActionType === 'REFUND' ? '#dc2626' : '#cbd5e1', backgroundColor: cancelActionType === 'REFUND' ? '#fef2f2' : '#ffffff', color: cancelActionType === 'REFUND' ? '#dc2626' : '#475569', fontWeight: 600, cursor: cancelLoading ? 'not-allowed' : 'pointer' }}
                 >
@@ -795,13 +797,26 @@ export const ManageBookingPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setCancelActionType('RESCHEDULE')}
+                    aria-pressed={cancelActionType === 'RESCHEDULE'}
                     disabled={cancelLoading}
                     style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid', borderColor: cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#cbd5e1', backgroundColor: cancelActionType === 'RESCHEDULE' ? '#f0fdfa' : '#ffffff', color: cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#475569', fontWeight: 600, cursor: cancelLoading ? 'not-allowed' : 'pointer' }}
                   >
                     Reschedule
                   </button>
                 )}
+                {!isUnpaidCancel && <button type="button" onClick={() => setCancelActionType('FORCE_MAJEURE')} disabled={cancelLoading}
+                  aria-pressed={cancelActionType === 'FORCE_MAJEURE'}
+                  style={{ flex: 1, minWidth: 160, padding: '10px', borderRadius: 8, border: '1px solid', borderColor: cancelActionType === 'FORCE_MAJEURE' ? '#b91c1c' : '#cbd5e1', backgroundColor: cancelActionType === 'FORCE_MAJEURE' ? '#fff7ed' : '#fff', color: '#9a3412', fontWeight: 600, cursor: cancelLoading ? 'not-allowed' : 'pointer' }}>
+                  Keadaan Kahar
+                </button>}
               </div>
+
+              {cancelActionType === 'FORCE_MAJEURE' && (
+                cancelBooking?.packageId && cancelBooking.rawTripDate
+                  ? <ForceMajeureForm departure={{ packageId: cancelBooking.packageId, departureDay: jakartaToday(new Date(cancelBooking.rawTripDate)) }}
+                      onBusyChange={setForceMajeureBusy} onSubmitted={(message) => { setShowCancelModal(false); showAlert({ type: 'success', title: 'Pembatalan Tercatat', message }); void loadData(); }} />
+                  : <p role="alert" style={{ color: '#b91c1c' }}>Jadwal pesanan tidak tersedia. Perbarui daftar booking atau hubungi admin.</p>
+              )}
 
               {cancelActionType === 'RESCHEDULE' && (
                 <div className="input-group" style={{ marginBottom: '16px' }}>
@@ -838,7 +853,7 @@ export const ManageBookingPage: React.FC = () => {
               >
                 Kembali
               </button>
-              <button 
+              {cancelActionType !== 'FORCE_MAJEURE' && <button
                 type="button" 
                 onClick={handleSubmitCancel}
                 disabled={cancelLoading || !cancelActionType}
@@ -846,7 +861,7 @@ export const ManageBookingPage: React.FC = () => {
                 style={{ width: 'auto', padding: '10px 24px', backgroundColor: cancelActionType === 'REFUND' ? '#dc2626' : (cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#94a3b8'), color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: (cancelLoading || !cancelActionType) ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
                 {cancelLoading ? (<><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</>) : 'Konfirmasi Tindakan'}
-              </button>
+              </button>}
             </div>
           </div>
         </div>

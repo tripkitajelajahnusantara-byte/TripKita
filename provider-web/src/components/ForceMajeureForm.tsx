@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertOctagon, Send } from 'lucide-react';
 import { request } from '../utils/api';
+import { addDays, jakartaToday } from '../utils/tripDates';
+import { useActionLock } from '../utils/useActionLock';
 
 interface UpcomingDeparture {
   packageId: number;
@@ -16,17 +18,12 @@ interface PackageOption {
 }
 
 const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  new Date(iso.length === 10 ? `${iso}T00:00:00+07:00` : iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
 
-function todayISO(): string {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
-}
-
-function tomorrowISO(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+interface Props {
+  departure?: { packageId: number; departureDay: string };
+  onSubmitted?: (message: string) => void;
+  onBusyChange?: (busy: boolean) => void;
 }
 
 /**
@@ -37,14 +34,14 @@ function tomorrowISO(): string {
  * pilihan yang sama seperti alur kuota: menerima tanggal pengganti, atau menolak
  * dan mendapat pengembalian dana penuh.
  */
-export const ForceMajeureForm: React.FC<{ onSubmitted?: () => void }> = ({ onSubmitted }) => {
+export const ForceMajeureForm: React.FC<Props> = ({ departure: targetDeparture, onSubmitted, onBusyChange }) => {
   const [departures, setDepartures] = useState<UpcomingDeparture[]>([]);
   const [packages, setPackages] = useState<PackageOption[]>([]);
-  const [selected, setSelected] = useState('');
+  const [selected, setSelected] = useState(targetDeparture ? `${targetDeparture.packageId}|${targetDeparture.departureDay}` : '');
   const [proposedDate, setProposedDate] = useState('');
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const { isBusy: submitting, run } = useActionLock();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -74,6 +71,7 @@ export const ForceMajeureForm: React.FC<{ onSubmitted?: () => void }> = ({ onSub
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     const departure = departures.find((d) => `${d.packageId}|${d.departureDay}` === selected);
     if (!departure) {
       setError('Pilih keberangkatan yang dibatalkan terlebih dahulu.');
@@ -96,33 +94,38 @@ export const ForceMajeureForm: React.FC<{ onSubmitted?: () => void }> = ({ onSub
       return;
     }
 
-    setSubmitting(true);
-    setError('');
-    setSuccess('');
-    try {
-      const result = await request('/provider/departures/force-majeure', {
-        method: 'POST',
-        body: JSON.stringify({
-          packageId: departure.packageId,
-          departureDay: departure.departureDay,
-          proposedDate,
-          reason: reason.trim(),
-        }),
-      });
-      setSuccess(result?.message || 'Pembatalan tercatat dan pelanggan telah diberi tahu.');
-      setSelected('');
-      setProposedDate('');
-      setReason('');
-      await load();
-      onSubmitted?.();
-    } catch (err) {
-      setError((err as Error)?.message || 'Pembatalan gagal dikirim.');
-    } finally {
-      setSubmitting(false);
-    }
+    await run('force-majeure', async () => {
+      onBusyChange?.(true);
+      setError('');
+      setSuccess('');
+      try {
+        const result = await request('/provider/departures/force-majeure', {
+          method: 'POST',
+          body: JSON.stringify({
+            packageId: departure.packageId,
+            departureDay: departure.departureDay,
+            proposedDate,
+            reason: reason.trim(),
+          }),
+        });
+        setSuccess(result?.message || 'Pembatalan tercatat dan pelanggan telah diberi tahu.');
+        if (!targetDeparture) setSelected('');
+        setProposedDate('');
+        setReason('');
+        await load();
+        onSubmitted?.(result?.message || 'Pembatalan tercatat dan pelanggan telah diberi tahu.');
+      } catch (err) {
+        setError((err as Error)?.message || 'Pembatalan gagal dikirim.');
+      } finally {
+        onBusyChange?.(false);
+      }
+    });
   };
 
-  if (loading) return null;
+  if (loading) return <p role="status" style={{ color: '#64748b' }}>Memuat jadwal keberangkatan...</p>;
+
+  const selectedDeparture = departures.find(d => `${d.packageId}|${d.departureDay}` === selected);
+  const targetUnavailable = Boolean(targetDeparture && !selectedDeparture);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -166,7 +169,7 @@ export const ForceMajeureForm: React.FC<{ onSubmitted?: () => void }> = ({ onSub
       </div>
 
       {error && (
-        <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '10px', padding: '10px 14px', fontSize: '12.5px', marginBottom: '14px' }}>
+        <div role="alert" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '10px', padding: '10px 14px', fontSize: '12.5px', marginBottom: '14px' }}>
           {error}
         </div>
       )}
@@ -176,9 +179,9 @@ export const ForceMajeureForm: React.FC<{ onSubmitted?: () => void }> = ({ onSub
         </div>
       )}
 
-      {departures.length === 0 ? (
+      {departures.length === 0 || targetUnavailable ? (
         <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
-          Tidak ada keberangkatan terjadwal dengan pesanan aktif saat ini.
+          {targetUnavailable ? 'Keberangkatan pesanan ini sudah tidak tersedia untuk pembatalan force majeure. Perbarui daftar booking atau hubungi admin.' : 'Tidak ada keberangkatan terjadwal dengan pesanan aktif saat ini.'}
         </p>
       ) : (
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '14px' }}>
@@ -187,6 +190,8 @@ export const ForceMajeureForm: React.FC<{ onSubmitted?: () => void }> = ({ onSub
             <select
               id="fm-departure"
               value={selected}
+              disabled={submitting || Boolean(targetDeparture)}
+              required
               onChange={(e) => setSelected(e.target.value)}
               style={inputStyle}
             >
@@ -199,13 +204,18 @@ export const ForceMajeureForm: React.FC<{ onSubmitted?: () => void }> = ({ onSub
             </select>
           </div>
 
+          {selectedDeparture && <p style={{ margin: 0, padding: '10px 12px', backgroundColor: '#fff7ed', color: '#9a3412', borderRadius: 8, fontSize: 12.5, lineHeight: 1.6 }}>
+            Tindakan ini berlaku untuk <strong>seluruh {selectedDeparture.bookingCount} pesanan</strong> pada keberangkatan yang dipilih. Pelanggan dapat menerima tanggal pengganti atau memilih refund penuh.
+          </p>}
           <div>
             <label style={labelStyle} htmlFor="fm-date">TANGGAL PENGGANTI YANG DITAWARKAN</label>
             <input
               id="fm-date"
               type="date"
               value={proposedDate}
-              min={tomorrowISO()}
+              min={addDays(jakartaToday(), 1)}
+              required
+              disabled={submitting}
               onChange={(e) => setProposedDate(e.target.value)}
               style={{ ...inputStyle, maxWidth: '240px' }}
             />
@@ -220,6 +230,9 @@ export const ForceMajeureForm: React.FC<{ onSubmitted?: () => void }> = ({ onSub
               id="fm-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
+              disabled={submitting}
+              required
+              minLength={10}
               rows={3}
               maxLength={500}
               placeholder="Contoh: Status Gunung Bromo dinaikkan ke Siaga III dan jalur pendakian ditutup BPBD sejak pagi ini."
@@ -233,8 +246,10 @@ export const ForceMajeureForm: React.FC<{ onSubmitted?: () => void }> = ({ onSub
           <div>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !selected || !proposedDate || reason.trim().length < 10}
+              aria-busy={submitting}
               style={{
+                opacity: submitting || !selected || !proposedDate || reason.trim().length < 10 ? 0.6 : 1,
                 backgroundColor: '#dc2626',
                 color: '#ffffff',
                 border: 'none',
@@ -251,7 +266,7 @@ export const ForceMajeureForm: React.FC<{ onSubmitted?: () => void }> = ({ onSub
               <Send size={15} /> {submitting ? 'Mengirim...' : 'Batalkan & Kirim Pilihan ke Pelanggan'}
             </button>
             <span style={{ fontSize: '11.5px', color: '#94a3b8', marginLeft: '12px' }}>
-              Berlaku juga pada hari keberangkatan ({formatDate(todayISO())}).
+              Berlaku juga pada hari keberangkatan ({formatDate(jakartaToday())}).
             </span>
           </div>
         </form>

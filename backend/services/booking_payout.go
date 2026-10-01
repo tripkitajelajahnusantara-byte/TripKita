@@ -67,6 +67,13 @@ func buildBookingPayouts(bookings []models.Booking, payouts []models.Payout, now
 
 	stage := func(b models.Booking, payoutType string, amount int64, unlocked bool) models.BookingPayoutStage {
 		result := models.BookingPayoutStage{Amount: amount}
+		availableAt := b.TripEndDate
+		if payoutType == "DP_50" {
+			availableAt = dpAvailableAt(b)
+		}
+		if !availableAt.IsZero() {
+			result.AvailableAt = &availableAt
+		}
 		covered := int64(0)
 		pending := false
 		if agg := assigned[stageKey{b.ID, payoutType}]; agg != nil {
@@ -97,6 +104,14 @@ func buildBookingPayouts(bookings []models.Booking, payouts []models.Payout, now
 			result.Status = models.BookingPayoutNone
 		case !unlocked:
 			result.Status = models.BookingPayoutLocked
+			if payoutType == "DP_50" {
+				result.BlockedReason = "DP dapat diajukan mulai H-3 sebelum trip dimulai, setelah pembayaran lunas."
+			} else {
+				result.BlockedReason = "Pelunasan dapat diajukan setelah waktu selesai perjalanan."
+			}
+			if availableAt.IsZero() {
+				result.BlockedReason = "Jadwal perjalanan belum tersedia. Hubungi admin untuk memperbarui jadwal."
+			}
 		default:
 			result.Status = models.BookingPayoutAvailable
 		}
@@ -119,7 +134,7 @@ func buildBookingPayouts(bookings []models.Booking, payouts []models.Payout, now
 			TripEndDate:   b.TripEndDate,
 			BookingStatus: b.Status,
 			NetEarning:    split.NetEarning,
-			DP:            stage(b, "DP_50", split.DPAmount, true),
+			DP:            stage(b, "DP_50", split.DPAmount, dpCanBePaid(b, now)),
 			Settlement:    stage(b, "PELUNASAN_50", split.SettlementHeld, settlementCanBePaid(b, now)),
 		})
 	}

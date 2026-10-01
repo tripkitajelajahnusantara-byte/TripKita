@@ -107,6 +107,9 @@ func (s *payoutService) RequestPayout(providerID uint, req *models.CreatePayoutR
 		switch stage.Status {
 		case models.BookingPayoutAvailable:
 		case models.BookingPayoutLocked:
+			if stage.BlockedReason != "" {
+				return errors.New(stage.BlockedReason)
+			}
 			return errors.New("pelunasan trip ini baru dapat dicairkan setelah tanggal trip selesai")
 		case models.BookingPayoutRequested:
 			return errors.New("pencairan tahap ini untuk trip tersebut sedang diproses admin")
@@ -286,6 +289,14 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 	availableDP, availablePelunasan := calculatePayoutAvailability(
 		dpEligible, pelunasanEligible, dpReserved, pelunasanReserved,
 	)
+	bookingPayouts := buildBookingPayouts(bookings, payouts, now)
+	availableDP = capAvailableDP(availableDP, bookingPayouts)
+	var heldDP int64
+	for _, item := range bookingPayouts {
+		if item.DP.Status == models.BookingPayoutLocked {
+			heldDP += item.DP.Remaining
+		}
+	}
 
 	ledger, err := GetLedgerBalance(database.DB, providerID)
 	if err != nil {
@@ -311,10 +322,11 @@ func (s *payoutService) GetProviderPayoutSummary(providerID uint) (*models.Payou
 		AvailableDP:        availableDP,
 		AvailablePelunasan: availablePelunasan,
 		HeldSettlement:     heldSettlement,
+		HeldDP:             heldDP,
 		TotalPaidOut:       totalPaidOut,
 		PendingPayout:      pendingPayout,
 		Payouts:            payouts,
-		Bookings:           buildBookingPayouts(bookings, payouts, now),
+		Bookings:           bookingPayouts,
 		LedgerAvailable:    ledger.Available,
 		LedgerHeld:         ledger.Held,
 		ProviderDebt:       ledger.Debt,
@@ -335,7 +347,36 @@ func settlementCanBePaid(booking models.Booking, now time.Time) bool {
 	if booking.Status == models.StatusCancelledByCustomer && booking.RefundAmount == 0 && booking.PaidAt != nil {
 		return true
 	}
-	return tripHasEnded(booking, now)
+	return bookingGeneratesProviderEarning(booking) && !booking.TripEndDate.IsZero() && !now.Before(booking.TripEndDate)
+}
+
+// H-3 begins at midnight WIB, independent of the server timezone or start hour.
+func dpAvailableAt(booking models.Booking) time.Time {
+	if booking.TripDate.IsZero() {
+		return time.Time{}
+	}
+	start := booking.TripDate.In(models.BookingLocation)
+	return time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, models.BookingLocation).AddDate(0, 0, -3)
+}
+
+func dpCanBePaid(booking models.Booking, now time.Time) bool {
+	availableAt := dpAvailableAt(booking)
+	return bookingGeneratesProviderEarning(booking) && !availableAt.IsZero() && !now.Before(availableAt)
+}
+
+// Credit remains in the ledger after payment; only withdrawal is gated by H-3.
+// Cap by unreserved per-booking rights so legacy payouts keep their allocation.
+func capAvailableDP(available int64, bookings []models.BookingPayout) int64 {
+	var unlocked int64
+	for _, booking := range bookings {
+		if booking.DP.Status == models.BookingPayoutAvailable {
+			unlocked += booking.DP.Remaining
+		}
+	}
+	if available > unlocked {
+		return unlocked
+	}
+	return available
 }
 
 // calculatePayoutAvailability mengimbangi kekurangan satu tahap dengan hak
@@ -624,6 +665,8 @@ func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error)
 		}
 	}
 	dpAvailable, settlementAvailable := calculatePayoutAvailability(dpEligible, settlementEligible, dpReserved, settlementReserved)
+	bookingPayouts := buildBookingPayouts(bookings, reserved, now)
+	dpAvailable = capAvailableDP(dpAvailable, bookingPayouts)
 	available := settlementAvailable
 	if current.Type == "DP_50" {
 		available = dpAvailable
@@ -632,12 +675,33 @@ func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error)
 	// Pencairan per trip: nominal juga dibatasi sisa hak booking itu sendiri,
 	// misalnya bila booking direfund setelah pengajuan dibuat.
 	if current.BookingID != nil {
-		stage, found := findBookingPayoutStage(buildBookingPayouts(bookings, reserved, now), *current.BookingID, current.Type)
+		stage, found := findBookingPayoutStage(bookingPayouts, *current.BookingID, current.Type)
 		if !found || stage.Status == models.BookingPayoutLocked {
 			return 0, nil
 		}
 		if stage.Remaining < available {
 			available = stage.Remaining
+		}
+	} else if current.Amount > 0 {
+		// Legacy aggregate requests are allocated to oldest bookings. A ready
+		// newer booking must not let approval pay a still-locked older trip.
+		candidate := *current
+		candidate.Status = models.PayoutStatusApproved
+		withCandidate := append(append([]models.Payout{}, reserved...), candidate)
+		after := buildBookingPayouts(bookings, withCandidate, now)
+		for _, booking := range bookings {
+			unlocked := settlementCanBePaid(booking, now)
+			if current.Type == "DP_50" {
+				unlocked = dpCanBePaid(booking, now)
+			}
+			if unlocked {
+				continue
+			}
+			beforeStage, found := findBookingPayoutStage(bookingPayouts, booking.ID, current.Type)
+			afterStage, foundAfter := findBookingPayoutStage(after, booking.ID, current.Type)
+			if found && foundAfter && afterStage.Remaining < beforeStage.Remaining {
+				return 0, nil
+			}
 		}
 	}
 	return available, nil

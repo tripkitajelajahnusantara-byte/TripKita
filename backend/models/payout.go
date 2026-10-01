@@ -60,11 +60,13 @@ const (
 
 // BookingPayoutStage merangkum hak dan status pencairan satu tahap booking.
 type BookingPayoutStage struct {
-	Amount    int64  `json:"amount"`
-	Remaining int64  `json:"remaining"`
-	Status    string `json:"status"`
-	PayoutID  *uint  `json:"payoutId,omitempty"`
-	ProofPath string `json:"proofPath,omitempty"`
+	Amount        int64      `json:"amount"`
+	Remaining     int64      `json:"remaining"`
+	Status        string     `json:"status"`
+	PayoutID      *uint      `json:"payoutId,omitempty"`
+	ProofPath     string     `json:"proofPath,omitempty"`
+	AvailableAt   *time.Time `json:"availableAt,omitempty"`
+	BlockedReason string     `json:"blockedReason,omitempty"`
 }
 
 // BookingPayout adalah baris pencairan per trip pada menu Keuangan mitra.
@@ -91,6 +93,7 @@ type PayoutSummary struct {
 	AvailableDP        int64           `json:"availableDp"`
 	AvailablePelunasan int64           `json:"availablePelunasan"`
 	HeldSettlement     int64           `json:"heldSettlement"`
+	HeldDP             int64           `json:"heldDp"`
 	TotalPaidOut       int64           `json:"totalPaidOut"`
 	PendingPayout      int64           `json:"pendingPayout"`
 	Payouts            []Payout        `json:"payouts"`

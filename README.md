@@ -152,7 +152,7 @@ diisi pada production. Jalankan migrasi
 Berbeda dengan aturan kuota yang hanya berlaku untuk Open Trip dan terikat batas
 H-3, mitra dapat menyatakan **keadaan kahar** untuk **seluruh tipe paket**, kapan
 saja sampai hari keberangkatan berakhir — termasuk pada hari-H, yang justru
-paling sering terjadi. Menu tersedia di Partner Hub → **Booking**.
+paling sering terjadi. Form tersedia di Partner Hub → **Booking → Batalkan** pada pesanan yang dipilih, lalu pilih **Keadaan Kahar**. Form tidak ditampilkan pada halaman daftar booking.
 
 Mitra wajib mengisi alasan (minimal 10 karakter) dan satu tanggal pengganti.
 Alasan tersimpan sebagai jejak audit dan ikut dikirim ke pelanggan. Setiap
@@ -176,6 +176,14 @@ Pencairan ke mitra berjalan manual: admin mentransfer dana lalu wajib mengunggah
 menyetujui payout. `ENABLE_AUTOMATIC_PAYOUT` harus tetap `false` karena integrasi pembayaran
 massal belum didukung oleh konfigurasi runtime. Refund juga manual dan wajib dicatat beserta
 nominal, metode, referensi transfer, dan admin pemrosesnya.
+
+DP 50% dapat diajukan mulai **H-3 pukul 00:00 WIB** sebelum tanggal mulai trip,
+setelah pembayaran pelanggan lunas. Tombol **Cairkan DP** selalu terlihat pada
+daftar pencairan per trip, tetapi nonaktif beserta alasannya bila belum memenuhi
+syarat. Pelunasan 50% dan tombol **Selesaikan Perjalanan** baru aktif saat waktu
+`trip_end_date` tercapai. Server memeriksa syarat tanggal saat pengajuan dan saat
+persetujuan admin; perubahan jadwal ikut mengubah waktu pencairan. Kebijakan
+kompensasi pembatalan customer tanpa refund tetap mengikuti aturan sebelumnya.
 
 Langkah menguji pencairan DP dan pelunasan secara lokal, beserta daftar periksanya,
 ada di [`PANDUAN_UJI_PENCAIRAN.md`](PANDUAN_UJI_PENCAIRAN.md).
