@@ -146,7 +146,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			{
 				bookings.GET("", bookingCtrl.GetAll)
 				bookings.PUT("/:id/status", bookingCtrl.UpdateStatus)
-				bookings.PUT("/:id/reschedule", bookingCtrl.ProviderReschedule)
+				// Perubahan jadwal selalu berupa tawaran yang dijawab pelanggan.
+				bookings.PUT("/:id/reschedule", departureCtrl.OfferBookingReschedule)
 			}
 
 			// Payouts / Keuangan Mitra

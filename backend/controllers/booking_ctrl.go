@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"tripkita-provider/config"
 	"tripkita-provider/models"
@@ -134,6 +135,15 @@ func guestBookingView(booking *models.Booking) gin.H {
 	if booking.Status == models.StatusPendingPayment && !booking.CreatedAt.IsZero() {
 		view["paymentDeadline"] = models.PaymentDeadline(booking)
 	}
+	// Tawaran jadwal pengganti dan sebab pembatalan tidak memuat data pribadi,
+	// jadi pemesan tamu tetap dapat melihat apa yang terjadi pada tripnya.
+	if booking.Status == models.StatusRescheduleOffered {
+		view["rescheduleDate"] = booking.RescheduleDate
+		view["rescheduleResponseDeadline"] = booking.RescheduleResponseDeadline
+	}
+	if booking.CancellationReason != "" {
+		view["cancellationReason"] = booking.CancellationReason
+	}
 	return view
 }
 
@@ -157,40 +167,24 @@ func (ctrl *BookingController) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	booking, err := ctrl.service.UpdateBookingStatus(uint(id), providerID.(uint), req.Status)
+	var booking *models.Booking
+	if req.Status == models.StatusCancelledByProvider {
+		// Pelanggan berhak tahu mengapa tripnya dibatalkan; alasan tampil di
+		// notifikasi, email, dan riwayat pesanannya.
+		booking, err = ctrl.service.CancelBookingByProvider(uint(id), providerID.(uint), req.CancellationReason)
+	} else {
+		booking, err = ctrl.service.UpdateBookingStatus(uint(id), providerID.(uint), req.Status)
+	}
 	if err != nil {
-		respondInternalError(c, "memperbarui status booking", err)
-		return
-	}
-
-	c.JSON(http.StatusOK, booking)
-}
-
-func (ctrl *BookingController) ProviderReschedule(c *gin.Context) {
-	providerID, exists := c.Get("provider_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
-		return
-	}
-
-	var req struct {
-		NewTripDate string `json:"newTripDate" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Tanggal baru diperlukan"})
-		return
-	}
-
-	booking, err := ctrl.service.ProviderReschedule(uint(id), providerID.(uint), req.NewTripDate)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		var inputErr *services.BookingInputError
+		switch {
+		case errors.As(err, &inputErr):
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Pesanan tidak ditemukan"})
+		default:
+			respondInternalError(c, "memperbarui status booking", err)
+		}
 		return
 	}
 

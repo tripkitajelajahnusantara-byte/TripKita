@@ -5,6 +5,7 @@ import { fetchCheckoutConfig } from '../utils/checkoutConfig';
 import { useActionLock } from '../utils/useActionLock';
 import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, MessageSquare, Star, LoaderCircle } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
+import { RescheduleOfferCard } from '../components/RescheduleOfferCard';
 
 interface BookingItem {
   id: number;
@@ -31,9 +32,10 @@ interface BookingItem {
   paymentReviewNotes?: string;
   providerWhatsApp?: string;
   providerName?: string;
-  // Terisi saat penyelenggara menawarkan tanggal pengganti karena kuota minimal
-  // open trip tidak terpenuhi pada H-3.
+  // Terisi saat penyelenggara menawarkan tanggal pengganti (perubahan jadwal
+  // oleh mitra, keadaan kahar, atau kuota/cuaca H-3) untuk tipe trip apa pun.
   rescheduleDate?: string | null;
+  rescheduleResponseDeadline?: string | null;
   tripDepartureId?: number | null;
   // Sebab keberangkatan tidak dapat dijalankan: kuota minimal tidak terpenuhi,
   // atau keadaan kahar beserta penjelasan penyelenggara.
@@ -47,6 +49,10 @@ const getWhatsAppURL = (phone?: string): string | null => {
   if (!digits.startsWith('62') || digits.length < 10 || digits.length > 15) return null;
   return `https://wa.me/${digits}`;
 };
+
+// Status pembatalan yang menampilkan keterangan (alasan penyelenggara atau
+// ketentuan refund) kepada pelanggan.
+const CANCELLED_WITH_REASON = ['REFUND_REQUIRED', 'REFUNDED', 'CANCELLED_BY_PROVIDER', 'CANCELLED_BY_CUSTOMER'];
 
 // Batas waktu pembayaran invoice. Nilai sebenarnya diambil dari /public/checkout-config;
 // konstanta ini hanya dipakai selama konfigurasi belum termuat.
@@ -321,14 +327,10 @@ export const CustomerHistoryPage: React.FC = () => {
     });
   };
 
-  // Jawaban pelanggan atas tanggal pengganti yang ditawarkan penyelenggara saat
-  // kuota minimal open trip tidak terpenuhi pada H-3.
+  // Jawaban pelanggan atas tanggal pengganti dari penyelenggara. Konfirmasi
+  // dilakukan di dalam RescheduleOfferCard sebelum fungsi ini dipanggil.
   const handleRescheduleResponse = async (bookingId: number, accept: boolean) => {
     if (isBusy) return;
-    const confirmText = accept
-      ? 'Terima tanggal pengganti ini? Jadwal trip Anda akan diperbarui.'
-      : 'Tolak tanggal pengganti ini? Pesanan Anda akan diteruskan ke proses pengembalian dana penuh.';
-    if (!window.confirm(confirmText)) return;
 
     await run(`reschedule-${bookingId}-${accept ? 'accept' : 'reject'}`, async () => {
     try {
@@ -336,6 +338,9 @@ export const CustomerHistoryPage: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({ accept }),
       });
+      if (result?.booking && trackedBooking && trackedBooking.id === bookingId) {
+        setTrackedBooking({ ...trackedBooking, ...result.booking });
+      }
       setModalNotice({
         title: accept ? 'Jadwal Pengganti Diterima' : 'Jadwal Pengganti Ditolak',
         message: result?.message || 'Jawaban Anda telah tersimpan.',
@@ -545,6 +550,20 @@ export const CustomerHistoryPage: React.FC = () => {
                   </div>
                 </div>
 
+                {trackedBooking.status === 'RESCHEDULE_OFFERED' && (
+                  <RescheduleOfferCard
+                    booking={trackedBooking}
+                    pending={pending}
+                    busy={isBusy}
+                    onRespond={trackedBooking.id ? (accept) => handleRescheduleResponse(trackedBooking.id, accept) : undefined}
+                  />
+                )}
+                {CANCELLED_WITH_REASON.includes(trackedBooking.status) && trackedBooking.cancellationReason && (
+                  <p style={{ margin: 0, fontSize: '12.5px', lineHeight: 1.55, color: '#7f1d1d', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 12px' }}>
+                    <strong>Keterangan pembatalan:</strong> {trackedBooking.cancellationReason}
+                  </p>
+                )}
+
                 <div style={{ borderTop: '1px dotted #cbd5e1', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
                     <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>TOTAL HARGA</span>
@@ -721,47 +740,19 @@ export const CustomerHistoryPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {booking.status === 'RESCHEDULE_OFFERED' && booking.rescheduleDate && (
-                    <div style={{ backgroundColor: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <strong style={{ fontSize: '13.5px', color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <AlertCircle size={16} color="#d97706" /> Penyelenggara Menawarkan Tanggal Pengganti
-                      </strong>
-                      <p style={{ fontSize: '13px', color: '#7c2d12', margin: 0, lineHeight: '1.6' }}>
-                        Keberangkatan <strong>{formattedTripDate}</strong> tidak dapat dijalankan. Penyelenggara menawarkan
-                        tanggal pengganti{' '}
-                        <strong style={{ color: '#b45309' }}>
-                          {new Date(booking.rescheduleDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                        </strong>.
-                      </p>
-                      {booking.cancellationReason && (
-                        <p style={{ fontSize: '12.5px', color: '#7c2d12', margin: 0, lineHeight: '1.5', backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 12px' }}>
-                          <strong>Sebab:</strong> {booking.cancellationReason}
-                        </p>
-                      )}
-                      <p style={{ fontSize: '12.5px', color: '#92400e', margin: 0, lineHeight: '1.5' }}>
-                        Jika Anda menolak, pesanan akan diteruskan ke proses pengembalian dana penuh.
-                      </p>
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          aria-busy={pending === `reschedule-${booking.id}-accept`}
-                          onClick={() => handleRescheduleResponse(booking.id, true)}
-                          style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: isBusy ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                        >
-                          {pending === `reschedule-${booking.id}-accept` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Mengirim...</> : 'Terima Jadwal Pengganti'}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          aria-busy={pending === `reschedule-${booking.id}-reject`}
-                          onClick={() => handleRescheduleResponse(booking.id, false)}
-                          style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1.5px solid #fca5a5', padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: isBusy ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                        >
-                          {pending === `reschedule-${booking.id}-reject` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Mengirim...</> : 'Tolak & Minta Refund'}
-                        </button>
-                      </div>
-                    </div>
+                  {booking.status === 'RESCHEDULE_OFFERED' && (
+                    <RescheduleOfferCard
+                      booking={booking}
+                      pending={pending}
+                      busy={isBusy}
+                      onRespond={(accept) => handleRescheduleResponse(booking.id, accept)}
+                    />
+                  )}
+
+                  {CANCELLED_WITH_REASON.includes(booking.status) && booking.cancellationReason && (
+                    <p style={{ margin: 0, fontSize: '12.5px', lineHeight: 1.55, color: '#7f1d1d', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 12px' }}>
+                      <strong>Keterangan pembatalan:</strong> {booking.cancellationReason}
+                    </p>
                   )}
 
                   {booking.status === 'PAYMENT_REVIEW' && (

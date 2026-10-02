@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { request } from '../utils/api';
 import { useActionLock } from '../utils/useActionLock';
+import { addDays, jakartaToday } from '../utils/tripDates';
 
 interface DepartureBooking {
   id: number;
@@ -35,7 +36,7 @@ export interface TripDeparture {
   seatsRequired: number;
   bookingCount: number;
   status: 'AWAITING_PROVIDER' | 'CONTINUED' | 'CANCELLED' | 'RESCHEDULE_OFFERED' | 'RESOLVED';
-  reason: 'QUOTA_SHORTFALL' | 'FORCE_MAJEURE' | 'WEATHER_FORECAST';
+  reason: 'QUOTA_SHORTFALL' | 'FORCE_MAJEURE' | 'WEATHER_FORECAST' | 'PROVIDER_RESCHEDULE';
   responseDeadline?: string | null;
   decision: string;
   proposedDate?: string | null;
@@ -64,19 +65,16 @@ const formatDate = (iso: string) =>
 const weatherMetric = (value: number | undefined, suffix: string) =>
   Number.isFinite(value) ? `${value}${suffix}` : '—';
 
-// Dibentuk dari komponen tanggal lokal; toISOString mengonversi ke UTC sehingga
-// pada dini hari WIB hasilnya masih tanggal hari ini.
-function tomorrowISO(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mm}-${dd}`;
+// Tanggal pengganti paling awal (WIB): pelanggan selalu punya minimal 2x24 jam
+// untuk menjawab, sama dengan aturan backend.
+function earliestReplacementISO(): string {
+  return addDays(jakartaToday(), 2);
 }
 
 const decisionCause = (departure: TripDeparture) => {
   if (departure.reason === 'WEATHER_FORECAST') return 'berdasarkan pertimbangan prakiraan cuaca H-3';
   if (departure.reason === 'FORCE_MAJEURE') return 'karena keadaan kahar';
+  if (departure.reason === 'PROVIDER_RESCHEDULE') return 'karena perubahan jadwal dari Anda';
   return 'karena kuota minimal belum terpenuhi';
 };
 
@@ -212,7 +210,7 @@ export const TripDepartureAlert: React.FC = () => {
             {rescheduleFor === departure.id && (
               <div className="reschedule-box">
                 <label htmlFor={`reschedule-${departure.id}`}>Tanggal pengganti yang ditawarkan</label>
-                <input id={`reschedule-${departure.id}`} type="date" value={proposedDate} min={tomorrowISO()} max={departure.packageDetails?.endDate || undefined} disabled={isSubmitting} onChange={(event) => setProposedDate(event.target.value)} />
+                <input id={`reschedule-${departure.id}`} type="date" value={proposedDate} min={earliestReplacementISO()} max={departure.packageDetails?.endDate || undefined} disabled={isSubmitting} onChange={(event) => setProposedDate(event.target.value)} />
                 <p>Pelanggan menerima notifikasi dan email untuk menerima atau menolak. Penolakan diteruskan ke proses refund.</p>
               </div>
             )}

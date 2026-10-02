@@ -42,6 +42,10 @@ const (
 	// DepartureReasonWeatherForecast adalah bahan pertimbangan H-3 khusus
 	// paket non-open-trip. Prakiraan tidak pernah mengambil keputusan otomatis.
 	DepartureReasonWeatherForecast = "WEATHER_FORECAST"
+	// DepartureReasonProviderReschedule: mitra menjadwalkan ulang satu pesanan
+	// dari menu Booking. Berlaku untuk semua tipe paket; pelanggan tetap memilih
+	// menerima tanggal baru atau menolak dengan refund penuh.
+	DepartureReasonProviderReschedule = "PROVIDER_RESCHEDULE"
 )
 
 // MinimumResponseWindow adalah waktu minimal yang dimiliki pelanggan untuk
@@ -130,13 +134,32 @@ func ReviewDeadlineFor(departureAt time.Time) time.Time {
 }
 
 // ResponseDeadlineFor menghitung batas jawaban pelanggan: waktu keberangkatan
-// semula, atau MinimumResponseWindow dari sekarang bila itu lebih longgar.
-func ResponseDeadlineFor(departureAt time.Time, now time.Time) time.Time {
-	floor := now.Add(MinimumResponseWindow)
-	if departureAt.After(floor) {
-		return departureAt
+// semula, tetapi tidak melewati mulainya jadwal pengganti, dan minimal
+// MinimumResponseWindow dari sekarang. Jadwal pengganti sendiri wajib dimulai
+// paling cepat EarliestProposedStart, sehingga batas ini tidak pernah jatuh
+// setelah trip pengganti berangkat.
+func ResponseDeadlineFor(departureAt, proposedStart, now time.Time) time.Time {
+	deadline := departureAt
+	if proposedStart.Before(deadline) {
+		deadline = proposedStart
 	}
-	return floor
+	if floor := now.Add(MinimumResponseWindow); deadline.Before(floor) {
+		deadline = floor
+	}
+	return deadline
+}
+
+// EarliestProposedStart adalah waktu paling awal jadwal pengganti boleh
+// dimulai: pelanggan selalu punya MinimumResponseWindow untuk menjawab.
+func EarliestProposedStart(now time.Time) time.Time {
+	return now.Add(MinimumResponseWindow)
+}
+
+// ProviderRescheduleRequest adalah tawaran jadwal pengganti dari menu Booking
+// mitra. Alasan wajib karena dibaca pelanggan pada notifikasi dan email.
+type ProviderRescheduleRequest struct {
+	NewTripDate string `json:"newTripDate" binding:"required,datetime=2006-01-02"`
+	Reason      string `json:"reason" binding:"required,min=10,max=200"`
 }
 
 // ForceMajeureRequest adalah pernyataan mitra bahwa satu keberangkatan tidak

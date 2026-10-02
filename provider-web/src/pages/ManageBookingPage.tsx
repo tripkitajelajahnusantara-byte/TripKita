@@ -9,13 +9,14 @@ import {
   Eye, 
   Check,
   X,
+  CalendarX2,
   FileSpreadsheet,
   LoaderCircle
 } from 'lucide-react';
 import type { Booking, BookingParticipant } from '../types';
 import { request } from '../utils/api';
 import { SkeletonTableRows } from '../components/Skeleton';
-import { ForceMajeureForm } from '../components/ForceMajeureForm';
+import { TripChangeModal } from '../components/TripChangeModal';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { jakartaToday } from '../utils/tripDates';
 import { useActionLock } from '../utils/useActionLock';
@@ -33,18 +34,6 @@ const formatParticipantBirth = (birthDate?: string) => {
   if (now.getMonth() < m - 1 || (now.getMonth() === m - 1 && now.getDate() < d)) age--;
   const label = birth.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
   return `${label} (${Math.max(age, 0)} Tahun)`;
-};
-
-// Tanggal besok (zona waktu lokal) dalam format YYYY-MM-DD untuk atribut `min`
-// input reschedule. Backend menolak tanggal yang tidak berada di masa mendatang,
-// jadi hari ini pun tidak boleh dipilih. toISOString tidak dipakai karena
-// mengonversi ke UTC dan bisa menggeser tanggal satu hari.
-const getTomorrowLocal = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mm}-${dd}`;
 };
 
 const isSettledPayment = (status: string, paidAt?: string) =>
@@ -101,21 +90,12 @@ export const ManageBookingPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // Cancel/Reschedule Modal States
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelBookingId, setCancelBookingId] = useState<number | null>(null);
-  // Status booking yang dibatalkan menentukan isi modal: booking yang belum
-  // dibayar tidak punya dana untuk direfund dan tidak dapat di-reschedule.
-  const [cancelBookingStatus, setCancelBookingStatus] = useState<string | null>(null);
-  const [cancelActionType, setCancelActionType] = useState<'REFUND' | 'RESCHEDULE' | 'FORCE_MAJEURE' | null>(null);
-  const [newRescheduleDate, setNewRescheduleDate] = useState('');
+  // Pesanan yang sedang dibuka di dialog "Ubah atau batalkan trip".
+  const [changeBookingId, setChangeBookingId] = useState<number | null>(null);
   // Satu kunci untuk semua aksi yang mengubah status booking agar klik ganda
   // atau dua aksi berbeda tidak terkirim bersamaan.
   const { pending, isBusy, run } = useActionLock();
-  const [forceMajeureBusy, setForceMajeureBusy] = useState(false);
-  const cancelLoading = pending === 'cancel' || forceMajeureBusy;
-  const cancelBooking = bookings.find(b => b.dbId === cancelBookingId);
-  const isUnpaidCancel = cancelBookingStatus === 'PENDING_PAYMENT';
+  const changeBooking = bookings.find(b => b.dbId === changeBookingId);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -154,6 +134,11 @@ export const ManageBookingPage: React.FC = () => {
           rawEndDate: b.tripEndDate,
           rawTripDate: b.tripDate,
           packageId: b.packageId || b.packageDetails?.id,
+          tripType: b.packageDetails?.tripType || '',
+          rescheduleCount: b.rescheduleCount || 0,
+          rescheduleDate: b.rescheduleDate || '',
+          rescheduleResponseDeadline: b.rescheduleResponseDeadline || '',
+          cancellationReason: b.cancellationReason || '',
           participants: Array.isArray(b.participants)
             ? [...b.participants].sort((x: BookingParticipant, y: BookingParticipant) => (x.position || 0) - (y.position || 0))
             : [],
@@ -172,14 +157,10 @@ export const ManageBookingPage: React.FC = () => {
     loadData();
   }, [providerProfile]);
 
-  const handleAction = async (type: string, id: string | number, status?: string) => {
-    if (type === 'reject') {
+  const handleAction = async (type: string, id: string | number) => {
+    if (type === 'change') {
       if (isBusy) return;
-      setCancelBookingId(id as number);
-      setCancelBookingStatus(status ?? null);
-      setCancelActionType(null);
-      setNewRescheduleDate('');
-      setShowCancelModal(true);
+      setChangeBookingId(id as number);
     } else if (type === 'complete') {
       if (isBusy) return;
       // Menyelesaikan trip tidak dapat dibatalkan dan melepas dana pelunasan,
@@ -206,37 +187,13 @@ export const ManageBookingPage: React.FC = () => {
     }
   };
 
-  const handleSubmitCancel = async () => {
-    if (isBusy || forceMajeureBusy || !cancelBookingId || !cancelActionType || cancelActionType === 'FORCE_MAJEURE') return;
-    // Validasi dilakukan sebelum mengunci agar tombol tidak sempat berputar.
-    if (cancelActionType === 'RESCHEDULE' && !newRescheduleDate) {
-      alert('Silakan pilih tanggal reschedule.');
-      return;
-    }
-    await run('cancel', async () => {
-      try {
-        if (cancelActionType === 'REFUND') {
-          await request(`/provider/bookings/${cancelBookingId}/status`, {
-            method: 'PUT',
-            body: JSON.stringify({ status: 'CANCELLED_BY_PROVIDER' }),
-          });
-          // Booking yang belum dibayar dibatalkan tanpa refund karena belum ada dana masuk.
-          alert(isUnpaidCancel
-            ? 'Booking berhasil dibatalkan. Tidak ada refund karena pelanggan belum melakukan pembayaran.'
-            : 'Booking berhasil dibatalkan dan direfund 100%.');
-        } else if (cancelActionType === 'RESCHEDULE') {
-          await request(`/provider/bookings/${cancelBookingId}/reschedule`, {
-            method: 'PUT',
-            body: JSON.stringify({ newTripDate: newRescheduleDate }),
-          });
-          alert('Jadwal booking berhasil diubah (Reschedule).');
-        }
-        setShowCancelModal(false);
-        loadData();
-      } catch (err: any) {
-        alert(err.message || 'Terjadi kesalahan saat memproses permintaan.');
-      }
-    });
+  // Open Trip berangkat bersama: tawaran jadwal pengganti berlaku untuk semua
+  // pesanan aktif pada paket dan tanggal yang sama.
+  const departureBookingCount = (target: Booking) => {
+    if (!target.packageId || !target.rawTripDate) return 1;
+    const day = jakartaToday(new Date(target.rawTripDate));
+    return bookings.filter(b => b.packageId === target.packageId && b.rawTripDate &&
+      (b.status === 'PAID' || b.status === 'CONFIRMED') && jakartaToday(new Date(b.rawTripDate)) === day).length || 1;
   };
 
   const filteredBookings = bookings.filter((b) => {
@@ -399,9 +356,17 @@ export const ManageBookingPage: React.FC = () => {
                         {(() => {
                           const meta = getBookingStatusMeta(b.status);
                           return (
-                            <span className="status-pill" style={{ backgroundColor: meta.background, color: meta.color }}>
-                              {meta.label}
-                            </span>
+                            <>
+                              <span className="status-pill" style={{ backgroundColor: meta.background, color: meta.color }}>
+                                {meta.label}
+                              </span>
+                              {b.status === 'RESCHEDULE_OFFERED' && b.rescheduleDate && (
+                                <small style={{ display: 'block', marginTop: 6, fontSize: 11.5, lineHeight: 1.45, color: '#6d28d9', maxWidth: 180 }}>
+                                  Ditawarkan {new Date(b.rescheduleDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' })}
+                                  {b.rescheduleResponseDeadline && <> · jawab s/d {new Date(b.rescheduleResponseDeadline).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB</>}
+                                </small>
+                              )}
+                            </>
                           );
                         })()}
                       </td>
@@ -428,16 +393,16 @@ export const ManageBookingPage: React.FC = () => {
                               {!canComplete && <small id={`complete-${b.dbId}-hint`} style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4 }}>{hint}</small>}
                             </div>;
                           })()}
-                          {(b.status === 'CONFIRMED' || b.status === 'PAID' || b.status === 'PENDING_PAYMENT') && b.dbId && (
+                          {(b.status === 'CONFIRMED' || b.status === 'PAID' || b.status === 'RESCHEDULE_OFFERED') && b.dbId && (
                             <button
                               className="action-btn text-red"
-                              title="Batalkan Pesanan"
-                              aria-label={`Batalkan pesanan ${b.id}`}
-                              onClick={() => handleAction('reject', b.dbId!, b.status)}
+                              title="Jadwalkan ulang atau batalkan trip"
+                              aria-label={`Ubah jadwal atau batalkan pesanan ${b.id}`}
+                              onClick={() => handleAction('change', b.dbId!)}
                               disabled={isBusy}
                               style={{ width: 'auto', borderRadius: 8, padding: '6px 10px', gap: 6, cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy ? 0.5 : 1 }}
                             >
-                              <X size={14} /> Batalkan
+                              <CalendarX2 size={14} /> Ubah / Batalkan
                             </button>
                           )}
                         </div>
@@ -765,106 +730,17 @@ export const ManageBookingPage: React.FC = () => {
         }
       `}</style>
 
-      {/* Cancel Action Modal */}
-      {showCancelModal && (
-        <div className="detail-modal-overlay">
-          <div className="detail-modal-card" role="dialog" aria-modal="true" aria-labelledby="cancel-modal-title" style={{ maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
-            <div className="modal-header">
-              <h2 id="cancel-modal-title">Batalkan Pesanan {cancelBooking?.id}</h2>
-              {/* Modal tidak boleh ditutup selama permintaan masih diproses. */}
-              <button className="close-modal" aria-label="Tutup dialog pembatalan" onClick={() => setShowCancelModal(false)} disabled={cancelLoading} style={{ cursor: cancelLoading ? 'not-allowed' : 'pointer' }}>✕</button>
-            </div>
-            
-            <div style={{ marginBottom: '20px' }}>
-              <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
-                {isUnpaidCancel
-                  ? 'Pesanan ini belum dibayar pelanggan, sehingga pembatalan tidak memerlukan refund.'
-                  : 'Pilih tindakan untuk pesanan ini: refund penuh, ubah tanggal, atau batalkan keberangkatan karena keadaan kahar (force majeure).'}
-              </p>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
-                <button
-                  type="button"
-                  onClick={() => setCancelActionType('REFUND')}
-                  aria-pressed={cancelActionType === 'REFUND'}
-                  disabled={cancelLoading}
-                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid', borderColor: cancelActionType === 'REFUND' ? '#dc2626' : '#cbd5e1', backgroundColor: cancelActionType === 'REFUND' ? '#fef2f2' : '#ffffff', color: cancelActionType === 'REFUND' ? '#dc2626' : '#475569', fontWeight: 600, cursor: cancelLoading ? 'not-allowed' : 'pointer' }}
-                >
-                  {isUnpaidCancel ? 'Batalkan Pesanan' : 'Refund 100%'}
-                </button>
-                {/* Backend hanya mengizinkan reschedule untuk booking yang sudah dibayar. */}
-                {!isUnpaidCancel && (
-                  <button
-                    type="button"
-                    onClick={() => setCancelActionType('RESCHEDULE')}
-                    aria-pressed={cancelActionType === 'RESCHEDULE'}
-                    disabled={cancelLoading}
-                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid', borderColor: cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#cbd5e1', backgroundColor: cancelActionType === 'RESCHEDULE' ? '#f0fdfa' : '#ffffff', color: cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#475569', fontWeight: 600, cursor: cancelLoading ? 'not-allowed' : 'pointer' }}
-                  >
-                    Reschedule
-                  </button>
-                )}
-                {!isUnpaidCancel && <button type="button" onClick={() => setCancelActionType('FORCE_MAJEURE')} disabled={cancelLoading}
-                  aria-pressed={cancelActionType === 'FORCE_MAJEURE'}
-                  style={{ flex: 1, minWidth: 160, padding: '10px', borderRadius: 8, border: '1px solid', borderColor: cancelActionType === 'FORCE_MAJEURE' ? '#b91c1c' : '#cbd5e1', backgroundColor: cancelActionType === 'FORCE_MAJEURE' ? '#fff7ed' : '#fff', color: '#9a3412', fontWeight: 600, cursor: cancelLoading ? 'not-allowed' : 'pointer' }}>
-                  Keadaan Kahar
-                </button>}
-              </div>
-
-              {cancelActionType === 'FORCE_MAJEURE' && (
-                cancelBooking?.packageId && cancelBooking.rawTripDate
-                  ? <ForceMajeureForm departure={{ packageId: cancelBooking.packageId, departureDay: jakartaToday(new Date(cancelBooking.rawTripDate)) }}
-                      onBusyChange={setForceMajeureBusy} onSubmitted={(message) => { setShowCancelModal(false); showAlert({ type: 'success', title: 'Pembatalan Tercatat', message }); void loadData(); }} />
-                  : <p role="alert" style={{ color: '#b91c1c' }}>Jadwal pesanan tidak tersedia. Perbarui daftar booking atau hubungi admin.</p>
-              )}
-
-              {cancelActionType === 'RESCHEDULE' && (
-                <div className="input-group" style={{ marginBottom: '16px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>Pilih Tanggal Baru</label>
-                  <input 
-                    type="date" 
-                    value={newRescheduleDate}
-                    min={getTomorrowLocal()}
-                    disabled={cancelLoading}
-                    onChange={(e) => setNewRescheduleDate(e.target.value)}  
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', marginTop: '6px' }}
-                  />
-                  <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>Maksimal penjadwalan ulang hanya diperbolehkan 1 kali.</p>
-                </div>
-              )}
-
-              {cancelActionType === 'REFUND' && (
-                <div style={{ padding: '12px', backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: '8px', marginBottom: '16px' }}>
-                  <p style={{ fontSize: '12px', color: '#c2410c', margin: 0 }}>
-                    {isUnpaidCancel
-                      ? <><strong>Perhatian:</strong> Booking ini akan dibatalkan secara permanen dan tautan pembayaran pelanggan tidak berlaku lagi.</>
-                      : <><strong>Perhatian:</strong> Memilih refund 100% akan membatalkan booking ini secara permanen. Jika pembayaran sudah cair, saldo Anda akan dipotong sebesar nilai transaksi ini.</>}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button 
-                type="button" 
-                onClick={() => setShowCancelModal(false)}
-                disabled={cancelLoading}
-                style={{ border: '1px solid var(--color-border)', backgroundColor: '#ffffff', color: '#334155', fontWeight: 600, padding: '10px 20px', borderRadius: '8px', cursor: cancelLoading ? 'not-allowed' : 'pointer', opacity: cancelLoading ? 0.6 : 1 }}
-              >
-                Kembali
-              </button>
-              {cancelActionType !== 'FORCE_MAJEURE' && <button
-                type="button" 
-                onClick={handleSubmitCancel}
-                disabled={cancelLoading || !cancelActionType}
-                aria-busy={cancelLoading}
-                style={{ width: 'auto', padding: '10px 24px', backgroundColor: cancelActionType === 'REFUND' ? '#dc2626' : (cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#94a3b8'), color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: (cancelLoading || !cancelActionType) ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                {cancelLoading ? (<><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</>) : 'Konfirmasi Tindakan'}
-              </button>}
-            </div>
-          </div>
-        </div>
+      {changeBooking && (
+        <TripChangeModal
+          booking={changeBooking}
+          departureBookingCount={departureBookingCount(changeBooking)}
+          onClose={() => setChangeBookingId(null)}
+          onCompleted={(title, message) => {
+            setChangeBookingId(null);
+            showAlert({ type: 'success', title, message });
+            void loadData();
+          }}
+        />
       )}
     </div>
   );

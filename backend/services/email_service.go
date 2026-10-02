@@ -210,7 +210,11 @@ func (s *EmailService) SendRefundPendingEmail(b *models.Booking) error {
 		return nil
 	}
 	subject := fmt.Sprintf("Pesanan Dibatalkan, Refund Sedang Diproses - #%s TemenTrip", b.BookingCode)
-	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px"><h2 style="color:#0284c7;text-align:center">Temen<span style="color:#00c9a7">Trip</span></h2><div style="background:#fff7ed;border:1px solid #fed7aa;padding:16px;border-radius:12px"><h3 style="color:#c2410c;margin-top:0">Pesanan Dibatalkan, Refund Menunggu Diproses</h3><p>Halo <strong>%s</strong>, pembatalan pesanan <strong>#%s</strong> sudah tercatat dan refund sedang menunggu verifikasi admin.</p></div><p>Email bukti refund akan dikirim setelah transfer refund benar-benar selesai.</p></div></body></html>`, html.EscapeString(b.CustomerName), html.EscapeString(b.BookingCode))
+	reasonHTML := ""
+	if reason := strings.TrimSpace(b.CancellationReason); reason != "" {
+		reasonHTML = fmt.Sprintf(`<p style="margin-bottom:0"><strong>Keterangan:</strong> %s</p>`, html.EscapeString(reason))
+	}
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px"><h2 style="color:#0284c7;text-align:center">Temen<span style="color:#00c9a7">Trip</span></h2><div style="background:#fff7ed;border:1px solid #fed7aa;padding:16px;border-radius:12px"><h3 style="color:#c2410c;margin-top:0">Pesanan Dibatalkan, Refund Menunggu Diproses</h3><p>Halo <strong>%s</strong>, pembatalan pesanan <strong>#%s</strong> sudah tercatat dan refund sedang menunggu verifikasi admin.</p>%s</div><p>Email bukti refund akan dikirim setelah transfer refund benar-benar selesai.</p></div></body></html>`, html.EscapeString(b.CustomerName), html.EscapeString(b.BookingCode), reasonHTML)
 	return s.sendMailWithAttachment(b.CustomerEmail, subject, body, nil, "")
 }
 
@@ -796,7 +800,7 @@ func (s *EmailService) SendWeatherAdvisoryEmail(provider *models.Provider, depar
 // SendRescheduleOfferEmail meminta persetujuan pelanggan atas tanggal pengganti.
 // Berbeda dengan SendRescheduleEmail yang mengabarkan jadwal yang sudah berubah,
 // email ini menuntut jawaban: diterima atau ditolak.
-func (s *EmailService) SendRescheduleOfferEmail(b *models.Booking, proposed time.Time, originalDate time.Time, cause string) error {
+func (s *EmailService) SendRescheduleOfferEmail(b *models.Booking, proposed, originalDate, deadline time.Time, cause string) error {
 	if b == nil || b.CustomerEmail == "" {
 		return nil
 	}
@@ -829,24 +833,25 @@ func (s *EmailService) SendRescheduleOfferEmail(b *models.Booking, proposed time
       <tr><td style="padding: 8px 0;">Jadwal Pengganti</td><td style="padding: 8px 0; text-align: right;"><strong style="color: #0284c7;">%s</strong></td></tr>
     </table>
     <p style="font-size: 14px; color: #475569;">
-      Silakan buka riwayat pesanan Anda untuk <strong>menerima</strong> atau <strong>menolak</strong> tanggal pengganti ini.
-      Jika Anda menolak, pesanan akan diteruskan ke proses pengembalian dana penuh.
+      Silakan buka riwayat pesanan Anda untuk <strong>menerima</strong> atau <strong>menolak</strong> tanggal pengganti ini
+      sebelum <strong>%s</strong>. Jika Anda menolak, pesanan akan diteruskan ke proses pengembalian dana penuh.
     </p>
     <div style="text-align: center; margin: 28px 0;">
       <a href="%s" style="background-color: #0284c7; color: #ffffff; padding: 12px 28px; border-radius: 10px; text-decoration: none; font-weight: bold; display: inline-block;">Tanggapi Tawaran Jadwal</a>
     </div>
-    <p style="font-size: 12px; color: #94a3b8; text-align: center;">Tanpa jawaban sampai tanggal keberangkatan semula, pesanan otomatis diteruskan ke proses pengembalian dana.</p>
+    <p style="font-size: 12px; color: #94a3b8; text-align: center;">Tanpa jawaban sampai batas waktu tersebut, pesanan otomatis diteruskan ke proses pengembalian dana penuh.</p>
   </div>
 </body>
 </html>
 `,
 		html.EscapeString(b.CustomerName),
 		html.EscapeString(packageName),
-		html.EscapeString(originalDate.Format("02 January 2006")),
+		html.EscapeString(indonesianDate(originalDate)),
 		html.EscapeString(cause),
 		html.EscapeString(b.BookingCode),
-		html.EscapeString(originalDate.Format("02 January 2006")),
-		html.EscapeString(proposed.Format("02 January 2006")),
+		html.EscapeString(indonesianDate(originalDate)),
+		html.EscapeString(indonesianDate(proposed)),
+		html.EscapeString(indonesianDateTime(deadline)),
 		html.EscapeString(historyURL),
 	)
 

@@ -92,9 +92,11 @@ func TestOverlapCheckedAcrossProviderPackages(t *testing.T) {
 	start := time.Now().In(models.BookingLocation).AddDate(0, 0, 15)
 	pkg := &models.Package{ID: 2, ProviderID: 7, TripType: "Private Trip", Duration: 3, StartDate: start.Format("2006-01-02"), EndDate: start.AddDate(0, 0, 5).Format("2006-01-02")}
 	end := calculatePackageTripEnd(pkg, start)
-	// Existing reservation is in a different package. Query must use provider ID.
-	mock.ExpectQuery(`SELECT count\(\*\) FROM "bookings".*bookings.provider_id = .*EXISTS .*source.trip_type`).
-		WithArgs(7, models.StatusPendingPayment, models.StatusPaymentReview, models.StatusPaid, models.StatusConfirmed, models.StatusCompleted, end.Format("2006-01-02"), start.Format("2006-01-02")).
+	// Existing reservation is in a different package. Query must use provider ID
+	// and also treat replacement dates still awaiting a customer's answer as taken.
+	mock.ExpectQuery(`SELECT count\(\*\) FROM "bookings".*bookings.provider_id = .*EXISTS .*source.trip_type.*reschedule_date`).
+		WithArgs(7, models.StatusPendingPayment, models.StatusPaymentReview, models.StatusPaid, models.StatusConfirmed, models.StatusCompleted, end.Format("2006-01-02"), start.Format("2006-01-02"),
+			models.StatusRescheduleOffered, end.Format("2006-01-02"), start.Format("2006-01-02")).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	if err := ensureExclusiveDateTx(db, pkg, start, end, 0); err == nil {
 		t.Fatal("overlap with provider's other package accepted")

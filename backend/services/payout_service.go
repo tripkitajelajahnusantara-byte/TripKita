@@ -705,11 +705,19 @@ func payoutIDFromReference(referenceID string) (uint, error) {
 	return uint(value), nil
 }
 
+// truncateText memotong teks sampai max byte tanpa memecah karakter UTF-8.
 func truncateText(value string, max int) string {
 	if len(value) <= max {
 		return value
 	}
-	return value[:max]
+	cut := 0
+	for i := range value {
+		if i > max {
+			break
+		}
+		cut = i
+	}
+	return value[:cut]
 }
 
 func availablePayoutAmountTx(tx *gorm.DB, current *models.Payout) (int64, error) {

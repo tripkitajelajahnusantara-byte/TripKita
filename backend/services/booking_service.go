@@ -22,7 +22,7 @@ import (
 type BookingService interface {
 	GetAllBookings(providerID uint) ([]models.Booking, error)
 	UpdateBookingStatus(id uint, providerID uint, status string) (*models.Booking, error)
-	ProviderReschedule(id uint, providerID uint, newDate string) (*models.Booking, error)
+	CancelBookingByProvider(id uint, providerID uint, reason string) (*models.Booking, error)
 	CreateBooking(booking *models.Booking) error
 	SubmitPaymentProof(bookingID uint, proofPath string) (*models.Booking, error)
 	ReviewManualPayment(bookingID uint, adminID uint, req *models.ReviewManualPaymentRequest) (*models.Booking, error)
@@ -168,6 +168,24 @@ func (s *bookingService) GetBookingByCode(code string) (*models.Booking, error) 
 }
 
 func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status string) (*models.Booking, error) {
+	return s.updateBookingStatus(id, providerID, status, "")
+}
+
+// CancelBookingByProvider membatalkan pesanan atas keputusan mitra dengan
+// refund penuh. Alasan disimpan agar pelanggan tahu mengapa tripnya batal.
+func (s *bookingService) CancelBookingByProvider(id uint, providerID uint, reason string) (*models.Booking, error) {
+	reason = strings.TrimSpace(reason)
+	if len([]rune(reason)) < 10 {
+		return nil, &BookingInputError{Message: "alasan pembatalan wajib diisi minimal 10 karakter"}
+	}
+	return s.updateBookingStatus(id, providerID, models.StatusCancelledByProvider, reason)
+}
+
+// providerCancellationPrefix menandai alasan yang ditulis mitra sendiri,
+// sehingga notifikasi dapat menampilkannya apa adanya kepada pelanggan.
+const providerCancellationPrefix = "Dibatalkan oleh penyelenggara: "
+
+func (s *bookingService) updateBookingStatus(id uint, providerID uint, status string, providerReason string) (*models.Booking, error) {
 	var booking models.Booking
 	var oldStatus string
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
@@ -212,6 +230,9 @@ func (s *bookingService) UpdateBookingStatus(id uint, providerID uint, status st
 				}
 			}
 			booking.CancellationReason = "Dibatalkan oleh provider (refund 100% untuk pembayaran yang telah diterima)"
+			if providerReason != "" {
+				booking.CancellationReason = truncateText(providerCancellationPrefix+providerReason, 255)
+			}
 		case "RESCHEDULE_OFFERED":
 			if booking.RescheduleCount >= 1 {
 				return fmt.Errorf("penjadwalan ulang hanya diperbolehkan maksimal 1 kali")
@@ -343,7 +364,7 @@ func validateProviderStatusTransition(current, next string, tripEndDate time.Tim
 	switch next {
 	case "CONFIRMED":
 		if current != "PAID" {
-			return fmt.Errorf("booking hanya dapat dikonfirmasi setelah pembayaran terverifikasi")
+			return &BookingInputError{Message: "booking hanya dapat dikonfirmasi setelah pembayaran terverifikasi"}
 		}
 	case "CANCELLED_BY_PROVIDER":
 		// RESCHEDULE_OFFERED ikut diizinkan: tawaran jadwal pengganti yang
@@ -352,31 +373,31 @@ func validateProviderStatusTransition(current, next string, tripEndDate time.Tim
 		// Booking yang belum terverifikasi dibayar tidak terlihat oleh provider
 		// dan tidak boleh ia batalkan.
 		if current != "PAID" && current != "CONFIRMED" && current != models.StatusRescheduleOffered {
-			return fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", current)
+			return &BookingInputError{Message: fmt.Sprintf("booking dengan status %s tidak dapat dibatalkan", current)}
 		}
 	case "CANCELLED_BY_CUSTOMER":
 		if current == models.StatusPaymentReview {
 			return errPaymentUnderReview
 		}
 		if current != "PENDING_PAYMENT" && current != "PAID" && current != "CONFIRMED" {
-			return fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", current)
+			return &BookingInputError{Message: fmt.Sprintf("booking dengan status %s tidak dapat dibatalkan", current)}
 		}
 	case "RESCHEDULE_OFFERED":
 		if current != "PAID" && current != "CONFIRMED" {
-			return fmt.Errorf("hanya booking terbayar yang dapat dijadwalkan ulang")
+			return &BookingInputError{Message: "hanya booking terbayar yang dapat dijadwalkan ulang"}
 		}
 	case models.StatusCompleted:
 		if current != models.StatusPaid && current != models.StatusConfirmed {
-			return fmt.Errorf("booking dengan status %s tidak dapat diselesaikan", current)
+			return &BookingInputError{Message: fmt.Sprintf("booking dengan status %s tidak dapat diselesaikan", current)}
 		}
 		if tripEndDate.IsZero() {
-			return fmt.Errorf("tanggal selesai perjalanan belum tersedia")
+			return &BookingInputError{Message: "tanggal selesai perjalanan belum tersedia"}
 		}
 		if now.Before(tripEndDate) {
-			return fmt.Errorf("booking baru dapat diselesaikan setelah perjalanan berakhir pada %s", tripEndDate.Format(time.RFC3339))
+			return &BookingInputError{Message: fmt.Sprintf("booking baru dapat diselesaikan setelah perjalanan berakhir pada %s WIB", tripEndDate.In(models.BookingLocation).Format("02 Jan 2006 15:04"))}
 		}
 	default:
-		return fmt.Errorf("perubahan status tidak diizinkan")
+		return &BookingInputError{Message: "perubahan status tidak diizinkan"}
 	}
 	return nil
 }
@@ -393,90 +414,6 @@ func (s *bookingService) CancelBookingByCustomer(id uint, customerID uint) (*mod
 		return nil, fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", booking.Status)
 	}
 	return s.UpdateBookingStatus(booking.ID, booking.ProviderID, "CANCELLED_BY_CUSTOMER")
-}
-
-func (s *bookingService) ProviderReschedule(id uint, providerID uint, newDate string) (*models.Booking, error) {
-	parsedDate, err := time.ParseInLocation("2006-01-02", newDate, models.BookingLocation)
-	if err != nil {
-		return nil, fmt.Errorf("format tanggal tidak valid")
-	}
-	if !parsedDate.After(time.Now()) {
-		return nil, fmt.Errorf("tanggal pengganti harus berada di masa mendatang")
-	}
-
-	var booking models.Booking
-	err = database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Package").Where("id = ? AND provider_id = ?", id, providerID).First(&booking).Error; err != nil {
-			return fmt.Errorf("booking tidak ditemukan")
-		}
-		if booking.RescheduleCount >= 1 {
-			return fmt.Errorf("penjadwalan ulang hanya diperbolehkan maksimal 1 kali")
-		}
-		if booking.Status != models.StatusPaid && booking.Status != models.StatusConfirmed && booking.Status != models.StatusRescheduleOffered {
-			return fmt.Errorf("hanya booking terbayar yang dapat dijadwalkan ulang")
-		}
-		// Tawaran yang berasal dari peninjauan kuota H-3 wajib melewati
-		// persetujuan pelanggan. Tanpa penjagaan ini, jalur lama dapat memaksa
-		// tanggal baru menjadi CONFIRMED tanpa pelanggan pernah menyetujuinya.
-		if booking.TripDepartureID != nil {
-			return fmt.Errorf("penjadwalan ulang keberangkatan open trip menunggu jawaban pelanggan dan tidak dapat diubah dari sini")
-		}
-		if models.IsOpenTrip(booking.Package.TripType) {
-			return fmt.Errorf("jadwal Open Trip harus diubah melalui keputusan keberangkatan agar seluruh pelanggan menerima tawaran yang sama")
-		}
-		// Kunci paket yang sama dengan jalur pembuatan booking agar dua transaksi
-		// tidak dapat meloloskan jadwal eksklusif yang bertabrakan secara bersamaan.
-		var lockedPackage models.Package
-		if err := lockBookingPackageTx(tx, booking.PackageID, &lockedPackage); err != nil {
-			return fmt.Errorf("paket tidak ditemukan")
-		}
-		booking.Package = lockedPackage
-		newTripDay := parsedDate.Format("2006-01-02")
-		if booking.Package.StartDate != "" && newTripDay < booking.Package.StartDate {
-			return fmt.Errorf("tanggal pengganti berada sebelum periode paket")
-		}
-		if booking.Package.EndDate != "" && newTripDay > booking.Package.EndDate {
-			return fmt.Errorf("tanggal pengganti berada setelah periode paket")
-		}
-		original := booking.TripDate.In(models.BookingLocation)
-		parsedDate = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), original.Hour(), original.Minute(), original.Second(), original.Nanosecond(), models.BookingLocation)
-		newTripEnd := calculatePackageTripEnd(&booking.Package, parsedDate)
-		if err := ensureExclusiveDateTx(tx, &booking.Package, parsedDate, newTripEnd, booking.ID); err != nil {
-			return err
-		}
-		booking.OriginalTripDate = &original
-		booking.RescheduleDate = &parsedDate
-		booking.TripDate = parsedDate
-		booking.TripEndDate = newTripEnd
-		booking.RescheduleCount++
-		booking.Status = "CONFIRMED"
-		if err := tx.Save(&booking).Error; err != nil {
-			return err
-		}
-		if err := syncPackageDatesTx(tx, booking.PackageID); err != nil {
-			return err
-		}
-		return tx.Model(&models.HeldSettlement{}).
-			Where("booking_id = ? AND status = ?", booking.ID, "HELD").
-			Update("release_date", booking.TripEndDate).Error
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Notifikasi
-	if booking.CustomerID != nil {
-		s.notifService.CreateNotification(
-			*booking.CustomerID,
-			"CUSTOMER",
-			"Booking Di-reschedule",
-			fmt.Sprintf("Jadwal trip Anda untuk %s telah diubah menjadi %s oleh Provider", booking.BookingCode, parsedDate.Format("02 Jan 2006")),
-			"INFO",
-			fmt.Sprintf("/riwayat-booking/%d", booking.ID),
-		)
-	}
-
-	return &booking, nil
 }
 
 // Non-open-trip bookings serialize across all packages owned by the provider.
@@ -1288,6 +1225,11 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 			title = "Pesanan Dibatalkan, Refund Diproses"
 			msgCustomer = fmt.Sprintf("Pembatalan pesanan #%s (%s) telah tercatat dan refund menunggu verifikasi admin.", b.BookingCode, packageName)
 			msgProvider = fmt.Sprintf("Refund pesanan #%s (%s) menunggu diproses admin.", b.BookingCode, packageName)
+			if reason, ok := strings.CutPrefix(b.CancellationReason, providerCancellationPrefix); ok {
+				title = "Trip Dibatalkan Penyelenggara"
+				msgCustomer = fmt.Sprintf("Penyelenggara membatalkan pesanan #%s (%s). Alasan: %s. Refund 100%% sedang diproses admin.", b.BookingCode, packageName, strings.TrimRight(reason, ".!? "))
+				msgProvider = fmt.Sprintf("Anda membatalkan pesanan #%s (%s). Refund 100%% ke pelanggan menunggu diproses admin.", b.BookingCode, packageName)
+			}
 			if s.emailService != nil {
 				sendEmail(s.emailService.SendRefundPendingEmail(&b))
 			}
@@ -1378,32 +1320,8 @@ func ensureExclusiveDateTx(tx *gorm.DB, pkg *models.Package, tripStart time.Time
 	if err := validateBookingSchedule(pkg, tripStart, tripEnd, time.Now(), excludeBookingID > 0); err != nil {
 		return err
 	}
-	tripStart = tripStart.In(models.BookingLocation)
-	tripEnd = tripEnd.In(models.BookingLocation)
-	startDay := tripStart.Format("2006-01-02")
-	endDay := tripEnd.Format("2006-01-02")
-	if endDay < startDay {
-		endDay = startDay
-	}
-
-	// Dua pesanan bentrok bila rentang menginapnya beririsan, bukan hanya bila
-	// tanggal berangkatnya sama. Paket 4D3N menahan pemandu dan armada selama
-	// empat hari, sehingga hari kedua pun tidak boleh dijual ke pemesan lain.
-	var conflicting int64
-	query := tx.Model(&models.Booking{}).
-		Where(`bookings.provider_id = ? AND bookings.status IN ?
-               AND EXISTS (SELECT 1 FROM packages source WHERE source.id = bookings.package_id AND LOWER(REPLACE(TRIM(source.trip_type), ' ', '')) <> 'opentrip')
-               AND to_char(trip_date AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') <= ?
-		       AND to_char(GREATEST(trip_end_date, trip_date) AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') >= ?`,
-			pkg.ProviderID, activeBookingStatuses, endDay, startDay)
-	if excludeBookingID > 0 {
-		query = query.Where("id <> ?", excludeBookingID)
-	}
-	if err := query.Count(&conflicting).Error; err != nil {
+	if err := ensureNoExclusiveConflictTx(tx, pkg.ProviderID, tripStart, tripEnd, excludeBookingID); err != nil {
 		return err
-	}
-	if conflicting > 0 {
-		return &BookingInputError{Message: "tanggal tersebut sudah dipesan pelanggan lain; silakan pilih tanggal lain yang masih tersedia"}
 	}
 
 	// Every occupied day must be explicitly offered. Empty means closed.
@@ -1419,6 +1337,55 @@ func ensureExclusiveDateTx(tx *gorm.DB, pkg *models.Package, tripStart time.Time
 	}
 
 	return nil
+}
+
+// ensureNoExclusiveConflictTx memastikan rentang trip eksklusif tidak beririsan
+// dengan pesanan aktif mitra yang sama, termasuk jadwal pengganti yang sedang
+// ditawarkan kepada pelanggan lain.
+//
+// Dua pesanan bentrok bila rentang menginapnya beririsan, bukan hanya bila
+// tanggal berangkatnya sama. Paket 4D3N menahan pemandu dan armada selama
+// empat hari, sehingga hari kedua pun tidak boleh dijual ke pemesan lain.
+func ensureNoExclusiveConflictTx(tx *gorm.DB, providerID uint, tripStart, tripEnd time.Time, excludeBookingID uint) error {
+	startDay := tripStart.In(models.BookingLocation).Format("2006-01-02")
+	endDay := tripEnd.In(models.BookingLocation).Format("2006-01-02")
+	if endDay < startDay {
+		endDay = startDay
+	}
+
+	var conflicting int64
+	query := tx.Model(&models.Booking{}).
+		Where(`bookings.provider_id = ?
+               AND EXISTS (SELECT 1 FROM packages source WHERE source.id = bookings.package_id AND LOWER(REPLACE(TRIM(source.trip_type), ' ', '')) <> 'opentrip')
+               AND ((bookings.status IN ?
+                     AND to_char(trip_date AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') <= ?
+                     AND to_char(GREATEST(trip_end_date, trip_date) AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') >= ?)
+                 OR (bookings.status = ? AND bookings.reschedule_date IS NOT NULL
+                     AND to_char(bookings.reschedule_date AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') <= ?
+                     AND to_char((bookings.reschedule_date + GREATEST(trip_end_date - trip_date, INTERVAL '0 second')) AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') >= ?))`,
+			providerID, activeBookingStatuses, endDay, startDay,
+			models.StatusRescheduleOffered, endDay, startDay)
+	if excludeBookingID > 0 {
+		query = query.Where("bookings.id <> ?", excludeBookingID)
+	}
+	if err := query.Count(&conflicting).Error; err != nil {
+		return err
+	}
+	if conflicting > 0 {
+		return &BookingInputError{Message: "tanggal tersebut sudah dipesan pelanggan lain; silakan pilih tanggal lain yang masih tersedia"}
+	}
+	return nil
+}
+
+// offeredTripRange adalah rentang jadwal pengganti yang ditawarkan: mulai pada
+// RescheduleDate dengan durasi yang sama seperti jadwal semula.
+func offeredTripRange(booking models.Booking) (time.Time, time.Time) {
+	start := *booking.RescheduleDate
+	end := start
+	if booking.TripEndDate.After(booking.TripDate) {
+		end = start.Add(booking.TripEndDate.Sub(booking.TripDate))
+	}
+	return start, end
 }
 
 // occupiedDays menjabarkan seluruh hari yang ditahan satu pesanan, dari tanggal
@@ -1467,6 +1434,26 @@ func syncPackageDatesTx(tx *gorm.DB, packageID uint) error {
 	taken := make(map[string]uint, len(active)*2)
 	for _, booking := range active {
 		for _, day := range occupiedDays(booking.TripDate, booking.TripEndDate) {
+			if _, exists := taken[day]; !exists {
+				taken[day] = booking.ID
+			}
+		}
+	}
+
+	// Jadwal pengganti yang sedang ditawarkan ditahan untuk pelanggan tersebut
+	// sampai ia menjawab, sehingga menerima tawaran tidak gagal karena
+	// tanggalnya keburu dipesan orang lain. Tanggal semula sudah batal dan
+	// dilepas karena status RESCHEDULE_OFFERED tidak termasuk status aktif.
+	var offered []models.Booking
+	if err := tx.Select("id", "trip_date", "trip_end_date", "reschedule_date").
+		Where("package_id = ? AND status = ? AND reschedule_date IS NOT NULL", packageID, models.StatusRescheduleOffered).
+		Order("id asc").
+		Find(&offered).Error; err != nil {
+		return err
+	}
+	for _, booking := range offered {
+		start, end := offeredTripRange(booking)
+		for _, day := range occupiedDays(start, end) {
 			if _, exists := taken[day]; !exists {
 				taken[day] = booking.ID
 			}

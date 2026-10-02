@@ -54,6 +54,9 @@ type Booking struct {
 	Participants     []BookingParticipant `gorm:"foreignKey:BookingID;constraint:OnDelete:CASCADE" json:"participants,omitempty"`
 	ProviderWhatsApp string               `gorm:"->;-:migration" json:"providerWhatsApp,omitempty"`
 	ProviderName     string               `gorm:"->;-:migration" json:"providerName,omitempty"`
+	// RescheduleResponseDeadline adalah batas jawaban tawaran jadwal pengganti,
+	// diambil dari trip_departures saat daftar booking dimuat.
+	RescheduleResponseDeadline *time.Time `gorm:"->;-:migration" json:"rescheduleResponseDeadline,omitempty"`
 }
 
 const (
@@ -78,8 +81,11 @@ type ReviewManualPaymentRequest struct {
 	Notes    string `json:"notes" binding:"max=500"`
 }
 
+// UpdateBookingStatusRequest mengubah status booking dari menu mitra. Tawaran
+// jadwal pengganti memakai endpoint reschedule tersendiri karena wajib membawa
+// tanggal baru dan menunggu jawaban pelanggan.
 type UpdateBookingStatusRequest struct {
-	Status             string `json:"status" binding:"required,oneof=CONFIRMED COMPLETED CANCELLED_BY_PROVIDER RESCHEDULE_OFFERED"`
-	CancellationReason string `json:"cancellationReason,omitempty"`
-	RescheduleDate     string `json:"rescheduleDate,omitempty"` // YYYY-MM-DD format if offering reschedule
+	Status string `json:"status" binding:"required,oneof=CONFIRMED COMPLETED CANCELLED_BY_PROVIDER"`
+	// CancellationReason wajib untuk CANCELLED_BY_PROVIDER dan dibaca pelanggan.
+	CancellationReason string `json:"cancellationReason,omitempty" binding:"max=200"`
 }

@@ -39,6 +39,12 @@ func (r *bookingRepository) Create(booking *models.Booking) error {
 	return r.db.Create(booking).Error
 }
 
+// rescheduleDeadlineJoin menyertakan batas jawaban tawaran jadwal pengganti
+// dari trip_departures dalam query yang sama. Kolom bookings yang namanya juga
+// ada di trip_departures (id, status, provider_id) wajib ditulis lengkap.
+const rescheduleDeadlineJoin = "LEFT JOIN trip_departures ON trip_departures.id = bookings.trip_departure_id"
+const rescheduleDeadlineColumn = "trip_departures.response_deadline AS reschedule_response_deadline"
+
 // orderParticipants menjaga urutan peserta sesuai isian form checkout.
 func orderParticipants(db *gorm.DB) *gorm.DB { return db.Order("position asc") }
 
@@ -74,10 +80,13 @@ func (r *bookingRepository) FindPlatformRevenueBookings(from, to time.Time) ([]m
 
 func (r *bookingRepository) FindAllByProvider(providerID uint) ([]models.Booking, error) {
 	var bookings []models.Booking
-	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+	err := r.db.Model(&models.Booking{}).
+		Select("bookings.*, "+rescheduleDeadlineColumn).
+		Joins(rescheduleDeadlineJoin).
+		Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Participants", orderParticipants).
-		Where("provider_id = ? AND (paid_at IS NOT NULL OR status IN ?)", providerID, []string{models.StatusPaid, models.StatusConfirmed, models.StatusCompleted}).
-		Order("id desc").Find(&bookings).Error
+		Where("bookings.provider_id = ? AND (bookings.paid_at IS NOT NULL OR bookings.status IN ?)", providerID, []string{models.StatusPaid, models.StatusConfirmed, models.StatusCompleted}).
+		Order("bookings.id desc").Find(&bookings).Error
 	return bookings, err
 }
 
@@ -111,9 +120,12 @@ func (r *bookingRepository) FindByXenditInvoiceID(invoiceID string) (*models.Boo
 func (r *bookingRepository) FindByBookingCode(code string) (*models.Booking, error) {
 	var booking models.Booking
 	cleanCode := strings.TrimSpace(code)
-	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Where("LOWER(booking_code) = LOWER(?)", cleanCode).
-		Order("id desc").First(&booking).Error
+	err := r.db.Model(&models.Booking{}).
+		Select("bookings.*, "+rescheduleDeadlineColumn).
+		Joins(rescheduleDeadlineJoin).
+		Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Where("LOWER(bookings.booking_code) = LOWER(?)", cleanCode).
+		Order("bookings.id desc").First(&booking).Error
 	if err != nil {
 		return nil, err
 	}
@@ -170,8 +182,9 @@ func (r *bookingRepository) FindAllByCustomer(customerID uint) ([]models.Booking
 	var bookings []models.Booking
 	threeMonthsAgo := time.Now().AddDate(0, -3, 0)
 	err := r.db.Model(&models.Booking{}).
-		Select("bookings.*, providers.whats_app AS provider_whats_app, providers.business_name AS provider_name").
+		Select("bookings.*, providers.whats_app AS provider_whats_app, providers.business_name AS provider_name, "+rescheduleDeadlineColumn).
 		Joins("JOIN providers ON providers.id = bookings.provider_id").
+		Joins(rescheduleDeadlineJoin).
 		Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Participants", orderParticipants).
 		Where("bookings.customer_id = ? AND (bookings.created_at >= ? OR bookings.created_at IS NULL)", customerID, threeMonthsAgo).

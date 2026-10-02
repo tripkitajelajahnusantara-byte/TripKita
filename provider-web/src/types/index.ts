@@ -92,6 +92,11 @@ export interface Booking {
   rawEndDate?: string;
   rawTripDate?: string;
   packageId?: number;
+  tripType?: string;
+  rescheduleCount?: number;
+  rescheduleDate?: string;
+  rescheduleResponseDeadline?: string;
+  cancellationReason?: string;
   participants?: BookingParticipant[];
   status: 'PENDING_PAYMENT' | 'PAYMENT_REVIEW' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED' | 'RESCHEDULE_OFFERED';
 }
