@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,20 +12,18 @@ import (
 	"gorm.io/gorm/clause"
 
 	"tripkita-provider/models"
-	"tripkita-provider/services"
 )
 
 // ExpirePendingBookings menutup booking yang tidak dibayar dalam 24 jam.
 //
-// Sebelum mengedaluwarsakan, status invoice dipastikan dulu ke payment gateway.
-// Status pembayaran sebelumnya hanya bergantung pada webhook; bila webhook hilang
-// permanen, booking yang sudah dibayar pelanggan ikut dikedaluwarsakan padahal
-// dananya sudah diterima.
+// Booking yang sudah mengunggah bukti berstatus PAYMENT_REVIEW sehingga tidak
+// ikut dilepas ketika batas transfer berakhir.
 func (r *Runner) ExpirePendingBookings(ctx context.Context) {
-	cutoff := time.Now().Add(-24 * time.Hour)
+	cutoff := time.Now().Add(-models.PaymentWindow)
 	var candidates []models.Booking
-	if err := r.db.WithContext(ctx).Select("id", "xendit_invoice_id").
-		Where("status = ? AND created_at < ?", models.StatusPendingPayment, cutoff).
+	if err := r.db.WithContext(ctx).Select("id", "xendit_invoice_id", "ipaymu_transaction_id").
+		Where("status = ? AND created_at < ? AND (payment_reviewed_at IS NULL OR payment_reviewed_at < ?)",
+			models.StatusPendingPayment, cutoff, time.Now().Add(-models.RejectedProofReuploadWindow)).
 		Find(&candidates).Error; err != nil {
 		log.Printf("[Auto Expire] Gagal mencari booking kedaluwarsa: %v", err)
 		return
@@ -36,18 +35,21 @@ func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 			return
 		}
 
-		// Jaring pengaman: booking yang ternyata sudah dibayar diselesaikan,
-		// bukan dikedaluwarsakan.
-		switch r.checkInvoiceBeforeExpiry(candidate) {
-		case invoiceSettled:
-			settled++
-			continue
-		case invoiceUnverified:
-			deferred++
-			continue
+		// Booking dari masa payment gateway (sebelum transfer manual) bisa saja
+		// sudah dibayar tetapi webhook-nya tidak pernah diterima. Pastikan dulu
+		// ke gateway; bila tidak dapat dipastikan, tahan untuk diperiksa operator.
+		if strings.TrimSpace(candidate.IPaymuTransactionID) != "" || strings.TrimSpace(candidate.XenditInvoiceID) != "" {
+			switch r.checkInvoiceBeforeExpiry(candidate) {
+			case invoiceSettled:
+				settled++
+				continue
+			case invoiceUnverified:
+				deferred++
+				continue
+			}
 		}
 
-		if err := r.expireOne(ctx, candidate.ID, cutoff); err != nil {
+		if err := r.container.BookingService.ExpirePendingBooking(candidate.ID, cutoff); err != nil {
 			if err != gorm.ErrRecordNotFound {
 				log.Printf("[Auto Expire] Booking %d gagal diproses: %v", candidate.ID, err)
 			}
@@ -60,10 +62,10 @@ func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 		log.Printf("[Auto Expire] %d booking kedaluwarsa dan kuota dilepas.", expired)
 	}
 	if settled > 0 {
-		log.Printf("[Auto Expire] %d booking diselesaikan: pembayaran terkonfirmasi ke gateway meski webhook tidak diterima.", settled)
+		log.Printf("[Auto Expire] %d booking payment gateway lama diselesaikan: pembayaran terkonfirmasi meski webhook tidak diterima.", settled)
 	}
 	if deferred > 0 {
-		log.Printf("[Auto Expire] %d booking ditunda: status pembayaran belum dapat dipastikan ke gateway. Perlu diperiksa bila berulang.", deferred)
+		log.Printf("[Auto Expire] %d booking payment gateway lama ditahan: status pembayaran belum dapat dipastikan, periksa manual di dashboard gateway.", deferred)
 	}
 }
 
@@ -84,11 +86,25 @@ const (
 // checkInvoiceBeforeExpiry memastikan status invoice ke payment gateway sebelum
 // booking dikedaluwarsakan.
 func (r *Runner) checkInvoiceBeforeExpiry(booking models.Booking) invoiceCheckResult {
-	if strings.TrimSpace(booking.XenditInvoiceID) == "" {
-		return invoiceUnpaid
+	transactionID := strings.TrimSpace(booking.IPaymuTransactionID)
+	if transactionID == "" {
+		// Data lama dari integrasi direct dapat menyimpan transaction ID pada
+		// kolom legacy. Session UUID redirect tidak valid untuk endpoint status.
+		if _, err := strconv.ParseInt(booking.XenditInvoiceID, 10, 64); err == nil {
+			transactionID = booking.XenditInvoiceID
+		}
+	}
+	if transactionID == "" {
+		// Redirect payment lazimnya hanya mengembalikan SessionID. Tanpa
+		// transaction ID, gateway belum dapat ditanya secara meyakinkan. Jangan
+		// pernah menganggap kondisi "tidak dapat diverifikasi" sebagai belum
+		// dibayar karena callback yang hilang dapat membuat pembayaran sah ikut
+		// kedaluwarsa dan kursinya dijual kembali.
+		log.Printf("[Rekonsiliasi] Booking %d belum memiliki transaction ID; kedaluwarsa ditunda untuk pemeriksaan callback/operator.", booking.ID)
+		return invoiceUnverified
 	}
 
-	txStatus, err := r.container.IPaymuService.GetTransactionStatus(booking.XenditInvoiceID)
+	txStatus, err := r.container.IPaymuService.GetTransactionStatus(transactionID)
 	if err != nil {
 		log.Printf("[Rekonsiliasi] Booking %d tidak dapat diverifikasi ke gateway, ditunda: %v", booking.ID, err)
 		return invoiceUnverified
@@ -107,21 +123,6 @@ func (r *Runner) checkInvoiceBeforeExpiry(booking models.Booking) invoiceCheckRe
 	}
 	log.Printf("[Rekonsiliasi] Booking %d diselesaikan dari status tagihan gateway (webhook tidak diterima).", booking.ID)
 	return invoiceSettled
-}
-
-func (r *Runner) expireOne(ctx context.Context, bookingID uint, cutoff time.Time) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var booking models.Booking
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ? AND status = ? AND created_at < ?", bookingID, models.StatusPendingPayment, cutoff).
-			First(&booking).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&booking).Update("status", "EXPIRED").Error; err != nil {
-			return err
-		}
-		return services.RecalculatePackageAvailability(tx, booking.PackageID)
-	})
 }
 
 // AutoCompleteFinishedBookings menandai trip yang sudah lewat sebagai selesai dan
@@ -159,7 +160,8 @@ func (r *Runner) AutoCompleteFinishedBookings(ctx context.Context) {
 				result := tx.Model(&models.ProviderBalance{}).
 					Where("provider_id = ? AND held_balance >= ?", booking.ProviderID, settlement.Amount).
 					Updates(map[string]interface{}{
-						"available_balance": gorm.Expr("available_balance + ?", settlement.Amount),
+						"available_balance": gorm.Expr("available_balance + GREATEST(? - debt_balance, 0)", settlement.Amount),
+						"debt_balance":      gorm.Expr("GREATEST(debt_balance - ?, 0)", settlement.Amount),
 						"held_balance":      gorm.Expr("held_balance - ?", settlement.Amount),
 						"updated_at":        time.Now(),
 					})

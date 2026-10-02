@@ -3,10 +3,10 @@ package controllers
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 	"tripkita-provider/config"
 	"tripkita-provider/models"
 	"tripkita-provider/repositories"
@@ -149,6 +149,45 @@ func (ctrl *PayoutController) AdminGetAllPayouts(c *gin.Context) {
 	c.JSON(http.StatusOK, payouts)
 }
 
+// AdminGetPlatformRevenue menampilkan penghasilan TemenTrip (biaya layanan +
+// komisi) per booking. Query from/to opsional berformat YYYY-MM-DD (WIB) dan
+// keduanya inklusif.
+func (ctrl *PayoutController) AdminGetPlatformRevenue(c *gin.Context) {
+	from, to, err := parseRevenuePeriod(c.Query("from"), c.Query("to"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	report, err := ctrl.service.GetPlatformRevenue(from, to)
+	if err != nil {
+		respondInternalError(c, "memuat penghasilan platform", err)
+		return
+	}
+	c.JSON(http.StatusOK, report)
+}
+
+func parseRevenuePeriod(fromParam, toParam string) (time.Time, time.Time, error) {
+	var from, to time.Time
+	if fromParam != "" {
+		parsed, err := time.ParseInLocation("2006-01-02", fromParam, models.BookingLocation)
+		if err != nil {
+			return from, to, errors.New("tanggal awal harus berformat YYYY-MM-DD")
+		}
+		from = parsed
+	}
+	if toParam != "" {
+		parsed, err := time.ParseInLocation("2006-01-02", toParam, models.BookingLocation)
+		if err != nil {
+			return from, to, errors.New("tanggal akhir harus berformat YYYY-MM-DD")
+		}
+		to = parsed.AddDate(0, 0, 1)
+	}
+	if !from.IsZero() && !to.IsZero() && !from.Before(to) {
+		return from, to, errors.New("tanggal awal tidak boleh setelah tanggal akhir")
+	}
+	return from, to, nil
+}
+
 type ProcessPayoutRequest struct {
 	Status    string `json:"status" binding:"required,oneof=APPROVED REJECTED"`
 	Notes     string `json:"notes" binding:"required,min=10,max=1000"`
@@ -181,47 +220,4 @@ func (ctrl *PayoutController) AdminProcessPayout(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, payout)
-}
-
-// XenditPayoutWebhook menerima status akhir pencairan dari payment gateway.
-//
-// Token callback dibandingkan constant-time seperti webhook pembayaran, dan
-// respons non-2xx sengaja dikembalikan saat pemrosesan gagal agar gateway
-// mengirim ulang eventnya.
-func (ctrl *PayoutController) IPaymuPayoutWebhook(c *gin.Context) {
-	payoutID := c.PostForm("payout_id")
-	referenceID := c.PostForm("reference_id")
-	status := c.PostForm("status")
-	failureCode := c.PostForm("failure_code")
-
-	if payoutID == "" {
-		var req struct {
-			PayoutID    string `json:"payout_id"`
-			ReferenceID string `json:"reference_id"`
-			Status      string `json:"status"`
-			FailureCode string `json:"failure_code"`
-		}
-		if err := c.ShouldBindJSON(&req); err == nil {
-			payoutID = req.PayoutID
-			referenceID = req.ReferenceID
-			status = req.Status
-			failureCode = req.FailureCode
-		}
-	}
-
-	if strings.TrimSpace(payoutID) == "" || strings.TrimSpace(referenceID) == "" {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-		return
-	}
-
-	if err := ctrl.service.HandlePayoutCallback(payoutID, referenceID, status, failureCode); err != nil {
-		if errors.Is(err, services.ErrUnknownPayoutReference) {
-			log.Printf("[Payout Webhook] Callback dengan reference tidak dikenali diabaikan")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Reference pencairan tidak dikenali"})
-			return
-		}
-		respondInternalError(c, "memproses callback pencairan", err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

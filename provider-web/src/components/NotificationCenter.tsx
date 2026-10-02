@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, X, CreditCard, RefreshCw, Calendar, Wallet, Info, UserPlus, ShieldCheck, CheckCheck } from 'lucide-react';
+import { Bell, X, CreditCard, RefreshCw, Calendar, Wallet, Info, UserPlus, ShieldCheck, CheckCheck, Target, CloudSun } from 'lucide-react';
 import { request } from '../utils/api';
+import { SkeletonList } from './Skeleton';
 import { useNavigation } from '../context/NavigationContext';
 
 export type NotificationType =
@@ -10,6 +11,7 @@ export type NotificationType =
   | 'PAYOUT'
   | 'REGISTRATION'
   | 'ACCOUNT'
+  | 'TRIP_PLAN'
   | 'GENERAL'
   | string;
 
@@ -165,7 +167,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
     }
 
     if (basePath === '/customer') {
-      navigateTo('riwayat-booking');
+      navigateTo(item.type === 'TRIP_PLAN' ? 'rencana-trip' : 'riwayat-booking');
       return;
     }
 
@@ -175,6 +177,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
         break;
       case 'ACCOUNT':
         navigateTo('profil-provider');
+        break;
+      case 'WEATHER':
+        navigateTo('dashboard');
         break;
       default:
         navigateTo('booking');
@@ -195,6 +200,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
         return <UserPlus size={16} color="#7c3aed" />;
       case 'ACCOUNT':
         return <ShieldCheck size={16} color="#0f766e" />;
+      case 'TRIP_PLAN':
+        return <Target size={16} color="#0f8b8d" />;
+      case 'WEATHER':
+        return <CloudSun size={16} color="#0891b2" />;
       default:
         return <Info size={16} color="#0284c7" />;
     }
@@ -321,8 +330,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
             )}
 
             {loading && notifications.length === 0 ? (
-              <div style={{ padding: '30px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-                Memuat notifikasi...
+              <div style={{ padding: '8px 6px' }}>
+                <SkeletonList rows={3} label="Memuat notifikasi" />
               </div>
             ) : notifications.length === 0 ? (
               <div style={{ padding: '30px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>

@@ -2,23 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { Sidebar } from '../components/Sidebar';
-import { request, API_BASE_URL, getAuthHeaders, openProtectedFile } from '../utils/api';
+import { request, API_BASE_URL, getAuthHeaders, openProtectedDocument } from '../utils/api';
 import { 
   Wallet, 
   DollarSign, 
   CheckCircle2, 
   AlertCircle, 
-  ArrowUpRight, 
   Building2, 
   HelpCircle,
   TrendingUp,
   Lock,
   Download,
-  FileText
+  FileText,
+  LoaderCircle,
+  CalendarDays,
+  RefreshCw
 } from 'lucide-react';
+import { useActionLock } from '../utils/useActionLock';
+import { SkeletonTable } from '../components/Skeleton';
+import { PayoutStageAction } from '../components/PayoutStageAction';
 
 interface PayoutItem {
   id: number;
+  bookingId?: number;
   amount: number;
   type: string;
   status: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'FAILED' | 'REJECTED';
@@ -27,29 +33,69 @@ interface PayoutItem {
   bankAccount: string;
   bankAccountName: string;
   notes?: string;
+  proofPath?: string;
   createdAt: string;
 }
 
+type PayoutType = 'DP_50' | 'PELUNASAN_50';
+
+interface BookingPayoutStage {
+  amount: number;
+  remaining: number;
+  status: 'AVAILABLE' | 'LOCKED' | 'REQUESTED' | 'PAID' | 'NONE';
+  payoutId?: number;
+  proofPath?: string;
+  availableAt?: string;
+  blockedReason?: string;
+}
+
+interface BookingPayout {
+  bookingId: number;
+  bookingCode: string;
+  packageName: string;
+  customerName: string;
+  guests: number;
+  tripDate: string;
+  tripEndDate: string;
+  bookingStatus: string;
+  netEarning: number;
+  dp: BookingPayoutStage;
+  settlement: BookingPayoutStage;
+}
+
 interface PayoutSummary {
+  platformFeePercent: number;
+  serviceFee: number;
   totalEarnings: number;
   platformFee: number;
   netEarnings: number;
   availableDp: number;
   availablePelunasan?: number;
   heldSettlement: number;
+  heldDp?: number;
   totalPaidOut: number;
   pendingPayout: number;
+  providerDebt: number;
   payouts: PayoutItem[];
+  bookings?: BookingPayout[];
 }
 
+const formatTripDate = (value: string) =>
+  new Date(value).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' });
+
+const payoutTypeLabel = (type: PayoutType) => type === 'DP_50' ? 'DP 50%' : 'Pelunasan 50%';
+
 export const ProviderFinancePage: React.FC = () => {
-  const { providerProfile } = useNavigation();
+  const { providerProfile, navigateTo } = useNavigation();
   const { showAlert } = useCustomAlert();
   const [summary, setSummary] = useState<PayoutSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  // Pengajuan pencairan menyangkut uang: kunci berbasis ref mencegah klik ganda
+  // cepat membuat dua pengajuan sebelum state sempat ter-render ulang.
+  const { isBusy: submitting, run } = useActionLock();
   const [showRequestModal, setShowRequestModal] = useState(false);
-  const [requestType, setRequestType] = useState<'DP_50' | 'PELUNASAN_50'>('DP_50');
+  const [requestTarget, setRequestTarget] = useState<{ booking: BookingPayout; type: PayoutType } | null>(null);
   const [modalNotice, setModalNotice] = useState<{ title: string; message: string; isError?: boolean } | null>(null);
 
   const fetchSummary = async () => {
@@ -57,8 +103,11 @@ export const ProviderFinancePage: React.FC = () => {
     try {
       const data = await request('/provider/payouts/summary');
       setSummary(data);
+      setLoadError('');
     } catch (err) {
       console.error('Failed to fetch payout summary:', err);
+      setSummary(null);
+      setLoadError(err instanceof Error ? err.message : 'Saldo belum dapat dimuat. Coba perbarui halaman.');
     } finally {
       setLoading(false);
     }
@@ -96,13 +145,16 @@ export const ProviderFinancePage: React.FC = () => {
     }
   };
 
-  const handleDownloadPDF = async (id: number) => {
+  // Bukti transfer adalah file yang diunggah admin saat menyetujui pencairan.
+  const handleViewProof = async (proofPath: string) => {
     try {
-      await openProtectedFile(`/provider/payouts/${id}/pdf-receipt`);
+      await openProtectedDocument('provider', proofPath);
     } catch (err: any) {
-      showAlert({ type: 'error', message: err.message || 'Bukti payout tidak dapat dibuka' });
+      showAlert({ type: 'error', message: err.message || 'Bukti transfer tidak dapat dibuka' });
     }
   };
+
+  const bookingCodeById = new Map((summary?.bookings || []).map(b => [b.bookingId, b.bookingCode]));
 
   const isBankConfigured = !!(providerProfile?.bankName && providerProfile?.bankAccount && providerProfile?.bankAccountName);
   const bankName = providerProfile?.bankName || '';
@@ -110,7 +162,9 @@ export const ProviderFinancePage: React.FC = () => {
   const bankAccountName = providerProfile?.bankAccountName || '';
 
   const handleCreatePayoutRequest = async () => {
-    if (!summary) return;
+    if (submitting || !summary || !requestTarget) return;
+    const { booking, type: requestType } = requestTarget;
+    const stage = requestType === 'DP_50' ? booking.dp : booking.settlement;
 
     if (!isBankConfigured) {
       setModalNotice({
@@ -121,45 +175,45 @@ export const ProviderFinancePage: React.FC = () => {
       return;
     }
 
-    const reqAmount = requestType === 'DP_50' ? summary.availableDp : (summary.availablePelunasan || 0);
+    const reqAmount = stage.remaining;
 
-    if (reqAmount <= 0) {
+    if (stage.status !== 'AVAILABLE' || reqAmount <= 0) {
       setModalNotice({
-        title: 'Saldo Tidak Mencukupi',
-        message: requestType === 'DP_50' 
-          ? 'Saat ini belum ada saldo DP 50% yang siap untuk dicairkan.' 
-          : 'Belum ada saldo pelunasan 50% yang siap dicairkan. Pelunasan 50% kedua dapat dicairkan setelah trip selesai.',
+        title: 'Belum Dapat Dicairkan',
+        message: requestType === 'DP_50'
+          ? 'DP 50% tersedia mulai H-3 sebelum trip dimulai, setelah pembayaran lunas.'
+          : 'Pelunasan 50% trip ini baru dapat dicairkan setelah tanggal trip selesai.',
         isError: true
       });
       return;
     }
 
-    setSubmitting(true);
-    try {
-      await request('/provider/payouts/request', {
-        method: 'POST',
-        body: JSON.stringify({
-          amount: reqAmount,
-          type: requestType
-        })
-      });
+    await run('payout', async () => {
+      try {
+        await request('/provider/payouts/request', {
+          method: 'POST',
+          body: JSON.stringify({
+            amount: reqAmount,
+            type: requestType,
+            bookingId: booking.bookingId
+          })
+        });
 
-      setShowRequestModal(false);
-      setModalNotice({
-        title: 'Pengajuan Berhasil Dikirim!',
-		message: `Pengajuan pencairan ${requestType === 'DP_50' ? 'DP 50%' : 'Pelunasan Akhir 50%'} sebesar ${formatIDR(reqAmount)} telah dikirim. Setelah disetujui admin, transfer diproses ke rekening Mitra yang terdaftar.`
-      });
-      fetchSummary();
-    } catch (err: any) {
-      console.error(err);
-      setModalNotice({
-        title: 'Gagal Mengirim Pengajuan',
-        message: err.message || 'Terjadi kesalahan saat membuat pengajuan pencairan.',
-        isError: true
-      });
-    } finally {
-      setSubmitting(false);
-    }
+        setShowRequestModal(false);
+        setModalNotice({
+          title: 'Pengajuan Berhasil Dikirim!',
+          message: `Pengajuan pencairan ${payoutTypeLabel(requestType)} trip ${booking.bookingCode} sebesar ${formatIDR(reqAmount)} telah dikirim. Setelah disetujui admin, transfer diproses ke rekening Mitra yang terdaftar.`
+        });
+        fetchSummary();
+      } catch (err: any) {
+        console.error(err);
+        setModalNotice({
+          title: 'Gagal Mengirim Pengajuan',
+          message: err.message || 'Terjadi kesalahan saat membuat pengajuan pencairan.',
+          isError: true
+        });
+      }
+    });
   };
 
   return (
@@ -180,7 +234,7 @@ export const ProviderFinancePage: React.FC = () => {
               </h1>
             </div>
             <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-              Sistem pencairan 50% DP di awal dan 50% Pelunasan setelah trip selesai langsung ke rekening bank Mitra Anda.
+              Pencairan dilakukan per trip: DP 50% mulai H-3 setelah pembayaran lunas dan Pelunasan 50% setelah waktu selesai perjalanan, langsung ke rekening bank Mitra Anda.
             </p>
           </div>
 
@@ -206,8 +260,14 @@ export const ProviderFinancePage: React.FC = () => {
           </button>
         </div>
 
+        <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <button type="button" className="btn" disabled={loading || submitting} onClick={fetchSummary} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><RefreshCw size={15} /> {loading ? 'Memuat saldo...' : 'Perbarui saldo'}</button>
+          <span style={{ color: '#64748b', fontSize: 12 }}>Jadwal pencairan menggunakan waktu WIB. Tombol aktif setelah seluruh syarat terpenuhi.</span>
+        </div>
+        {loadError && <p role="alert" style={{ background: '#fef2f2', borderRadius: 10, padding: 14, color: '#b91c1c' }}>{loadError}</p>}
+
         {/* 4 Summary Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
           
           {/* Card 1: Total Pendapatan Bersih Mitra */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '22px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
@@ -223,7 +283,7 @@ export const ProviderFinancePage: React.FC = () => {
               {formatIDR(summary?.netEarnings || 0)}
             </strong>
             <span style={{ fontSize: '11.5px', color: '#16a34a', fontWeight: '600' }}>
-              Net 85% Paket (Setelah komisi platform 15% & Biaya Admin Rp 5rb)
+              Tarif booking baru {summary?.platformFeePercent ?? providerProfile?.platformFeePercent ?? 0}% + biaya layanan {formatIDR(summary?.serviceFee ?? 0)}; transaksi lama mengikuti tarif saat dibuat
             </span>
           </div>
 
@@ -240,7 +300,8 @@ export const ProviderFinancePage: React.FC = () => {
             <strong style={{ fontSize: '20px', fontWeight: '800', color: '#0284c7', display: 'block', marginBottom: '4px' }}>
               {formatIDR(summary?.availableDp || 0)}
             </strong>
-            <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '600' }}>Bisa dicairkan awal booking lunas</span>
+            <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '600' }}>Tersedia mulai H-3, setelah pembayaran lunas</span>
+            {(summary?.heldDp || 0) > 0 && <p style={{ margin: '8px 0 0', fontSize: 12, color: '#64748b' }}>Menunggu H-3: {formatIDR(summary?.heldDp || 0)}</p>}
           </div>
 
           {/* Card 3: Saldo Pelunasan 50% (Akhir Trip) */}
@@ -277,6 +338,18 @@ export const ProviderFinancePage: React.FC = () => {
 
         </div>
 
+        {(summary?.providerDebt || 0) > 0 && (
+          <div style={{ backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: '14px', padding: '16px 18px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+            <AlertCircle size={20} color="#c2410c" style={{ flexShrink: 0, marginTop: '1px' }} />
+            <div>
+              <strong style={{ color: '#9a3412', display: 'block', marginBottom: '3px' }}>Penyesuaian saldo refund: {formatIDR(summary?.providerDebt || 0)}</strong>
+              <span style={{ color: '#7c2d12', fontSize: '13px', lineHeight: 1.5 }}>
+                Dana booking yang sebelumnya sudah dicairkan kemudian wajib direfund. Pendapatan berikutnya otomatis menutup penyesuaian ini sebelum saldo baru dapat diajukan.
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Action Banner: Request Payout & Destination Bank Info */}
         <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
           <div>
@@ -291,73 +364,68 @@ export const ProviderFinancePage: React.FC = () => {
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => {
-                if ((summary?.availableDp || 0) <= 0) {
-                  setModalNotice({
-                    title: 'Saldo DP Belum Tersedia',
-                    message: 'Belum ada saldo DP 50% yang siap dicairkan. Saldo DP 50% akan otomatis masuk ke sini saat pesanan baru lunas dibayar oleh pelanggan.',
-                    isError: true
-                  });
-                  return;
-                }
-                setRequestType('DP_50');
-                setShowRequestModal(true);
-              }}
-              style={{
-                padding: '12px 20px',
-                backgroundColor: (summary?.availableDp || 0) > 0 ? '#0284c7' : '#94a3b8',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '12px',
-                fontSize: '13.5px',
-                fontWeight: '700',
-                cursor: (summary?.availableDp || 0) > 0 ? 'pointer' : 'not-allowed',
-                boxShadow: (summary?.availableDp || 0) > 0 ? '0 4px 14px rgba(2, 132, 199, 0.3)' : 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                opacity: (summary?.availableDp || 0) > 0 ? 1 : 0.75
-              }}
-            >
-              <ArrowUpRight size={18} /> Cairkan DP (50% Awal)
-            </button>
+          <span style={{ fontSize: '13px', color: '#64748b', maxWidth: '360px', lineHeight: 1.5 }}>
+            Pilih trip pada daftar di bawah untuk mengajukan pencairan DP atau pelunasan.
+          </span>
+        </div>
 
-            <button
-              onClick={() => {
-                if ((summary?.availablePelunasan || 0) <= 0) {
-                  setModalNotice({
-                    title: 'Pencairan Pelunasan Masih Tertahan',
-                    message: 'Saldo Pelunasan 50% kedua didisable/tertahan selama trip berlangsung. Tombol ini akan otomatis AKTIF dan saldo bisa dicairkan setelah tanggal & jam akhir trip selesai.',
-                    isError: true
-                  });
-                  return;
-                }
-                setRequestType('PELUNASAN_50');
-                setShowRequestModal(true);
-              }}
-              style={{
-                padding: '12px 20px',
-                backgroundColor: (summary?.availablePelunasan || 0) > 0 ? '#16a34a' : '#64748b',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '12px',
-                fontSize: '13.5px',
-                fontWeight: '700',
-                cursor: (summary?.availablePelunasan || 0) > 0 ? 'pointer' : 'not-allowed',
-                boxShadow: (summary?.availablePelunasan || 0) > 0 ? '0 4px 14px rgba(22, 163, 74, 0.3)' : 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                opacity: (summary?.availablePelunasan || 0) > 0 ? 1 : 0.75
-              }}
-              title={(summary?.availablePelunasan || 0) > 0 ? 'Klik untuk mencairkan pelunasan' : 'Disabled hingga tanggal & jam trip selesai'}
-            >
-              {(summary?.availablePelunasan || 0) > 0 ? <ArrowUpRight size={18} /> : <Lock size={16} />} 
-              Cairkan Pelunasan (50% Akhir Trip) {(summary?.availablePelunasan || 0) <= 0 && '(Terkunci)'}
-            </button>
-          </div>
+        {/* Pencairan per Trip */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', marginBottom: '32px' }}>
+          <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
+            Pencairan per Trip
+          </h2>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 20px 0' }}>
+            Setiap booking memiliki pencairan DP 50% dan Pelunasan 50% masing-masing.
+          </p>
+
+          {loading ? (
+            <SkeletonTable rows={4} columns={5} label="Memuat daftar booking" />
+          ) : !summary?.bookings || summary.bookings.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
+              Belum ada booking lunas yang dapat dicairkan.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1.5px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '12.5px', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '12px' }}>Trip</th>
+                    <th style={{ padding: '12px' }}>Tanggal Trip</th>
+                    <th style={{ padding: '12px' }}>Hak Bersih</th>
+                    <th style={{ padding: '12px' }}>DP 50%</th>
+                    <th style={{ padding: '12px' }}>Pelunasan 50%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.bookings.map(b => (
+                    <tr key={b.bookingId} style={{ borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' }}>
+                      <td style={{ padding: '14px 12px' }}>
+                        <strong style={{ display: 'block', color: '#0f172a' }}>{b.packageName || 'Paket'}</strong>
+                        <span style={{ display: 'block', fontSize: '12px', color: '#0284c7', fontWeight: 700 }}>{b.bookingCode}</span>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>{b.customerName} · {b.guests} peserta</span>
+                      </td>
+                      <td style={{ padding: '14px 12px', color: '#475569', whiteSpace: 'nowrap' }}>
+                        <CalendarDays size={14} style={{ verticalAlign: '-2px', marginRight: '6px' }} aria-hidden="true" />
+                        {formatTripDate(b.tripDate)} – {formatTripDate(b.tripEndDate)}
+                      </td>
+                      <td style={{ padding: '14px 12px', fontWeight: 800, color: '#0f172a' }}>{formatIDR(b.netEarning)}</td>
+                      {(['DP_50', 'PELUNASAN_50'] as PayoutType[]).map(type => {
+                        const stage = type === 'DP_50' ? b.dp : b.settlement;
+                        return (
+                          <td key={type} style={{ padding: '14px 12px', minWidth: '170px' }}>
+                            <PayoutStageAction stage={stage} type={type} bookingId={b.bookingId}
+                              bankConfigured={isBankConfigured} availableBalance={type === 'DP_50' ? summary?.availableDp || 0 : summary?.availablePelunasan || 0} busy={submitting || loading}
+                              onRequest={() => { setRequestTarget({ booking: b, type }); setShowRequestModal(true); }}
+                              onBankSettings={() => navigateTo('profil-provider')} onViewProof={handleViewProof} />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Payout History Table */}
@@ -367,12 +435,10 @@ export const ProviderFinancePage: React.FC = () => {
           </h2>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
-              Sedang memuat riwayat pencairan...
-            </div>
+            <SkeletonTable rows={4} columns={5} label="Memuat riwayat pencairan" />
           ) : !summary?.payouts || summary.payouts.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
-              Belum ada riwayat pengajuan pencairan dana. Klik tombol di atas untuk mengajukan pencairan DP 50%.
+              Belum ada riwayat pengajuan pencairan dana. Pilih trip pada daftar di atas untuk mengajukan pencairan.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -380,6 +446,7 @@ export const ProviderFinancePage: React.FC = () => {
                 <thead>
                   <tr style={{ borderBottom: '1.5px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '12.5px', textTransform: 'uppercase' }}>
                     <th style={{ padding: '12px' }}>Tanggal</th>
+                    <th style={{ padding: '12px' }}>Trip</th>
                     <th style={{ padding: '12px' }}>Tipe Pencairan</th>
                     <th style={{ padding: '12px' }}>Nominal</th>
                     <th style={{ padding: '12px' }}>Bank Tujuan</th>
@@ -393,6 +460,9 @@ export const ProviderFinancePage: React.FC = () => {
                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '14px 12px', color: '#64748b' }}>
                         {new Date(p.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td style={{ padding: '14px 12px', color: '#0284c7', fontWeight: 700, fontSize: '13px' }}>
+                        {(p.bookingId && bookingCodeById.get(p.bookingId)) || (p.bookingId ? `Booking #${p.bookingId}` : 'Gabungan (lama)')}
                       </td>
                       <td style={{ padding: '14px 12px', fontWeight: '700', color: '#0f172a' }}>
                         {p.type === 'DP_50' ? 'Uang Muka (DP 50%)' : 'Pelunasan Akhir (50%)'}
@@ -435,9 +505,9 @@ export const ProviderFinancePage: React.FC = () => {
                         {p.notes || '-'}
                       </td>
                       <td style={{ padding: '14px 12px' }}>
-                        {p.status === 'APPROVED' ? (
+                        {p.status === 'APPROVED' && p.proofPath ? (
                           <button
-                            onClick={() => handleDownloadPDF(p.id)}
+                            onClick={() => handleViewProof(p.proofPath!)}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -452,7 +522,7 @@ export const ProviderFinancePage: React.FC = () => {
                               cursor: 'pointer'
                             }}
                           >
-                            <FileText size={14} /> Bukti PDF
+                            <FileText size={14} /> Lihat Bukti
                           </button>
                         ) : (
                           <span style={{ color: '#94a3b8', fontSize: '12px' }}>-</span>
@@ -469,7 +539,7 @@ export const ProviderFinancePage: React.FC = () => {
       </main>
 
       {/* MODAL REQUEST PAYOUT */}
-      {showRequestModal && (
+      {showRequestModal && requestTarget && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
           <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', maxWidth: '460px', width: '100%', padding: '32px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
             
@@ -478,19 +548,19 @@ export const ProviderFinancePage: React.FC = () => {
             </div>
 
             <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', textAlign: 'center', margin: '0 0 8px 0' }}>
-              {requestType === 'DP_50' ? 'Konfirmasi Pengajuan DP (50% Awal)' : 'Konfirmasi Pencairan Pelunasan (50% Akhir Trip)'}
+              {requestTarget.type === 'DP_50' ? 'Konfirmasi Pengajuan DP (50% Awal)' : 'Konfirmasi Pencairan Pelunasan (50% Akhir Trip)'}
             </h3>
 
             <p style={{ fontSize: '13.5px', color: '#64748b', textAlign: 'center', lineHeight: '1.5', margin: '0 0 20px 0' }}>
-              {requestType === 'DP_50' 
-                ? 'Anda akan mengajukan pencairan Uang Muka DP 50% ke rekening bank Mitra sebesar:'
-                : 'Anda akan mengajukan pencairan Sisa Pelunasan 50% Akhir Trip ke rekening bank Mitra sebesar:'}
+              {requestTarget.type === 'DP_50' ? 'Pencairan Uang Muka DP 50%' : 'Pencairan Sisa Pelunasan 50%'} untuk trip{' '}
+              <strong style={{ color: '#0f172a' }}>{requestTarget.booking.packageName} ({requestTarget.booking.bookingCode})</strong>{' '}
+              ke rekening bank Mitra sebesar:
             </p>
 
             <div style={{ backgroundColor: '#f0f9ff', padding: '16px', borderRadius: '12px', border: '1px solid #bae6fd', textAlign: 'center', marginBottom: '20px' }}>
               <span style={{ fontSize: '12px', color: '#0369a1', display: 'block', marginBottom: '2px' }}>Nominal Pencairan:</span>
               <strong style={{ fontSize: '22px', color: '#0284c7', fontWeight: '800' }}>
-                {formatIDR(requestType === 'DP_50' ? (summary?.availableDp || 0) : (summary?.availablePelunasan || 0))}
+                {formatIDR(requestTarget.type === 'DP_50' ? requestTarget.booking.dp.remaining : requestTarget.booking.settlement.remaining)}
               </strong>
             </div>
 
@@ -503,16 +573,19 @@ export const ProviderFinancePage: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <button
                 onClick={() => setShowRequestModal(false)}
-                style={{ padding: '12px', backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}
+                // Modal tidak boleh ditutup saat pengajuan masih diproses agar hasilnya tetap terlihat.
+                disabled={submitting}
+                style={{ padding: '12px', backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1 }}
               >
                 Batal
               </button>
               <button
                 onClick={handleCreatePayoutRequest}
                 disabled={submitting}
-                style={{ padding: '12px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)' }}
+                aria-busy={submitting}
+                style={{ padding: '12px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.75 : 1, boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
-                {submitting ? 'Mengirim...' : 'Ya, Ajukan Pencairan'}
+                {submitting ? (<><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Mengirim...</>) : 'Ya, Ajukan Pencairan'}
               </button>
             </div>
 

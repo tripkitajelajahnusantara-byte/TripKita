@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Status satu tanggal keberangkatan pada paket non-open-trip.
 const (
@@ -24,12 +27,11 @@ const (
 
 // AvailabilityHorizonMonths membatasi seberapa jauh ke depan mitra boleh membuka
 // tanggal keberangkatan.
-const AvailabilityHorizonMonths = 6
+const AvailabilityHorizonMonths = 3
 
 // MaxAvailabilityDates membatasi jumlah tanggal per paket agar satu permintaan
-// tidak dapat menulis ribuan baris sekaligus. Enam bulan berisi paling banyak
-// 184 hari, jadi batas ini tidak pernah menghalangi pemakaian yang wajar.
-const MaxAvailabilityDates = 200
+// tidak dapat menulis ribuan baris sekaligus. Tiga bulan maksimal 93 hari inklusif.
+const MaxAvailabilityDates = 100
 
 // PackageDate adalah satu tanggal keberangkatan pada paket selain Open Trip.
 //
@@ -52,12 +54,42 @@ type PackageDate struct {
 // SetPackageDatesRequest mengganti seluruh tanggal yang dibuka untuk satu paket.
 // Daftar kosong berarti mitra menutup semua tanggal.
 type SetPackageDatesRequest struct {
-	Dates []string `json:"dates" binding:"omitempty,max=200,dive,datetime=2006-01-02"`
+	Dates []string `json:"dates" binding:"omitempty,max=100,dive,datetime=2006-01-02"`
 }
 
 // AvailabilityWindow mengembalikan batas tanggal yang boleh dibuka mitra,
 // dihitung dari hari berjalan.
 func AvailabilityWindow(now time.Time) (earliest string, latest string) {
+	now = now.In(BookingLocation)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	return today.Format("2006-01-02"), today.AddDate(0, AvailabilityHorizonMonths, 0).Format("2006-01-02")
+	// Clamp month-end, e.g. November 30 + three months = February 28.
+	month := time.Date(today.Year(), today.Month()+AvailabilityHorizonMonths, 1, 0, 0, 0, 0, today.Location())
+	day := today.Day()
+	last := month.AddDate(0, 1, -1).Day()
+	if day > last {
+		day = last
+	}
+	return today.Format("2006-01-02"), month.AddDate(0, 0, day-1).Format("2006-01-02")
+}
+
+var BookingLocation = time.FixedZone("WIB", 7*60*60)
+
+func CalendarRange(start, end string) ([]string, error) {
+	a, err := time.Parse("2006-01-02", start)
+	if err != nil {
+		return nil, fmt.Errorf("tanggal mulai tidak valid")
+	}
+	b, err := time.Parse("2006-01-02", end)
+	if err != nil || b.Before(a) {
+		return nil, fmt.Errorf("tanggal selesai tidak valid")
+	}
+	count := int(b.Sub(a).Hours()/24) + 1
+	if count > MaxAvailabilityDates {
+		return nil, fmt.Errorf("rentang tanggal maksimal tiga bulan")
+	}
+	dates := make([]string, count)
+	for i := range dates {
+		dates[i] = a.AddDate(0, 0, i).Format("2006-01-02")
+	}
+	return dates, nil
 }

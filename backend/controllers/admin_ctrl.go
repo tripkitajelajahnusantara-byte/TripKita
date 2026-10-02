@@ -1,10 +1,12 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"tripkita-provider/models"
 	"tripkita-provider/services"
@@ -43,12 +45,54 @@ func (ctrl *AdminController) UpdateProviderStatus(c *gin.Context) {
 	}
 
 	err = ctrl.service.UpdateProviderStatus(uint(id), req.Status, req.VerificationNotes)
-	if err != nil {
+	switch {
+	case errors.Is(err, services.ErrProviderStatusUnchanged):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	case errors.Is(err, services.ErrProviderRejectionReasonRequired):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "Provider tidak ditemukan"})
+		return
+	case err != nil:
 		respondInternalError(c, "memperbarui status provider", err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Provider status updated successfully"})
+}
+
+func (ctrl *AdminController) UpdateProviderPlatformFee(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid provider ID"})
+		return
+	}
+
+	var req models.UpdateProviderPlatformFeeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Potongan platform harus berupa angka bulat antara 1 dan 100 persen"})
+		return
+	}
+	err = ctrl.service.UpdateProviderPlatformFee(uint(id), req.PlatformFeePercent)
+	switch {
+	case errors.Is(err, services.ErrInvalidPlatformFee), errors.Is(err, services.ErrPlatformFeeNotProvider):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "Provider tidak ditemukan"})
+		return
+	case err != nil:
+		// Detail database tidak boleh tampil ke admin sebagai pesan validasi.
+		respondInternalError(c, "memperbarui potongan platform", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":            "Potongan platform berhasil diperbarui",
+		"platformFeePercent": req.PlatformFeePercent,
+	})
 }
 
 func (ctrl *AdminController) DeleteProvider(c *gin.Context) {
@@ -90,6 +134,24 @@ type VerifyLegalRequest struct {
 	Reason string `json:"reason"`
 }
 
+func (ctrl *AdminController) VerifyProviderProfile(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid provider ID"})
+		return
+	}
+
+	var req VerifyLegalRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if respondVerificationError(c, "memverifikasi perubahan profil provider", ctrl.service.VerifyProviderProfile(uint(id), req.Action, req.Reason)) {
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Provider profile verification processed"})
+}
+
 func (ctrl *AdminController) VerifyProviderLegal(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
@@ -105,8 +167,7 @@ func (ctrl *AdminController) VerifyProviderLegal(c *gin.Context) {
 	}
 
 	err = ctrl.service.VerifyProviderLegal(uint(id), req.Action, req.Reason)
-	if err != nil {
-		respondInternalError(c, "memverifikasi data legal provider", err)
+	if respondVerificationError(c, "memverifikasi data legal provider", err) {
 		return
 	}
 
@@ -134,10 +195,31 @@ func (ctrl *AdminController) VerifyProviderDocument(c *gin.Context) {
 	}
 
 	err = ctrl.service.VerifyProviderDocument(uint(id), req.DocType, req.Action, req.Reason)
-	if err != nil {
-		respondInternalError(c, "memverifikasi dokumen provider", err)
+	if respondVerificationError(c, "memverifikasi dokumen provider", err) {
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Provider document verification processed"})
+}
+
+// respondVerificationError memetakan penolakan bisnis verifikasi ke status 4xx
+// agar klik kedua atau data yang sudah berubah tampil sebagai pesan jelas,
+// bukan gangguan server. Mengembalikan true bila respons sudah dikirim.
+func respondVerificationError(c *gin.Context, operation string, err error) bool {
+	var inputErr *services.AuthInputError
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, services.ErrNothingToVerify):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, services.ErrProviderRejectionReasonRequired):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.As(err, &inputErr):
+		c.JSON(http.StatusConflict, gin.H{"error": inputErr.Error()})
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "Provider tidak ditemukan"})
+	default:
+		respondInternalError(c, operation, err)
+	}
+	return true
 }

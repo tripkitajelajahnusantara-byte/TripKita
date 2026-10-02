@@ -1,12 +1,29 @@
-import React, { useState } from 'react';
+import { bookingTimestamp, formatTripRange, validDate } from '../utils/tripDates';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
-import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck } from 'lucide-react';
+import { fetchCheckoutConfig } from '../utils/checkoutConfig';
+import { useActionLock } from '../utils/useActionLock';
+import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck, LoaderCircle } from 'lucide-react';
 import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsContent } from '../components/LegalModals';
+import { Skeleton } from '../components/Skeleton';
+import { useCustomAlert } from '../components/CustomAlertModal';
+import {
+  getMeetingPointAddress,
+  getMeetingPointCoordinates,
+  MeetingPointMap,
+} from '../components/MeetingPointMap';
 
 export const CustomerConfirmationPage: React.FC = () => {
-  const { navigateTo, selectedPackageForDetail, bookingFormData } = useNavigation();
-  const [submitting, setSubmitting] = useState(false);
+  const { navigateTo, selectedPackageForDetail, bookingFormData, setBookingFormData, setSelectedBookingForInvoice, setSelectedPackageForDetail } = useNavigation();
+  const { showAlert } = useCustomAlert();
+  // POST /public/bookings membuat pesanan baru; kunci berbasis ref mencegah
+  // klik ganda di tick yang sama membuat dua booking dan dua tagihan.
+  const { pending, isBusy, run } = useActionLock();
+  // Menjaga tombol tetap nonaktif selama perpindahan ke halaman pembayaran.
+  const redirectingRef = useRef(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const submitting = pending === 'create-booking' || redirecting;
   
   // Agreement Checkbox state
   const [isAgreed, setIsAgreed] = useState(false);
@@ -18,10 +35,58 @@ export const CustomerConfirmationPage: React.FC = () => {
   // Confirmation Modal Popup state (YES / NO)
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // Biaya layanan diambil dari backend (sama persis dengan yang ditambahkan server ke total)
+  const [serviceFee, setServiceFee] = useState<number | null>(null);
+  const [cancellationRefundDays, setCancellationRefundDays] = useState<number | null>(null);
+  const [checkoutConfigError, setCheckoutConfigError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCheckoutConfig()
+      .then((cfg) => {
+        if (!cancelled) {
+          setServiceFee(cfg.serviceFee);
+          setCancellationRefundDays(cfg.cancellationRefundDays);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setCheckoutConfigError(err instanceof Error && err.message ? err.message : 'Gagal memuat biaya layanan.');
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const [restoring, setRestoring] = useState(!selectedPackageForDetail && !!bookingFormData?.packageId);
+  const [restoreError, setRestoreError] = useState('');
+  useEffect(() => {
+    if (selectedPackageForDetail || !bookingFormData?.packageId) return;
+    let cancelled = false;
+    request('/public/packages').then((packages) => {
+      if (cancelled) return;
+      const found = Array.isArray(packages) ? packages.find(p => Number(p.id) === Number(bookingFormData.packageId)) : null;
+      if (!found) throw new Error('Paket tidak tersedia. Silakan pilih ulang paket dan tanggal.');
+      setSelectedPackageForDetail({ ...found, bookingDate: bookingFormData.tripDate, bookingEndDate: bookingFormData.tripEndDate, bookingGuests: bookingFormData.peserta.length });
+    }).catch(error => { if (!cancelled) setRestoreError(error.message || 'Gagal memuat paket.'); })
+      .finally(() => { if (!cancelled) setRestoring(false); });
+    return () => { cancelled = true; };
+  }, [selectedPackageForDetail, bookingFormData, setSelectedPackageForDetail]);
+
+  if (restoring && !selectedPackageForDetail) return <p role="status" style={{ padding: 40 }}>Memuat pilihan perjalanan...</p>;
+
+  // Setelah booking dibuat, data form dikosongkan sementara halaman tagihan
+  // masih dimuat; tampilkan status pengalihan, bukan pesan "tidak ditemukan".
+  if (redirecting) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }} role="status" aria-live="polite">
+        <LoaderCircle size={20} className="btn-spinner" aria-hidden="true" style={{ verticalAlign: 'middle', marginRight: 8 }} />
+        Booking berhasil dibuat. Membuka halaman pembayaran...
+      </div>
+    );
+  }
+
   if (!selectedPackageForDetail || !bookingFormData) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
-        <p>Data pemesanan tidak ditemukan. Silakan isi data pemesan terlebih dahulu.</p>
+        <p>{restoreError || 'Data pemesanan tidak ditemukan. Silakan isi data pemesan terlebih dahulu.'}</p>
         <button onClick={() => navigateTo('beranda')} style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
           Kembali ke Beranda
         </button>
@@ -30,13 +95,16 @@ export const CustomerConfirmationPage: React.FC = () => {
   }
 
   const pkg = selectedPackageForDetail;
+  const meetingPointCoordinates = getMeetingPointCoordinates(pkg);
+  const meetingPointAddress = getMeetingPointAddress(pkg);
   const { pemesan, peserta } = bookingFormData;
   const guestsCount = peserta.length;
   const selectedAddOns = pkg.selectedAddOns || bookingFormData?.selectedAddOns || [];
   const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
   const baseCost = pkg.price * guestsCount;
-  const serviceFee = 5000;
-  const totalCost = baseCost + addOnsTotal + serviceFee;
+  const checkoutConfigLoading = (serviceFee === null || cancellationRefundDays === null) && !checkoutConfigError;
+  const checkoutReady = serviceFee !== null && cancellationRefundDays !== null;
+  const totalCost = baseCost + addOnsTotal + (serviceFee ?? 0);
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -47,6 +115,7 @@ export const CustomerConfirmationPage: React.FC = () => {
   };
 
   const handleOpenConfirmModal = () => {
+    if (isBusy || redirectingRef.current || !checkoutReady) return;
     if (!isAgreed) {
       setAgreementError('Anda wajib menyetujui Syarat & Ketentuan untuk melanjutkan.');
       return;
@@ -69,9 +138,10 @@ export const CustomerConfirmationPage: React.FC = () => {
   };
 
   const handleFinalConfirmBooking = async () => {
-    setShowConfirmModal(false);
-    setSubmitting(true);
-
+    if (isBusy || redirectingRef.current || !checkoutReady) return;
+    // Modal tetap terbuka selama permintaan berjalan agar tombol "Ya, Bayar"
+    // menampilkan indikator dan tidak bisa ditekan ulang.
+    await run('create-booking', async () => {
 	const nowIso = new Date().toISOString();
 
     try {
@@ -103,14 +173,17 @@ export const CustomerConfirmationPage: React.FC = () => {
           }
         }
 
-        const defaultFuture = new Date();
-        defaultFuture.setDate(defaultFuture.getDate() + 14);
-        return defaultFuture;
+        // Jangan menebak tanggal: pesanan untuk tanggal yang tidak dipilih
+        // pelanggan lebih merugikan daripada menghentikan checkout.
+        throw new Error('Tanggal perjalanan tidak terbaca. Silakan kembali ke detail paket dan pilih tanggal lagi.');
       };
 
-      const selectedTripSchedule = bookingFormData?.tripDate || pkg.bookingDate || pkg.schedule || '';
-
-      const parsedTripDate = parseTripDateToFuture(selectedTripSchedule);
+      const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
+      const selectedTripSchedule = bookingFormData.tripDate || pkg.bookingDate || (isOpenTrip ? pkg.schedule : '') || '';
+      if (!isOpenTrip && (!validDate(selectedTripSchedule) || Number(bookingFormData.packageId) !== Number(pkg.id))) {
+        throw new Error('Pilihan tanggal tidak valid untuk paket ini. Kembali ke detail paket dan pilih tanggal pada kalender.');
+      }
+      const tripTimestamp = isOpenTrip ? parseTripDateToFuture(selectedTripSchedule).toISOString() : bookingTimestamp(selectedTripSchedule);
 
 	  const rawPkgId = Number(pkg.id);
 	  if (!Number.isInteger(rawPkgId) || rawPkgId <= 0) {
@@ -119,31 +192,29 @@ export const CustomerConfirmationPage: React.FC = () => {
 
       const payload: any = {
 		packageId: rawPkgId,
-        customerName: pemesan.nama || 'Pelanggan TripKita',
+        customerName: pemesan.nama || 'Pelanggan TemenTrip',
         customerEmail: pemesan.email,
         customerPhone: pemesan.whatsapp,
         customerInitial: (pemesan.nama || 'P').charAt(0).toUpperCase(),
         guests: guestsCount || 1,
-        tripDate: parsedTripDate.toISOString(),
-        addOnIds: selectedAddOns.map((item: any) => item.id)
+        tripDate: tripTimestamp,
+        addOnIds: selectedAddOns.map((item: any) => item.id),
+        participants: peserta.map((p) => {
+          const medical = String(p.riwayatPenyakit || '').trim();
+          return {
+            name: String(p.nama || '').trim(),
+            phone: String(p.hp || '').trim(),
+            gender: p.gender,
+            birthDate: p.tanggalLahir,
+            medicalNotes: (medical === '' || medical === '-' || medical.toLowerCase() === 'tidak ada') ? '' : medical
+          };
+        })
       };
 
       const response = await request('/public/bookings', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-
-      const paymentUrl = response.paymentUrl || response.payment_url;
-	  let parsedPaymentURL: URL;
-	  try {
-		parsedPaymentURL = new URL(paymentUrl);
-	  } catch {
-		throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
-	  }
-	  const paymentHost = parsedPaymentURL.hostname.toLowerCase();
-	  if (parsedPaymentURL.protocol !== 'https:' || (paymentHost !== 'xendit.co' && !paymentHost.endsWith('.xendit.co'))) {
-		throw new Error('Backend tidak mengembalikan Invoice URL Xendit yang valid');
-	  }
 
 	  const finalBookingCode = response.bookingCode || response.booking_code;
 	  if (!finalBookingCode) throw new Error('Backend tidak mengembalikan kode booking');
@@ -153,27 +224,36 @@ export const CustomerConfirmationPage: React.FC = () => {
         packageName: pkg.name,
         totalPrice: response.totalPrice,
         guests: guestsCount,
-        tripDate: selectedTripSchedule || parsedTripDate.toISOString().split('T')[0],
+        tripDate: selectedTripSchedule,
         createdAt: response.createdAt || nowIso,
         status: response.status || 'PENDING_PAYMENT',
-        paymentUrl: paymentUrl
+        paymentMethod: response.paymentMethod || 'Transfer Bank Manual'
       };
 
-      // Save into local history
-      const existingHistoryStr = localStorage.getItem('tripkita_my_bookings') || '[]';
-      const history = JSON.parse(existingHistoryStr);
-      history.unshift(bookingObj);
-      localStorage.setItem('tripkita_my_bookings', JSON.stringify(history));
+      // Riwayat lokal lama tidak pernah dibaca dan menumpuk data pemesan di
+      // perangkat bersama, jadi dibersihkan; invoice cukup memakai sessionStorage.
+      localStorage.removeItem('tripkita_my_bookings');
       sessionStorage.setItem('tripkita_recent_guest_booking', JSON.stringify(bookingObj));
 
-      // Direct external redirect to Xendit Invoice URL (using replace so back button doesn't loop)!
-	  window.location.replace(parsedPaymentURL.toString());
+	  // Booking telah dibuat dan kuota langsung ditahan selama 24 jam.
+	  redirectingRef.current = true;
+	  setRedirecting(true);
+	  setSelectedBookingForInvoice(bookingObj);
+	  navigateTo('halaman-pembayaran');
+	  // Data form dikosongkan agar tombol Back tidak dapat membuat booking kedua.
+	  setBookingFormData(null);
 
     } catch (err: any) {
       console.error('[Booking Error]', err);
-      alert(`Gagal membuat tagihan pembayaran: ${err?.message || 'Terjadi kesalahan sistem'}`);
-      setSubmitting(false);
+      setShowConfirmModal(false);
+      showAlert({
+        title: 'Pembayaran Belum Dapat Diproses',
+        message: err?.message || 'Booking belum dapat dibuat. Silakan coba kembali.',
+        type: 'error',
+        confirmText: 'Coba Lagi',
+      });
     }
+    });
   };
 
   return (
@@ -247,6 +327,28 @@ export const CustomerConfirmationPage: React.FC = () => {
             </div>
           </div>
 
+          {meetingPointCoordinates && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px' }}>
+                Titik Kumpul
+              </h2>
+              {meetingPointAddress && (
+                <p style={{ fontSize: '13px', color: '#334155', margin: '0 0 14px', lineHeight: 1.6 }}>
+                  <strong>{meetingPointAddress}</strong>
+                </p>
+              )}
+              <MeetingPointMap position={meetingPointCoordinates} height={220} />
+              <a
+                href={`https://www.google.com/maps?q=${meetingPointCoordinates.lat},${meetingPointCoordinates.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', marginTop: '12px', color: '#0284c7', fontSize: '13px', fontWeight: 700 }}
+              >
+                Buka petunjuk arah
+              </a>
+            </div>
+          )}
+
           {/* Ringkasan Pembayaran Card (Positioned directly below Data Peserta) */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
@@ -262,7 +364,7 @@ export const CustomerConfirmationPage: React.FC = () => {
               </h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>
                 <Calendar size={14} color="#94a3b8" />
-                <span>{bookingFormData?.tripDate || pkg.bookingDate || pkg.schedule || 'Jadwal Fleksibel'}</span>
+                <span>{!pkg.tripType || pkg.tripType === 'Open Trip' ? (bookingFormData.tripDate || pkg.bookingDate || pkg.schedule || 'Jadwal Fleksibel') : formatTripRange(bookingFormData.tripDate || pkg.bookingDate, bookingFormData.tripEndDate || pkg.bookingEndDate)}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b' }}>
                 <Users size={14} color="#94a3b8" />
@@ -284,28 +386,36 @@ export const CustomerConfirmationPage: React.FC = () => {
                 </div>
               ))}
 
-              {serviceFee > 0 && (
+              {(serviceFee === null || serviceFee > 0) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Biaya Admin</span>
-                  <span style={{ color: '#0f172a', fontWeight: '600' }}>{formatIDR(serviceFee)}</span>
+                  <span style={{ color: checkoutConfigError ? '#ef4444' : '#0f172a', fontWeight: '600' }}>
+                    {serviceFee !== null ? formatIDR(serviceFee) : (checkoutConfigError ? 'Gagal dimuat' : <Skeleton width={90} height={16} style={{ display: 'inline-block', verticalAlign: 'middle' }} />)}
+                  </span>
                 </div>
               )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1.5px dashed #cbd5e1' }}>
               <strong style={{ fontSize: '14px', color: '#0f172a' }}>TOTAL PEMBAYARAN</strong>
-              <strong style={{ fontSize: '18px', color: '#0284c7', fontWeight: '800' }}>{formatIDR(totalCost)}</strong>
+              <strong style={{ fontSize: '18px', color: '#0284c7', fontWeight: '800' }}>{checkoutReady ? formatIDR(totalCost) : (checkoutConfigError ? '-' : <Skeleton width={90} height={16} style={{ display: 'inline-block', verticalAlign: 'middle' }} />)}</strong>
             </div>
+
+            {checkoutConfigError && (
+              <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '700', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <AlertCircle size={14} /> Gagal memuat biaya layanan: {checkoutConfigError} Muat ulang halaman untuk mencoba lagi.
+              </span>
+            )}
           </div>
 
           {/* Cancellation Policy Banner */}
           <div style={{ backgroundColor: '#f0f9ff', borderRadius: '16px', padding: '16px 20px', border: '1px solid #bae6fd', marginBottom: '16px' }}>
             <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '800', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ShieldCheck size={16} color="#0369a1" /> Kebijakan Pembatalan Strict H-7 TripKita
+              <ShieldCheck size={16} color="#0369a1" /> Kebijakan Pembatalan H-{cancellationRefundDays ?? '—'} TemenTrip
             </h4>
             <p style={{ margin: 0, fontSize: '12px', color: '#0c4a6e', lineHeight: '1.5' }}>
-              • Pembatalan <strong>≥ 7 hari sebelum trip</strong> berhak pengembalian dana <strong>100% Full Refund</strong>.<br/>
-              • Pembatalan <strong>&lt; 7 hari sebelum trip (H-6 s/d Hari H)</strong> dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>).<br/>
+              • Pembatalan <strong>≥ {cancellationRefundDays ?? '—'} hari sebelum trip</strong> berhak pengembalian dana <strong>100% Full Refund</strong>.<br/>
+              • Pembatalan <strong>&lt; {cancellationRefundDays ?? '—'} hari sebelum trip</strong> dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>).<br/>
               • Jika trip dibatalkan oleh Provider/Cuaca/Kuota Kurang, Pemesan berhak atas <strong>100% Refund</strong> atau <strong>Reschedule Maks 1x</strong>.
             </p>
           </div>
@@ -334,7 +444,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveLegalModal('cancellation'); }}
                   style={{ background: 'none', border: 'none', padding: 0, color: '#0284c7', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
                 >
-                  Kebijakan Pembatalan Strict H-7 TripKita
+                  Kebijakan Pembatalan H-{cancellationRefundDays ?? '—'} TemenTrip
                 </button>
                 . Seluruh data peserta yang diisikan adalah benar.
               </span>
@@ -349,22 +459,27 @@ export const CustomerConfirmationPage: React.FC = () => {
           {/* Action CTA Button */}
           <button
             onClick={handleOpenConfirmModal}
-            disabled={submitting}
+            disabled={submitting || !checkoutReady}
+            aria-busy={submitting}
             style={{
               width: '100%',
               padding: '16px',
-              backgroundColor: submitting ? '#94a3b8' : '#0284c7',
+              backgroundColor: (submitting || !checkoutReady) ? '#94a3b8' : '#0284c7',
               color: '#ffffff',
               border: 'none',
               borderRadius: '12px',
               fontSize: '16px',
               fontWeight: '700',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              boxShadow: submitting ? 'none' : '0 4px 14px rgba(2, 132, 199, 0.3)',
-              transition: 'all 0.2s'
+              cursor: (submitting || !checkoutReady) ? 'not-allowed' : 'pointer',
+              boxShadow: (submitting || !checkoutReady) ? 'none' : '0 4px 14px rgba(2, 132, 199, 0.3)',
+              transition: 'all 0.2s',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
             }}
           >
-            {submitting ? 'Memproses Booking...' : 'Konfirmasi & Bayar Sekarang'}
+            {submitting ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses Booking...</> : checkoutConfigLoading ? 'Memuat Biaya Layanan...' : 'Konfirmasi & Bayar Sekarang'}
           </button>
 
         </div>
@@ -416,6 +531,9 @@ export const CustomerConfirmationPage: React.FC = () => {
               {/* NO Button */}
               <button
                 onClick={() => setShowConfirmModal(false)}
+                // Menutup modal tidak membatalkan POST yang sudah terkirim, jadi
+                // tombol ini ikut dikunci agar pengguna tidak mengira batal.
+                disabled={submitting}
                 style={{
                   padding: '12px',
                   backgroundColor: '#ffffff',
@@ -424,7 +542,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                   borderRadius: '12px',
                   fontSize: '14px',
                   fontWeight: '700',
-                  cursor: 'pointer'
+                  cursor: submitting ? 'not-allowed' : 'pointer'
                 }}
               >
                 Batal (No)
@@ -433,19 +551,25 @@ export const CustomerConfirmationPage: React.FC = () => {
               {/* YES Button */}
               <button
                 onClick={handleFinalConfirmBooking}
+                disabled={submitting || !checkoutReady}
+                aria-busy={submitting}
                 style={{
                   padding: '12px',
-                  backgroundColor: '#0284c7',
+                  backgroundColor: submitting ? '#94a3b8' : '#0284c7',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '12px',
                   fontSize: '14px',
                   fontWeight: '700',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 10px rgba(2, 132, 199, 0.3)'
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  boxShadow: submitting ? 'none' : '0 4px 10px rgba(2, 132, 199, 0.3)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
                 }}
               >
-                Ya, Bayar Sekarang
+                {submitting ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses Booking...</> : 'Ya, Bayar Sekarang'}
               </button>
             </div>
 
@@ -459,16 +583,16 @@ export const CustomerConfirmationPage: React.FC = () => {
         onClose={() => setActiveLegalModal(null)}
         title="Syarat & Ketentuan Customer TemenTrip"
       >
-        <GeneralTermsContent />
+        <GeneralTermsContent cancellationRefundDays={cancellationRefundDays ?? undefined} />
       </LegalModalContainer>
 
       {/* Kebijakan Pembatalan Strict H-7 Modal */}
       <LegalModalContainer
         isOpen={activeLegalModal === 'cancellation'}
         onClose={() => setActiveLegalModal(null)}
-        title="Kebijakan Pembatalan Strict H-7 TripKita"
+        title={`Kebijakan Pembatalan H-${cancellationRefundDays ?? '—'} TemenTrip`}
       >
-        <CustomerRegistrationTermsContent />
+        <CustomerRegistrationTermsContent cancellationRefundDays={cancellationRefundDays ?? undefined} />
       </LegalModalContainer>
     </div>
   );

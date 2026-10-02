@@ -48,6 +48,12 @@ type AuthInputError struct{ Message string }
 
 func (e *AuthInputError) Error() string { return e.Message }
 
+// ErrAccountDisabled hanya dikembalikan setelah password terbukti benar,
+// sehingga status akun tidak bocor ke pihak yang tidak mengetahui password.
+// Tanpa pesan ini, akun nonaktif yang baru reset password terlihat seperti
+// password barunya ditolak.
+var ErrAccountDisabled = errors.New("akun ini sedang dinonaktifkan oleh admin TemenTrip. Hubungi tim TemenTrip untuk mengaktifkannya kembali")
+
 func NewAuthService(db *gorm.DB, repo repositories.ProviderRepository, cfg *config.Config, emailService *EmailService, notifService *NotificationService) AuthService {
 	_ = dummyPasswordHash()
 	return &authService{db: db, repo: repo, cfg: cfg, emailService: emailService, notifService: notifService}
@@ -55,10 +61,15 @@ func NewAuthService(db *gorm.DB, repo repositories.ProviderRepository, cfg *conf
 
 func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, error) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	normalizedPhone, err := normalizeIndonesianMobilePhone(req.WhatsApp)
+	if err != nil {
+		return nil, &AuthInputError{Message: err.Error()}
+	}
+	req.WhatsApp = normalizedPhone
 	if req.KtpPath == "" {
 		return nil, &AuthInputError{Message: "dokumen KTP wajib diunggah"}
 	}
-	if err := validateManagedDocumentPaths(req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
+	if err := validateManagedDocumentPaths(s.cfg.DocumentUploadDir(), req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
 		return nil, &AuthInputError{Message: err.Error()}
 	}
 	hashedPassword, err := authn.HashPassword(req.Password)
@@ -85,11 +96,12 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 		Email:               req.Email,
 		// Kredensial kanonik disimpan di users; kolom lama dibiarkan kosong
 		// supaya tidak ada dua salinan password hash untuk akun baru.
-		PasswordHash: "",
-		WhatsApp:     req.WhatsApp,
-		Role:         "PROVIDER",
-		Status:       "PENDING",
-		IsVerified:   false,
+		PasswordHash:       "",
+		WhatsApp:           req.WhatsApp,
+		Role:               "PROVIDER",
+		Status:             "PENDING",
+		IsVerified:         false,
+		PlatformFeePercent: models.DefaultPlatformFeePercent,
 	}
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
@@ -134,6 +146,11 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.Provider, e
 
 func (s *authService) RegisterCustomer(req *models.RegisterCustomerRequest) (*models.LoginResponse, error) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	normalizedPhone, err := normalizeIndonesianMobilePhone(req.WhatsApp)
+	if err != nil {
+		return nil, &AuthInputError{Message: err.Error()}
+	}
+	req.WhatsApp = normalizedPhone
 	hashedPassword, err := authn.HashPassword(req.Password)
 	if err != nil {
 		return nil, &AuthInputError{Message: err.Error()}
@@ -184,6 +201,7 @@ func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 	var user models.User
 	var provider models.Provider
 	invalidCredentials := false
+	accountDisabled := false
 	now := time.Now().UTC()
 	loginErr := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("LOWER(email) = LOWER(?)", req.Email).First(&user).Error; err != nil {
@@ -224,7 +242,7 @@ func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 			return nil
 		}
 		if !loginStatusAllowed(&provider) {
-			invalidCredentials = true
+			accountDisabled = true
 			return nil
 		}
 
@@ -247,6 +265,9 @@ func (s *authService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 	}
 	if invalidCredentials {
 		return nil, &AuthInputError{Message: "login tidak berhasil; periksa email dan password atau coba lagi nanti"}
+	}
+	if accountDisabled {
+		return nil, ErrAccountDisabled
 	}
 
 	tokenString, err := authn.IssueSession(context.Background(), s.db, user.ID)
@@ -347,7 +368,7 @@ func (s *authService) ResetPassword(email string, otp string, newPassword string
 		return authn.RevokeAllUserSessions(context.Background(), tx, user.ID)
 	})
 	if invalidToken {
-		return &AuthInputError{Message: "invalid or expired reset token"}
+		return &AuthInputError{Message: "kode OTP salah atau sudah kedaluwarsa. Minta kode baru bila perlu"}
 	}
 	return err
 }
@@ -372,10 +393,7 @@ func ensureEmailAvailable(tx *gorm.DB, email string) error {
 }
 
 func loginStatusAllowed(provider *models.Provider) bool {
-	if provider.Role == "PROVIDER" {
-		return provider.Status == "PENDING" || provider.Status == "APPROVED"
-	}
-	return provider.Status == "APPROVED"
+	return provider.CanAuthenticate()
 }
 
 func hashResetToken(secret string, userID uint, token string) string {
@@ -406,6 +424,13 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 	if err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(req.WhatsApp) != "" {
+		normalizedPhone, normalizeErr := normalizeIndonesianMobilePhone(req.WhatsApp)
+		if normalizeErr != nil {
+			return nil, &AuthInputError{Message: normalizeErr.Error()}
+		}
+		req.WhatsApp = normalizedPhone
+	}
 
 	if provider.Role == "CUSTOMER" {
 		if req.PicName != "" {
@@ -426,72 +451,145 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 		err = s.repo.Update(provider)
 		return provider, err
 	}
-	if err := validateManagedDocumentPaths(req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
+	if err := validateManagedDocumentPaths(s.cfg.DocumentUploadDir(), req.DocumentPath, req.KtpPath, req.NibPath, req.NpwpPath, req.AktaPath, req.SertifikatPath); err != nil {
 		return nil, err
 	}
 
-	// 1. Validation for Contact & Social Media changes (Max 1 update in 7 days)
-	contactChanged := false
-	if req.PicName != "" && req.PicName != provider.PicName {
-		contactChanged = true
-	}
-	if req.WhatsApp != "" && req.WhatsApp != provider.WhatsApp {
-		contactChanged = true
-	}
-	if req.Email != "" && strings.ToLower(strings.TrimSpace(req.Email)) != provider.Email {
-		return nil, errors.New("perubahan email harus dilakukan melalui layanan pelanggan agar kepemilikan alamat baru dapat diverifikasi")
-	}
-	if req.Instagram != "" && req.Instagram != provider.Instagram {
-		contactChanged = true
-	}
-	if req.TikTok != "" && req.TikTok != provider.TikTok {
-		contactChanged = true
-	}
-	if req.Website != "" && req.Website != provider.Website {
-		contactChanged = true
-	}
-
-	if contactChanged {
-		if provider.ContactLastUpdatedAt != nil {
-			if time.Since(*provider.ContactLastUpdatedAt) < 7*24*time.Hour {
-				return nil, errors.New("perubahan kontak hanya dapat dilakukan 1 kali setiap 7 hari untuk menjaga keamanan akun dan kepercayaan pelanggan")
+	// 1. Informasi bisnis, kontak, sosial media, dan email disimpan sebagai satu
+	// snapshot pending. Data aktif tetap dipakai untuk login dan tampilan publik
+	// sampai admin menyetujuinya. Ini menggantikan aturan lama yang menolak
+	// perubahan email dan membatasi kontak sekali per tujuh hari.
+	profileRequested := strings.TrimSpace(req.BusinessName) != "" ||
+		strings.TrimSpace(req.BusinessCategory) != "" ||
+		strings.TrimSpace(req.OperationalProvince) != "" ||
+		strings.TrimSpace(req.OperationalCity) != "" ||
+		strings.TrimSpace(req.PicName) != "" ||
+		strings.TrimSpace(req.Email) != "" ||
+		strings.TrimSpace(req.WhatsApp) != "" ||
+		strings.TrimSpace(req.Description) != "" ||
+		strings.TrimSpace(req.Website) != "" ||
+		strings.TrimSpace(req.Instagram) != "" ||
+		strings.TrimSpace(req.TikTok) != ""
+	profileChanged := false
+	if profileRequested {
+		usePending := provider.ProfileVerificationStatus == "PENDING" || provider.ProfileVerificationStatus == "REJECTED"
+		baseBusinessName, baseBusinessCategory := provider.BusinessName, provider.BusinessCategory
+		baseProvince, baseCity, basePicName := provider.OperationalProvince, provider.OperationalCity, provider.PicName
+		baseEmail, baseWhatsApp := provider.Email, provider.WhatsApp
+		if usePending {
+			baseBusinessName = provider.PendingBusinessName
+			baseBusinessCategory = provider.PendingBusinessCategory
+			baseProvince = provider.PendingOperationalProvince
+			baseCity = provider.PendingOperationalCity
+			basePicName = provider.PendingPicName
+			baseEmail = provider.PendingEmail
+			baseWhatsApp = provider.PendingWhatsApp
+		}
+		fallback := func(requested, current string) string {
+			requested = strings.TrimSpace(requested)
+			if requested == "" {
+				return current
 			}
+			return requested
 		}
 
-		// Update fields if allowed
-		if req.PicName != "" {
-			provider.PicName = req.PicName
+		candidateBusinessName := fallback(req.BusinessName, baseBusinessName)
+		candidateBusinessCategory := fallback(req.BusinessCategory, baseBusinessCategory)
+		candidateProvince := fallback(req.OperationalProvince, baseProvince)
+		candidateCity := fallback(req.OperationalCity, baseCity)
+		candidatePicName := fallback(req.PicName, basePicName)
+		candidateEmail := strings.ToLower(fallback(req.Email, baseEmail))
+		candidateWhatsApp := fallback(req.WhatsApp, baseWhatsApp)
+		if candidateBusinessName == "" || candidateBusinessCategory == "" || candidateProvince == "" || candidateCity == "" || candidatePicName == "" || candidateEmail == "" || candidateWhatsApp == "" {
+			return nil, &AuthInputError{Message: "nama bisnis, kategori, wilayah operasional, PIC, email, dan WhatsApp wajib diisi"}
 		}
-		if req.WhatsApp != "" {
-			provider.WhatsApp = req.WhatsApp
+
+		var duplicateIdentityCount int64
+		if err := s.db.Model(&models.User{}).
+			Where("provider_id <> ? AND LOWER(email) = ?", provider.ID, candidateEmail).
+			Count(&duplicateIdentityCount).Error; err != nil {
+			return nil, err
 		}
-		if req.Instagram != "" {
-			provider.Instagram = req.Instagram
+		var duplicatePendingCount int64
+		if err := s.db.Model(&models.Provider{}).
+			Where("id <> ? AND profile_verification_status = ? AND LOWER(pending_email) = ?", provider.ID, "PENDING", candidateEmail).
+			Count(&duplicatePendingCount).Error; err != nil {
+			return nil, err
 		}
-		if req.TikTok != "" {
-			provider.TikTok = req.TikTok
+		if duplicateIdentityCount > 0 || duplicatePendingCount > 0 {
+			return nil, &AuthInputError{Message: "email sudah digunakan atau sedang diajukan oleh akun lain"}
 		}
-		if req.Website != "" {
-			provider.Website = req.Website
+
+		candidateDescription := strings.TrimSpace(req.Description)
+		candidateWebsite := strings.TrimSpace(req.Website)
+		candidateInstagram := strings.TrimSpace(req.Instagram)
+		candidateTikTok := strings.TrimSpace(req.TikTok)
+		profileChanged = provider.ProfileVerificationStatus == "REJECTED" ||
+			candidateBusinessName != baseBusinessName || candidateBusinessCategory != baseBusinessCategory ||
+			candidateProvince != baseProvince || candidateCity != baseCity ||
+			candidateDescription != func() string {
+				if usePending {
+					return provider.PendingDescription
+				}
+				return provider.Description
+			}() ||
+			candidatePicName != basePicName || candidateEmail != strings.ToLower(baseEmail) || candidateWhatsApp != baseWhatsApp ||
+			candidateWebsite != func() string {
+				if usePending {
+					return provider.PendingWebsite
+				}
+				return provider.Website
+			}() ||
+			candidateInstagram != func() string {
+				if usePending {
+					return provider.PendingInstagram
+				}
+				return provider.Instagram
+			}() ||
+			candidateTikTok != func() string {
+				if usePending {
+					return provider.PendingTikTok
+				}
+				return provider.TikTok
+			}()
+
+		if profileChanged {
+			provider.PendingBusinessName = candidateBusinessName
+			provider.PendingBusinessCategory = candidateBusinessCategory
+			provider.PendingOperationalProvince = candidateProvince
+			provider.PendingOperationalCity = candidateCity
+			provider.PendingDescription = candidateDescription
+			provider.PendingPicName = candidatePicName
+			provider.PendingEmail = candidateEmail
+			provider.PendingWhatsApp = candidateWhatsApp
+			provider.PendingWebsite = candidateWebsite
+			provider.PendingInstagram = candidateInstagram
+			provider.PendingTikTok = candidateTikTok
+			provider.ProfileVerificationStatus = "PENDING"
+			provider.ProfileRejectionReason = ""
 		}
-		now := time.Now()
-		provider.ContactLastUpdatedAt = &now
 	}
 
 	// 2. Data Legal & Rekening updates (Pending approval workflow)
-	legalChanged := false
-	if req.NPWP != "" && (req.NPWP != provider.NPWP || req.NPWP != provider.PendingNPWP || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
-		legalChanged = true
+	// Nilai dibandingkan dengan data yang sedang berlaku bagi mitra: pengajuan
+	// pending bila ada, selain itu data aktif. Membandingkan dengan keduanya
+	// sekaligus membuat setiap simpan profil mengembalikan verifikasi rekening
+	// yang sudah disetujui ke PENDING walau datanya tidak berubah.
+	legalNeedsReview := provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED"
+	legalFieldChanged := func(requested, pending, current string) bool {
+		if requested == "" {
+			return false
+		}
+		effective := current
+		if pending != "" {
+			effective = pending
+		}
+		return requested != effective || legalNeedsReview
 	}
-	if req.BankName != "" && (req.BankName != provider.BankName || req.BankName != provider.PendingBankName || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
-		legalChanged = true
-	}
-	if req.BankAccount != "" && (req.BankAccount != provider.BankAccount || req.BankAccount != provider.PendingBankAccount || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
-		legalChanged = true
-	}
-	if req.BankAccountName != "" && (req.BankAccountName != provider.BankAccountName || req.BankAccountName != provider.PendingBankAccountName || provider.LegalVerificationStatus == "" || provider.LegalVerificationStatus == "REJECTED") {
-		legalChanged = true
-	}
+	legalChanged := legalFieldChanged(req.NPWP, provider.PendingNPWP, provider.NPWP) ||
+		legalFieldChanged(req.BankName, provider.PendingBankName, provider.BankName) ||
+		legalFieldChanged(req.BankAccount, provider.PendingBankAccount, provider.BankAccount) ||
+		legalFieldChanged(req.BankAccountName, provider.PendingBankAccountName, provider.BankAccountName)
 
 	if legalChanged {
 		if req.NPWP != "" {
@@ -519,53 +617,44 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 	}
 
 	// 3. Document updates (Pending approval workflow)
+	documentsChanged := false
 	if req.KtpPath != "" && req.KtpPath != provider.KtpPath {
+		documentsChanged = true
 		provider.PendingKtpPath = req.KtpPath
 		provider.KtpStatus = "PENDING"
 		provider.KtpRejectionReason = ""
 	}
 	if req.NibPath != "" && req.NibPath != provider.NibPath {
+		documentsChanged = true
 		provider.PendingNibPath = req.NibPath
 		provider.NibStatus = "PENDING"
 		provider.NibRejectionReason = ""
 	}
 	if req.DocumentPath != "" && req.DocumentPath != provider.DocumentPath {
+		documentsChanged = true
 		provider.PendingDocumentPath = req.DocumentPath
 		provider.SiupStatus = "PENDING"
 		provider.SiupRejectionReason = ""
 	}
 	if req.NpwpPath != "" && req.NpwpPath != provider.NpwpPath {
+		documentsChanged = true
 		provider.PendingNpwpPath = req.NpwpPath
 		provider.NpwpDocStatus = "PENDING"
 		provider.NpwpDocRejectionReason = ""
 	}
 	if req.AktaPath != "" && req.AktaPath != provider.AktaPath {
+		documentsChanged = true
 		provider.PendingAktaPath = req.AktaPath
 		provider.AktaStatus = "PENDING"
 		provider.AktaRejectionReason = ""
 	}
 	if req.SertifikatPath != "" && req.SertifikatPath != provider.SertifikatPath {
+		documentsChanged = true
 		provider.PendingSertifikatPath = req.SertifikatPath
 		provider.SertifikatStatus = "PENDING"
 		provider.SertifikatRejectionReason = ""
 	}
 
-	// 4. Basic Profile fields
-	if req.BusinessName != "" {
-		provider.BusinessName = req.BusinessName
-	}
-	if req.BusinessCategory != "" {
-		provider.BusinessCategory = req.BusinessCategory
-	}
-	if req.OperationalProvince != "" {
-		provider.OperationalProvince = req.OperationalProvince
-	}
-	if req.OperationalCity != "" {
-		provider.OperationalCity = req.OperationalCity
-	}
-	if req.Description != "" {
-		provider.Description = req.Description
-	}
 	if req.DocumentUploaded != nil {
 		provider.DocumentUploaded = *req.DocumentUploaded
 	}
@@ -575,10 +664,27 @@ func (s *authService) UpdateProfile(providerID uint, req *models.UpdateProfileRe
 		return nil, err
 	}
 
+	if (profileChanged || legalChanged || documentsChanged) && s.notifService != nil {
+		sections := make([]string, 0, 3)
+		if profileChanged {
+			sections = append(sections, "profil bisnis/kontak")
+		}
+		if legalChanged {
+			sections = append(sections, "data legal/rekening")
+		}
+		if documentsChanged {
+			sections = append(sections, "dokumen")
+		}
+		message := fmt.Sprintf("%s mengajukan perubahan %s. Data aktif tetap berlaku sampai pengajuan diputuskan.", provider.BusinessName, strings.Join(sections, ", "))
+		if err := s.notifService.NotifyAdmins("Perubahan Data Mitra Menunggu Persetujuan", message, NotifTypeAccount, "/admin/dashboard"); err != nil {
+			log.Printf("[Notifikasi] Gagal memberi tahu admin tentang perubahan provider %d: %v", provider.ID, err)
+		}
+	}
+
 	return provider, nil
 }
 
-func validateManagedDocumentPaths(paths ...string) error {
+func validateManagedDocumentPaths(uploadDir string, paths ...string) error {
 	for _, documentPath := range paths {
 		if documentPath == "" {
 			continue
@@ -596,7 +702,7 @@ func validateManagedDocumentPaths(paths ...string) error {
 		if !strings.HasPrefix(filename, "doc_") || err != nil || len(decoded) != 16 {
 			return errors.New("identitas dokumen tidak valid")
 		}
-		if _, err := os.Stat(filepath.Join("uploads", filename)); err != nil {
+		if _, err := os.Stat(filepath.Join(uploadDir, filename)); err != nil {
 			return errors.New("dokumen yang diunggah tidak ditemukan")
 		}
 	}

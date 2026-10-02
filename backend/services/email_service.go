@@ -2,11 +2,20 @@ package services
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"html"
+	"io"
 	"log"
+	"mime"
+	"net"
+	"net/http"
+	"net/mail"
 	"net/smtp"
+	"net/textproto"
+	"strings"
 	"time"
 
 	"tripkita-provider/config"
@@ -14,8 +23,11 @@ import (
 )
 
 type EmailService struct {
-	cfg        *config.Config
-	pdfService *PDFService
+	cfg                 *config.Config
+	pdfService          *PDFService
+	mailSender          func(string, smtp.Auth, string, []string, []byte) error
+	httpClient          *http.Client
+	apiEndpointOverride string
 }
 
 func NewEmailService(cfg *config.Config, pdfService *PDFService) *EmailService {
@@ -25,7 +37,8 @@ func NewEmailService(cfg *config.Config, pdfService *PDFService) *EmailService {
 	}
 }
 
-// SendPaymentSuccessEmail sends payment confirmation email to Customer with PDF E-Voucher attachment
+// SendPaymentSuccessEmail sends payment confirmation email to Customer with a
+// PDF rendering of the successful-payment page.
 func (s *EmailService) SendPaymentSuccessEmail(b *models.Booking, pkg *models.Package) error {
 	to := b.CustomerEmail
 	if to == "" {
@@ -33,7 +46,7 @@ func (s *EmailService) SendPaymentSuccessEmail(b *models.Booking, pkg *models.Pa
 		return nil
 	}
 
-	subject := fmt.Sprintf("✨ Pembayaran Berhasil! E-Voucher Pesanan #%s - TemenTrip", b.BookingCode)
+	subject := fmt.Sprintf("✨ Pembayaran Berhasil! Bukti Pesanan #%s - TemenTrip", b.BookingCode)
 
 	pdfBytes, pdfFilename, err := s.pdfService.GenerateBookingReceiptPDF(b, pkg)
 	if err != nil {
@@ -42,7 +55,7 @@ func (s *EmailService) SendPaymentSuccessEmail(b *models.Booking, pkg *models.Pa
 
 	packageName := "Paket Wisata TemenTrip"
 	destination := "Indonesia"
-	meetingPoint := "Lokasi Utama Destinasi"
+	meetingPoint := "Lihat detail paket"
 
 	if pkg != nil {
 		if pkg.Name != "" {
@@ -86,8 +99,8 @@ func (s *EmailService) SendPaymentSuccessEmail(b *models.Booking, pkg *models.Pa
       </table>
 
       <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 14px; border-radius: 8px; font-size: 13.5px; color: #0369a1;">
-        <strong>📄 Bukti E-Voucher PDF Terlampir:</strong><br>
-        Kami telah melampirkan berkas PDF E-Voucher resmi pada email ini. Harap mengunduh dan menyimpannya untuk ditunjukkan kepada petugas saat tiba di Titik Kumpul.
+        <strong>📄 Halaman Pembayaran Berhasil dalam PDF:</strong><br>
+        Halaman pembayaran berhasil beserta detail transaksi telah kami ubah menjadi PDF dan dilampirkan pada email ini. Simpan juga sebagai E-Voucher untuk ditunjukkan saat tiba di titik kumpul.
       </div>
     </div>
 
@@ -137,7 +150,7 @@ func (s *EmailService) SendRefundEmail(b *models.Booking) error {
   </div>
 </body>
 </html>
-`, html.EscapeString(b.CustomerName), formatIDRNumber(b.TotalPrice), html.EscapeString(b.BookingCode), html.EscapeString(packageName))
+`, html.EscapeString(b.CustomerName), formatIDRNumber(b.RefundAmount), html.EscapeString(b.BookingCode), html.EscapeString(packageName))
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
 }
@@ -176,6 +189,44 @@ func (s *EmailService) SendExpiredEmail(b *models.Booking) error {
 `, html.EscapeString(b.CustomerName), html.EscapeString(packageName), html.EscapeString(b.BookingCode))
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, nil, "")
+}
+
+// SendPaymentFailedEmail memberi tahu pelanggan saat gateway menolak/gagal
+// membuat atau menyelesaikan pembayaran. Status gagal sengaja dibedakan dari
+// kedaluwarsa agar pelanggan tidak mendapat alasan yang menyesatkan.
+func (s *EmailService) SendPaymentFailedEmail(b *models.Booking) error {
+	if strings.TrimSpace(b.CustomerEmail) == "" {
+		return nil
+	}
+	subject := fmt.Sprintf("Pembayaran Gagal - Pesanan #%s TemenTrip", b.BookingCode)
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px"><h2 style="color:#0284c7;text-align:center">Temen<span style="color:#00c9a7">Trip</span></h2><div style="background:#fef2f2;border:1px solid #fecaca;padding:16px;border-radius:12px"><h3 style="color:#dc2626;margin-top:0">Pembayaran Belum Berhasil</h3><p>Halo <strong>%s</strong>, pembayaran untuk pesanan <strong>#%s</strong> belum berhasil diproses. Tidak ada pembayaran yang kami catat untuk transaksi ini.</p></div><p>Silakan buat pemesanan baru atau hubungi layanan pelanggan bila saldo Anda sempat terpotong.</p></div></body></html>`, html.EscapeString(b.CustomerName), html.EscapeString(b.BookingCode))
+	return s.sendMailWithAttachment(b.CustomerEmail, subject, body, nil, "")
+}
+
+// SendRefundPendingEmail membedakan permintaan refund dari refund yang benar-
+// benar sudah ditransfer. Bukti refund PDF hanya dikirim pada status REFUNDED.
+func (s *EmailService) SendRefundPendingEmail(b *models.Booking) error {
+	if strings.TrimSpace(b.CustomerEmail) == "" {
+		return nil
+	}
+	subject := fmt.Sprintf("Pesanan Dibatalkan, Refund Sedang Diproses - #%s TemenTrip", b.BookingCode)
+	reasonHTML := ""
+	if reason := strings.TrimSpace(b.CancellationReason); reason != "" {
+		reasonHTML = fmt.Sprintf(`<p style="margin-bottom:0"><strong>Keterangan:</strong> %s</p>`, html.EscapeString(reason))
+	}
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px"><h2 style="color:#0284c7;text-align:center">Temen<span style="color:#00c9a7">Trip</span></h2><div style="background:#fff7ed;border:1px solid #fed7aa;padding:16px;border-radius:12px"><h3 style="color:#c2410c;margin-top:0">Pesanan Dibatalkan, Refund Menunggu Diproses</h3><p>Halo <strong>%s</strong>, pembatalan pesanan <strong>#%s</strong> sudah tercatat dan refund sedang menunggu verifikasi admin.</p>%s</div><p>Email bukti refund akan dikirim setelah transfer refund benar-benar selesai.</p></div></body></html>`, html.EscapeString(b.CustomerName), html.EscapeString(b.BookingCode), reasonHTML)
+	return s.sendMailWithAttachment(b.CustomerEmail, subject, body, nil, "")
+}
+
+// SendProviderTransactionStatusEmail memastikan mitra juga menerima jejak email
+// untuk hasil akhir transaksi, tidak hanya notifikasi dalam aplikasi.
+func (s *EmailService) SendProviderTransactionStatusEmail(provider *models.Provider, b *models.Booking, title, message string) error {
+	if provider == nil || strings.TrimSpace(provider.Email) == "" {
+		return nil
+	}
+	subject := fmt.Sprintf("%s - Pesanan #%s TemenTrip Partner", title, b.BookingCode)
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px"><h2 style="color:#0284c7">Temen<span style="color:#00c9a7">Trip</span> Partner</h2><h3>%s</h3><p>Halo <strong>%s</strong>, %s</p><p>Kode pesanan: <strong>#%s</strong></p></div></body></html>`, html.EscapeString(title), html.EscapeString(provider.BusinessName), html.EscapeString(message), html.EscapeString(b.BookingCode))
+	return s.sendMailWithAttachment(provider.Email, subject, body, nil, "")
 }
 
 // SendPayoutDisbursedEmail sends payout completion notification email to Provider with PDF Transfer Proof attachment
@@ -222,6 +273,38 @@ func (s *EmailService) SendPayoutDisbursedEmail(payout *models.Payout, provider 
 `, html.EscapeString(provider.BusinessName), html.EscapeString(payoutTypeLabel), formatIDRNumber(payout.Amount), html.EscapeString(payout.BankName), html.EscapeString(payout.BankAccount), html.EscapeString(payout.BankAccountName), formatIDRNumber(payout.Amount))
 
 	return s.sendMailWithAttachment(to, subject, htmlBody, pdfBytes, pdfFilename)
+}
+
+// SendPayoutStatusEmail mengirim hasil setiap tahap pencairan. Status APPROVED
+// memakai email bukti transfer PDF yang lebih lengkap.
+func (s *EmailService) SendPayoutStatusEmail(payout *models.Payout, provider *models.Provider) error {
+	if payout == nil || provider == nil || strings.TrimSpace(provider.Email) == "" {
+		return nil
+	}
+	if payout.Status == models.PayoutStatusApproved {
+		return s.SendPayoutDisbursedEmail(payout, provider)
+	}
+
+	var title, detail string
+	switch payout.Status {
+	case models.PayoutStatusPending:
+		title = "Pengajuan Pencairan Diterima"
+		detail = "Pengajuan telah tercatat dan menunggu verifikasi admin."
+	case models.PayoutStatusProcessing:
+		title = "Pencairan Sedang Diproses"
+		detail = "Instruksi transfer sedang diproses."
+	case models.PayoutStatusRejected:
+		title = "Pengajuan Pencairan Ditolak"
+		detail = "Pengajuan ditolak. Catatan admin: " + payout.Notes
+	case models.PayoutStatusFailed:
+		title = "Pencairan Gagal"
+		detail = "Transfer gagal dan saldo telah dikembalikan ke saldo mitra."
+	default:
+		return nil
+	}
+	subject := fmt.Sprintf("%s - TemenTrip Partner", title)
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:30px"><h2 style="color:#0284c7">Temen<span style="color:#00c9a7">Trip</span> Partner</h2><h3>%s</h3><p>Halo <strong>%s</strong>, %s</p><p>Jenis: <strong>%s</strong><br>Nominal: <strong>Rp %s</strong></p></div></body></html>`, html.EscapeString(title), html.EscapeString(provider.BusinessName), html.EscapeString(detail), html.EscapeString(payout.Type), formatIDRNumber(payout.Amount))
+	return s.sendMailWithAttachment(provider.Email, subject, body, nil, "")
 }
 
 // SendCancelledEmail sends cancellation confirmation email to Customer with PDF Cancellation receipt attachment
@@ -305,33 +388,138 @@ func (s *EmailService) SendRescheduleEmail(b *models.Booking) error {
 
 // SendResetPasswordEmail sends a 6-digit OTP for password reset
 func (s *EmailService) SendResetPasswordEmail(email string, otp string) error {
-	subject := "TripKita - Kode Reset Password"
+	subject := "TemenTrip - Kode Reset Password"
 
 	htmlBody := fmt.Sprintf(`
 		<h2>Reset Password Anda</h2>
-		<p>Seseorang telah meminta untuk mereset password akun TripKita Anda.</p>
+		<p>Seseorang telah meminta untuk mereset password akun TemenTrip Anda.</p>
 		<p>Gunakan kode 6 digit di bawah ini untuk mereset password Anda. Kode ini berlaku selama 15 menit.</p>
 		<h1 style="color: #00a896; letter-spacing: 5px;">%s</h1>
 		<p>Jika Anda tidak merasa meminta reset password, abaikan email ini.</p>
 		<br/>
 		<p>Salam hangat,</p>
-		<p>Tim TripKita</p>
+		<p>Tim TemenTrip</p>
 	`, otp)
 
 	return s.sendMailWithAttachment(email, subject, htmlBody, nil, "")
 }
 
-func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfBytes []byte, pdfFilename string) error {
-	smtpUser := s.cfg.SMTPUser
-	smtpPass := s.cfg.SMTPPass
-	smtpHost := s.cfg.SMTPHost
-	smtpPort := s.cfg.SMTPPort
-	fromAddr := s.cfg.SMTPFrom
-
-	if smtpUser == "" || smtpPass == "" || smtpHost == "" {
-		log.Printf("[EmailService] SMTP credentials not fully set; email dispatch skipped")
+// SendTripPlanEventEmail confirms every persisted trip-plan mutation. The
+// detailed message is generated by TripPlanService so email and in-app
+// notification always describe the same event.
+func (s *EmailService) SendTripPlanEventEmail(customer *models.Provider, plan *models.TripPlan, title, message string) error {
+	if customer == nil || plan == nil || strings.TrimSpace(customer.Email) == "" {
 		return nil
 	}
+
+	name := strings.TrimSpace(customer.PicName)
+	if name == "" {
+		name = "Traveler"
+	}
+	plannerURL := strings.TrimRight(s.cfg.FrontendURL, "/") + "/#/rencana-trip"
+	subject := fmt.Sprintf("%s - TemenTrip", title)
+	htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #1e293b;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #0284c7; text-align: center;">Temen<span style="color: #00c9a7;">Trip</span>✨</h2>
+    <h3 style="color: #0f766e;">%s</h3>
+    <p style="font-size: 14px; color: #475569;">Halo <strong>%s</strong>, %s</p>
+    <table style="width: 100%%; font-size: 14px; color: #334155; margin: 20px 0;">
+      <tr><td style="padding: 5px 0; color: #64748b;">Destinasi</td><td style="text-align: right; font-weight: bold;">%s</td></tr>
+      <tr><td style="padding: 5px 0; color: #64748b;">Target berangkat</td><td style="text-align: right; font-weight: bold;">%s</td></tr>
+      <tr><td style="padding: 5px 0; color: #64748b;">Peserta</td><td style="text-align: right; font-weight: bold;">%d orang</td></tr>
+      <tr><td style="padding: 5px 0; color: #64748b;">Target budget</td><td style="text-align: right; font-weight: bold;">Rp %s</td></tr>
+      <tr><td style="padding: 5px 0; color: #64748b;">Tabungan tercatat</td><td style="text-align: right; font-weight: bold; color: #059669;">Rp %s</td></tr>
+    </table>
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="%s" style="background-color: #0284c7; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; display: inline-block;">Buka Rencana Trip</a>
+    </div>
+  </div>
+</body>
+</html>`,
+		html.EscapeString(title),
+		html.EscapeString(name),
+		html.EscapeString(message),
+		html.EscapeString(plan.Destination),
+		html.EscapeString(plan.TargetMonthLabel),
+		plan.Participants,
+		formatIDRNumber(plan.TargetBudget),
+		formatIDRNumber(plan.SavedAmount),
+		html.EscapeString(plannerURL),
+	)
+
+	return s.sendMailWithAttachment(customer.Email, subject, htmlBody, nil, "")
+}
+
+// SendProviderPlatformFeeChangedEmail memberi tahu mitra ketika admin mengubah
+// persentase keuntungan platform. Tarif baru hanya berlaku untuk booking baru.
+func (s *EmailService) SendProviderPlatformFeeChangedEmail(provider *models.Provider, percent int64) error {
+	if provider == nil || strings.TrimSpace(provider.Email) == "" {
+		return nil
+	}
+
+	name := provider.BusinessName
+	if strings.TrimSpace(name) == "" {
+		name = provider.PicName
+	}
+	subject := fmt.Sprintf("Potongan Platform TemenTrip Diperbarui Menjadi %d%%", percent)
+	htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #1e293b;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #0284c7;">Temen<span style="color: #00c9a7;">Trip</span></h2>
+    <p>Halo <strong>%s</strong>,</p>
+    <p>Administrator telah menetapkan potongan platform akun Anda menjadi <strong>%d%%</strong>.</p>
+    <p>Tarif ini berlaku untuk booking baru. Booking yang sudah dibuat tetap memakai tarif yang tersimpan pada transaksi tersebut.</p>
+    <p>Anda dapat melihat ringkasan pendapatan melalui halaman Keuangan Partner Hub.</p>
+  </div>
+</body>
+</html>`, html.EscapeString(name), percent)
+
+	return s.sendMailWithAttachment(provider.Email, subject, htmlBody, nil, "")
+}
+
+func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfBytes []byte, pdfFilename string) error {
+	if s.cfg.UsesEmailAPI() {
+		err := s.sendViaAPI(to, subject, htmlBody, pdfBytes, pdfFilename)
+		if err == nil {
+			log.Printf("[EmailService] Email dispatched via %s API", s.cfg.EmailAPIProvider)
+		}
+		return err
+	}
+	smtpUser := strings.TrimSpace(s.cfg.SMTPUser)
+	smtpPass := s.cfg.SMTPPass
+	smtpHost := strings.TrimSpace(s.cfg.SMTPHost)
+	smtpPort := strings.TrimSpace(s.cfg.SMTPPort)
+	fromAddr := strings.TrimSpace(s.cfg.SMTPFrom)
+	if fromAddr == "" {
+		fromAddr = smtpUser
+	}
+
+	if smtpUser == "" || smtpPass == "" || smtpHost == "" || smtpPort == "" || fromAddr == "" {
+		return fmt.Errorf("konfigurasi SMTP belum lengkap; email tidak dikirim")
+	}
+	// Google menampilkan app password dalam kelompok empat karakter. Spasi
+	// tampilan yang ikut tersalin membuat AUTH gagal walau kredensial benar.
+	if strings.EqualFold(smtpHost, "smtp.gmail.com") {
+		smtpPass = strings.ReplaceAll(smtpPass, " ", "")
+	}
+	if smtpPass == "" {
+		return fmt.Errorf("konfigurasi SMTP belum lengkap; email tidak dikirim")
+	}
+	fromMailbox, err := mail.ParseAddress(fromAddr)
+	if err != nil || fromMailbox.Address == "" || strings.ContainsAny(fromMailbox.Address, "\r\n") {
+		return fmt.Errorf("alamat pengirim SMTP tidak valid")
+	}
+	toMailbox, err := mail.ParseAddress(strings.TrimSpace(to))
+	if err != nil || toMailbox.Address == "" || strings.ContainsAny(toMailbox.Address, "\r\n") {
+		return fmt.Errorf("alamat penerima email tidak valid")
+	}
+	fromAddr = fromMailbox.Address
+	to = toMailbox.Address
 
 	auth := smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
 
@@ -340,7 +528,7 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 
 	bodyBuf.WriteString(fmt.Sprintf("From: TemenTrip <%s>\r\n", fromAddr))
 	bodyBuf.WriteString(fmt.Sprintf("To: %s\r\n", to))
-	bodyBuf.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	bodyBuf.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("UTF-8", subject)))
 	bodyBuf.WriteString("MIME-Version: 1.0\r\n")
 
 	if len(pdfBytes) > 0 && pdfFilename != "" {
@@ -372,7 +560,20 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 	}
 
 	addr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
-	err := smtp.SendMail(addr, auth, fromAddr, []string{to}, bodyBuf.Bytes())
+	mailSender := s.mailSender
+	if mailSender != nil {
+		err = mailSender(addr, auth, fromAddr, []string{to}, bodyBuf.Bytes())
+	} else {
+		err = sendSMTPMessage(addr, smtpHost, smtpPort, auth, fromAddr, []string{to}, bodyBuf.Bytes())
+		// Koneksi yang tidak pernah tersambung (port SMTP diblokir) tidak
+		// diulang: hasilnya pasti sama dan hanya memperlama permintaan.
+		if err != nil && isTransientSMTPError(err) && !strings.Contains(err.Error(), "gagal terhubung ke server SMTP") {
+			// Satu retry pendek cukup untuk gangguan koneksi sesaat tanpa membuat
+			// goroutine email menggantung lama atau berpotensi mengirim berulang.
+			time.Sleep(750 * time.Millisecond)
+			err = sendSMTPMessage(addr, smtpHost, smtpPort, auth, fromAddr, []string{to}, bodyBuf.Bytes())
+		}
+	}
 	if err != nil {
 		log.Printf("[EmailService] SMTP dispatch failed: %v\n", err)
 		return err
@@ -380,6 +581,121 @@ func (s *EmailService) sendMailWithAttachment(to, subject, htmlBody string, pdfB
 
 	log.Printf("[EmailService] Email dispatched successfully")
 	return nil
+}
+
+// sendSMTPMessage mendukung SMTP STARTTLS (umumnya port 587) dan implicit TLS
+// (port 465). smtp.SendMail dari standard library hanya menangani STARTTLS,
+// sehingga konfigurasi provider yang memakai 465 sebelumnya selalu gagal.
+func sendSMTPMessage(addr, host, port string, auth smtp.Auth, from string, recipients []string, message []byte) error {
+	dialer := &net.Dialer{Timeout: 8 * time.Second}
+	var (
+		client *smtp.Client
+		conn   net.Conn
+		err    error
+	)
+
+	tlsConfig := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+	if port == "465" {
+		conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	} else {
+		conn, err = dialer.Dial("tcp", addr)
+	}
+	if err != nil {
+		return fmt.Errorf("gagal terhubung ke server SMTP: %w", err)
+	}
+	_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
+
+	client, err = smtp.NewClient(conn, host)
+	if err != nil {
+		_ = conn.Close()
+		return fmt.Errorf("server SMTP tidak dapat digunakan: %w", err)
+	}
+	defer client.Close()
+
+	if port != "465" {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(tlsConfig); err != nil {
+				return fmt.Errorf("negosiasi TLS SMTP gagal: %w", err)
+			}
+		} else {
+			return fmt.Errorf("server SMTP tidak menawarkan STARTTLS; gunakan port 465 untuk implicit TLS")
+		}
+	}
+	if auth != nil {
+		if ok, _ := client.Extension("AUTH"); !ok {
+			return fmt.Errorf("server SMTP tidak mendukung autentikasi")
+		}
+		if err := client.Auth(auth); err != nil {
+			return fmt.Errorf("autentikasi SMTP gagal: %w", err)
+		}
+	}
+	if err := client.Mail(from); err != nil {
+		return fmt.Errorf("alamat pengirim ditolak server SMTP: %w", err)
+	}
+	for _, recipient := range recipients {
+		if err := client.Rcpt(recipient); err != nil {
+			return fmt.Errorf("alamat penerima ditolak server SMTP: %w", err)
+		}
+	}
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("server SMTP menolak isi email: %w", err)
+	}
+	if _, err := w.Write(message); err != nil {
+		_ = w.Close()
+		return fmt.Errorf("gagal mengirim isi email: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("server SMTP gagal menyelesaikan email: %w", err)
+	}
+	if err := client.Quit(); err != nil {
+		return fmt.Errorf("server SMTP menutup koneksi dengan error: %w", err)
+	}
+	return nil
+}
+
+func isTransientSMTPError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var protocolErr *textproto.Error
+	if errors.As(err, &protocolErr) {
+		return protocolErr.Code >= 400 && protocolErr.Code < 500
+	}
+	var networkErr net.Error
+	if errors.As(err, &networkErr) {
+		return networkErr.Timeout() || networkErr.Temporary()
+	}
+	return errors.Is(err, io.EOF) || strings.Contains(strings.ToLower(err.Error()), "connection reset")
+}
+
+func emailFailureHint(err error) string {
+	if err == nil {
+		return "Tidak ada error."
+	}
+	message := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(message, "konfigurasi smtp belum lengkap"):
+		return "Konfigurasi SMTP belum lengkap. Periksa SMTP_HOST, SMTP_PORT, SMTP_USER, dan SMTP_PASS."
+	case strings.Contains(message, "autentikasi smtp"):
+		return "Autentikasi SMTP ditolak. Untuk Gmail gunakan App Password, bukan password akun biasa."
+	case strings.Contains(message, "autentikasi api email"):
+		return "API key email ditolak. Periksa EMAIL_API_KEY dan pastikan alamat pengirim (EMAIL_FROM) sudah diverifikasi di Brevo/Resend."
+	case strings.Contains(message, "api email") && strings.Contains(message, "menolak"):
+		return "Layanan email menolak pengiriman. Pastikan alamat pengirim (EMAIL_FROM) sudah diverifikasi dan kuota harian belum habis."
+	case strings.Contains(message, "api email"):
+		return "Layanan email tidak dapat dihubungi. Coba lagi beberapa saat."
+	case strings.Contains(message, "gagal terhubung ke server smtp"):
+		return "Server tidak dapat membuka koneksi SMTP (umumnya port SMTP diblokir hosting, mis. Railway non-Pro). Gunakan EMAIL_API_PROVIDER=brevo dengan EMAIL_API_KEY."
+	case strings.Contains(message, "tls") || strings.Contains(message, "terhubung") || strings.Contains(message, "timeout"):
+		return "Koneksi aman ke server email gagal. Periksa host, port 587/465, dan akses jaringan deployment."
+	case strings.Contains(message, "alamat pengirim"):
+		return "Alamat pengirim ditolak. Samakan SMTP_FROM dengan SMTP_USER atau alias yang diizinkan provider email."
+	case strings.Contains(message, "alamat penerima"):
+		return "Alamat email customer ditolak oleh server email."
+	default:
+		return "Server email menolak pengiriman. Periksa log backend untuk detail teknis."
+	}
 }
 
 // SendOpenTripQuotaAlertEmail memberi tahu mitra bahwa kuota minimal satu
@@ -437,10 +753,54 @@ func (s *EmailService) SendOpenTripQuotaAlertEmail(provider *models.Provider, de
 	return s.sendMailWithAttachment(provider.Email, subject, htmlBody, nil, "")
 }
 
+// SendWeatherAdvisoryEmail mengirim snapshot prakiraan H-3 untuk trip selain
+// Open Trip. Teksnya sengaja menegaskan bahwa data cuaca bukan keputusan sistem
+// dan bahwa memilih lanjut tidak mengubah ketentuan payout yang berlaku.
+func (s *EmailService) SendWeatherAdvisoryEmail(provider *models.Provider, departure *models.TripDeparture, pkg *models.Package) error {
+	if provider == nil || departure == nil || strings.TrimSpace(provider.Email) == "" {
+		return nil
+	}
+	packageName := "Paket Wisata"
+	destination := departure.WeatherLocation
+	tripType := "Trip Non-Open-Trip"
+	if pkg != nil {
+		if strings.TrimSpace(pkg.Name) != "" {
+			packageName = pkg.Name
+		}
+		if strings.TrimSpace(pkg.Destination) != "" && strings.TrimSpace(destination) == "" {
+			destination = pkg.Destination
+		}
+		if strings.TrimSpace(pkg.TripType) != "" {
+			tripType = pkg.TripType
+		}
+	}
+	riskTitle := "Prakiraan Cuaca Tersedia"
+	riskColor := "#0369a1"
+	riskBackground := "#f0f9ff"
+	riskBorder := "#bae6fd"
+	if departure.WeatherIsAdverse {
+		riskTitle = "Ada Potensi Cuaca Kurang Mendukung"
+		riskColor = "#b45309"
+		riskBackground = "#fffbeb"
+		riskBorder = "#fde68a"
+	}
+	dashboardURL := s.cfg.FrontendURL + "/#/provider/dashboard"
+	subject := fmt.Sprintf("Prakiraan Cuaca H-3: %s - TemenTrip Partner", packageName)
+	body := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b"><div style="max-width:620px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:30px"><h2 style="color:#0284c7;text-align:center">Temen<span style="color:#00c9a7">Trip</span> Partner</h2><div style="background:%s;border:1px solid %s;padding:18px;border-radius:14px;margin:20px 0"><h3 style="color:%s;margin:0 0 8px">%s</h3><p style="color:%s;margin:0;font-size:14px;line-height:1.7">Halo <strong>%s</strong>, berikut prakiraan untuk <strong>%s</strong> (%s) pada <strong>%s</strong> di <strong>%s</strong>.</p></div><table style="width:100%%;border-collapse:collapse;font-size:14px;color:#475569"><tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0">Kondisi</td><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;text-align:right"><strong>%s</strong></td></tr><tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0">Suhu</td><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;text-align:right">%.0f–%.0f°C</td></tr><tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0">Peluang hujan</td><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;text-align:right">%d%%</td></tr><tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0">Perkiraan curah hujan</td><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;text-align:right">%.1f mm</td></tr><tr><td style="padding:9px 0">Angin maksimum</td><td style="padding:9px 0;text-align:right">%.1f km/jam</td></tr></table><div style="background:#f8fafc;border-left:4px solid #64748b;padding:14px 16px;border-radius:8px;margin:20px 0;font-size:13px;line-height:1.65;color:#475569"><strong>Penting:</strong> Prakiraan cuaca hanya bahan pertimbangan provider dan bukan keputusan otomatis TemenTrip. Anda dapat tetap melanjutkan, menawarkan reschedule, atau membatalkan trip. Jika memilih tetap melanjutkan, trip dan pencairan DP 50%% tetap mengikuti ketentuan payout yang berlaku.</div><p style="font-size:13px;color:#475569">%s</p><div style="text-align:center;margin:26px 0"><a href="%s" style="background:#0f8b8d;color:#fff;padding:12px 26px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block">Tinjau di Dashboard Provider</a></div><p style="font-size:11px;color:#94a3b8;text-align:center">Prakiraan dapat berubah. Pertimbangkan informasi BMKG dan kondisi lapangan sebelum mengambil keputusan operasional.</p></div></body></html>`,
+		riskBackground, riskBorder, riskColor, html.EscapeString(riskTitle), riskColor,
+		html.EscapeString(provider.PicName), html.EscapeString(packageName), html.EscapeString(tripType),
+		html.EscapeString(departure.DepartureAt.Format("02 January 2006")), html.EscapeString(destination),
+		html.EscapeString(departure.WeatherCondition), departure.WeatherMinTempC, departure.WeatherMaxTempC,
+		departure.WeatherRainChance, departure.WeatherPrecipMM, departure.WeatherMaxWindKPH,
+		html.EscapeString(departure.WeatherAdvisory), html.EscapeString(dashboardURL),
+	)
+	return s.sendMailWithAttachment(provider.Email, subject, body, nil, "")
+}
+
 // SendRescheduleOfferEmail meminta persetujuan pelanggan atas tanggal pengganti.
 // Berbeda dengan SendRescheduleEmail yang mengabarkan jadwal yang sudah berubah,
 // email ini menuntut jawaban: diterima atau ditolak.
-func (s *EmailService) SendRescheduleOfferEmail(b *models.Booking, proposed time.Time, originalDate time.Time, cause string) error {
+func (s *EmailService) SendRescheduleOfferEmail(b *models.Booking, proposed, originalDate, deadline time.Time, cause string) error {
 	if b == nil || b.CustomerEmail == "" {
 		return nil
 	}
@@ -473,24 +833,25 @@ func (s *EmailService) SendRescheduleOfferEmail(b *models.Booking, proposed time
       <tr><td style="padding: 8px 0;">Jadwal Pengganti</td><td style="padding: 8px 0; text-align: right;"><strong style="color: #0284c7;">%s</strong></td></tr>
     </table>
     <p style="font-size: 14px; color: #475569;">
-      Silakan buka riwayat pesanan Anda untuk <strong>menerima</strong> atau <strong>menolak</strong> tanggal pengganti ini.
-      Jika Anda menolak, pesanan akan diteruskan ke proses pengembalian dana penuh.
+      Silakan buka riwayat pesanan Anda untuk <strong>menerima</strong> atau <strong>menolak</strong> tanggal pengganti ini
+      sebelum <strong>%s</strong>. Jika Anda menolak, pesanan akan diteruskan ke proses pengembalian dana penuh.
     </p>
     <div style="text-align: center; margin: 28px 0;">
       <a href="%s" style="background-color: #0284c7; color: #ffffff; padding: 12px 28px; border-radius: 10px; text-decoration: none; font-weight: bold; display: inline-block;">Tanggapi Tawaran Jadwal</a>
     </div>
-    <p style="font-size: 12px; color: #94a3b8; text-align: center;">Tanpa jawaban sampai tanggal keberangkatan semula, pesanan otomatis diteruskan ke proses pengembalian dana.</p>
+    <p style="font-size: 12px; color: #94a3b8; text-align: center;">Tanpa jawaban sampai batas waktu tersebut, pesanan otomatis diteruskan ke proses pengembalian dana penuh.</p>
   </div>
 </body>
 </html>
 `,
 		html.EscapeString(b.CustomerName),
 		html.EscapeString(packageName),
-		html.EscapeString(originalDate.Format("02 January 2006")),
+		html.EscapeString(indonesianDate(originalDate)),
 		html.EscapeString(cause),
 		html.EscapeString(b.BookingCode),
-		html.EscapeString(originalDate.Format("02 January 2006")),
-		html.EscapeString(proposed.Format("02 January 2006")),
+		html.EscapeString(indonesianDate(originalDate)),
+		html.EscapeString(indonesianDate(proposed)),
+		html.EscapeString(indonesianDateTime(deadline)),
 		html.EscapeString(historyURL),
 	)
 

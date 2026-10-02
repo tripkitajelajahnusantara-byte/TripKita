@@ -18,7 +18,7 @@ func IsOpenTrip(tripType string) bool {
 	return normalized == "opentrip"
 }
 
-// Status peninjauan keberangkatan open trip.
+// Status peninjauan keberangkatan yang memerlukan keputusan provider.
 const (
 	// DepartureAwaitingProvider: batas H-3 terlampaui dengan kuota kurang dan
 	// mitra belum menentukan keputusan.
@@ -34,12 +34,18 @@ const (
 	DepartureResolved = "RESOLVED"
 )
 
-// Sebab satu keberangkatan ditinjau. Keduanya berujung pada pilihan yang sama
-// bagi pelanggan, tetapi pemicunya berbeda: kuota kurang terdeteksi otomatis
-// pada H-3, sedangkan keadaan kahar dinyatakan sendiri oleh mitra kapan saja.
+// Sebab satu keberangkatan ditinjau. Kuota kurang dan prakiraan cuaca dibuat
+// otomatis pada H-3, sedangkan keadaan kahar dinyatakan sendiri oleh mitra.
 const (
 	DepartureReasonQuotaShortfall = "QUOTA_SHORTFALL"
 	DepartureReasonForceMajeure   = "FORCE_MAJEURE"
+	// DepartureReasonWeatherForecast adalah bahan pertimbangan H-3 khusus
+	// paket non-open-trip. Prakiraan tidak pernah mengambil keputusan otomatis.
+	DepartureReasonWeatherForecast = "WEATHER_FORECAST"
+	// DepartureReasonProviderReschedule: mitra menjadwalkan ulang satu pesanan
+	// dari menu Booking. Berlaku untuk semua tipe paket; pelanggan tetap memilih
+	// menerima tanggal baru atau menolak dengan refund penuh.
+	DepartureReasonProviderReschedule = "PROVIDER_RESCHEDULE"
 )
 
 // MinimumResponseWindow adalah waktu minimal yang dimiliki pelanggan untuk
@@ -48,15 +54,15 @@ const (
 // mengikuti jam berangkat yang mungkin tinggal beberapa jam lagi.
 const MinimumResponseWindow = 48 * time.Hour
 
-// Pilihan keputusan mitra atas keberangkatan yang kekurangan peserta.
+// Pilihan keputusan mitra atas satu peninjauan keberangkatan.
 const (
 	DepartureDecisionContinue   = "CONTINUE"
 	DepartureDecisionCancel     = "CANCEL"
 	DepartureDecisionReschedule = "RESCHEDULE"
 )
 
-// TripDeparture adalah satu keberangkatan open trip (kombinasi paket dan
-// tanggal jalan) yang kuota minimalnya tidak terpenuhi pada batas H-3.
+// TripDeparture adalah satu keberangkatan (kombinasi paket dan tanggal jalan)
+// yang memerlukan pertimbangan provider karena kuota, cuaca, atau keadaan kahar.
 //
 // Barisnya dibuat oleh job latar belakang, bukan oleh antarmuka, sehingga
 // keputusan mitra selalu punya jejak: berapa kursi terisi saat ditinjau, kapan
@@ -96,6 +102,19 @@ type TripDeparture struct {
 	AcceptedCount int `gorm:"not null;default:0" json:"acceptedCount"`
 	DeclinedCount int `gorm:"not null;default:0" json:"declinedCount"`
 
+	// Snapshot prakiraan H-3 disimpan agar dashboard, email, dan jejak keputusan
+	// menampilkan data yang sama walaupun respons Weather API berubah kemudian.
+	WeatherLocation     string     `gorm:"size:255" json:"weatherLocation,omitempty"`
+	WeatherCondition    string     `gorm:"size:255" json:"weatherCondition,omitempty"`
+	WeatherMinTempC     float64    `json:"weatherMinTempC,omitempty"`
+	WeatherMaxTempC     float64    `json:"weatherMaxTempC,omitempty"`
+	WeatherRainChance   int        `json:"weatherRainChance,omitempty"`
+	WeatherPrecipMM     float64    `json:"weatherPrecipMm,omitempty"`
+	WeatherMaxWindKPH   float64    `json:"weatherMaxWindKph,omitempty"`
+	WeatherIsAdverse    bool       `gorm:"not null;default:false" json:"weatherIsAdverse"`
+	WeatherAdvisory     string     `gorm:"type:text" json:"weatherAdvisory,omitempty"`
+	WeatherForecastedAt *time.Time `json:"weatherForecastedAt,omitempty"`
+
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 
@@ -115,13 +134,32 @@ func ReviewDeadlineFor(departureAt time.Time) time.Time {
 }
 
 // ResponseDeadlineFor menghitung batas jawaban pelanggan: waktu keberangkatan
-// semula, atau MinimumResponseWindow dari sekarang bila itu lebih longgar.
-func ResponseDeadlineFor(departureAt time.Time, now time.Time) time.Time {
-	floor := now.Add(MinimumResponseWindow)
-	if departureAt.After(floor) {
-		return departureAt
+// semula, tetapi tidak melewati mulainya jadwal pengganti, dan minimal
+// MinimumResponseWindow dari sekarang. Jadwal pengganti sendiri wajib dimulai
+// paling cepat EarliestProposedStart, sehingga batas ini tidak pernah jatuh
+// setelah trip pengganti berangkat.
+func ResponseDeadlineFor(departureAt, proposedStart, now time.Time) time.Time {
+	deadline := departureAt
+	if proposedStart.Before(deadline) {
+		deadline = proposedStart
 	}
-	return floor
+	if floor := now.Add(MinimumResponseWindow); deadline.Before(floor) {
+		deadline = floor
+	}
+	return deadline
+}
+
+// EarliestProposedStart adalah waktu paling awal jadwal pengganti boleh
+// dimulai: pelanggan selalu punya MinimumResponseWindow untuk menjawab.
+func EarliestProposedStart(now time.Time) time.Time {
+	return now.Add(MinimumResponseWindow)
+}
+
+// ProviderRescheduleRequest adalah tawaran jadwal pengganti dari menu Booking
+// mitra. Alasan wajib karena dibaca pelanggan pada notifikasi dan email.
+type ProviderRescheduleRequest struct {
+	NewTripDate string `json:"newTripDate" binding:"required,datetime=2006-01-02"`
+	Reason      string `json:"reason" binding:"required,min=10,max=200"`
 }
 
 // ForceMajeureRequest adalah pernyataan mitra bahwa satu keberangkatan tidak

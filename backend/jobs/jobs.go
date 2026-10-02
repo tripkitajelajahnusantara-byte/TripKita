@@ -16,6 +16,7 @@ import (
 )
 
 const jobInterval = 1 * time.Hour
+const bookingExpiryInterval = 1 * time.Minute
 
 type Runner struct {
 	db        *gorm.DB
@@ -43,6 +44,8 @@ func (r *Runner) Start(ctx context.Context) <-chan struct{} {
 
 		ticker := time.NewTicker(jobInterval)
 		defer ticker.Stop()
+		expiryTicker := time.NewTicker(bookingExpiryInterval)
+		defer expiryTicker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
@@ -50,6 +53,8 @@ func (r *Runner) Start(ctx context.Context) <-chan struct{} {
 				return
 			case <-ticker.C:
 				r.runOnce(ctx)
+			case <-expiryTicker.C:
+				r.ExpirePendingBookings(ctx)
 			}
 		}
 	}()

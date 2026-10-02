@@ -46,23 +46,63 @@ var PayoutReservedStatuses = []string{PayoutStatusPending, PayoutStatusProcessin
 type CreatePayoutRequest struct {
 	Amount    int64  `json:"amount" binding:"required,gt=0"`
 	Type      string `json:"type" binding:"required,oneof=DP_50 PELUNASAN_50"`
-	BookingID *uint  `json:"bookingId"`
+	BookingID *uint  `json:"bookingId" binding:"required"`
+}
+
+// Status satu tahap pencairan (DP atau pelunasan) pada satu booking.
+const (
+	BookingPayoutAvailable = "AVAILABLE" // dapat diajukan sekarang
+	BookingPayoutLocked    = "LOCKED"    // pelunasan menunggu trip selesai
+	BookingPayoutRequested = "REQUESTED" // pengajuan sedang menunggu/diproses admin
+	BookingPayoutPaid      = "PAID"      // sudah ditransfer
+	BookingPayoutNone      = "NONE"      // tidak ada hak cair (mis. booking direfund)
+)
+
+// BookingPayoutStage merangkum hak dan status pencairan satu tahap booking.
+type BookingPayoutStage struct {
+	Amount        int64      `json:"amount"`
+	Remaining     int64      `json:"remaining"`
+	Status        string     `json:"status"`
+	PayoutID      *uint      `json:"payoutId,omitempty"`
+	ProofPath     string     `json:"proofPath,omitempty"`
+	AvailableAt   *time.Time `json:"availableAt,omitempty"`
+	BlockedReason string     `json:"blockedReason,omitempty"`
+}
+
+// BookingPayout adalah baris pencairan per trip pada menu Keuangan mitra.
+type BookingPayout struct {
+	BookingID     uint               `json:"bookingId"`
+	BookingCode   string             `json:"bookingCode"`
+	PackageName   string             `json:"packageName"`
+	CustomerName  string             `json:"customerName"`
+	Guests        int                `json:"guests"`
+	TripDate      time.Time          `json:"tripDate"`
+	TripEndDate   time.Time          `json:"tripEndDate"`
+	BookingStatus string             `json:"bookingStatus"`
+	NetEarning    int64              `json:"netEarning"`
+	DP            BookingPayoutStage `json:"dp"`
+	Settlement    BookingPayoutStage `json:"settlement"`
 }
 
 type PayoutSummary struct {
-	TotalEarnings      int64    `json:"totalEarnings"`
-	PlatformFee        int64    `json:"platformFee"`
-	NetEarnings        int64    `json:"netEarnings"`
-	AvailableDP        int64    `json:"availableDp"`
-	AvailablePelunasan int64    `json:"availablePelunasan"`
-	HeldSettlement     int64    `json:"heldSettlement"`
-	TotalPaidOut       int64    `json:"totalPaidOut"`
-	PendingPayout      int64    `json:"pendingPayout"`
-	Payouts            []Payout `json:"payouts"`
+	PlatformFeePercent int64           `json:"platformFeePercent"`
+	ServiceFee         int64           `json:"serviceFee"`
+	TotalEarnings      int64           `json:"totalEarnings"`
+	PlatformFee        int64           `json:"platformFee"`
+	NetEarnings        int64           `json:"netEarnings"`
+	AvailableDP        int64           `json:"availableDp"`
+	AvailablePelunasan int64           `json:"availablePelunasan"`
+	HeldSettlement     int64           `json:"heldSettlement"`
+	HeldDP             int64           `json:"heldDp"`
+	TotalPaidOut       int64           `json:"totalPaidOut"`
+	PendingPayout      int64           `json:"pendingPayout"`
+	Payouts            []Payout        `json:"payouts"`
+	Bookings           []BookingPayout `json:"bookings"`
 
 	// Saldo menurut buku besar. Dibawa agar selisih terhadap hak cair yang
 	// dihitung dari booking terlihat langsung, bukan hanya di log server.
 	LedgerAvailable  int64 `json:"ledgerAvailable"`
 	LedgerHeld       int64 `json:"ledgerHeld"`
+	ProviderDebt     int64 `json:"providerDebt"`
 	LedgerConsistent bool  `json:"ledgerConsistent"`
 }

@@ -20,6 +20,7 @@ type BookingRepository interface {
 	FindAllRefunds() ([]models.Booking, error)
 	FindAllByCustomer(customerID uint) ([]models.Booking, error)
 	FindAll() ([]models.Booking, error)
+	FindPlatformRevenueBookings(from, to time.Time) ([]models.Booking, error)
 	Update(booking *models.Booking) error
 	CountByProvider(providerID uint) (int64, error)
 	CountByStatusAndProvider(status string, providerID uint) (int64, error)
@@ -38,6 +39,15 @@ func (r *bookingRepository) Create(booking *models.Booking) error {
 	return r.db.Create(booking).Error
 }
 
+// rescheduleDeadlineJoin menyertakan batas jawaban tawaran jadwal pengganti
+// dari trip_departures dalam query yang sama. Kolom bookings yang namanya juga
+// ada di trip_departures (id, status, provider_id) wajib ditulis lengkap.
+const rescheduleDeadlineJoin = "LEFT JOIN trip_departures ON trip_departures.id = bookings.trip_departure_id"
+const rescheduleDeadlineColumn = "trip_departures.response_deadline AS reschedule_response_deadline"
+
+// orderParticipants menjaga urutan peserta sesuai isian form checkout.
+func orderParticipants(db *gorm.DB) *gorm.DB { return db.Order("position asc") }
+
 func (r *bookingRepository) FindAll() ([]models.Booking, error) {
 	var bookings []models.Booking
 	threeMonthsAgo := time.Now().AddDate(0, -3, 0)
@@ -47,11 +57,36 @@ func (r *bookingRepository) FindAll() ([]models.Booking, error) {
 	return bookings, err
 }
 
+// FindPlatformRevenueBookings memuat booking berbayar seluruh mitra untuk
+// laporan penghasilan TemenTrip. Periode memakai tanggal pembayaran (atau
+// tanggal booking untuk data lama tanpa paid_at); nilai nol berarti tanpa batas.
+// Status akhir (refund, pembatalan) tetap disaring oleh service.
+func (r *bookingRepository) FindPlatformRevenueBookings(from, to time.Time) ([]models.Booking, error) {
+	var bookings []models.Booking
+	query := r.db.Model(&models.Booking{}).
+		Select("bookings.*, providers.business_name AS provider_name").
+		Joins("JOIN providers ON providers.id = bookings.provider_id").
+		Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Where("(bookings.paid_at IS NOT NULL OR bookings.status IN ?)", []string{models.StatusPaid, models.StatusConfirmed, models.StatusCompleted})
+	if !from.IsZero() {
+		query = query.Where("COALESCE(bookings.paid_at, bookings.created_at) >= ?", from)
+	}
+	if !to.IsZero() {
+		query = query.Where("COALESCE(bookings.paid_at, bookings.created_at) < ?", to)
+	}
+	err := query.Order("COALESCE(bookings.paid_at, bookings.created_at) DESC, bookings.id DESC").Find(&bookings).Error
+	return bookings, err
+}
+
 func (r *bookingRepository) FindAllByProvider(providerID uint) ([]models.Booking, error) {
 	var bookings []models.Booking
-	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Where("provider_id = ?", providerID).
-		Order("id desc").Find(&bookings).Error
+	err := r.db.Model(&models.Booking{}).
+		Select("bookings.*, "+rescheduleDeadlineColumn).
+		Joins(rescheduleDeadlineJoin).
+		Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Participants", orderParticipants).
+		Where("bookings.provider_id = ? AND (bookings.paid_at IS NOT NULL OR bookings.status IN ?)", providerID, []string{models.StatusPaid, models.StatusConfirmed, models.StatusCompleted}).
+		Order("bookings.id desc").Find(&bookings).Error
 	return bookings, err
 }
 
@@ -85,9 +120,12 @@ func (r *bookingRepository) FindByXenditInvoiceID(invoiceID string) (*models.Boo
 func (r *bookingRepository) FindByBookingCode(code string) (*models.Booking, error) {
 	var booking models.Booking
 	cleanCode := strings.TrimSpace(code)
-	err := r.db.Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Where("LOWER(booking_code) = LOWER(?)", cleanCode).
-		Order("id desc").First(&booking).Error
+	err := r.db.Model(&models.Booking{}).
+		Select("bookings.*, "+rescheduleDeadlineColumn).
+		Joins(rescheduleDeadlineJoin).
+		Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Where("LOWER(bookings.booking_code) = LOWER(?)", cleanCode).
+		Order("bookings.id desc").First(&booking).Error
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +156,9 @@ func (r *bookingRepository) Update(booking *models.Booking) error {
 
 func (r *bookingRepository) CountByProvider(providerID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&models.Booking{}).Where("provider_id = ?", providerID).Count(&count).Error
+	err := r.db.Model(&models.Booking{}).
+		Where("provider_id = ? AND (paid_at IS NOT NULL OR status IN ?)", providerID, []string{models.StatusPaid, models.StatusConfirmed, models.StatusCompleted}).
+		Count(&count).Error
 	return count, err
 }
 
@@ -142,9 +182,11 @@ func (r *bookingRepository) FindAllByCustomer(customerID uint) ([]models.Booking
 	var bookings []models.Booking
 	threeMonthsAgo := time.Now().AddDate(0, -3, 0)
 	err := r.db.Model(&models.Booking{}).
-		Select("bookings.*, providers.whats_app AS provider_whats_app, providers.business_name AS provider_name").
+		Select("bookings.*, providers.whats_app AS provider_whats_app, providers.business_name AS provider_name, "+rescheduleDeadlineColumn).
 		Joins("JOIN providers ON providers.id = bookings.provider_id").
+		Joins(rescheduleDeadlineJoin).
 		Preload("Package", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Participants", orderParticipants).
 		Where("bookings.customer_id = ? AND (bookings.created_at >= ? OR bookings.created_at IS NULL)", customerID, threeMonthsAgo).
 		Order("bookings.id desc").Find(&bookings).Error
 	return bookings, err

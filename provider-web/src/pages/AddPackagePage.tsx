@@ -12,94 +12,127 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  UploadCloud
+  UploadCloud,
+  LoaderCircle
 } from 'lucide-react';
 
-import { request, API_BASE_URL } from '../utils/api';
-import { PackageDateManager } from '../components/PackageDateManager';
+import { request } from '../utils/api';
+import { AvailabilityCalendar } from '../components/AvailabilityCalendar';
+import { addDays, jakartaToday, threeMonthLimit, tripEndDate, rangeAvailable } from '../utils/tripDates';
+import { PROVINCES } from '../utils/locationData';
+import { OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES, resolveMediaUrl } from '../utils/tripImages';
+import { TripImage } from '../components/TripImage';
+import { useActionLock } from '../utils/useActionLock';
+import { useCustomAlert } from '../components/CustomAlertModal';
+import { getMeetingPointCoordinates, type MeetingPointCoordinates } from '../components/MeetingPointMap';
+import { MeetingPointPicker } from '../components/MeetingPointPicker';
 
 /** Open Trip berangkat bersama pada jadwal tetap; tipe lain eksklusif per tanggal. */
 function isOpenTripType(tripType: string): boolean {
   return tripType.toLowerCase().replace(/\s+/g, '') === 'opentrip';
 }
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 
-const customIcon = new L.Icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
-
-function LocationPicker({ position, setPosition, setMeetPoint }: any) {
-  useMapEvents({
-    click(e) {
-      setPosition(e.latlng);
-      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`)
-        .then(res => res.json())
-        .then(data => {
-            if (data && data.display_name) {
-                setMeetPoint(data.display_name);
-            }
-        }).catch(() => {
-            setMeetPoint(`Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`);
-        });
-    },
-  });
-  return position === null ? null : <Marker position={position} icon={customIcon} />;
+function suggestedMinimumGuests(tripType: string): string {
+  if (tripType === 'Honeymoon' || tripType === 'Private Trip') return '2';
+  if (tripType === 'Family') return '3';
+  if (tripType === 'Corporate') return '10';
+  return '1';
 }
-
-export const INDONESIA_PROVINCES = [
-  "Aceh", "Sumatera Utara", "Sumatera Barat", "Riau", "Kepulauan Riau", 
-  "Jambi", "Sumatera Selatan", "Bangka Belitung", "Bengkulu", "Lampung",
-  "DKI Jakarta", "Jawa Barat", "Banten", "Jawa Tengah", "DI Yogyakarta", "Jawa Timur",
-  "Bali", "Nusa Tenggara Barat (NTB)", "Nusa Tenggara Timur (NTT)",
-  "Kalimantan Barat", "Kalimantan Tengah", "Kalimantan Selatan", "Kalimantan Timur", "Kalimantan Utara",
-  "Sulawesi Utara", "Gorontalo", "Sulawesi Tengah", "Sulawesi Barat", "Sulawesi Selatan", "Sulawesi Tenggara",
-  "Maluku", "Maluku Utara",
-  "Papua", "Papua Barat", "Papua Barat Daya", "Papua Tengah", "Papua Pegunungan", "Papua Selatan"
-];
-
-import { OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
-
-
 export const CATEGORIES = OFFICIAL_CATEGORIES;
 export const TRIP_TYPES = OFFICIAL_TRIP_TYPES;
 
+// Foto lama bisa tersimpan sebagai URL absolut ber-host lokal (mis. saat
+// development). Ubah menjadi path "/uploads/..." agar tidak ikut tersimpan ulang.
+function toStoredPhotoPath(raw: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    // Foto paket publik disimpan relatif, apa pun host yang dulu tercatat.
+    if (/^\/uploads\/pkg_[0-9a-f]{32}\.(jpg|png)$/.test(parsed.pathname)) {
+      return parsed.pathname;
+    }
+    if (['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'].includes(parsed.hostname) && parsed.pathname.startsWith('/uploads/')) {
+      return parsed.pathname;
+    }
+  } catch {
+    // Bukan URL absolut: sudah berupa path.
+  }
+  return trimmed;
+}
+
+// Hanya referensi yang diterima backend saat simpan: foto paket publik
+// ("/uploads/pkg_...") atau URL HTTPS eksternal. Sisa data lama (teks bukan
+// URL, http://, dokumen "doc_") dibuang agar paket tetap dapat disimpan.
+function isSavablePhotoRef(ref: string): boolean {
+  if (/^\/uploads\/pkg_[0-9a-f]{32}\.(jpg|png)$/.test(ref)) return true;
+  return /^https:\/\//i.test(ref) && !ref.includes('/uploads/doc_');
+}
+
 export const AddPackagePage: React.FC = () => {
   const { navigateTo, editingPackageId } = useNavigation();
+  const { showAlert } = useCustomAlert();
   const [activeStep, setActiveStep] = useState<'info' | 'itinerary' | 'facilities' | 'pricing' | 'photos'>('info');
 
   // Form states
   const [packageName, setPackageName] = useState('');
-  const [category, setCategory] = useState('');
-  const [tripType, setTripType] = useState('');
-  const [duration, setDuration] = useState('5');
-  const [location, setLocation] = useState('DKI Jakarta');
+  // Select menampilkan opsi pertama walau value React masih kosong. Beri nilai
+  // awal nyata agar menyimpan tanpa menyentuh dropdown tidak mengirim string kosong.
+  const [category, setCategory] = useState(CATEGORIES[0] || '');
+  const [tripType, setTripType] = useState(TRIP_TYPES[0] || '');
+  const [duration, setDuration] = useState('');
+  const [location, setLocation] = useState('');
   const [meetPoint, setMeetPoint] = useState('');
-  const [mapPosition, setMapPosition] = useState<any>(null);
+  const [mapPosition, setMapPosition] = useState<MeetingPointCoordinates | null>(null);
   const [description, setDescription] = useState('');
-  const [minGuests, setMinGuests] = useState('2');
-  const [maxGuests, setMaxGuests] = useState('12');
-  const [minAge, setMinAge] = useState('10');
-  const [maxAge, setMaxAge] = useState('65');
+  const [minGuests, setMinGuests] = useState('1');
+  const [useMinimumBooking, setUseMinimumBooking] = useState(false);
+  const [maxGuests, setMaxGuests] = useState('');
+  const [minAge, setMinAge] = useState('');
+  const [maxAge, setMaxAge] = useState('');
 
   // New fields mapping to backend
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = isOpenTripType(tripType) ? new Date().toISOString().split('T')[0] : jakartaToday();
+  const latestDate = threeMonthLimit(todayStr);
   const [price, setPrice] = useState('');
-  const [quotaMin, setQuotaMin] = useState('14');
-  const [quotaMax, setQuotaMax] = useState('15');
+  const [quotaMin, setQuotaMin] = useState('');
+  const [quotaMax, setQuotaMax] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [bookedPackageDates, setBookedPackageDates] = useState<string[]>([]);
+  const [availabilityDates, setAvailabilityDates] = useState<string[]>([]);
   const [schedule, setSchedule] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const requiresMinimumQuota = isOpenTripType(tripType);
+  // Unggah foto dan simpan paket berbagi satu kunci: paket tidak boleh disimpan
+  // selagi foto masih diunggah (foto baru belum masuk payload), dan sebaliknya.
+  const { pending, isBusy, run } = useActionLock();
+
+  const showValidation = (message: string, step?: typeof activeStep) => {
+    if (step) setActiveStep(step);
+    showAlert({
+      title: 'Periksa Data Paket',
+      message,
+      type: 'warning',
+      confirmText: 'Perbaiki Data',
+    });
+  };
+
+  const handleDigitsOnlyInput = (
+    value: string,
+    setter: React.Dispatch<React.SetStateAction<string>>,
+    fieldLabel: string,
+    step: typeof activeStep,
+  ) => {
+    if (/^\d*$/.test(value)) {
+      setter(value);
+      return;
+    }
+    showValidation(`${fieldLabel} hanya boleh diisi angka bulat tanpa huruf, tanda minus, atau desimal.`, step);
+  };
 
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
-    if (val) {
+    if (val && isOpenTripType(tripType)) {
       const durNum = parseInt(duration, 10) || 1;
       const d = new Date(val);
       if (!isNaN(d.getTime())) {
@@ -112,7 +145,7 @@ export const AddPackagePage: React.FC = () => {
   };
 
   React.useEffect(() => {
-    if (startDate) {
+    if (startDate && isOpenTripType(tripType)) {
       const durNum = parseInt(duration, 10) || 1;
       const d = new Date(startDate);
       if (!isNaN(d.getTime())) {
@@ -125,34 +158,29 @@ export const AddPackagePage: React.FC = () => {
   }, [duration]);
 
   // Itinerary states
+  // Paket baru dimulai kosong: contoh hanya muncul sebagai placeholder agar
+  // tidak ikut terpublikasi sebagai janji yang tidak ditawarkan mitra.
   const [itineraries, setItineraries] = useState<{ day: number; activities: { time: string; title: string }[] }[]>([
-    { day: 1, activities: [{ time: '08:00 - 10:00', title: 'Penjemputan di Meeting Point' }, { time: '12:00 - 13:00', title: 'Makan Siang' }] }
+    { day: 1, activities: [] }
   ]);
   const [newActivityTime, setNewActivityTime] = useState('');
   const [newActivityTitle, setNewActivityTitle] = useState('');
   const [selectedItineraryDay, setSelectedItineraryDay] = useState(1);
 
   // Facilities states
-  const [includedFacilities, setIncludedFacilities] = useState<string[]>([
-    'Transportasi AC AC/PP',
-    'Makan sesuai program',
-    'Tiket masuk objek wisata',
-    'Pemandu wisata profesional'
-  ]);
-  const [excludedFacilities, setExcludedFacilities] = useState<string[]>([
-    'Pengeluaran pribadi',
-    'Tiket penerbangan ke meeting point',
-    'Tipping guide & driver'
-  ]);
+  const [includedFacilities, setIncludedFacilities] = useState<string[]>([]);
+  const [excludedFacilities, setExcludedFacilities] = useState<string[]>([]);
+  // Mode edit: bila data paket gagal dimuat, penyimpanan dikunci supaya form
+  // kosong tidak menimpa paket asli.
+  const [packageLoadError, setPackageLoadError] = useState('');
+  const [packageLoadAttempt, setPackageLoadAttempt] = useState(0);
   const [newIncludedFacility, setNewIncludedFacility] = useState('');
   const [newExcludedFacility, setNewExcludedFacility] = useState('');
 
   // Photos states
-  const [packagePhotos, setPackagePhotos] = useState<string[]>([
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=400&q=80'
-  ]);
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  // Paket baru dimulai tanpa foto: mitra wajib mengunggah foto aslinya sendiri.
+  const [packagePhotos, setPackagePhotos] = useState<string[]>([]);
+  const isUploadingPhoto = pending === 'photos';
 
   const steps = [
     { id: 'info', label: 'Info Dasar' },
@@ -170,15 +198,30 @@ export const AddPackagePage: React.FC = () => {
           setPackageName(pkg.name || '');
           setLocation(pkg.destination || '');
           setMeetPoint(pkg.meetingPoint || '');
+          const savedCoordinates = getMeetingPointCoordinates(pkg);
+          if (savedCoordinates) {
+            setMapPosition(savedCoordinates);
+          }
           setPrice(pkg.price ? String(pkg.price) : '');
-          if (pkg.quotaMin) setQuotaMin(String(pkg.quotaMin));
+          const loadedTripType = pkg.tripType || TRIP_TYPES[0] || '';
+          setQuotaMin(isOpenTripType(loadedTripType) && pkg.quotaMin ? String(pkg.quotaMin) : '');
           setQuotaMax(pkg.quotaMax ? String(pkg.quotaMax) : '');
           if (pkg.category) setCategory(pkg.category);
           if (pkg.tripType) setTripType(pkg.tripType);
           if (pkg.startDate) setStartDate(pkg.startDate);
           if (pkg.endDate) setEndDate(pkg.endDate);
+          setBookedPackageDates(Array.isArray(pkg.bookedDates) ? pkg.bookedDates : []);
+          if (!isOpenTripType(loadedTripType)) {
+            const configured: string[] = (pkg.configuredDates || pkg.availableDates || []).filter((day: string) => day >= jakartaToday());
+            configured.sort();
+            setAvailabilityDates(configured);
+            setStartDate(configured[0] || '');
+            setEndDate(configured[configured.length - 1] || '');
+          }
           if (pkg.duration) setDuration(String(pkg.duration));
-          if (pkg.minGuests) setMinGuests(String(pkg.minGuests));
+          const loadedMinGuests = Math.max(1, Number(pkg.minGuests) || 1);
+          setMinGuests(String(loadedMinGuests));
+          setUseMinimumBooking(loadedMinGuests > 1);
           if (pkg.maxGuests) setMaxGuests(String(pkg.maxGuests));
           if (pkg.minAge) setMinAge(String(pkg.minAge));
           if (pkg.maxAge) setMaxAge(String(pkg.maxAge));
@@ -194,19 +237,40 @@ export const AddPackagePage: React.FC = () => {
               // ignore
             }
           }
-          if (pkg.images) {
-            const splitImgs = pkg.images.split(',').filter(Boolean);
-            if (splitImgs.length > 0) setPackagePhotos(splitImgs);
-          } else if (pkg.image) {
-            setPackagePhotos([pkg.image]);
+          const rawPhotos: string[] = (pkg.images ? pkg.images.split(',') : [pkg.image || ''])
+            .map(toStoredPhotoPath)
+            .filter(Boolean);
+          const savablePhotos = rawPhotos.filter(isSavablePhotoRef);
+          if (savablePhotos.length > 0) setPackagePhotos(savablePhotos);
+          const droppedPhotos = rawPhotos.length - savablePhotos.length;
+          if (droppedPhotos > 0) {
+            showAlert({
+              title: 'Sebagian Foto Perlu Diunggah Ulang',
+              message: `${droppedPhotos} foto lama pada paket ini tidak lagi valid dan tidak ditampilkan. Unggah ulang foto tersebut di langkah Foto sebelum menyimpan.`,
+              type: 'warning',
+            });
           }
-        } catch (err) {
+          setPackageLoadError('');
+        } catch (err: any) {
           console.error('Failed to load package details:', err);
+          setPackageLoadError(err?.message || 'Data paket gagal dimuat.');
         }
       }
     }
     loadPackage();
-  }, [editingPackageId]);
+  }, [editingPackageId, packageLoadAttempt]);
+
+  React.useEffect(() => {
+    if (editingPackageId || requiresMinimumQuota) return;
+    let cancelled = false;
+    request('/provider/packages').then((packages) => {
+      if (!cancelled && Array.isArray(packages)) {
+        const busy: string[] = packages.filter(pkg => !isOpenTripType(pkg.tripType || '')).flatMap(pkg => pkg.bookedDates || []);
+        setBookedPackageDates([...new Set(busy)].sort());
+      }
+    }).catch(error => console.error('Gagal memuat availability provider:', error));
+    return () => { cancelled = true; };
+  }, [editingPackageId, requiresMinimumQuota]);
 
   // Itinerary helper actions
   const handleAddActivity = (day: number) => {
@@ -256,8 +320,9 @@ export const AddPackagePage: React.FC = () => {
 
   // Photos helper actions
   const triggerPhotoUpload = () => {
+    if (isBusy) return;
     if (packagePhotos.length >= 20) {
-      alert('⚠️ Jumlah foto paket telah mencapai batas maksimal 20 foto.');
+      showAlert({ title: 'Batas Foto Tercapai', message: 'Jumlah foto paket telah mencapai batas maksimal 20 foto.', type: 'warning' });
       return;
     }
     document.getElementById('photo-file-input')?.click();
@@ -270,52 +335,58 @@ export const AddPackagePage: React.FC = () => {
     const maxFileSize = 2 * 1024 * 1024; // 2 MB
     const allowedExtensions = ['jpg', 'jpeg', 'png'];
     const newPhotos: string[] = [];
+    const input = e.target;
 
-    setIsUploadingPhoto(true);
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+    await run('photos', async () => {
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
 
-        if (packagePhotos.length + newPhotos.length >= 20) {
-          alert('⚠️ Jumlah foto paket telah mencapai batas maksimal 20 foto.');
-          break;
+          if (packagePhotos.length + newPhotos.length >= 20) {
+            showAlert({ title: 'Batas Foto Tercapai', message: 'Jumlah foto paket telah mencapai batas maksimal 20 foto.', type: 'warning' });
+            break;
+          }
+
+          const ext = file.name.split('.').pop()?.toLowerCase();
+          if (!ext || !allowedExtensions.includes(ext)) {
+            showAlert({ title: 'Format Foto Tidak Didukung', message: `File “${file.name}” harus menggunakan format JPG, JPEG, atau PNG.`, type: 'warning' });
+            continue;
+          }
+
+          if (file.size > maxFileSize) {
+            showAlert({ title: 'Ukuran Foto Terlalu Besar', message: `Ukuran “${file.name}” adalah ${(file.size / (1024 * 1024)).toFixed(2)} MB. Maksimal ukuran setiap foto adalah 2 MB.`, type: 'warning' });
+            continue;
+          }
+
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await request('/provider/packages/photos', {
+            method: 'POST',
+            body: formData,
+          });
+          // Simpan path relatif dari server; origin backend ditambahkan saat
+          // ditampilkan sehingga database tidak terikat host tertentu.
+          if (res && res.photoPath) {
+            newPhotos.push(res.photoPath);
+          }
         }
-
-        const ext = file.name.split('.').pop()?.toLowerCase();
-        if (!ext || !allowedExtensions.includes(ext)) {
-          alert(`⚠️ Format file "${file.name}" tidak didukung. Hanya format JPG, JPEG, dan PNG yang diperbolehkan.`);
-          continue;
+      } catch (err: any) {
+		showAlert({
+		  title: 'Unggah Foto Belum Selesai',
+		  message: newPhotos.length > 0
+			? `${err.message || 'Gagal mengunggah foto'}. ${newPhotos.length} foto yang sudah terunggah tetap disimpan.`
+			: (err.message || 'Gagal mengunggah foto'),
+		  type: 'error',
+		});
+      } finally {
+        // Foto yang sudah berhasil diunggah sebelum terjadi kegagalan tetap
+        // ditambahkan, supaya provider tidak perlu mengunggah ulang semuanya.
+        if (newPhotos.length > 0) {
+          setPackagePhotos(prev => [...prev, ...newPhotos]);
         }
-
-        if (file.size > maxFileSize) {
-          alert(`⚠️ Ukuran foto "${file.name}" melebihi 2 MB (Ukuran: ${(file.size / (1024 * 1024)).toFixed(2)} MB). Harap unggah foto maksimal 2 MB.`);
-          continue;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await request('/provider/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        if (res && res.documentPath) {
-          const baseUrl = API_BASE_URL.replace('/api/v1', '');
-          const fullPhotoUrl = res.documentPath.startsWith('http') 
-            ? res.documentPath 
-            : `${baseUrl}${res.documentPath}`;
-          newPhotos.push(fullPhotoUrl);
-        }
+        input.value = '';
       }
-
-      if (newPhotos.length > 0) {
-        setPackagePhotos(prev => [...prev, ...newPhotos]);
-      }
-    } catch (err: any) {
-      alert(err.message || 'Gagal mengunggah foto');
-    } finally {
-      setIsUploadingPhoto(false);
-      if (e.target) e.target.value = '';
-    }
+    });
   };
 
   const handleDeletePhoto = (idx: number) => {
@@ -323,120 +394,234 @@ export const AddPackagePage: React.FC = () => {
   };
 
   const handleSubmit = async (status: 'draft' | 'publish') => {
-    if (isSubmitting) return;
+    if (isBusy) return;
 
-    const qMin = parseInt(quotaMin, 10);
-    const qMax = parseInt(quotaMax, 10);
-    const minG = parseInt(minGuests, 10);
-    const maxG = parseInt(maxGuests, 10);
+	const priceValue = price === '' ? Number.NaN : Number(price);
+	const qMin = quotaMin === '' ? Number.NaN : Number(quotaMin);
+	const qMax = quotaMax === '' ? Number.NaN : Number(quotaMax);
+	const minG = useMinimumBooking ? (minGuests === '' ? Number.NaN : Number(minGuests)) : 1;
+	const maxG = maxGuests === '' ? Number.NaN : Number(maxGuests);
+	const durationValue = Number(duration);
+	const minAgeValue = minAge === '' ? 0 : Number(minAge);
+	const maxAgeValue = maxAge === '' ? 0 : Number(maxAge);
+
+	// Validasi ini berlaku juga saat menyimpan draf: draf boleh belum lengkap,
+	// tetapi nilai yang sudah diisi tidak boleh rusak atau negatif.
+	if (duration !== '' && (!Number.isInteger(durationValue) || durationValue < 1)) {
+	  showValidation('Durasi harus berupa bilangan bulat minimal 1 hari dan tidak boleh bernilai minus.', 'info');
+	  return;
+	}
+	if ((minAge !== '' && (!Number.isInteger(minAgeValue) || minAgeValue < 0)) ||
+	    (maxAge !== '' && (!Number.isInteger(maxAgeValue) || maxAgeValue < 0))) {
+	  showValidation('Batas umur harus berupa bilangan bulat 0 atau lebih. Nilai umur tidak boleh minus.', 'pricing');
+	  return;
+	}
+	if (maxAge !== '' && minAgeValue > maxAgeValue) {
+	  showValidation(`Umur maksimal (${maxAgeValue}) tidak boleh lebih kecil dari umur minimal (${minAgeValue}).`, 'pricing');
+	  return;
+	}
+	const enteredPricingValues = [
+	  ['Harga', price, priceValue],
+	  ['Kuota minimal', quotaMin, qMin],
+	  ['Kuota maksimal', quotaMax, qMax],
+	  ['Minimum peserta', useMinimumBooking ? minGuests : '1', minG],
+	  ['Maksimum peserta', maxGuests, maxG],
+	] as const;
+	const invalidPricing = enteredPricingValues.find(([label, raw, value]) =>
+	  (label !== 'Kuota minimal' || requiresMinimumQuota) &&
+	  raw !== '' &&
+	  (!Number.isFinite(value) || !Number.isInteger(value) || value < 0)
+	);
+	if (invalidPricing) {
+	  showValidation(`${invalidPricing[0]} harus berupa bilangan bulat dan tidak boleh bernilai minus.`, 'pricing');
+	  return;
+	}
+	if (priceValue > 1_000_000_000_000 || qMax > 10_000) {
+	  showValidation('Harga atau kuota paket melebihi batas yang diizinkan.', 'pricing');
+	  return;
+	}
+	if (startDate && endDate && endDate < startDate) {
+	  showValidation('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.', 'pricing');
+	  return;
+	}
+
+    if (editingPackageId && packageLoadError) {
+      showAlert({ title: 'Data Paket Belum Termuat', message: 'Muat ulang data paket terlebih dahulu agar perubahan tidak menimpa paket dengan data kosong.', type: 'warning' });
+      return;
+    }
 
     if (status === 'publish') {
       if (!packageName.trim()) {
-        alert('⚠️ Nama paket wisata harus diisi!');
+		showValidation('Nama paket wisata wajib diisi sebelum paket dipublikasikan.', 'info');
         return;
       }
+	  if (!category || !tripType) {
+		showValidation('Kategori dan tipe trip wajib dipilih sebelum paket dipublikasikan.', 'info');
+		return;
+	  }
       if (!location.trim()) {
-        alert('⚠️ Lokasi destinasi harus diisi!');
+		showValidation('Lokasi destinasi wajib dipilih sebelum paket dipublikasikan.', 'info');
         return;
       }
-      if (!price || parseInt(price, 10) <= 0) {
-        alert('⚠️ Harga per orang harus berupa angka lebih dari 0!');
+	  if (!meetPoint.trim()) {
+		showValidation('Pin titik kumpul wajib dipilih pada peta.', 'info');
+		return;
+	  }
+	  if (!mapPosition) {
+		showValidation('Klik peta untuk menentukan koordinat latitude dan longitude titik kumpul.', 'info');
+		return;
+	  }
+	  if (!description.trim()) {
+		showValidation('Deskripsi paket wajib diisi sebelum paket dipublikasikan.', 'info');
+		return;
+	  }
+      if (!price || priceValue <= 0) {
+		showValidation('Harga per orang harus berupa angka lebih dari 0.', 'pricing');
         return;
       }
-      if (isNaN(qMin) || qMin < 1) {
-        alert('⚠️ Kuota minimal harus diisi dan minimal 1 peserta!');
+      if (!duration || durationValue < 1) {
+		showValidation('Durasi paket wajib diisi dan minimal 1 hari.', 'info');
+        return;
+      }
+      if (requiresMinimumQuota && (isNaN(qMin) || qMin < 1)) {
+		showValidation('Kuota minimal wajib diisi dan minimal 1 peserta.', 'pricing');
         return;
       }
       if (isNaN(qMax) || qMax <= 0) {
-        alert('⚠️ Kuota maksimal harus lebih besar dari 0 (contoh: 15)!');
+		showValidation('Kuota maksimal harus lebih besar dari 0, misalnya 15.', 'pricing');
         return;
       }
-      if (qMax < qMin) {
-        alert(`⚠️ Kuota maksimal (${qMax}) tidak boleh lebih kecil dari kuota minimal (${qMin})! Silakan naikkan kuota maksimal atau sesuaikan kuota minimal.`);
+      if (requiresMinimumQuota && qMax < qMin) {
+		showValidation(`Kuota maksimal (${qMax}) tidak boleh lebih kecil dari kuota minimal (${qMin}).`, 'pricing');
         return;
       }
-      if (isNaN(minG) || minG < 1) {
-        alert('⚠️ Minimum peserta per pemesanan minimal 1 orang!');
+      if (useMinimumBooking && (isNaN(minG) || minG < 1)) {
+		showValidation('Minimum peserta per pemesanan minimal 1 orang.', 'pricing');
         return;
       }
       if (isNaN(maxG) || maxG < minG) {
-        alert(`⚠️ Maksimum peserta per pemesanan (${maxG}) tidak boleh lebih kecil dari minimum peserta (${minG})!`);
+		showValidation(`Maksimum peserta per pemesanan (${maxG}) tidak boleh lebih kecil dari minimum peserta (${minG}).`, 'pricing');
         return;
       }
       if (maxG > qMax) {
-        alert(`⚠️ Maksimum peserta per pemesanan (${maxG}) tidak boleh melebihi kuota maksimal paket (${qMax})!`);
+		showValidation(`Maksimum peserta per pemesanan (${maxG}) tidak boleh melebihi kuota maksimal paket (${qMax}).`, 'pricing');
         return;
       }
       if (!startDate || !endDate) {
-        alert('⚠️ Jadwal tanggal mulai dan tanggal selesai keberangkatan harus diisi!');
+		showValidation('Tanggal mulai dan tanggal selesai keberangkatan wajib diisi.', 'pricing');
         return;
       }
       if (startDate < todayStr) {
-        alert('⚠️ Tanggal mulai keberangkatan tidak boleh memilih tanggal yang sudah lewat dari hari ini!');
+		showValidation('Tanggal mulai keberangkatan tidak boleh menggunakan tanggal yang sudah lewat.', 'pricing');
+        return;
+      }
+      if (!itineraries.some((day) => day.activities.length > 0)) {
+		showValidation('Tambahkan minimal satu kegiatan pada itinerary sebelum paket dipublikasikan.', 'itinerary');
+        return;
+      }
+      if (includedFacilities.length === 0) {
+		showValidation('Tambahkan minimal satu fasilitas yang termasuk dalam paket.', 'facilities');
         return;
       }
       if (packagePhotos.length < 3) {
-        alert(`⚠️ Foto masih kurang! Minimal 3 foto wajib diunggah (Saat ini baru ada ${packagePhotos.length} foto).`);
-        setActiveStep('photos');
+		showValidation(`Minimal 3 foto wajib diunggah. Saat ini baru ada ${packagePhotos.length} foto.`, 'photos');
         return;
       }
     } else {
       if (!packageName.trim()) {
-        alert('⚠️ Nama paket harus diisi untuk menyimpan draf');
+		showValidation('Nama paket harus diisi untuk menyimpan draf.', 'info');
         return;
       }
     }
 
-    setIsSubmitting(true);
-    try {
-      const dbStatus = status === 'draft' ? 'Draft' : 'Aktif';
-      const finalSchedule = schedule.trim() || (startDate && endDate ? `${startDate} s/d ${endDate} (${duration} Hari)` : 'Jadwal Fleksibel');
-
-      const payload = {
-        name: packageName,
-        destination: location,
-        meetingPoint: meetPoint,
-        category: category,
-        tripType: tripType,
-        price: parseInt(price, 10) || 0,
-        quotaMin: qMin,
-        quotaMax: qMax,
-        startDate: startDate,
-        endDate: endDate,
-        schedule: finalSchedule,
-        duration: parseInt(duration, 10) || 1,
-        minGuests: minG,
-        maxGuests: maxG,
-        minAge: parseInt(minAge, 10) || 0,
-        maxAge: parseInt(maxAge, 10) || 100,
-        status: dbStatus,
-        description: description,
-        includedFacilities: includedFacilities.join('\n'),
-        excludedFacilities: excludedFacilities.join('\n'),
-        itinerary: JSON.stringify(itineraries),
-        image: packagePhotos[0] || '',
-        images: packagePhotos.join(','),
-      };
-
-      if (editingPackageId) {
-        await request(`/provider/packages/${editingPackageId}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
-        alert(status === 'draft' ? `Draf paket "${packageName}" berhasil diperbarui.` : `Paket "${packageName}" berhasil dipublikasikan.`);
-      } else {
-        await request('/provider/packages', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-        alert(status === 'draft' ? `Draf paket "${packageName}" berhasil dibuat.` : `Paket "${packageName}" berhasil dipublikasikan.`);
-      }
-      navigateTo('kelola-paket');
-    } catch (err: any) {
-      alert(err.message || 'Gagal menyimpan paket wisata');
-    } finally {
-      setIsSubmitting(false);
+    if (!isOpenTripType(tripType) && (!availabilityDates.length || availabilityDates.some(day => day < todayStr || day > latestDate) ||
+      !availabilityDates.some(day => rangeAvailable(day, tripEndDate(day, durationValue || 1), todayStr, latestDate, availabilityDates)))) {
+      showValidation('Buka tanggal availability maksimal tiga bulan ke depan. Sediakan setidaknya satu periode yang cukup untuk durasi perjalanan.', 'pricing');
+      return;
     }
+
+    await run(status, async () => {
+      try {
+        const dbStatus = status === 'draft' ? 'Draft' : 'Aktif';
+        const finalSchedule = isOpenTripType(tripType) ? (schedule.trim() || (startDate && endDate ? `${startDate} s/d ${endDate} (${duration} Hari)` : 'Jadwal Fleksibel')) : 'Sesuai kalender availability';
+
+        const payload = {
+          name: packageName,
+          destination: location,
+          meetingPoint: meetPoint,
+          meetingPointLatitude: mapPosition?.lat ?? null,
+          meetingPointLongitude: mapPosition?.lng ?? null,
+          category: category,
+          tripType: tripType,
+		  price: Number.isFinite(priceValue) ? priceValue : 0,
+          // Kuota minimum adalah ambang keberangkatan bersama dan hanya berlaku
+          // untuk Open Trip. Tipe lain memakai minimum peserta per booking.
+          quotaMin: requiresMinimumQuota && Number.isFinite(qMin) ? qMin : 0,
+          quotaMax: Number.isFinite(qMax) ? qMax : 0,
+          startDate: startDate,
+          endDate: endDate,
+          ...(!isOpenTripType(tripType) ? { availableDates: availabilityDates } : {}),
+          schedule: finalSchedule,
+		  duration: duration === '' ? 1 : durationValue,
+          minGuests: Number.isFinite(minG) ? minG : 0,
+          maxGuests: Number.isFinite(maxG) ? maxG : 0,
+		  minAge: minAgeValue,
+		  maxAge: maxAgeValue,
+          status: dbStatus,
+          description: description,
+          includedFacilities: includedFacilities.join('\n'),
+          excludedFacilities: excludedFacilities.join('\n'),
+          itinerary: JSON.stringify(itineraries),
+          image: packagePhotos[0] || '',
+          images: packagePhotos.join(','),
+        };
+
+		let savedPackage;
+        if (editingPackageId) {
+          savedPackage = await request(`/provider/packages/${editingPackageId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          });
+        } else {
+		  savedPackage = await request('/provider/packages', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+        }
+
+		// Jangan tampilkan sukses bila server mengabaikan nilai update. PKG-02
+		// mengharuskan hasil tersimpan sama dengan payload yang dinyatakan sukses.
+		if (!savedPackage?.id || savedPackage.status !== dbStatus || savedPackage.name !== payload.name ||
+		    savedPackage.category !== payload.category || savedPackage.tripType !== payload.tripType ||
+		    Number(savedPackage.quotaMin) !== payload.quotaMin ||
+		    Number(savedPackage.duration) !== payload.duration ||
+		    (mapPosition && (
+		      !Number.isFinite(Number(savedPackage.meetingPointLatitude)) ||
+		      !Number.isFinite(Number(savedPackage.meetingPointLongitude)) ||
+		      Math.abs(Number(savedPackage.meetingPointLatitude) - mapPosition.lat) > 0.0000001 ||
+		      Math.abs(Number(savedPackage.meetingPointLongitude) - mapPosition.lng) > 0.0000001
+		    ))) {
+		  throw new Error('Server belum menyimpan seluruh perubahan paket. Muat ulang data lalu coba kembali.');
+		}
+
+		showAlert({
+		  title: status === 'draft' ? 'Draf Tersimpan' : 'Paket Berhasil Dipublikasikan',
+		  message: status === 'draft'
+		    ? `Draf paket “${packageName}” berhasil ${editingPackageId ? 'diperbarui' : 'dibuat'}.`
+		    : `Paket “${packageName}” sudah aktif dan dapat dilihat pelanggan.`,
+		  type: 'success',
+		  confirmText: 'Lihat Daftar Paket',
+		  onConfirm: () => navigateTo('kelola-paket'),
+		});
+      } catch (err: any) {
+		showAlert({
+		  title: 'Paket Belum Tersimpan',
+		  message: err.message || 'Gagal menyimpan paket wisata. Periksa kembali data yang diisi.',
+		  type: 'error',
+		  confirmText: 'Periksa Kembali',
+		});
+      }
+    });
   };
 
   return (
@@ -451,19 +636,44 @@ export const AddPackagePage: React.FC = () => {
               <ArrowLeft size={18} />
             </button>
             <div className="header-welcome">
-              <h1>Tambah Paket Wisata</h1>
-              <p>Lengkapi semua informasi paket dengan detail</p>
+              <h1>{editingPackageId ? 'Edit Paket Wisata' : 'Tambah Paket Wisata'}</h1>
+              <p>{editingPackageId ? 'Perbarui informasi paket wisata Anda' : 'Lengkapi semua informasi paket dengan detail'}</p>
             </div>
           </div>
           <div className="header-actions-row">
-            <button className="action-outline-btn" onClick={() => handleSubmit('draft')} disabled={isSubmitting}>
-              <Save size={14} /> {isSubmitting ? 'Menyimpan...' : 'Simpan Draft'}
+            {/* Kedua tombol terkunci selama ada proses (simpan maupun unggah foto);
+                indikator hanya tampil pada tombol yang diklik. */}
+            <button
+              className="action-outline-btn"
+              onClick={() => handleSubmit('draft')}
+              disabled={isBusy}
+              aria-busy={pending === 'draft'}
+              title={isUploadingPhoto ? 'Tunggu hingga unggah foto selesai' : undefined}
+            >
+              {pending === 'draft'
+                ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
+                : <><Save size={14} /> Simpan Draft</>}
             </button>
-            <button className="action-solid-btn" onClick={() => handleSubmit('publish')} disabled={isSubmitting}>
-              <Send size={14} /> {isSubmitting ? 'Memproses...' : 'Publikasikan'}
+            <button
+              className="action-solid-btn"
+              onClick={() => handleSubmit('publish')}
+              disabled={isBusy}
+              aria-busy={pending === 'publish'}
+              title={isUploadingPhoto ? 'Tunggu hingga unggah foto selesai' : undefined}
+            >
+              {pending === 'publish'
+                ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</>
+                : <><Send size={14} /> Publikasikan</>}
             </button>
           </div>
         </header>
+
+        {editingPackageId && packageLoadError && (
+          <div role="alert" style={{ margin: '0 0 16px', padding: '12px 16px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <span><strong>Data paket gagal dimuat.</strong> {packageLoadError} Penyimpanan dikunci sampai data termuat.</span>
+            <button type="button" className="action-outline-btn" onClick={() => setPackageLoadAttempt((n) => n + 1)}>Coba Lagi</button>
+          </div>
+        )}
 
         {/* Wizard Form Layout Split */}
         <div className="add-pkg-split">
@@ -487,7 +697,7 @@ export const AddPackagePage: React.FC = () => {
               <Sparkles size={18} className="tips-icon" />
               <div>
                 <strong>Tips Paket Populer</strong>
-                <p>Tambahkan minimal 5 foto berkualitas tinggi untuk meningkatkan booking hingga 3x lipat.</p>
+                <p>Unggah minimal 3 foto asli yang terang dan jelas (disarankan 5 atau lebih). Foto pertama menjadi sampul paket.</p>
               </div>
             </div>
           </div>
@@ -523,24 +733,19 @@ export const AddPackagePage: React.FC = () => {
                       value={tripType} 
                       onChange={(e) => {
                         const val = e.target.value;
-                        setTripType(val);
-                        if (val === 'Honeymoon' || val === 'Private Trip') {
-                          setQuotaMin('2');
-                          setMinGuests('2');
-                        } else if (val === 'Family') {
-                          setQuotaMin('3');
-                          setMinGuests('3');
-                        } else if (val === 'Corporate') {
-                          setQuotaMin('10');
-                          setMinGuests('10');
-                        } else {
-                          setQuotaMin('1');
-                          setMinGuests('1');
+                        if (isOpenTripType(val) !== isOpenTripType(tripType)) {
+                          setStartDate('');
+                          setEndDate('');
+                          setSchedule('');
+                          setAvailabilityDates([]);
                         }
+                        setTripType(val);
+                        setQuotaMin(isOpenTripType(val) ? (quotaMin || '1') : '');
+                        setMinGuests(useMinimumBooking ? suggestedMinimumGuests(val) : '1');
                       }}
                     >
                       {TRIP_TYPES.map(tt => (
-                        <option key={tt} value={tt}>{tt}</option>
+                        <option key={tt} value={tt}>{tt === 'Family' || tt === 'Corporate' ? `${tt} Trip` : tt}</option>
                       ))}
                     </select>
                   </div>
@@ -548,10 +753,12 @@ export const AddPackagePage: React.FC = () => {
                     <label>Durasi *</label>
                     <div className="input-suffix-wrapper">
                       <input 
-                        type="number" 
+						type="text"
+						inputMode="numeric"
+						pattern="[0-9]*"
                         value={duration} 
-                        onChange={(e) => setDuration(e.target.value)} 
-                        placeholder="5"
+                        onChange={(e) => handleDigitsOnlyInput(e.target.value, setDuration, 'Durasi', 'info')}
+                        placeholder="Contoh: 3"
                       />
                       <span className="input-suffix">Hari</span>
                     </div>
@@ -564,10 +771,14 @@ export const AddPackagePage: React.FC = () => {
                     <MapPin size={16} className="field-icon" />
                     <select 
                       value={location} 
-                      onChange={(e) => setLocation(e.target.value)}
+                      onChange={(e) => {
+                        setLocation(e.target.value);
+                        setMapPosition(null);
+                      }}
                       className="input-indent"
                     >
-                      {INDONESIA_PROVINCES.map(prov => (
+                      <option value="" disabled>Pilih provinsi destinasi</option>
+                      {PROVINCES.map(prov => (
                         <option key={prov} value={prov}>{prov}</option>
                       ))}
                     </select>
@@ -575,22 +786,8 @@ export const AddPackagePage: React.FC = () => {
                 </div>
 
                 <div className="input-group">
-                  <label>Titik Kumpul *</label>
-                  <p style={{fontSize: '12.5px', color: '#64748b', marginBottom: '8px', marginTop: '-4px'}}>Pilih lokasi di peta atau ketik langsung nama titik kumpulnya.</p>
-                  <div style={{ height: '250px', width: '100%', marginBottom: '12px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', zIndex: 1 }}>
-                    <MapContainer center={[-0.7893, 113.9213]} zoom={4} style={{ height: '100%', width: '100%', zIndex: 1 }}>
-                      <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      <LocationPicker position={mapPosition} setPosition={setMapPosition} setMeetPoint={setMeetPoint} />
-                    </MapContainer>
-                  </div>
-                  <input 
-                    type="text" 
-                    value={meetPoint} 
-                    onChange={(e) => setMeetPoint(e.target.value)}
-                    placeholder="Contoh: Bandara Marinda, Raja Ampat"
-                  />
+                  <label>Alamat Titik Kumpul *</label>
+                  <MeetingPointPicker address={meetPoint} position={mapPosition} onAddressChange={setMeetPoint} onSelect={setMapPosition} />
                 </div>
 
                 <div className="input-group">
@@ -647,7 +844,7 @@ export const AddPackagePage: React.FC = () => {
                                 className="delete-activity-btn" 
                                 onClick={() => handleDeleteActivity(selectedItineraryDay, idx)}
                               >
-                                <Trash2 size={12} />
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </div>
@@ -666,7 +863,7 @@ export const AddPackagePage: React.FC = () => {
                         />
                         <input 
                           type="text" 
-                          placeholder="Deskripsi aktivitas atau destinasi" 
+                          placeholder="Kegiatan, contoh: Penjemputan di titik kumpul" 
                           value={newActivityTitle}
                           onChange={(e) => setNewActivityTitle(e.target.value)}
                         />
@@ -703,7 +900,7 @@ export const AddPackagePage: React.FC = () => {
                     <div className="add-facility-input-row">
                       <input 
                         type="text" 
-                        placeholder="Tambah fasilitas termasuk..." 
+                        placeholder="Contoh: Transportasi AC PP, makan 3x, tiket masuk" 
                         value={newIncludedFacility}
                         onChange={(e) => setNewIncludedFacility(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFacility('included'))}
@@ -725,7 +922,7 @@ export const AddPackagePage: React.FC = () => {
                     <div className="add-facility-input-row">
                       <input 
                         type="text" 
-                        placeholder="Tambah fasilitas tidak termasuk..." 
+                        placeholder="Contoh: Pengeluaran pribadi, tip pemandu" 
                         value={newExcludedFacility}
                         onChange={(e) => setNewExcludedFacility(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFacility('excluded'))}
@@ -740,39 +937,42 @@ export const AddPackagePage: React.FC = () => {
             {activeStep === 'pricing' && (
               <div className="form-section-body animate-fade-in">
                 <h3>Jadwal & Harga</h3>
-                <p className="section-subtitle">Lengkapi detail harga, kuota, jadwal keberangkatan, dan batas peserta</p>
+                <p className="section-subtitle">Lengkapi detail harga, kapasitas, jadwal keberangkatan, dan batas peserta</p>
                 
                 <div className="input-row-3">
                   <div className="input-group">
                     <label>Harga per Orang *</label>
                     <input 
-                      type="number" 
-                      min="1"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={price} 
-                      onChange={(e) => setPrice(e.target.value)}
+                      onChange={(e) => handleDigitsOnlyInput(e.target.value, setPrice, 'Harga per orang', 'pricing')}
                       placeholder="Contoh: 1200000"
                     />
                   </div>
+                  {requiresMinimumQuota && (
+                    <div className="input-group">
+                      <label>Kuota Minimal Open Trip (Min. 1) *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={quotaMin}
+                        onChange={(e) => setQuotaMin(e.target.value)}
+                        placeholder="Contoh: 14"
+                      />
+                      {parseInt(quotaMin, 10) < 1 && (
+                        <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                          ⚠️ Kuota minimal harus lebih besar dari 0 (minimal 1)
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="input-group">
-                    <label>Kuota Minimal (Min. 1) *</label>
+                    <label>{requiresMinimumQuota ? 'Kuota Maksimal *' : 'Kapasitas Maksimal per Booking *'}</label>
                     <input 
                       type="number" 
-                      min="1"
-                      value={quotaMin} 
-                      onChange={(e) => setQuotaMin(e.target.value)}
-                      placeholder="Contoh: 14"
-                    />
-                    {parseInt(quotaMin, 10) < 1 && (
-                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                        ⚠️ Kuota minimal harus lebih besar dari 0 (minimal 1)
-                      </span>
-                    )}
-                  </div>
-                  <div className="input-group">
-                    <label>Kuota Maksimal *</label>
-                    <input 
-                      type="number" 
-                      min={quotaMin || "1"}
+                      min={requiresMinimumQuota ? (quotaMin || "1") : "1"}
                       value={quotaMax} 
                       onChange={(e) => setQuotaMax(e.target.value)}
                       placeholder="Contoh: 15"
@@ -781,7 +981,7 @@ export const AddPackagePage: React.FC = () => {
                       <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
                         ⚠️ Kuota maksimal tidak boleh 0 atau minus
                       </span>
-                    ) : parseInt(quotaMax, 10) < parseInt(quotaMin, 10) ? (
+                    ) : requiresMinimumQuota && parseInt(quotaMax, 10) < parseInt(quotaMin, 10) ? (
                       <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
                         ⚠️ Kuota maksimal ({quotaMax}) harus &gt;= kuota minimal ({quotaMin})
                       </span>
@@ -789,6 +989,7 @@ export const AddPackagePage: React.FC = () => {
                   </div>
                 </div>
 
+                {isOpenTripType(tripType) ? (<>
                 <div className="input-group">
                   <label>Jadwal Keberangkatan (Durasi {duration} Hari) *</label>
                   <div className="input-range-row">
@@ -827,23 +1028,15 @@ export const AddPackagePage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Paket selain Open Trip berangkat eksklusif per pesanan, jadi
-                    mitra menentukan sendiri tanggal mana yang dibuka. */}
-                {tripType && !isOpenTripType(tripType) && (
+                </>) : (
                   <div className="input-group">
-                    {editingPackageId ? (
-                      <PackageDateManager packageId={Number(editingPackageId)} tripType={tripType} />
-                    ) : (
-                      <div style={{ border: '1px dashed #cbd5e1', borderRadius: '12px', padding: '16px', backgroundColor: '#f8fafc', fontSize: '12.5px', color: '#475569', lineHeight: 1.6 }}>
-                        <strong style={{ color: '#0f172a' }}>Tanggal keberangkatan</strong><br />
-                        Simpan paket ini terlebih dahulu, lalu buka kembali untuk memilih tanggal mana saja yang
-                        dibuka bagi pelanggan (maksimal enam bulan ke depan). Satu tanggal hanya untuk satu pesanan.
-                      </div>
-                    )}
+                    <label>Availability Calendar *</label>
+                    <p style={{fontSize: 13, color: '#64748b'}}>Buka tanggal satu per satu atau beberapa rentang selama tiga bulan ke depan. Customer hanya bisa memesan periode yang seluruh harinya tersedia. Satu periode yang dipesan mengunci provider, berapa pun jumlah pesertanya. Durasi perjalanan {duration || 1} hari; pemesanan minimal H+7 ({addDays(todayStr, 7)}).</p>
+                    <AvailabilityCalendar dates={availabilityDates} min={todayStr} max={latestDate} booked={bookedPackageDates} disabled={isBusy} onChange={(dates) => { setAvailabilityDates(dates); setStartDate(dates[0] || ''); setEndDate(dates[dates.length - 1] || ''); }} />
                   </div>
                 )}
 
-                <div className="input-group">
+                {isOpenTripType(tripType) && <div className="input-group">
                   <label>Keterangan Jadwal Tambahan</label>
                   <input 
                     type="text" 
@@ -851,35 +1044,56 @@ export const AddPackagePage: React.FC = () => {
                     onChange={(e) => setSchedule(e.target.value)}
                     placeholder="Contoh: 2026-08-01 s/d 2026-08-05 (5 Hari)"
                   />
+                </div>}
+
+                <div className="input-group" style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '9px', cursor: 'pointer', width: 'fit-content' }}>
+                    <input
+                      type="checkbox"
+                      checked={useMinimumBooking}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setUseMinimumBooking(checked);
+                        setMinGuests(checked ? suggestedMinimumGuests(tripType) : '1');
+                      }}
+                      style={{ width: '16px', height: '16px', margin: 0 }}
+                    />
+                    Terapkan minimum peserta per booking
+                  </label>
+                  <span style={{ color: '#64748b', fontSize: '12px', marginTop: '5px' }}>
+                    Jika tidak dicentang, pelanggan dapat memesan mulai dari 1 orang.
+                  </span>
                 </div>
 
                 <div className="input-row-2">
-                  <div className="input-group">
-                    <label>Minimum Peserta (per Booking)</label>
-                    <input 
-                      type="number" 
-                      min="1"
-                      value={minGuests} 
-                      onChange={(e) => setMinGuests(e.target.value)}
-                      placeholder="2"
-                    />
-                    {parseInt(minGuests, 10) < 1 && (
-                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                        ⚠️ Minimum peserta per pemesanan minimal 1
-                      </span>
-                    )}
-                  </div>
-                  <div className="input-group">
+                  {useMinimumBooking && (
+                    <div className="input-group">
+                      <label>Minimum Peserta (per Booking)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={minGuests}
+                        onChange={(e) => setMinGuests(e.target.value)}
+                        placeholder="2"
+                      />
+                      {parseInt(minGuests, 10) < 1 && (
+                        <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                          ⚠️ Minimum peserta per pemesanan minimal 1
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="input-group" style={!useMinimumBooking ? { gridColumn: '1 / -1' } : undefined}>
                     <label>Maksimum Peserta (per Booking)</label>
                     <input 
                       type="number" 
-                      min={minGuests || "1"}
+                      min={useMinimumBooking ? (minGuests || "1") : "1"}
                       max={quotaMax || undefined}
                       value={maxGuests} 
                       onChange={(e) => setMaxGuests(e.target.value)}
                       placeholder="12"
                     />
-                    {parseInt(maxGuests, 10) < parseInt(minGuests, 10) ? (
+                    {parseInt(maxGuests, 10) < (useMinimumBooking ? parseInt(minGuests, 10) : 1) ? (
                       <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
                         ⚠️ Maksimum peserta ({maxGuests}) harus &gt;= minimum peserta ({minGuests})
                       </span>
@@ -896,6 +1110,8 @@ export const AddPackagePage: React.FC = () => {
                   <div className="input-range-row">
                     <input 
                       type="number" 
+					  min="0"
+					  step="1"
                       value={minAge} 
                       onChange={(e) => setMinAge(e.target.value)} 
                       placeholder="10"
@@ -903,12 +1119,24 @@ export const AddPackagePage: React.FC = () => {
                     <span>s/d</span>
                     <input 
                       type="number" 
+					  min="0"
+					  step="1"
                       value={maxAge} 
                       onChange={(e) => setMaxAge(e.target.value)} 
                       placeholder="65"
                     />
                     <span className="range-suffix">tahun</span>
                   </div>
+				  {(Number(minAge) < 0 || Number(maxAge) < 0) && (
+					<span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+					  Umur tidak boleh bernilai minus.
+					</span>
+				  )}
+				  {minAge !== '' && maxAge !== '' && Number(minAge) > Number(maxAge) && (
+					<span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+					  Umur maksimal tidak boleh lebih kecil dari umur minimal.
+					</span>
+				  )}
                 </div>
               </div>
             )}
@@ -934,9 +1162,12 @@ export const AddPackagePage: React.FC = () => {
                   <div 
                     className="photos-upload-dropzone"
                     onClick={triggerPhotoUpload}
-                    style={{ borderColor: packagePhotos.length < 3 ? '#fecaca' : undefined }}
+                    aria-busy={isUploadingPhoto}
+                    style={{ borderColor: packagePhotos.length < 3 ? '#fecaca' : undefined, cursor: isBusy ? 'not-allowed' : undefined, opacity: isBusy && !isUploadingPhoto ? 0.6 : undefined }}
                   >
-                    <UploadCloud size={32} color="var(--color-accent)" />
+                    {isUploadingPhoto
+                      ? <LoaderCircle size={32} color="var(--color-accent)" className="btn-spinner" aria-hidden="true" />
+                      : <UploadCloud size={32} color="var(--color-accent)" />}
                     <div>
                       <strong>{isUploadingPhoto ? 'Mengunggah...' : 'Klik untuk Unggah Foto'}</strong>
                       <p>Format JPG, JPEG, PNG. Maksimal 2MB per foto (Batas: {packagePhotos.length}/20 foto).</p>
@@ -954,11 +1185,14 @@ export const AddPackagePage: React.FC = () => {
                   <div className="photos-gallery-grid">
                     {packagePhotos.map((url, idx) => (
                       <div key={idx} className="gallery-photo-card">
-                        <img src={url} alt={`Gallery ${idx + 1}`} onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80'; }} />
+                        <TripImage src={resolveMediaUrl(url)} alt={`Foto paket ${idx + 1}`} placeholderIconSize={20} placeholderShowText={false} />
+                        {idx === 0 && <span className="gallery-cover-badge">Sampul</span>}
                         <button 
                           type="button"
                           className="delete-photo-btn"
                           onClick={() => handleDeletePhoto(idx)}
+                          aria-label={`Hapus foto ${idx + 1}`}
+                          title="Hapus foto"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -1534,12 +1768,30 @@ export const AddPackagePage: React.FC = () => {
           object-fit: cover;
         }
 
+        .gallery-cover-badge {
+          position: absolute;
+          left: 8px;
+          bottom: 8px;
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.75);
+          color: #ffffff;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        @media (max-width: 640px) {
+          .photos-gallery-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
         .delete-photo-btn {
           position: absolute;
           top: 8px;
           right: 8px;
-          width: 24px;
-          height: 24px;
+          width: 32px;
+          height: 32px;
           border-radius: 50%;
           background: rgba(255, 255, 255, 0.9);
           border: 1px solid var(--color-border);

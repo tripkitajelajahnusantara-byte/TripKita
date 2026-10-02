@@ -45,19 +45,21 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 	authCtrl := controllers.NewAuthController(c.AuthService, cfg)
 	adminCtrl := controllers.NewAdminController(c.AdminService)
 	packageCtrl := controllers.NewPackageController(c.PackageService)
-	bookingCtrl := controllers.NewBookingController(c.BookingService, cfg)
+	bookingCtrl := controllers.NewBookingController(c.BookingService, c.IPaymuService, cfg)
 	dashboardCtrl := controllers.NewDashboardController(c.DashService)
-	uploadCtrl := controllers.NewUploadController(db)
+	uploadCtrl := controllers.NewUploadController(db, cfg.DocumentUploadDir())
 	oauthCtrl := controllers.NewOAuthController(db, cfg)
 	payoutCtrl := controllers.NewPayoutController(c.PayoutService, c.ExcelService, c.PDFService, c.ProviderRepo, c.BookingRepo, c.PayoutRepo, cfg)
 	reviewCtrl := controllers.NewReviewController(c.ReviewService)
 	notifCtrl := controllers.NewNotificationController(c.NotifService)
 	departureCtrl := controllers.NewDepartureController(c.DepartureService)
+	tripPlanCtrl := controllers.NewTripPlanController(c.TripPlanService)
+	geocodingCtrl := controllers.NewGeocodingController(c.GeocodingService)
 
-	// Dokumen verifikasi tidak boleh menjadi file publik di production.
-	if !cfg.IsProduction() {
-		r.Static("/uploads", "./uploads")
-	}
+	// Direktori unggahan tidak pernah disajikan utuh di environment mana pun:
+	// hanya foto paket ("pkg_") yang publik. Dokumen verifikasi dan bukti
+	// transfer tetap lewat endpoint /provider|/admin/documents berotorisasi.
+	r.GET("/uploads/:filename", uploadCtrl.ServePackagePhoto)
 
 	// API Group
 	apiV1 := r.Group("/api/v1")
@@ -68,6 +70,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			// Packages public endpoint for mobile customers
 			public.GET("/packages", packageCtrl.GetAllPublic)
 			public.GET("/providers/:id", packageCtrl.GetPublicProviderProfile)
+			public.GET("/checkout-config", bookingCtrl.GetCheckoutConfig)
 
 			// Reviews public read endpoints
 			public.GET("/reviews/package/:packageId", reviewCtrl.GetReviewsByPackage)
@@ -77,14 +80,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			// derived from a valid token and never accepted from the request body.
 			public.POST("/bookings", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.CreateBooking)
 			public.GET("/bookings/status/:code", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.GetPublicStatus)
-			public.POST("/webhooks/ipaymu", middleware.RateLimit(120, time.Minute), bookingCtrl.IPaymuWebhook)
-			public.POST("/webhooks/ipaymu/payout", middleware.RateLimit(120, time.Minute), payoutCtrl.IPaymuPayoutWebhook)
-			public.POST("/webhooks/xendit", middleware.RateLimit(120, time.Minute), bookingCtrl.IPaymuWebhook)
-
-			if cfg.EnableDevMocks {
-				public.GET("/xendit-mock-checkout/:id", bookingCtrl.RenderMockCheckout)
-				public.POST("/xendit-mock-checkout/:id/pay", bookingCtrl.ProcessMockPayment)
-			}
+			public.POST("/bookings/:code/payment-proof", middleware.RateLimit(10, time.Hour), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.SubmitPaymentProof)
 
 			// Auth routes
 			auth := public.Group("/auth")
@@ -124,9 +120,15 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 		provider := apiV1.Group("/provider")
 		provider.Use(middleware.AuthMiddleware(db, cfg), middleware.ProviderRequired())
 		{
+			// Pencarian dilakukan hanya setelah tindakan eksplisit pengguna dan
+			// dibatasi agar tidak berubah menjadi autocomplete geocoder publik.
+			provider.GET("/geocode", middleware.RateLimit(20, time.Minute), geocodingCtrl.Search)
+
 			// Packages
 			packages := provider.Group("/packages")
 			{
+				// Satu paket butuh 3-20 foto, jadi batasnya lebih longgar dari dokumen.
+				packages.POST("/photos", middleware.RateLimit(300, time.Hour), uploadCtrl.UploadPackagePhoto)
 				packages.POST("", packageCtrl.Create)
 				packages.GET("", packageCtrl.GetAll)
 				packages.GET("/:id", packageCtrl.GetByID)
@@ -144,7 +146,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			{
 				bookings.GET("", bookingCtrl.GetAll)
 				bookings.PUT("/:id/status", bookingCtrl.UpdateStatus)
-				bookings.PUT("/:id/reschedule", bookingCtrl.ProviderReschedule)
+				// Perubahan jadwal selalu berupa tawaran yang dijawab pelanggan.
+				bookings.PUT("/:id/reschedule", departureCtrl.OfferBookingReschedule)
 			}
 
 			// Payouts / Keuangan Mitra
@@ -159,8 +162,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			// Ulasan yang diterima mitra
 			provider.GET("/reviews", reviewCtrl.GetProviderReviews)
 
-			// Keputusan atas keberangkatan bermasalah: kuota open trip kurang
-			// pada H-3, maupun pembatalan force majeure oleh mitra.
+			// Keputusan atas keberangkatan: kuota Open Trip, prakiraan cuaca H-3
+			// khusus non-Open-Trip, dan force majeure oleh mitra.
 			provider.GET("/departures", departureCtrl.GetProviderDepartures)
 			provider.GET("/departures/upcoming", departureCtrl.GetUpcomingDepartures)
 			provider.POST("/departures/force-majeure", departureCtrl.DeclareForceMajeure)
@@ -173,17 +176,23 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 		{
 			admin.GET("/providers", adminCtrl.ListProviders)
 			admin.GET("/documents", uploadCtrl.GetAdminDocument)
+			admin.POST("/upload", middleware.RateLimit(20, time.Hour), uploadCtrl.UploadDocument)
 			admin.PUT("/providers/:id/status", adminCtrl.UpdateProviderStatus)
+			admin.PUT("/providers/:id/platform-fee", adminCtrl.UpdateProviderPlatformFee)
 			admin.DELETE("/providers/:id", adminCtrl.DeleteProvider)
 			admin.GET("/providers/:id/history", adminCtrl.GetStatusHistory)
+			admin.POST("/providers/:id/verify-profile", adminCtrl.VerifyProviderProfile)
 			admin.POST("/providers/:id/verify-legal", adminCtrl.VerifyProviderLegal)
 			admin.POST("/providers/:id/verify-document", adminCtrl.VerifyProviderDocument)
 			admin.GET("/refunds", bookingCtrl.GetRefunds)
 			admin.POST("/refunds/:id/complete", bookingCtrl.CompleteRefund)
 			admin.GET("/bookings", bookingCtrl.AdminListBookings)
+			admin.POST("/bookings/:id/payment-review", bookingCtrl.ReviewManualPayment)
+			admin.POST("/bookings/:id/resend-email", middleware.RateLimit(20, time.Hour), bookingCtrl.ResendBookingEmail)
 
 			// Admin Payout management
 			admin.GET("/payouts", payoutCtrl.AdminGetAllPayouts)
+			admin.GET("/revenue", payoutCtrl.AdminGetPlatformRevenue)
 			admin.PUT("/payouts/:id/process", payoutCtrl.AdminProcessPayout)
 			admin.GET("/payouts/:id/pdf-receipt", payoutCtrl.GetPayoutPDFReceipt)
 		}
@@ -199,6 +208,11 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			customer.GET("/notifications", notifCtrl.GetUserNotifications)
 			customer.PUT("/notifications/read-all", notifCtrl.MarkAllAsRead)
 			customer.PUT("/notifications/:id/read", notifCtrl.MarkAsRead)
+
+			customer.GET("/trip-plans", tripPlanCtrl.List)
+			customer.POST("/trip-plans", tripPlanCtrl.Create)
+			customer.PUT("/trip-plans/:id", tripPlanCtrl.Update)
+			customer.DELETE("/trip-plans/:id", tripPlanCtrl.Delete)
 		}
 	}
 

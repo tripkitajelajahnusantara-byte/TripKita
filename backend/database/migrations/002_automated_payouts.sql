@@ -22,6 +22,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_payouts_xendit_payout_id
 
 -- 2. Setiap provider dengan transaksi wajib punya baris buku besar, karena
 --    pencairan kini memotong ProviderBalance dan akan gagal bila barisnya hilang.
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS platform_fee_percent BIGINT DEFAULT 15;
+UPDATE bookings
+SET platform_fee_percent = 15
+WHERE platform_fee_percent IS NULL OR platform_fee_percent < 1 OR platform_fee_percent > 100;
+
 INSERT INTO provider_balances (provider_id, available_balance, held_balance, total_earned, updated_at)
 SELECT DISTINCT b.provider_id, 0, 0, 0, NOW()
 FROM bookings b
@@ -34,18 +39,18 @@ WHERE NOT EXISTS (
 --    Sebelum versi ini, persetujuan pencairan tidak pernah mengurangi
 --    provider_balances, sehingga available_balance kelebihan sebesar total
 --    pencairan yang sudah disetujui. Nilai dihitung ulang dengan rumus yang
---    sama seperti aplikasi: (total_price - biaya layanan 5000) * 85%, dengan
---    50% tersedia langsung dan sisanya dilepas setelah trip selesai.
+--    sama seperti aplikasi: biaya layanan tetap dipisahkan lebih dulu, kemudian
+--    komisi mengikuti snapshot platform_fee_percent masing-masing booking.
 WITH earnings AS (
     SELECT
         b.provider_id,
-        SUM(GREATEST(b.total_price - CASE WHEN b.total_price < 5000 THEN 0 ELSE 5000 END, 0) * 85 / 100) AS provider_net,
+        SUM(GREATEST(b.total_price - CASE WHEN b.total_price < 5000 THEN 0 ELSE 5000 END, 0) * (100 - b.platform_fee_percent) / 100) AS provider_net,
         SUM(
             CASE
                 WHEN b.status = 'COMPLETED' OR b.trip_date < NOW() - INTERVAL '24 hours'
                 THEN 0
-                ELSE GREATEST(b.total_price - CASE WHEN b.total_price < 5000 THEN 0 ELSE 5000 END, 0) * 85 / 100
-                     - (GREATEST(b.total_price - CASE WHEN b.total_price < 5000 THEN 0 ELSE 5000 END, 0) * 85 / 100) / 2
+                ELSE GREATEST(b.total_price - CASE WHEN b.total_price < 5000 THEN 0 ELSE 5000 END, 0) * (100 - b.platform_fee_percent) / 100
+                     - (GREATEST(b.total_price - CASE WHEN b.total_price < 5000 THEN 0 ELSE 5000 END, 0) * (100 - b.platform_fee_percent) / 100) / 2
             END
         ) AS still_held
     FROM bookings b

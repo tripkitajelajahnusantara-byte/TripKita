@@ -15,3 +15,10 @@ type OAuthLoginCode struct {
 	UsedAt     *time.Time
 	CreatedAt  time.Time
 }
+
+// TableName keeps GORM aligned with the versioned SQL migrations. Without an
+// explicit name GORM splits the OAuth acronym into o_auth_login_codes, while
+// the production schema and RLS setup use oauth_login_codes.
+func (OAuthLoginCode) TableName() string {
+	return "oauth_login_codes"
+}

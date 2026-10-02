@@ -21,11 +21,15 @@ import (
 const maxDocumentSize = 5 * 1024 * 1024
 
 type UploadController struct {
-	db *gorm.DB
+	db        *gorm.DB
+	uploadDir string
 }
 
-func NewUploadController(db *gorm.DB) *UploadController {
-	return &UploadController{db: db}
+func NewUploadController(db *gorm.DB, uploadDir string) *UploadController {
+	if strings.TrimSpace(uploadDir) == "" {
+		uploadDir = "uploads"
+	}
+	return &UploadController{db: db, uploadDir: filepath.Clean(uploadDir)}
 }
 
 func (ctrl *UploadController) UploadDocument(c *gin.Context) {
@@ -56,7 +60,7 @@ func (ctrl *UploadController) UploadDocument(c *gin.Context) {
 		return
 	}
 
-	savePath := filepath.Join("uploads", filename)
+	savePath := filepath.Join(ctrl.uploadDir, filename)
 	if err := c.SaveUploadedFile(file, savePath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan dokumen"})
 		return
@@ -146,6 +150,18 @@ func (ctrl *UploadController) serveDocument(c *gin.Context, providerID *uint) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dokumen tidak dapat diperiksa"})
 		return
 	}
+	if count == 0 {
+		// Bukti transfer pencairan yang diunggah admin boleh dilihat mitra
+		// penerima payout tersebut.
+		payoutQuery := ctrl.db.Model(&models.Payout{}).Where("proof_path = ?", documentPath)
+		if providerID != nil {
+			payoutQuery = payoutQuery.Where("provider_id = ?", *providerID)
+		}
+		if err := payoutQuery.Count(&count).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Dokumen tidak dapat diperiksa"})
+			return
+		}
+	}
 	if count == 0 && providerID == nil {
 		if err := ctrl.db.Model(&models.Booking{}).Where("payment_proof = ?", documentPath).Count(&count).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Dokumen tidak dapat diperiksa"})
@@ -157,7 +173,7 @@ func (ctrl *UploadController) serveDocument(c *gin.Context, providerID *uint) {
 		return
 	}
 
-	localPath := filepath.Join("uploads", filename)
+	localPath := filepath.Join(ctrl.uploadDir, filename)
 	if _, err := os.Stat(localPath); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Dokumen tidak ditemukan"})
 		return

@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
+import { TripImage } from '../components/TripImage';
+import { Skeleton, SkeletonCards } from '../components/Skeleton';
 import { ArrowLeft, MapPin, Star, Package, MessageSquare, Award } from 'lucide-react';
+import { filterCustomerVisiblePackages } from '../utils/publicPackages';
 
 interface TripPackage {
   id: number;
@@ -24,6 +27,12 @@ interface TripPackage {
   image?: string;
   images?: string;
   highlights?: string[];
+  includedFacilities?: string;
+  duration?: number;
+  minGuests?: number;
+  meetingPoint?: string;
+  meetingPointLatitude?: number;
+  meetingPointLongitude?: number;
 }
 
 interface PublicProviderProfile {
@@ -73,7 +82,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
           request('/public/packages')
         ]);
         const filtered = Array.isArray(allPkgs)
-          ? allPkgs.filter((p: TripPackage) => p.providerId === selectedProviderId)
+          ? filterCustomerVisiblePackages(allPkgs as TripPackage[]).filter((p: TripPackage) => p.providerId === selectedProviderId)
           : [];
         const reviewResponses = await Promise.all(
           filtered.map((pkg: TripPackage) => request(`/public/reviews/package/${pkg.id}`).catch(() => []))
@@ -115,8 +124,20 @@ export const ProviderPublicProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
-        <p>Memuat profil mitra provider...</p>
+      <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '80px' }}>
+        {/* Kerangka banner, kartu profil provider, lalu grid paket */}
+        <Skeleton height={240} radius={0} />
+        <div className="container" style={{ maxWidth: '1080px', margin: '-60px auto 0 auto', padding: '0 20px', position: 'relative', zIndex: 10 }}>
+          <div aria-hidden="true" style={{ backgroundColor: '#ffffff', borderRadius: '20px', padding: '28px', border: '1px solid #e2e8f0', marginBottom: '30px', display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <Skeleton width={88} height={88} radius={20} />
+            <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <Skeleton width="45%" height={24} />
+              <Skeleton width="30%" />
+              <Skeleton width="80%" />
+            </div>
+          </div>
+          <SkeletonCards count={6} minWidth={240} label="Memuat profil mitra provider" />
+        </div>
       </div>
     );
   }
@@ -129,9 +150,8 @@ export const ProviderPublicProfilePage: React.FC = () => {
     );
   }
 
-  const bannerImage = packages.length > 0
-    ? getTripImage(packages[0].id, packages[0].name, packages[0].category)
-    : getTripImage(providerInfo.id, providerInfo.businessName, providerInfo.businessCategory);
+  // Banner memakai foto asli paket pertama; tanpa foto -> gradien polos (bukan foto stok)
+  const bannerImage = packages.length > 0 ? getTripImage(packages[0]) : '';
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '80px', fontFamily: 'Inter, sans-serif' }}>
@@ -141,7 +161,9 @@ export const ProviderPublicProfilePage: React.FC = () => {
         style={{ 
           position: 'relative', 
           height: '240px', 
-          backgroundImage: `linear-gradient(to bottom, rgba(15,23,42,0.4), rgba(15,23,42,0.8)), url(${bannerImage})`,
+          backgroundImage: bannerImage
+            ? `linear-gradient(to bottom, rgba(15,23,42,0.4), rgba(15,23,42,0.8)), url(${JSON.stringify(bannerImage)})`
+            : 'linear-gradient(135deg, #0c4a6e 0%, #0f172a 100%)',
           backgroundSize: 'cover',
           backgroundPosition: 'center 40%',
           color: '#ffffff'
@@ -338,8 +360,8 @@ export const ProviderPublicProfilePage: React.FC = () => {
                   >
                     {/* Image & Badges */}
                     <div style={{ position: 'relative', height: '150px', overflow: 'hidden' }}>
-                      <img 
-                        src={getTripImage(pkg.id, pkg.name, pkg.category, (pkg as any).images || (pkg as any).image || (pkg as any).imageUrl)} 
+                      <TripImage
+                        src={getTripImage(pkg.id, pkg.name, pkg.category, (pkg as any).images || (pkg as any).image || (pkg as any).imageUrl)}  
                         alt={pkg.name} 
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />

@@ -1,10 +1,11 @@
-import React, { createContext, useCallback, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, startTransition, useCallback, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Route } from '../types';
 import { request, setProviderToken, getProviderToken, removeProviderToken, setCustomerToken, getCustomerToken, removeCustomerToken, revokeSessionToken } from '../utils/api';
 
 
 import { AuthModal } from '../components/AuthModal';
+import { normalizeIndonesianPhone } from '../utils/phone';
 
 export function getRouteFromHash(): Route {
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
@@ -44,6 +45,16 @@ export function getRouteFromHash(): Route {
   if (hash.includes('/rencana-trip')) return 'rencana-trip';
 
   return 'beranda';
+}
+
+// Halaman masuk/daftar tidak pernah menjadi tujuan setelah login; bila
+// tersimpan (mis. saat guard berjalan di tengah logout) pengguna akan tertahan
+// di form login walau sudah masuk.
+const AUTH_HASH_PREFIXES = ['#/provider/login', '#/provider-login', '#/provider/register', '#/admin/login', '#/masuk', '#/customer-register', '#/daftar'];
+export function isReturnableHash(hash: string | null | undefined): hash is string {
+  if (!hash || !hash.startsWith('#/') || hash.startsWith('#//')) return false;
+  if (hash === '#/' || hash === '#') return false;
+  return !AUTH_HASH_PREFIXES.some((prefix) => hash.startsWith(prefix));
 }
 
 export function getHashFromRoute(r: Route): string {
@@ -124,6 +135,7 @@ interface ProviderProfile {
   role: 'ADMIN' | 'PROVIDER' | 'CUSTOMER';
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   verificationNotes?: string;
+  platformFeePercent?: number;
 
   // New fields
   website?: string;
@@ -135,6 +147,20 @@ interface ProviderProfile {
   bankAccount?: string;
   bankAccountName?: string;
   contactLastUpdatedAt?: string;
+
+  pendingBusinessName?: string;
+  pendingBusinessCategory?: string;
+  pendingOperationalProvince?: string;
+  pendingOperationalCity?: string;
+  pendingDescription?: string;
+  pendingPicName?: string;
+  pendingEmail?: string;
+  pendingWhatsapp?: string;
+  pendingInstagram?: string;
+  pendingTiktok?: string;
+  pendingWebsite?: string;
+  profileVerificationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | '';
+  profileRejectionReason?: string;
 
   pendingNpwp?: string;
   pendingBankName?: string;
@@ -197,6 +223,7 @@ interface NavigationContextType {
   bookingFormData: {
     packageId?: number | string;
     tripDate?: string;
+    tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -204,6 +231,7 @@ interface NavigationContextType {
   setBookingFormData: React.Dispatch<React.SetStateAction<{
     packageId?: number | string;
     tripDate?: string;
+    tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -223,14 +251,35 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
   const [customerProfile, setCustomerProfile] = useState<ProviderProfile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
+  // Hanya pemuatan profil pertama yang menahan tampilan; bila ada token, layar
+  // awal langsung memakai kerangka shimmer alih-alih sempat merender halaman
+  // tamu lalu berganti.
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(() => !!(getProviderToken() || getCustomerToken()));
   // Menandai permintaan profil aktif agar respons dari sesi lama tidak dapat
   // menimpa state atau menghapus token sesi yang baru dibuat saat login.
   const profileRequestSequence = useRef(0);
+  // Salinan profil untuk fetchSessionProfile yang sengaja tidak bergantung
+  // pada state profil agar referensinya stabil.
+  const providerProfileRef = useRef<ProviderProfile | null>(null);
+  const customerProfileRef = useRef<ProviderProfile | null>(null);
+  useEffect(() => { providerProfileRef.current = providerProfile; }, [providerProfile]);
+  useEffect(() => { customerProfileRef.current = customerProfile; }, [customerProfile]);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
-  const [selectedPackageForDetail, setSelectedPackageForDetail] = useState<any>(null);
+  const [selectedPackageForDetail, setSelectedPackageForDetailState] = useState<any>(null);
+  // Ref diperbarui sinkron agar navigateTo yang dipanggil tepat setelah setter
+  // dapat menaruh id paket/kode booking di URL (bisa di-refresh & dibagikan).
+  const selectedPackageRef = useRef<any>(null);
+  const setSelectedPackageForDetail = useCallback((pkg: any) => {
+    selectedPackageRef.current = pkg;
+    setSelectedPackageForDetailState(pkg);
+  }, []);
   const [selectedProviderId, setSelectedProviderId] = useState<number | null>(null);
-  const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<any>(null);
+  const [selectedBookingForInvoice, setSelectedBookingForInvoiceState] = useState<any>(null);
+  const selectedBookingRef = useRef<any>(null);
+  const setSelectedBookingForInvoice = useCallback((booking: any) => {
+    selectedBookingRef.current = booking;
+    setSelectedBookingForInvoiceState(booking);
+  }, []);
 
   const [searchParams, setSearchParams] = useState({
     destination: '',
@@ -242,6 +291,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [bookingFormData, setBookingFormDataState] = useState<{
     packageId?: number | string;
     tripDate?: string;
+    tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -257,6 +307,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const setBookingFormData: React.Dispatch<React.SetStateAction<{
     packageId?: number | string;
     tripDate?: string;
+    tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
     peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
@@ -300,8 +351,17 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Sync hash changes with internal route state
   const navigateTo = useCallback((newRoute: Route) => {
-    setRoute(newRoute);
-    const targetHash = getHashFromRoute(newRoute);
+    // Transisi membuat halaman lama tetap tampil sampai chunk halaman baru
+    // siap, sehingga fallback Suspense tidak menutup layar tiap pindah menu.
+    startTransition(() => setRoute(newRoute));
+    let targetHash = getHashFromRoute(newRoute);
+    const packageId = selectedPackageRef.current?.id;
+    const bookingCode = selectedBookingRef.current?.bookingCode;
+    if (newRoute === 'paket-detail' && packageId) {
+      targetHash += `?id=${encodeURIComponent(String(packageId))}`;
+    } else if (newRoute === 'halaman-pembayaran' && bookingCode) {
+      targetHash += `?code=${encodeURIComponent(String(bookingCode))}`;
+    }
     if (window.location.hash !== targetHash) {
       window.location.hash = targetHash;
     }
@@ -311,7 +371,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   useEffect(() => {
     const handleHashChange = () => {
       const targetRoute = getRouteFromHash();
-      setRoute(targetRoute);
+      startTransition(() => setRoute(targetRoute));
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -319,11 +379,17 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
 
   const fetchSessionProfile = useCallback(async (targetRoute: Route) => {
     const requestSequence = ++profileRequestSequence.current;
-    setLoadingProfile(true);
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
     const isProviderRoute = hash.includes('/provider') || hash.includes('/admin') ||
       ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard'].includes(targetRoute);
     let tokenUsed: string | null = null;
+
+    // Profil divalidasi ulang setiap pindah route agar perubahan status dari
+    // admin cepat terbaca. Bila profil area ini sudah ada, validasi berjalan di
+    // latar belakang; layar hanya ditahan saat profil belum pernah dimuat.
+    const knownProfile = isProviderRoute ? providerProfileRef.current : customerProfileRef.current;
+    const areaToken = isProviderRoute ? getProviderToken() : getCustomerToken();
+    setLoadingProfile(!knownProfile && !!areaToken);
 
     const requestIsCurrent = () => {
       if (requestSequence !== profileRequestSequence.current) return false;
@@ -378,6 +444,12 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       // baru. Respons lamanya tidak boleh membatalkan sesi yang lebih baru.
       if (!requestIsCurrent()) return null;
       console.error('Failed to fetch profile:', err);
+      // Gangguan jaringan/server sementara tidak boleh mengeluarkan pengguna;
+      // sesi hanya dihapus bila server menyatakan token tidak berlaku.
+      const sessionRejected = err?.status === 401 || err?.status === 403;
+      if (!sessionRejected) {
+        return isProviderRoute ? providerProfileRef.current : customerProfileRef.current;
+      }
       if (isProviderRoute) {
         setProviderProfile(null);
         if (tokenUsed && getProviderToken() === tokenUsed) removeProviderToken();
@@ -399,7 +471,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     sessionStorage.removeItem('tementrip_auth_return_to');
 
     // Tujuan harus route internal dan harus sesuai area role pengguna.
-    if (returnHash?.startsWith('#/') && !returnHash.startsWith('#//')) {
+    if (isReturnableHash(returnHash)) {
       const isProviderDestination = returnHash.startsWith('#/provider/');
       const isAdminDestination = returnHash.startsWith('#/admin/');
       const providerIsOperational = profile.status === 'APPROVED' && profile.isVerified;
@@ -412,7 +484,8 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
 
       if (roleMayOpenDestination) {
         window.location.hash = returnHash;
-        setRoute(getRouteFromHash());
+        const destination = getRouteFromHash();
+        startTransition(() => setRoute(destination));
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -519,7 +592,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
   const registerCustomer = async (name: string, email: string, password: string, whatsapp: string, options: { redirect?: boolean } = {}) => {
     const res = await request('/public/auth/register-customer', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, whatsapp }),
+      body: JSON.stringify({ name, email, password, whatsapp: normalizeIndonesianPhone(whatsapp) }),
     });
 
     if (res && res.token && (res.customer || res.provider)) {
@@ -606,6 +679,17 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       password: '',
     });
     sessionStorage.removeItem('tementrip_auth_return_to');
+    // Data pribadi pengguna sebelumnya tidak boleh tersisa di perangkat bersama.
+    setBookingFormData(null);
+    setSelectedBookingForInvoice(null);
+    try {
+      sessionStorage.removeItem('tripkita_recent_guest_booking');
+      localStorage.removeItem('tripkita_customer_wishlist');
+      localStorage.removeItem('tripkita_my_bookings');
+      window.dispatchEvent(new CustomEvent('tripkita_wishlist_updated', { detail: [] }));
+    } catch {
+      // Penyimpanan browser dapat diblokir; logout tetap dilanjutkan.
+    }
     setIsLogoutConfirmOpen(false);
     navigateTo(destination);
   };

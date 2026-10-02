@@ -56,6 +56,17 @@ export interface TripPlan {
   updatedAt: string;
 }
 
+export interface BookingParticipant {
+  id?: number;
+  position: number;
+  name: string;
+  phone: string;
+  gender: string;
+  birthDate: string;
+  medicalNotes: string;
+  createdAt?: string;
+}
+
 export interface Booking {
   id: string;
   dbId?: number;
@@ -73,8 +84,21 @@ export interface Booking {
   createdAt?: string;
   paidAt?: string;
   paymentUrl?: string;
+  paymentProof?: string;
+  paymentProofSubmittedAt?: string;
+  paymentReviewDeadline?: string;
+  paymentReviewedAt?: string;
+  paymentReviewNotes?: string;
   rawEndDate?: string;
-  status: 'PENDING_PAYMENT' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED' | 'RESCHEDULE_OFFERED';
+  rawTripDate?: string;
+  packageId?: number;
+  tripType?: string;
+  rescheduleCount?: number;
+  rescheduleDate?: string;
+  rescheduleResponseDeadline?: string;
+  cancellationReason?: string;
+  participants?: BookingParticipant[];
+  status: 'PENDING_PAYMENT' | 'PAYMENT_REVIEW' | 'PAID' | 'CONFIRMED' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'CANCELLED_BY_CUSTOMER' | 'CANCELLED_BY_PROVIDER' | 'REFUND_REQUIRED' | 'REFUNDED' | 'RESCHEDULE_OFFERED';
 }
 
 export interface PopularPackage {

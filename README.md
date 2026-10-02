@@ -73,6 +73,16 @@ Frontend membaca `VITE_API_BASE_URL` saat build. Bila kosong, aplikasi memakai
 `/api/v1` pada host non-localhost, sehingga cocok untuk deployment di belakang
 reverse proxy.
 
+## Foto paket dan dokumen
+
+Foto paket diunggah lewat `POST /api/v1/provider/packages/photos`, disimpan sebagai
+`pkg_<acak>.jpg|png`, dan disajikan publik di `/uploads/<nama>`. Selain berkas `pkg_`,
+isi direktori unggahan tidak pernah disajikan publik: dokumen verifikasi mitra dan
+bukti transfer (`doc_`) hanya dapat dibuka lewat `/provider/documents` atau
+`/admin/documents`. Saat startup, foto paket lama yang masih tersimpan sebagai `doc_`
+disalin menjadi `pkg_` (kecuali berkas yang juga tercatat sebagai dokumen privat) dan
+URL absolut ber-host di database ditulis ulang menjadi path relatif.
+
 ## Alur uang
 
 Pelanggan membayar **penuh di muka** melalui satu invoice Xendit; tidak ada uang muka parsial.
@@ -124,12 +134,25 @@ diperlakukan sebagai penolakan agar dana pelanggan tidak menggantung.
 Pemeriksaan dijalankan oleh job latar belakang, sehingga `ENABLE_BACKGROUND_JOBS`
 wajib bernilai `true` agar aturan ini berjalan.
 
+## Pembayaran customer manual
+
+Checkout customer sementara menggunakan transfer bank tanpa payment gateway. Backend
+membuat Booking ID unik dan langsung menahan kuota selama 24 jam. Customer wajib
+mentransfer sesuai total lalu mengunggah JPG, PNG, atau PDF maksimal 5 MB. Setelah
+unggah, status menjadi `PAYMENT_REVIEW`; admin wajib menyetujui atau menolak bukti
+maksimal 1×24 jam. Booking belum tampil ke provider sebelum admin menyetujuinya.
+
+Rekening tujuan dibaca dari `MANUAL_PAYMENT_BANK_NAME`,
+`MANUAL_PAYMENT_ACCOUNT_NUMBER`, dan `MANUAL_PAYMENT_ACCOUNT_HOLDER`. Ketiganya wajib
+diisi pada production. Jalankan migrasi
+`backend/database/migrations/011_manual_customer_payments.sql` saat rollout production.
+
 ### Pembatalan karena keadaan kahar (force majeure)
 
 Berbeda dengan aturan kuota yang hanya berlaku untuk Open Trip dan terikat batas
 H-3, mitra dapat menyatakan **keadaan kahar** untuk **seluruh tipe paket**, kapan
 saja sampai hari keberangkatan berakhir — termasuk pada hari-H, yang justru
-paling sering terjadi. Menu tersedia di Partner Hub → **Booking**.
+paling sering terjadi. Form tersedia di Partner Hub → **Booking → Batalkan** pada pesanan yang dipilih, lalu pilih **Keadaan Kahar**. Form tidak ditampilkan pada halaman daftar booking.
 
 Mitra wajib mengisi alasan (minimal 10 karakter) dan satu tanggal pengganti.
 Alasan tersimpan sebagai jejak audit dan ikut dikirim ke pelanggan. Setiap
@@ -149,15 +172,25 @@ itu dipaksakan.
 
 ## Pencairan dana mitra
 
-Pencairan ke mitra berjalan manual secara default (admin mentransfer lalu mencatat bukti) dan
-dapat dialihkan ke Xendit Payouts API lewat `ENABLE_AUTOMATIC_PAYOUT`. Refund selalu manual,
-tetapi wajib dicatat beserta nominal, metode, referensi transfer, dan admin pemrosesnya.
+Pencairan ke mitra berjalan manual: admin mentransfer dana lalu wajib mengunggah bukti sebelum
+menyetujui payout. `ENABLE_AUTOMATIC_PAYOUT` harus tetap `false` karena integrasi pembayaran
+massal belum didukung oleh konfigurasi runtime. Refund juga manual dan wajib dicatat beserta
+nominal, metode, referensi transfer, dan admin pemrosesnya.
+
+DP 50% dapat diajukan mulai **H-3 pukul 00:00 WIB** sebelum tanggal mulai trip,
+setelah pembayaran pelanggan lunas. Tombol **Cairkan DP** selalu terlihat pada
+daftar pencairan per trip, tetapi nonaktif beserta alasannya bila belum memenuhi
+syarat. Pelunasan 50% dan tombol **Selesaikan Perjalanan** baru aktif saat waktu
+`trip_end_date` tercapai. Server memeriksa syarat tanggal saat pengajuan dan saat
+persetujuan admin; perubahan jadwal ikut mengubah waktu pencairan. Kebijakan
+kompensasi pembatalan customer tanpa refund tetap mengikuti aturan sebelumnya.
 
 Langkah menguji pencairan DP dan pelunasan secara lokal, beserta daftar periksanya,
 ada di [`PANDUAN_UJI_PENCAIRAN.md`](PANDUAN_UJI_PENCAIRAN.md).
 
-Untuk menguji pencairan otomatis, pakai [`backend/.env.staging.example`](backend/.env.staging.example)
-dan jalankan [`backend/scripts/test_staging_payout.sh`](backend/scripts/test_staging_payout.sh)
+Contoh konfigurasi staging tersedia di
+[`backend/.env.staging.example`](backend/.env.staging.example). Jangan menyalakan pencairan
+otomatis sebelum integrasi money-out khusus iPaymu tersedia dan telah diuji terpisah.
 terhadap Xendit test mode. Rinciannya ada di [`PRODUCTION_RELEASE.md`](PRODUCTION_RELEASE.md).
 
 ## Endpoint operasional
@@ -177,3 +210,21 @@ ditelusuri ke baris log yang tepat.
 Langkah rilis, nilai environment yang wajib, dan pemeriksaan setelah deploy ada di
 [`PRODUCTION_RELEASE.md`](PRODUCTION_RELEASE.md). Baca dokumen tersebut sebelum
 melakukan deploy pertama.
+
+## Prakiraan cuaca H-3
+
+Prakiraan cuaca H-3 untuk booking selain Open Trip memakai WeatherAPI.com. Isi
+`WEATHER_API_KEY`, gunakan `WEATHER_API_BASE_URL=https://api.weatherapi.com/v1`, dan
+pastikan `ENABLE_BACKGROUND_JOBS=true`. Tanpa API key, backend tetap berjalan tetapi
+job prakiraan dilewati; booking dan payout tidak diubah. Pada production, jalankan juga
+`backend/database/migrations/014_weather_advisories.sql` dan
+`backend/database/migrations/015_provider_balance_debt.sql` sebelum deploy backend baru.
+
+## Pencarian alamat titik kumpul
+
+Form paket mencari alamat melalui proxy backend agar hasil dapat di-cache dan laju
+permintaan dapat dibatasi. Default-nya memakai
+`GEOCODING_API_BASE_URL=https://nominatim.openstreetmap.org`; variabel ini dapat
+diarahkan ke instance Nominatim lain tanpa mengubah aplikasi web. Pencarian hanya
+dikirim setelah provider menekan tombol **Cari Lokasi** atau Enter, bukan sebagai
+autocomplete pada setiap ketikan.

@@ -5,27 +5,41 @@ import (
 )
 
 type Booking struct {
-	ID                 uint      `gorm:"primaryKey" json:"id"`
-	BookingCode        string    `gorm:"size:100;uniqueIndex;not null" json:"bookingCode"` // e.g. TK-2824-1891
-	ProviderID         uint      `gorm:"not null" json:"providerId"`
-	PackageID          uint      `gorm:"not null" json:"packageId"`
-	Package            Package   `gorm:"foreignKey:PackageID" json:"packageDetails,omitempty"`
-	CustomerID         *uint     `gorm:"index" json:"customerId,omitempty"`
-	CustomerName       string    `gorm:"size:255;not null" json:"customerName"`
-	CustomerPhone      string    `gorm:"size:50" json:"customerPhone"`
-	CustomerEmail      string    `gorm:"size:255" json:"customerEmail"`
-	CustomerInitial    string    `gorm:"size:10" json:"customerInitial"`
-	TripDate           time.Time `gorm:"not null" json:"tripDate"`
-	TripEndDate        time.Time `gorm:"not null" json:"tripEndDate"`
-	Guests             int       `gorm:"not null" json:"guests"`
-	TotalPrice         int64     `gorm:"not null" json:"totalPrice"`
-	PaymentMethod      string    `gorm:"size:100" json:"paymentMethod"`
-	Status             string    `gorm:"size:50;default:'PENDING_PAYMENT'" json:"status"` // PENDING_PAYMENT, PAID, CONFIRMED, COMPLETED, EXPIRED, CANCELLED_BY_CUSTOMER, CANCELLED_BY_PROVIDER, REFUND_REQUIRED, REFUNDED
-	XenditInvoiceID    string    `gorm:"size:255" json:"xenditInvoiceId"`
-	PaymentURL         string    `gorm:"size:1024" json:"paymentUrl"`
-	CancellationReason string    `gorm:"size:255" json:"cancellationReason,omitempty"`
-	RefundAmount       int64     `json:"refundAmount"`
-	RescheduleCount    int       `gorm:"default:0" json:"rescheduleCount"`
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	BookingCode     string    `gorm:"size:100;uniqueIndex;not null" json:"bookingCode"` // e.g. TK-2824-1891
+	ProviderID      uint      `gorm:"not null" json:"providerId"`
+	PackageID       uint      `gorm:"not null" json:"packageId"`
+	Package         Package   `gorm:"foreignKey:PackageID" json:"packageDetails,omitempty"`
+	CustomerID      *uint     `gorm:"index" json:"customerId,omitempty"`
+	CustomerName    string    `gorm:"size:255;not null" json:"customerName"`
+	CustomerPhone   string    `gorm:"size:50" json:"customerPhone"`
+	CustomerEmail   string    `gorm:"size:255" json:"customerEmail"`
+	CustomerInitial string    `gorm:"size:10" json:"customerInitial"`
+	TripDate        time.Time `gorm:"not null" json:"tripDate"`
+	TripEndDate     time.Time `gorm:"not null" json:"tripEndDate"`
+	Guests          int       `gorm:"not null" json:"guests"`
+	TotalPrice      int64     `gorm:"not null" json:"totalPrice"`
+	// PlatformFeePercent adalah snapshot tarif provider saat booking dibuat.
+	// Nilai ini tidak ikut berubah saat admin mengganti tarif provider di kemudian hari.
+	PlatformFeePercent      int64      `gorm:"not null;default:15" json:"platformFeePercent"`
+	PaymentMethod           string     `gorm:"size:100" json:"paymentMethod"`
+	Status                  string     `gorm:"size:50;default:'PENDING_PAYMENT';index" json:"status"` // PENDING_PAYMENT, PAYMENT_REVIEW, PAID, CONFIRMED, COMPLETED, FAILED, EXPIRED, CANCELLED_BY_CUSTOMER, CANCELLED_BY_PROVIDER, REFUND_REQUIRED, REFUNDED
+	PaymentProof            string     `gorm:"size:500" json:"paymentProof,omitempty"`
+	PaymentProofSubmittedAt *time.Time `gorm:"index" json:"paymentProofSubmittedAt,omitempty"`
+	PaymentReviewDeadline   *time.Time `gorm:"index" json:"paymentReviewDeadline,omitempty"`
+	PaymentReviewedAt       *time.Time `json:"paymentReviewedAt,omitempty"`
+	PaymentReviewedBy       *uint      `json:"paymentReviewedBy,omitempty"`
+	PaymentReviewNotes      string     `gorm:"size:500" json:"paymentReviewNotes,omitempty"`
+	// XenditInvoiceID dipertahankan sementara agar klien/data lama tetap dapat
+	// dibaca. Integrasi baru menggunakan kedua field iPaymu di bawah ini.
+	XenditInvoiceID     string     `gorm:"size:255" json:"xenditInvoiceId,omitempty"`
+	IPaymuSessionID     string     `gorm:"column:ipaymu_session_id;size:255;index" json:"ipaymuSessionId,omitempty"`
+	IPaymuTransactionID string     `gorm:"column:ipaymu_transaction_id;size:255;index" json:"ipaymuTransactionId,omitempty"`
+	PaidAt              *time.Time `gorm:"column:paid_at" json:"paidAt,omitempty"`
+	PaymentURL          string     `gorm:"size:1024" json:"paymentUrl"`
+	CancellationReason  string     `gorm:"size:255" json:"cancellationReason,omitempty"`
+	RefundAmount        int64      `json:"refundAmount"`
+	RescheduleCount     int        `gorm:"default:0" json:"rescheduleCount"`
 	// TripDepartureID menautkan booking ke peninjauan kuota H-3 yang
 	// menghasilkan tawaran jadwal pengganti, supaya jawaban pelanggan dapat
 	// direkap per keberangkatan.
@@ -35,13 +49,22 @@ type Booking struct {
 	CreatedAt        time.Time  `json:"createdAt"`
 	UpdatedAt        time.Time  `json:"updatedAt"`
 	SelectedAddOnIDs []string   `gorm:"-" json:"-"`
-	ProviderWhatsApp string     `gorm:"->;-:migration" json:"providerWhatsApp,omitempty"`
-	ProviderName     string     `gorm:"->;-:migration" json:"providerName,omitempty"`
+	// Participants hanya dimuat pada endpoint mitra pemilik paket dan
+	// customer pemilik booking; endpoint publik tidak menyertakannya.
+	Participants     []BookingParticipant `gorm:"foreignKey:BookingID;constraint:OnDelete:CASCADE" json:"participants,omitempty"`
+	ProviderWhatsApp string               `gorm:"->;-:migration" json:"providerWhatsApp,omitempty"`
+	ProviderName     string               `gorm:"->;-:migration" json:"providerName,omitempty"`
+	// RescheduleResponseDeadline adalah batas jawaban tawaran jadwal pengganti,
+	// diambil dari trip_departures saat daftar booking dimuat.
+	RescheduleResponseDeadline *time.Time `gorm:"->;-:migration" json:"rescheduleResponseDeadline,omitempty"`
 }
 
 const (
 	StatusPendingPayment      = "PENDING_PAYMENT"
+	StatusPaymentReview       = "PAYMENT_REVIEW"
 	StatusPaid                = "PAID"
+	StatusPaymentFailed       = "FAILED"
+	StatusExpired             = "EXPIRED"
 	StatusConfirmed           = "CONFIRMED"
 	StatusCompleted           = "COMPLETED"
 	StatusCancelledByCustomer = "CANCELLED_BY_CUSTOMER"
@@ -51,8 +74,18 @@ const (
 	StatusRescheduleOffered   = "RESCHEDULE_OFFERED"
 )
 
+const AdminPaymentReviewWindow = 24 * time.Hour
+
+type ReviewManualPaymentRequest struct {
+	Decision string `json:"decision" binding:"required,oneof=APPROVED REJECTED"`
+	Notes    string `json:"notes" binding:"max=500"`
+}
+
+// UpdateBookingStatusRequest mengubah status booking dari menu mitra. Tawaran
+// jadwal pengganti memakai endpoint reschedule tersendiri karena wajib membawa
+// tanggal baru dan menunggu jawaban pelanggan.
 type UpdateBookingStatusRequest struct {
-	Status             string `json:"status" binding:"required,oneof=CONFIRMED COMPLETED CANCELLED_BY_PROVIDER RESCHEDULE_OFFERED"`
-	CancellationReason string `json:"cancellationReason,omitempty"`
-	RescheduleDate     string `json:"rescheduleDate,omitempty"` // YYYY-MM-DD format if offering reschedule
+	Status string `json:"status" binding:"required,oneof=CONFIRMED COMPLETED CANCELLED_BY_PROVIDER"`
+	// CancellationReason wajib untuk CANCELLED_BY_PROVIDER dan dibaca pelanggan.
+	CancellationReason string `json:"cancellationReason,omitempty" binding:"max=200"`
 }

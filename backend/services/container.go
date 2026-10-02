@@ -18,6 +18,7 @@ type Container struct {
 	ReviewRepo      repositories.ReviewRepository
 	DepartureRepo   repositories.DepartureRepository
 	PackageDateRepo repositories.PackageDateRepository
+	TripPlanRepo    repositories.TripPlanRepository
 
 	PDFService       *PDFService
 	EmailService     *EmailService
@@ -27,11 +28,14 @@ type Container struct {
 	AdminService     AdminService
 	PackageService   PackageService
 	IPaymuService    IPaymuService
+	WeatherService   WeatherService
+	GeocodingService GeocodingService
 	BookingService   BookingService
 	DashService      DashboardService
 	PayoutService    PayoutService
 	ReviewService    ReviewService
 	DepartureService DepartureService
+	TripPlanService  TripPlanService
 }
 
 func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
@@ -42,12 +46,15 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 	reviewRepo := repositories.NewReviewRepository(db)
 	departureRepo := repositories.NewDepartureRepository(db)
 	packageDateRepo := repositories.NewPackageDateRepository(db)
+	tripPlanRepo := repositories.NewTripPlanRepository(db)
 
 	pdfService := NewPDFService()
 	emailService := NewEmailService(cfg, pdfService)
 	excelService := NewExcelService()
 	notifService := NewNotificationService(db)
 	ipaymuService := NewIPaymuService(cfg)
+	weatherService := NewWeatherService(cfg)
+	geocodingService := NewGeocodingService(cfg)
 
 	bookingService := NewBookingService(bookingRepo, packageRepo, ipaymuService, emailService, notifService)
 
@@ -59,19 +66,23 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 		ReviewRepo:      reviewRepo,
 		DepartureRepo:   departureRepo,
 		PackageDateRepo: packageDateRepo,
+		TripPlanRepo:    tripPlanRepo,
 
 		PDFService:       pdfService,
 		EmailService:     emailService,
 		ExcelService:     excelService,
 		NotifService:     notifService,
 		IPaymuService:    ipaymuService,
+		WeatherService:   weatherService,
+		GeocodingService: geocodingService,
 		AuthService:      NewAuthService(db, providerRepo, cfg, emailService, notifService),
-		AdminService:     NewAdminService(db, providerRepo, notifService),
+		AdminService:     NewAdminService(db, providerRepo, notifService, emailService),
 		PackageService:   NewPackageService(packageRepo, providerRepo, packageDateRepo),
 		BookingService:   bookingService,
 		DashService:      NewDashboardService(packageRepo, bookingRepo, providerRepo, reviewRepo),
 		PayoutService:    NewPayoutService(payoutRepo, providerRepo, bookingRepo, emailService, notifService, ipaymuService, cfg),
 		ReviewService:    NewReviewService(reviewRepo, bookingRepo, packageRepo),
-		DepartureService: NewDepartureService(db, departureRepo, providerRepo, bookingService, notifService, emailService),
+		DepartureService: NewDepartureService(db, departureRepo, providerRepo, bookingService, notifService, emailService, weatherService),
+		TripPlanService:  NewTripPlanService(tripPlanRepo, providerRepo, notifService, emailService),
 	}
 }

@@ -14,9 +14,11 @@ import {
   AlertTriangle,
   FileCheck,
   Upload,
-  Clock
+  Clock,
+  LoaderCircle
 } from 'lucide-react';
 import { openProtectedDocument, request } from '../utils/api';
+import { useActionLock } from '../utils/useActionLock';
 
 interface DashboardStats {
   totalPackages: number;
@@ -38,32 +40,17 @@ interface ProviderReview {
   createdAt: string;
 }
 
-const SUPPORTED_PAYOUT_BANKS = [
-  'BCA',
-  'Bank Mandiri',
-  'BNI',
-  'BRI',
-  'BTN',
-  'CIMB Niaga',
-  'Bank Permata',
-  'Bank Danamon',
-  'Bank Panin',
-  'Maybank',
-  'OCBC NISP',
-  'Bank Syariah Indonesia',
-  'Bank Mega',
-  'BJB',
-  'Bank Sinarmas',
-  'Bank Bukopin',
-  'Bank Muamalat',
-] as const;
-
 export const ProfileProviderPage: React.FC = () => {
   const { providerProfile, updateProfile } = useNavigation();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [reviews, setReviews] = useState<ProviderReview[]>([]);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  // Simpan profil dan unggah dokumen sama-sama memanggil updateProfile, jadi
+  // keduanya berbagi satu kunci agar tidak saling menimpa data profil.
+  const { pending, isBusy, run } = useActionLock();
+  const isSaving = pending === 'save';
+  const isUploading = pending === 'upload';
   const [activeModalTab, setActiveModalTab] = useState<'bisnis' | 'kontak' | 'legal'>('bisnis');
   const [editFields, setEditFields] = useState({
     businessName: '',
@@ -83,30 +70,21 @@ export const ProfileProviderPage: React.FC = () => {
     bankAccountName: '',
   });
 
-  const lastContactUpdate = providerProfile?.contactLastUpdatedAt ? new Date(providerProfile.contactLastUpdatedAt) : null;
-  const isContactLocked = lastContactUpdate 
-    ? (new Date().getTime() - lastContactUpdate.getTime()) < 7 * 24 * 60 * 60 * 1000 
-    : false;
-
-  const getNextContactUpdateDate = () => {
-    if (!lastContactUpdate) return null;
-    return new Date(lastContactUpdate.getTime() + 7 * 24 * 60 * 60 * 1000);
-  };
-
   const openEditModal = () => {
     if (providerProfile) {
+      const usePendingProfile = providerProfile.profileVerificationStatus === 'PENDING' || providerProfile.profileVerificationStatus === 'REJECTED';
       setEditFields({
-        businessName: providerProfile.businessName,
-        businessCategory: providerProfile.businessCategory,
-        operationalProvince: providerProfile.operationalProvince || '',
-        operationalCity: providerProfile.operationalCity,
-        description: providerProfile.description || '',
-        picName: providerProfile.picName,
-        whatsapp: providerProfile.whatsapp,
-        email: providerProfile.email,
-        website: providerProfile.website || '',
-        instagram: providerProfile.instagram || '',
-        tiktok: providerProfile.tiktok || '',
+        businessName: usePendingProfile ? providerProfile.pendingBusinessName || providerProfile.businessName : providerProfile.businessName,
+        businessCategory: usePendingProfile ? providerProfile.pendingBusinessCategory || providerProfile.businessCategory : providerProfile.businessCategory,
+        operationalProvince: usePendingProfile ? providerProfile.pendingOperationalProvince || providerProfile.operationalProvince : providerProfile.operationalProvince || '',
+        operationalCity: usePendingProfile ? providerProfile.pendingOperationalCity || providerProfile.operationalCity : providerProfile.operationalCity,
+        description: usePendingProfile ? providerProfile.pendingDescription ?? providerProfile.description ?? '' : providerProfile.description || '',
+        picName: usePendingProfile ? providerProfile.pendingPicName || providerProfile.picName : providerProfile.picName,
+        whatsapp: usePendingProfile ? providerProfile.pendingWhatsapp || providerProfile.whatsapp : providerProfile.whatsapp,
+        email: usePendingProfile ? providerProfile.pendingEmail || providerProfile.email : providerProfile.email,
+        website: usePendingProfile ? providerProfile.pendingWebsite ?? providerProfile.website ?? '' : providerProfile.website || '',
+        instagram: usePendingProfile ? providerProfile.pendingInstagram ?? providerProfile.instagram ?? '' : providerProfile.instagram || '',
+        tiktok: usePendingProfile ? providerProfile.pendingTiktok ?? providerProfile.tiktok ?? '' : providerProfile.tiktok || '',
         npwp: providerProfile.pendingNpwp || providerProfile.npwp || '',
         bankName: providerProfile.pendingBankName || providerProfile.bankName || '',
         bankAccount: providerProfile.pendingBankAccount || providerProfile.bankAccount || '',
@@ -119,13 +97,16 @@ export const ProfileProviderPage: React.FC = () => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await updateProfile(editFields);
-      setIsEditModalOpen(false);
-      alert('Profil berhasil diperbarui!');
-    } catch (err: any) {
-      alert(err.message || 'Gagal memperbarui profil');
-    }
+    if (isBusy) return;
+    await run('save', async () => {
+      try {
+        await updateProfile(editFields);
+        setIsEditModalOpen(false);
+        alert('Perubahan berhasil diajukan dan menunggu persetujuan Admin. Data aktif tetap digunakan sampai disetujui.');
+      } catch (err: any) {
+        alert(err.message || 'Gagal memperbarui profil');
+      }
+    });
   };
 
   const providerName = providerProfile?.businessName || 'Mitra TemenTrip';
@@ -158,9 +139,24 @@ export const ProfileProviderPage: React.FC = () => {
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [activeUploadField, setActiveUploadField] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [viewingDocumentField, setViewingDocumentField] = useState<string | null>(null);
+
+  const handleViewDocument = async (fieldName: string, path: string) => {
+    if (!path || viewingDocumentField) return;
+    setViewingDocumentField(fieldName);
+    try {
+      await openProtectedDocument('provider', path);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Dokumen tidak dapat dibuka');
+    } finally {
+      setViewingDocumentField(null);
+    }
+  };
 
   const triggerUpload = (fieldName: string) => {
+    // Jangan membuka pemilih berkas baru selama unggahan lain masih berjalan,
+    // karena activeUploadField akan tertimpa dan dokumen masuk ke kolom yang salah.
+    if (isBusy) return;
     setActiveUploadField(fieldName);
     setTimeout(() => {
       fileInputRef.current?.click();
@@ -171,30 +167,32 @@ export const ProfileProviderPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const input = e.target;
     if (file.size > 5 * 1024 * 1024) {
       alert("Ukuran file melebihi batas maksimum 5MB");
+      // Reset agar memilih berkas yang sama lagi tetap memicu onChange.
+      input.value = '';
       return;
     }
 
     const formData = new FormData();
     formData.append('file', file);
 
-    setIsUploading(true);
-    try {
-      const res = await request('/provider/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (res && res.documentPath) {
-        await updateProfile({ [fieldName]: res.documentPath });
-        alert("Dokumen berhasil diunggah!");
+    await run('upload', async () => {
+      try {
+        const res = await request('/provider/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (res && res.documentPath) {
+          await updateProfile({ [fieldName]: res.documentPath });
+          alert("Dokumen berhasil diunggah!");
+        }
+      } catch (err: any) {
+        alert(err.message || "Gagal mengunggah dokumen");
       }
-    } catch (err: any) {
-      alert(err.message || "Gagal mengunggah dokumen");
-    } finally {
-      setIsUploading(false);
-      if (e.target) e.target.value = '';
-    }
+    });
+    input.value = '';
   };
 
   const formatDate = (date: Date) => {
@@ -212,14 +210,57 @@ export const ProfileProviderPage: React.FC = () => {
     const isApproved = status === 'APPROVED' || (!pendingPath && activePath && providerProfile?.status === 'APPROVED');
     const isPending = !!pendingPath || status === 'PENDING';
     const isRejected = status === 'REJECTED';
+    const isUploadingThis = isUploading && activeUploadField === fieldName;
+    const isViewingThis = viewingDocumentField === fieldName;
+    const isViewingAny = viewingDocumentField !== null;
+    // Tautan "Ganti" dinonaktifkan secara visual selama ada proses lain berjalan.
+    const replaceLinkStyle: React.CSSProperties = {
+      color: 'var(--color-text-medium)',
+      fontWeight: 600,
+      fontSize: '9px',
+      cursor: isBusy ? 'not-allowed' : 'pointer',
+      opacity: isBusy && !isUploadingThis ? 0.5 : 1,
+    };
+    const replaceLinkLabel = isUploadingThis ? 'Mengunggah...' : 'Ganti';
+    const renderViewButton = (path: string | undefined) => (
+      <button
+        type="button"
+        disabled={!path || isViewingAny}
+        onClick={() => path && void handleViewDocument(fieldName, path)}
+        aria-busy={isViewingThis}
+        style={{
+          color: 'var(--color-accent)',
+          fontWeight: 600,
+          fontSize: '9px',
+          border: 0,
+          background: 'transparent',
+          cursor: !path || isViewingAny ? 'wait' : 'pointer',
+          padding: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          opacity: !path || (isViewingAny && !isViewingThis) ? 0.5 : 1,
+        }}
+      >
+        {isViewingThis && <LoaderCircle size={11} className="btn-spinner" aria-hidden="true" />}
+        {isViewingThis ? 'Membuka...' : 'Lihat'}
+      </button>
+    );
 
     if (!activePath && !pendingPath) {
       return (
-        <div className="doc-status-box upload-doc" onClick={() => triggerUpload(fieldName)}>
-          <Upload size={18} color="#94a3b8" />
+        <div
+          className="doc-status-box upload-doc"
+          onClick={() => triggerUpload(fieldName)}
+          aria-busy={isUploadingThis}
+          style={{ cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy && !isUploadingThis ? 0.6 : 1 }}
+        >
+          {isUploadingThis
+            ? <LoaderCircle size={18} color="#94a3b8" className="btn-spinner" aria-hidden="true" />
+            : <Upload size={18} color="#94a3b8" />}
           <div>
             <strong>{label}</strong>
-            <span style={{ color: '#94a3b8' }}>{isUploading && activeUploadField === fieldName ? 'Mengunggah...' : 'Belum Upload'}</span>
+            <span style={{ color: '#94a3b8' }}>{isUploadingThis ? 'Mengunggah...' : 'Belum Upload'}</span>
           </div>
         </div>
       );
@@ -234,8 +275,8 @@ export const ProfileProviderPage: React.FC = () => {
             <span style={{ color: '#10b981' }}>Terverifikasi</span>
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <button type="button" disabled={!activePath} onClick={() => openProtectedDocument('provider', activePath || '').catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
-            <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
+            {renderViewButton(activePath)}
+            <span onClick={() => triggerUpload(fieldName)} aria-disabled={isBusy} style={replaceLinkStyle}>{replaceLinkLabel}</span>
           </div>
         </div>
       );
@@ -253,9 +294,9 @@ export const ProfileProviderPage: React.FC = () => {
             {pendingPath ? 'Review Berkas Baru' : 'Menunggu Verifikasi'}
           </div>
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <button type="button" onClick={() => openProtectedDocument('provider', pendingPath || activePath || '').catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
+            {renderViewButton(pendingPath || activePath)}
             {activePath && (
-              <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
+              <span onClick={() => triggerUpload(fieldName)} aria-disabled={isBusy} style={replaceLinkStyle}>{replaceLinkLabel}</span>
             )}
           </div>
         </div>
@@ -277,9 +318,9 @@ export const ProfileProviderPage: React.FC = () => {
           )}
           <div style={{ marginTop: '6px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
             {activePath && (
-              <button type="button" onClick={() => openProtectedDocument('provider', activePath).catch((err) => alert(err.message))} style={{ color: 'var(--color-accent)', fontWeight: 600, fontSize: '9px', border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }}>Lihat</button>
+              renderViewButton(activePath)
             )}
-            <span onClick={() => triggerUpload(fieldName)} style={{ color: 'var(--color-text-medium)', fontWeight: 600, fontSize: '9px', cursor: 'pointer' }}>Ganti</span>
+            <span onClick={() => triggerUpload(fieldName)} aria-disabled={isBusy} style={replaceLinkStyle}>{replaceLinkLabel}</span>
           </div>
         </div>
       );
@@ -553,10 +594,16 @@ export const ProfileProviderPage: React.FC = () => {
                   <span>{providerProfile?.tiktok || '—'}</span>
                 </div>
               </div>
-              {isContactLocked && lastContactUpdate && (
-                <div className="caution-box-banner" style={{ marginTop: '20px', backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}>
-                  <AlertTriangle size={16} className="caution-icon" color="#3b82f6" />
-                  <p>Kontak & Media Sosial terakhir diperbarui pada <strong>{formatDate(lastContactUpdate)}</strong>. Perubahan berikutnya baru dapat dilakukan pada <strong>{formatDate(getNextContactUpdateDate()!)}</strong>.</p>
+              {providerProfile?.profileVerificationStatus === 'PENDING' && (
+                <div className="caution-box-banner" style={{ marginTop: '20px', backgroundColor: '#fffbeb', borderColor: '#fde68a', color: '#b45309' }}>
+                  <Clock size={16} className="caution-icon" color="#f59e0b" />
+                  <p><strong>Perubahan profil sedang menunggu persetujuan Admin.</strong> Informasi aktif di atas tetap berlaku sampai pengajuan disetujui.</p>
+                </div>
+              )}
+              {providerProfile?.profileVerificationStatus === 'REJECTED' && providerProfile.profileRejectionReason && (
+                <div className="caution-box-banner" style={{ marginTop: '20px', backgroundColor: '#fef2f2', borderColor: '#fecaca', color: '#dc2626' }}>
+                  <AlertTriangle size={16} className="caution-icon" color="#ef4444" />
+                  <p>Perubahan profil ditolak: <strong>“{providerProfile.profileRejectionReason}”</strong>. Anda dapat memperbaiki dan mengajukannya kembali.</p>
                 </div>
               )}
             </div>
@@ -660,7 +707,8 @@ export const ProfileProviderPage: React.FC = () => {
           <div className="modal-content animate-fade-in" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div className="modal-header" style={{ flexShrink: 0, marginBottom: '16px' }}>
               <h2>Edit Profil Provider</h2>
-              <button className="modal-close-btn" style={{ background: 'transparent', border: 0 }} onClick={() => setIsEditModalOpen(false)}>×</button>
+              {/* Modal tetap terbuka selama penyimpanan agar hasilnya tidak hilang. */}
+              <button className="modal-close-btn" style={{ background: 'transparent', border: 0, cursor: isSaving ? 'not-allowed' : 'pointer' }} onClick={() => setIsEditModalOpen(false)} disabled={isSaving}>×</button>
             </div>
             
             {/* Modal Tabs Header */}
@@ -796,12 +844,10 @@ export const ProfileProviderPage: React.FC = () => {
               {/* Tab 2: Kontak & Media Sosial */}
               {activeModalTab === 'kontak' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {isContactLocked && lastContactUpdate && (
-                    <div className="caution-box-banner" style={{ margin: '0 0 8px 0', backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}>
-                      <AlertTriangle size={16} className="caution-icon" color="#3b82f6" />
-                      <p style={{ margin: 0 }}>Kontak & Media Sosial terakhir diperbarui pada <strong>{formatDate(lastContactUpdate)}</strong>. Perubahan berikutnya baru dapat dilakukan pada <strong>{formatDate(getNextContactUpdateDate()!)}</strong>.</p>
-                    </div>
-                  )}
+                  <div className="caution-box-banner" style={{ margin: '0 0 8px 0', backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}>
+                    <Clock size={16} className="caution-icon" color="#3b82f6" />
+                    <p style={{ margin: 0 }}>Perubahan kontak, termasuk email login, akan diajukan ke Admin dan baru berlaku setelah disetujui.</p>
+                  </div>
                   
                   <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div className="input-group">
@@ -811,8 +857,6 @@ export const ProfileProviderPage: React.FC = () => {
                         value={editFields.picName} 
                         onChange={(e) => setEditFields({ ...editFields, picName: e.target.value })}
                         required
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                     <div className="input-group">
@@ -822,8 +866,6 @@ export const ProfileProviderPage: React.FC = () => {
                         value={editFields.whatsapp} 
                         onChange={(e) => setEditFields({ ...editFields, whatsapp: e.target.value })}
                         required
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                   </div>
@@ -836,8 +878,6 @@ export const ProfileProviderPage: React.FC = () => {
                         value={editFields.email} 
                         onChange={(e) => setEditFields({ ...editFields, email: e.target.value })}
                         required
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                     <div className="input-group">
@@ -846,8 +886,6 @@ export const ProfileProviderPage: React.FC = () => {
                         type="text" 
                         value={editFields.website} 
                         onChange={(e) => setEditFields({ ...editFields, website: e.target.value })}
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                   </div>
@@ -859,8 +897,6 @@ export const ProfileProviderPage: React.FC = () => {
                         type="text" 
                         value={editFields.instagram} 
                         onChange={(e) => setEditFields({ ...editFields, instagram: e.target.value })}
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                     <div className="input-group">
@@ -869,8 +905,6 @@ export const ProfileProviderPage: React.FC = () => {
                         type="text" 
                         value={editFields.tiktok} 
                         onChange={(e) => setEditFields({ ...editFields, tiktok: e.target.value })}
-                        disabled={isContactLocked}
-                        style={{ backgroundColor: isContactLocked ? '#f1f5f9' : '#ffffff', cursor: isContactLocked ? 'not-allowed' : 'text' }}
                       />
                     </div>
                   </div>
@@ -890,18 +924,13 @@ export const ProfileProviderPage: React.FC = () => {
                   </div>
                   <div className="input-group">
                     <label>Nama Bank</label>
-                    <select
+                    <input
+                      type="text"
                       value={editFields.bankName}
                       onChange={(e) => setEditFields({ ...editFields, bankName: e.target.value })}
-                    >
-                      <option value="">Pilih bank tujuan payout</option>
-                      {editFields.bankName && !SUPPORTED_PAYOUT_BANKS.includes(editFields.bankName as typeof SUPPORTED_PAYOUT_BANKS[number]) && (
-                        <option value={editFields.bankName} disabled>{editFields.bankName} (belum didukung payout otomatis)</option>
-                      )}
-                      {SUPPORTED_PAYOUT_BANKS.map((bank) => (
-                        <option key={bank} value={bank}>{bank}</option>
-                      ))}
-                    </select>
+                      placeholder="Contoh: Bank Central Asia (BCA)"
+                      maxLength={100}
+                    />
                   </div>
                   <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div className="input-group">
@@ -930,8 +959,16 @@ export const ProfileProviderPage: React.FC = () => {
               )}
 
               <div className="modal-footer" style={{ flexShrink: 0, marginTop: '20px' }}>
-                <button type="button" className="cancel-btn" onClick={() => setIsEditModalOpen(false)}>Batal</button>
-                <button type="submit" className="save-btn">Simpan Perubahan</button>
+                <button type="button" className="cancel-btn" onClick={() => setIsEditModalOpen(false)} disabled={isSaving}>Batal</button>
+                <button
+                  type="submit"
+                  className="save-btn"
+                  disabled={isBusy}
+                  aria-busy={isSaving}
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy ? 0.75 : 1 }}
+                >
+                  {isSaving ? (<><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>) : 'Simpan Perubahan'}
+                </button>
               </div>
             </form>
           </div>

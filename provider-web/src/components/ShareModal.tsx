@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Copy, Check, MessageCircle, Share2, Camera } from 'lucide-react';
 import { getTripImage } from '../utils/tripImages';
+import { TripImage } from './TripImage';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -27,7 +28,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
   };
 
   const handleWhatsAppShare = () => {
-    const text = `Halo! Cek paket wisata "${pkg.name}" di TripKita!\n\n📍 Destinasi: ${pkg.destination || 'Indonesia'}\n💰 Harga: Rp ${(pkg.price || 0).toLocaleString('id-ID')} / orang\n\nLihat detail paket selengkapnya di sini:\n${shareUrl}`;
+    const text = `Halo! Cek paket wisata "${pkg.name}" di TemenTrip!\n\n📍 Destinasi: ${pkg.destination || 'Indonesia'}\n💰 Harga: Rp ${(pkg.price || 0).toLocaleString('id-ID')} / orang\n\nLihat detail paket selengkapnya di sini:\n${shareUrl}`;
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
   };
@@ -100,8 +101,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
 
         {/* Package Preview Box */}
         <div style={{ display: 'flex', gap: '14px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '20px', alignItems: 'center' }}>
-          <img 
-            src={pkgImg} 
+          <TripImage
+            src={pkgImg}
+            placeholderIconSize={22}
+            placeholderShowText={false} 
             alt={pkg.name} 
             style={{ width: '70px', height: '70px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} 
           />

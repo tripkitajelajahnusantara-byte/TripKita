@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Lock, Save } from 'lucide-react';
+import { CalendarDays, LoaderCircle, Lock, Save } from 'lucide-react';
 import { request } from '../utils/api';
+import { useActionLock } from '../utils/useActionLock';
 
 interface PackageDate {
   id: number;
@@ -28,7 +29,7 @@ function toISO(year: number, month: number, day: number): string {
 /**
  * Pengaturan tanggal keberangkatan untuk paket selain Open Trip.
  *
- * Mitra menandai tanggal mana saja yang dibuka, paling jauh enam bulan ke depan.
+ * Mitra menandai tanggal mana saja yang dibuka, paling jauh tiga bulan ke depan.
  * Tanggal yang sudah dikunci pesanan pelanggan ditampilkan terkunci dan tidak
  * dapat ditutup dari sini, karena menutupnya akan membuat pesanan yang sudah
  * dibayar menunjuk jadwal yang tidak lagi diakui paketnya.
@@ -40,7 +41,9 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
   const [latest, setLatest] = useState('');
   const [monthOffset, setMonthOffset] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  // Kunci berbasis ref mencegah klik ganda mengirim dua PUT sebelum state
+  // `saving` sempat ter-render ulang.
+  const { isBusy: saving, run } = useActionLock();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -48,7 +51,7 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
     try {
       const data = await request(`/provider/packages/${packageId}/dates`);
       const rows: PackageDate[] = Array.isArray(data?.dates) ? data.dates : [];
-      setSelected(new Set(rows.filter((d) => d.origin === 'PROVIDER' || d.status === 'BOOKED').map((d) => d.date)));
+      setSelected(new Set(rows.filter((d) => d.date >= data.earliestDate && d.date <= data.latestDate && (d.origin === 'PROVIDER' || d.status === 'BOOKED')).map((d) => d.date)));
       setBooked(new Set(rows.filter((d) => d.status === 'BOOKED').map((d) => d.date)));
       setEarliest(data?.earliestDate || '');
       setLatest(data?.latestDate || '');
@@ -66,14 +69,15 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
 
   const months = useMemo(() => {
     const base = new Date();
-    return Array.from({ length: 7 }, (_, i) => {
+    return Array.from({ length: 4 }, (_, i) => {
       const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
       return { year: d.getFullYear(), month: d.getMonth() };
     });
   }, []);
 
   const toggle = (iso: string) => {
-    if (booked.has(iso)) return;
+    // Pilihan dikunci selama penyimpanan agar yang tersimpan sama dengan yang terlihat.
+    if (saving || booked.has(iso)) return;
     setSuccess('');
     setSelected((prev) => {
       const next = new Set(prev);
@@ -84,21 +88,21 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setError('');
-    setSuccess('');
-    try {
-      const result = await request(`/provider/packages/${packageId}/dates`, {
-        method: 'PUT',
-        body: JSON.stringify({ dates: Array.from(selected).sort() }),
-      });
-      setSuccess(result?.message || 'Tanggal keberangkatan tersimpan.');
-      await load();
-    } catch (err) {
-      setError((err as Error)?.message || 'Tanggal keberangkatan gagal disimpan.');
-    } finally {
-      setSaving(false);
-    }
+    if (saving) return;
+    await run('save', async () => {
+      setError('');
+      setSuccess('');
+      try {
+        const result = await request(`/provider/packages/${packageId}/dates`, {
+          method: 'PUT',
+          body: JSON.stringify({ dates: Array.from(selected).sort() }),
+        });
+        setSuccess(result?.message || 'Tanggal keberangkatan tersimpan.');
+        await load();
+      } catch (err) {
+        setError((err as Error)?.message || 'Tanggal keberangkatan gagal disimpan.');
+      }
+    });
   };
 
   if (loading) return null;
@@ -120,7 +124,7 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
             Tanggal Keberangkatan yang Dibuka
           </h4>
           <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#64748b', lineHeight: 1.6 }}>
-            Pilih tanggal yang boleh dipesan pelanggan untuk paket <strong>{tripType}</strong>, paling jauh enam bulan
+            Pilih tanggal yang boleh dipesan pelanggan untuk paket <strong>{tripType}</strong>, paling jauh tiga bulan
             ke depan{latest && ` (sampai ${latest})`}. Satu tanggal hanya untuk satu pesanan — begitu dipilih pelanggan,
             tanggal itu terkunci otomatis.
           </p>
@@ -181,8 +185,8 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
               key={iso}
               type="button"
               onClick={() => toggle(iso)}
-              disabled={!!outOfWindow || isBooked}
-              title={isBooked ? 'Sudah dipesan pelanggan; tidak dapat ditutup' : outOfWindow ? 'Di luar jangkauan enam bulan' : undefined}
+              disabled={!!outOfWindow || isBooked || saving}
+              title={isBooked ? 'Sudah dipesan pelanggan; tidak dapat ditutup' : outOfWindow ? 'Di luar jangkauan tiga bulan' : undefined}
               style={{
                 aspectRatio: '1',
                 border: `1px solid ${isBooked ? '#fca5a5' : isOpen ? '#0284c7' : '#e2e8f0'}`,
@@ -191,8 +195,8 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
                 borderRadius: '8px',
                 fontSize: '12px',
                 fontWeight: isOpen || isBooked ? 700 : 500,
-                cursor: outOfWindow || isBooked ? 'not-allowed' : 'pointer',
-                opacity: outOfWindow ? 0.4 : 1,
+                cursor: outOfWindow || isBooked || saving ? 'not-allowed' : 'pointer',
+                opacity: outOfWindow ? 0.4 : saving ? 0.7 : 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -225,6 +229,7 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
         type="button"
         onClick={handleSave}
         disabled={saving}
+        aria-busy={saving}
         style={{
           backgroundColor: '#0284c7',
           color: '#ffffff',
@@ -233,13 +238,16 @@ export const PackageDateManager: React.FC<Props> = ({ packageId, tripType }) => 
           borderRadius: '10px',
           fontSize: '13px',
           fontWeight: 700,
-          cursor: saving ? 'wait' : 'pointer',
+          cursor: saving ? 'not-allowed' : 'pointer',
+          opacity: saving ? 0.75 : 1,
           display: 'inline-flex',
           alignItems: 'center',
           gap: '8px',
         }}
       >
-        <Save size={15} /> {saving ? 'Menyimpan...' : 'Simpan Tanggal'}
+        {saving
+          ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
+          : <><Save size={15} /> Simpan Tanggal</>}
       </button>
     </div>
   );

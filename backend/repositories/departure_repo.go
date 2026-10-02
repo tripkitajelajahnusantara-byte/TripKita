@@ -11,6 +11,10 @@ import (
 // DepartureCandidate adalah satu kombinasi paket dan tanggal jalan beserta
 // jumlah kursi yang sudah terisi. Kuota dihitung per keberangkatan, bukan per
 // paket, karena satu open trip dapat memiliki banyak tanggal jalan sekaligus.
+//
+// Hari keberangkatan selalu dihitung dalam WIB, sama dengan tanggal yang
+// dilihat mitra. Tanpa AT TIME ZONE, database ber-zona UTC menggeser trip yang
+// berangkat sebelum pukul 07:00 WIB ke tanggal sebelumnya.
 type DepartureCandidate struct {
 	PackageID     uint
 	ProviderID    uint
@@ -19,10 +23,14 @@ type DepartureCandidate struct {
 	SeatsBooked   int
 	SeatsRequired int
 	BookingCount  int
+	Destination   string
+	PackageName   string
+	TripType      string
 }
 
 type DepartureRepository interface {
 	FindUnderfilledDepartures(now time.Time) ([]DepartureCandidate, error)
+	FindNonOpenTripWeatherCandidates(now time.Time) ([]DepartureCandidate, error)
 	FindDeparture(packageID uint, departureDay string) (*models.TripDeparture, error)
 	FindByID(id uint) (*models.TripDeparture, error)
 	ListByProvider(providerID uint, limit int) ([]models.TripDeparture, error)
@@ -30,6 +38,34 @@ type DepartureRepository interface {
 	FindStaleRescheduleOffers(now time.Time) ([]models.Booking, error)
 	FindUpcomingDepartures(providerID uint, from time.Time) ([]DepartureCandidate, error)
 	HasOpenReview(packageID uint, departureDay string) (bool, error)
+}
+
+// FindNonOpenTripWeatherCandidates mengambil booking terbayar selain Open Trip.
+// Service menerapkan batas H-3 dalam zona waktu TripDate dan menyimpan snapshot
+// idempoten berdasarkan pasangan paket dan tanggal keberangkatan.
+func (r *departureRepository) FindNonOpenTripWeatherCandidates(now time.Time) ([]DepartureCandidate, error) {
+	var rows []DepartureCandidate
+	err := r.db.Raw(`
+		SELECT b.package_id AS package_id,
+		       b.provider_id AS provider_id,
+		       to_char(b.trip_date AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') AS departure_day,
+		       MIN(b.trip_date) AS departure_at,
+		       SUM(b.guests) AS seats_booked,
+		       p.quota_min AS seats_required,
+		       COUNT(*) AS booking_count,
+		       p.destination AS destination,
+		       p.name AS package_name,
+		       p.trip_type AS trip_type
+		FROM bookings b
+		JOIN packages p ON p.id = b.package_id AND p.deleted_at IS NULL
+		WHERE lower(replace(p.trip_type, ' ', '')) <> 'opentrip'
+		  AND b.status IN ?
+		  AND b.trip_date > ?
+		GROUP BY b.package_id, b.provider_id, to_char(b.trip_date AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD'),
+		         p.quota_min, p.destination, p.name, p.trip_type
+		ORDER BY MIN(b.trip_date) ASC
+	`, occupyingBookingStatuses, now).Scan(&rows).Error
+	return rows, err
 }
 
 type departureRepository struct {
@@ -50,7 +86,7 @@ func (r *departureRepository) FindUnderfilledDepartures(now time.Time) ([]Depart
 	err := r.db.Raw(`
 		SELECT b.package_id            AS package_id,
 		       b.provider_id           AS provider_id,
-		       to_char(b.trip_date, 'YYYY-MM-DD') AS departure_day,
+		       to_char(b.trip_date AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') AS departure_day,
 		       MIN(b.trip_date)        AS departure_at,
 		       SUM(b.guests)           AS seats_booked,
 		       p.quota_min             AS seats_required,
@@ -60,7 +96,7 @@ func (r *departureRepository) FindUnderfilledDepartures(now time.Time) ([]Depart
 		WHERE lower(replace(p.trip_type, ' ', '')) = 'opentrip'
 		  AND b.status IN ?
 		  AND b.trip_date > ?
-		GROUP BY b.package_id, b.provider_id, to_char(b.trip_date, 'YYYY-MM-DD'), p.quota_min
+		GROUP BY b.package_id, b.provider_id, to_char(b.trip_date AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD'), p.quota_min
 		HAVING SUM(b.guests) < p.quota_min
 		ORDER BY MIN(b.trip_date) ASC
 	`, occupyingBookingStatuses, now).Scan(&rows).Error
@@ -100,7 +136,7 @@ func (r *departureRepository) ListByProvider(providerID uint, limit int) ([]mode
 func (r *departureRepository) FindActiveBookings(packageID uint, departureDay string) ([]models.Booking, error) {
 	var bookings []models.Booking
 	err := r.db.Preload("Package").
-		Where("package_id = ? AND to_char(trip_date, 'YYYY-MM-DD') = ? AND status IN ?",
+		Where("package_id = ? AND to_char(trip_date AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') = ? AND status IN ?",
 			packageID, departureDay, occupyingBookingStatuses).
 		Order("id asc").
 		Find(&bookings).Error
@@ -135,7 +171,7 @@ func (r *departureRepository) FindUpcomingDepartures(providerID uint, from time.
 	err := r.db.Raw(`
 		SELECT b.package_id            AS package_id,
 		       b.provider_id           AS provider_id,
-		       to_char(b.trip_date, 'YYYY-MM-DD') AS departure_day,
+		       to_char(b.trip_date AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') AS departure_day,
 		       MIN(b.trip_date)        AS departure_at,
 		       SUM(b.guests)           AS seats_booked,
 		       p.quota_min             AS seats_required,
@@ -145,7 +181,7 @@ func (r *departureRepository) FindUpcomingDepartures(providerID uint, from time.
 		WHERE b.provider_id = ?
 		  AND b.status IN ?
 		  AND b.trip_date >= ?
-		GROUP BY b.package_id, b.provider_id, to_char(b.trip_date, 'YYYY-MM-DD'), p.quota_min
+		GROUP BY b.package_id, b.provider_id, to_char(b.trip_date AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD'), p.quota_min
 		ORDER BY MIN(b.trip_date) ASC
 		LIMIT 100
 	`, providerID, occupyingBookingStatuses, from).Scan(&rows).Error

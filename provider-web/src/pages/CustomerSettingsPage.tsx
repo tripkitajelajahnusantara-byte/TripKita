@@ -2,15 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { request } from '../utils/api';
+import { useActionLock } from '../utils/useActionLock';
 import { getTripImage } from '../utils/tripImages';
-import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin } from 'lucide-react';
+import { TripImage } from '../components/TripImage';
+import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin, LoaderCircle } from 'lucide-react';
+import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
+import { isValidIndonesianMobilePhone } from '../utils/phone';
+import { filterCustomerVisiblePackages } from '../utils/publicPackages';
 
 export const CustomerSettingsPage: React.FC = () => {
   const { customerProfile, setCustomerProfile, navigateTo, setSelectedPackageForDetail } = useNavigation();
   const { showAlert } = useCustomAlert();
 
   const [activeTab, setActiveTab] = useState<'akun' | 'favorit' | 'review'>('akun');
-  const [submitting, setSubmitting] = useState(false);
+  // Kunci berbasis ref agar klik/enter ganda tidak mengirim dua PUT profil.
+  const { pending, isBusy, run } = useActionLock();
+  const submitting = pending === 'save-profile';
 
   // Profile Form State
   const [namaLengkap, setNamaLengkap] = useState('');
@@ -34,16 +41,32 @@ export const CustomerSettingsPage: React.FC = () => {
   }, [customerProfile]);
 
   useEffect(() => {
-    const loadWishlist = () => {
+    let cancelled = false;
+    const loadWishlist = async () => {
       try {
         const storedWishlist = localStorage.getItem('tripkita_customer_wishlist');
-        if (storedWishlist) {
-          setWishlistItems(JSON.parse(storedWishlist));
-        } else {
+        const storedItems = storedWishlist ? JSON.parse(storedWishlist) : [];
+        if (!Array.isArray(storedItems) || storedItems.length === 0) {
           setWishlistItems([]);
+          return;
         }
+
+        // Favorit berisi snapshot lokal. Cocokkan ID-nya dengan katalog
+        // publik terbaru agar paket kedaluwarsa/provider nonaktif ikut hilang.
+        const publicPackages = await request('/public/packages');
+        const visibleById = new Map(
+          filterCustomerVisiblePackages(Array.isArray(publicPackages) ? publicPackages : [])
+            .map((pkg: any) => [Number(pkg.id), pkg])
+        );
+        const currentItems = storedItems
+          .map((item: any) => visibleById.get(Number(item.id)))
+          .filter(Boolean);
+        if (cancelled) return;
+        setWishlistItems(currentItems);
+        localStorage.setItem('tripkita_customer_wishlist', JSON.stringify(currentItems));
       } catch (e) {
         console.error(e);
+        if (!cancelled) setWishlistItems([]);
       }
     };
 
@@ -63,71 +86,72 @@ export const CustomerSettingsPage: React.FC = () => {
       console.error(e);
     }
 
-    return () => window.removeEventListener('tripkita_wishlist_updated', loadWishlist);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('tripkita_wishlist_updated', loadWishlist);
+    };
   }, []);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isBusy) return;
     if (!namaLengkap.trim()) {
       showAlert({ type: 'error', message: 'Nama Lengkap wajib diisi.' });
       return;
     }
-
-    setSubmitting(true);
-    try {
-      const payload = {
-        picName: namaLengkap,
-        name: namaLengkap,
-        whatsapp: whatsapp,
-        gender: gender,
-        birthDate: birthDate
-      };
-
-      const updated = await request('/provider/profile', {
-        method: 'PUT',
-        body: JSON.stringify(payload)
-      });
-
-      const updatedProfile = {
-        ...(customerProfile || {}),
-        ...updated,
-        picName: namaLengkap,
-        whatsapp: whatsapp,
-        gender: gender,
-        birthDate: birthDate
-      };
-
-      setCustomerProfile(updatedProfile as any);
-      localStorage.setItem('tementrip_customer', JSON.stringify(updatedProfile));
-      localStorage.setItem('tripkita_customer', JSON.stringify(updatedProfile));
-
-      showAlert({
-        type: 'success',
-        title: 'Profil Berhasil Diperbarui',
-        message: 'Data akun Anda telah berhasil disimpan di database.'
-      });
-    } catch (err: any) {
-      console.error(err);
-      // Fallback local update if offline
-      const updatedProfile = {
-        ...(customerProfile || {}),
-        picName: namaLengkap,
-        whatsapp: whatsapp,
-        gender: gender,
-        birthDate: birthDate
-      };
-      setCustomerProfile(updatedProfile as any);
-      localStorage.setItem('tementrip_customer', JSON.stringify(updatedProfile));
-      localStorage.setItem('tripkita_customer', JSON.stringify(updatedProfile));
-
-      showAlert({
-        type: 'success',
-        title: 'Profil Berhasil Disimpan',
-        message: 'Data akun Anda telah tersimpan.'
-      });
-    } finally {
-      setSubmitting(false);
+    if (!isValidIndonesianMobilePhone(whatsapp)) {
+      showAlert({ type: 'error', message: 'Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.' });
+      return;
     }
+
+    await run('save-profile', async () => {
+      try {
+        const payload = {
+          picName: namaLengkap,
+          name: namaLengkap,
+          whatsapp: whatsapp,
+          gender: gender,
+          birthDate: birthDate
+        };
+
+        const updated = await request('/provider/profile', {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+
+        const updatedProfile = {
+          ...(customerProfile || {}),
+          ...updated,
+          picName: namaLengkap,
+          whatsapp: whatsapp,
+          gender: gender,
+          birthDate: birthDate
+        };
+
+        setCustomerProfile(updatedProfile as any);
+        localStorage.setItem('tementrip_customer', JSON.stringify(updatedProfile));
+        localStorage.setItem('tripkita_customer', JSON.stringify(updatedProfile));
+
+        showAlert({
+          type: 'success',
+          title: 'Profil Berhasil Diperbarui',
+          message: 'Data akun Anda telah berhasil disimpan di database.'
+        });
+      } catch (err: any) {
+        console.error(err);
+        // Profil tidak ditulis ke state/localStorage saat server menolak atau
+        // tidak terjangkau; sebelumnya kegagalan ditampilkan sebagai sukses
+        // sehingga data di perangkat berbeda dengan data akun sebenarnya.
+        // Isian form tetap dibiarkan agar pengguna bisa langsung mencoba lagi.
+        showAlert({
+          type: 'error',
+          title: 'Profil Gagal Disimpan',
+          message: err instanceof Error && err.message
+            ? err.message
+            : 'Perubahan profil belum tersimpan. Periksa koneksi Anda lalu coba lagi.'
+        });
+      }
+    });
   };
 
   const handleRemoveWishlist = (id: number | string) => {
@@ -163,7 +187,7 @@ export const CustomerSettingsPage: React.FC = () => {
               </div>
               <div>
                 <strong style={{ display: 'block', fontSize: '14.5px', color: '#0f172a' }}>
-                  {namaLengkap || 'Pelanggan TripKita'}
+                  {namaLengkap || 'Pelanggan TemenTrip'}
                 </strong>
                 <span style={{ fontSize: '12px', color: '#64748b' }}>
                   {email || 'Traveler'}
@@ -309,21 +333,7 @@ export const CustomerSettingsPage: React.FC = () => {
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
                         Nomor HP / WhatsApp
                       </label>
-                      <input
-                        type="text"
-                        value={whatsapp}
-                        onChange={(e) => setWhatsapp(e.target.value)}
-                        placeholder="Contoh: 08123456789"
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          borderRadius: '12px',
-                          border: '1.5px solid #cbd5e1',
-                          fontSize: '14px',
-                          color: '#0f172a',
-                          outline: 'none'
-                        }}
-                      />
+                      <IndonesianPhoneInput value={whatsapp} onChange={setWhatsapp} required />
                     </div>
                   </div>
 
@@ -377,7 +387,8 @@ export const CustomerSettingsPage: React.FC = () => {
                   <div style={{ marginTop: '12px', paddingTop: '20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
                     <button
                       type="submit"
-                      disabled={submitting}
+                      disabled={isBusy}
+                      aria-busy={submitting}
                       style={{
                         padding: '12px 28px',
                         backgroundColor: '#0284c7',
@@ -393,7 +404,9 @@ export const CustomerSettingsPage: React.FC = () => {
                         boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
                       }}
                     >
-                      <Save size={16} /> {submitting ? 'Memproses...' : 'Simpan Perubahan'}
+                      {submitting
+                        ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
+                        : <><Save size={16} /> Simpan Perubahan</>}
                     </button>
                   </div>
                 </form>
@@ -430,13 +443,10 @@ export const CustomerSettingsPage: React.FC = () => {
                     {wishlistItems.map((pkg: any) => (
                       <div key={pkg.id} style={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
                         <div style={{ height: '160px', overflow: 'hidden', position: 'relative' }}>
-                          <img 
-                            src={getTripImage(pkg.id, pkg.name || '', pkg.category || '', pkg.image)} 
-                            alt={pkg.name} 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                            onError={(e) => {
-                              e.currentTarget.src = getTripImage(pkg.id, pkg.name || '', pkg.category || '');
-                            }}
+                          <TripImage
+                            src={getTripImage(pkg.id, pkg.name || '', pkg.category || '', pkg.image)}
+                            alt={pkg.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           />
                           <button
                             onClick={() => handleRemoveWishlist(pkg.id)}
@@ -504,7 +514,7 @@ export const CustomerSettingsPage: React.FC = () => {
                               Ulasan Perjalanan
                             </span>
                             <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: '2px 0 0 0' }}>
-                              {rev.packageName || 'TripKita Package'}
+                              {rev.packageName || 'TemenTrip Package'}
                             </h4>
                           </div>
                           <span style={{ fontSize: '12px', color: '#64748b' }}>

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// BankRouting adalah identitas bank yang dikirim ke Xendit Payouts v3.
+// BankRouting adalah identitas bank untuk integrasi layanan transfer eksternal.
 // Payouts v3 tidak lagi menerima channel_code legacy seperti ID_BCA; rekening
 // bank diidentifikasi menggunakan routing type dan routing value.
 type BankRouting struct {
@@ -17,7 +17,7 @@ type BankRouting struct {
 // bankRoutings sengaja hanya berisi bank yang SWIFT/BIC-nya sudah dipastikan.
 // Nama bank yang belum ada harus ditolak agar uang tidak pernah diarahkan ke
 // routing value hasil tebakan. Tambahkan bank baru setelah dicocokkan dengan
-// Payout Coverage/Dynamic Schema Xendit yang berlaku untuk akun merchant.
+// layanan transfer yang kelak diaktifkan pada akun merchant.
 var bankRoutings = map[string]BankRouting{
 	"bca":                    {Type: "SWIFT", Value: "CENAIDJA"},
 	"bank central asia":      {Type: "SWIFT", Value: "CENAIDJA"},
@@ -73,5 +73,5 @@ func ResolveBankRouting(bankName string) (BankRouting, error) {
 		}
 	}
 
-	return BankRouting{}, fmt.Errorf("nama bank %q belum dipetakan ke routing payout Xendit v3; verifikasi routing bank sebelum memproses pencairan", bankName)
+	return BankRouting{}, fmt.Errorf("nama bank %q belum dipetakan ke routing layanan transfer; verifikasi routing bank sebelum memproses pencairan", bankName)
 }

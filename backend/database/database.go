@@ -69,7 +69,9 @@ func ConnectDB(cfg *config.Config) {
 			&models.User{},
 			&models.AuthSession{},
 			&models.Package{},
+			&models.PackageDate{},
 			&models.Booking{},
+			&models.BookingParticipant{},
 			&models.ProviderStatusHistory{},
 			&models.Payout{},
 			&models.Review{},
@@ -79,15 +81,34 @@ func ConnectDB(cfg *config.Config) {
 			&models.OAuthLoginCode{},
 			&models.RefundRecord{},
 			&models.TripDeparture{},
+			&models.TripPlan{},
 		)
 		if err != nil {
 			log.Fatalf("Migrasi database gagal: %v", err)
 		}
 		fmt.Println("Migrasi database selesai")
+		execMigration(`UPDATE providers SET status = 'DISABLED', deleted_at = updated_at WHERE status = 'REJECTED' AND deleted_at IS NULL AND verification_notes = 'Akun dinonaktifkan oleh administrator';`)
+		execMigration(`UPDATE packages SET status = 'Nonaktif' WHERE provider_id IN (SELECT id FROM providers WHERE deleted_at IS NOT NULL);`)
+
+		// Provider baru memakai tarif default 15%. Booking menyimpan snapshot
+		// tarif agar perubahan admin tidak mengubah laporan transaksi lama.
+		// Nilai kosong pada booking berasal dari versi lama yang masih memakai
+		// komisi hardcoded 15%, sehingga dibackfill dengan tarif legacy tersebut.
+		execMigration(`UPDATE providers SET platform_fee_percent = 15 WHERE platform_fee_percent IS NULL OR platform_fee_percent < 1 OR platform_fee_percent > 100;`)
+		execMigration(`ALTER TABLE providers ALTER COLUMN platform_fee_percent SET DEFAULT 15;`)
+		execMigration(`ALTER TABLE providers ALTER COLUMN platform_fee_percent SET NOT NULL;`)
+		execMigration(`UPDATE bookings SET platform_fee_percent = 15 WHERE platform_fee_percent IS NULL OR platform_fee_percent = 0;`)
+		execMigration(`ALTER TABLE bookings ALTER COLUMN platform_fee_percent SET DEFAULT 15;`)
+		execMigration(`ALTER TABLE bookings ALTER COLUMN platform_fee_percent SET NOT NULL;`)
+		execMigration(`ALTER TABLE providers DROP CONSTRAINT IF EXISTS providers_platform_fee_percent_check;`)
+		execMigration(`ALTER TABLE providers ADD CONSTRAINT providers_platform_fee_percent_check CHECK (platform_fee_percent BETWEEN 1 AND 100);`)
+		execMigration(`ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_platform_fee_percent_check;`)
+		execMigration(`ALTER TABLE bookings ADD CONSTRAINT bookings_platform_fee_percent_check CHECK (platform_fee_percent BETWEEN 1 AND 100);`)
 
 		// Ensure RLS (Row Level Security) is enabled on all tables for Supabase security compliance
 		execMigration(`ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS bookings ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS booking_participants ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS packages ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS providers ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS payouts ENABLE ROW LEVEL SECURITY;`)
@@ -99,6 +120,9 @@ func ConnectDB(cfg *config.Config) {
 		execMigration(`ALTER TABLE IF EXISTS users ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS auth_sessions ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS oauth_login_codes ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS trip_plans ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS trip_departures ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS package_dates ENABLE ROW LEVEL SECURITY;`)
 		if err := syncLegacyAuthUsers(); err != nil {
 			log.Fatalf("Migrasi identitas akun lama gagal: %v", err)
 		}
@@ -114,6 +138,10 @@ func ConnectDB(cfg *config.Config) {
 		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_guests INTEGER DEFAULT 10;`)
 		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS min_age INTEGER DEFAULT 0;`)
 		execMigration(`ALTER TABLE packages ADD COLUMN IF NOT EXISTS max_age INTEGER DEFAULT 100;`)
+		// Kuota minimum adalah aturan keberangkatan bersama khusus Open Trip.
+		// Data lama tipe lain dinolkan agar API, database, dan formulir konsisten.
+		execMigration(`UPDATE packages SET quota_min = 0 WHERE LOWER(REGEXP_REPLACE(TRIM(COALESCE(trip_type, '')), '\s+', '', 'g')) <> 'opentrip';`)
+		execMigration(`ALTER TABLE packages ALTER COLUMN quota_min SET DEFAULT 0;`)
 		execMigration(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT;`)
 		execMigration(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT;`)
 
@@ -615,6 +643,18 @@ func SeedDatabase() {
 	}
 
 	for i := range pkgs {
+		// Fixture lama memakai quota_min sebagai minimum pemesanan untuk semua
+		// tipe. Pertahankan maksud tersebut di min_guests, lalu kosongkan
+		// quota_min pada paket selain Open Trip.
+		if !models.IsOpenTrip(pkgs[i].TripType) {
+			if pkgs[i].MinGuests <= 0 {
+				pkgs[i].MinGuests = pkgs[i].QuotaMin
+				if pkgs[i].MinGuests <= 0 {
+					pkgs[i].MinGuests = 1
+				}
+			}
+			pkgs[i].QuotaMin = 0
+		}
 		var existing models.Package
 		if err := DB.Where("name = ?", pkgs[i].Name).First(&existing).Error; err != nil {
 			if errCreate := DB.Create(&pkgs[i]).Error; errCreate != nil {
@@ -638,7 +678,7 @@ func SeedDatabase() {
 			TripEndDate:     time.Now().AddDate(0, 0, 10+1),
 			Guests:          2,
 			TotalPrice:      700000,
-			PaymentMethod:   "Xendit Invoice",
+			PaymentMethod:   "Transfer Bank Manual",
 			Status:          "CONFIRMED",
 		},
 		{
@@ -651,7 +691,7 @@ func SeedDatabase() {
 			TripEndDate:     time.Now().AddDate(0, 0, 13+1),
 			Guests:          4,
 			TotalPrice:      1800000,
-			PaymentMethod:   "Xendit Invoice",
+			PaymentMethod:   "Transfer Bank Manual",
 			Status:          "CONFIRMED",
 		},
 		{
@@ -682,7 +722,13 @@ func SeedDatabase() {
 		},
 	}
 
+	providerFeeByID := make(map[uint]int64, len(createdProviders))
+	for _, provider := range createdProviders {
+		providerFeeByID[provider.ID] = models.NormalizePlatformFeePercent(provider.PlatformFeePercent)
+	}
+
 	for i := range bookingsList {
+		bookingsList[i].PlatformFeePercent = providerFeeByID[bookingsList[i].ProviderID]
 		if err := DB.Create(&bookingsList[i]).Error; err == nil {
 			b := bookingsList[i]
 			if b.Status == "CONFIRMED" || b.Status == "PAID" || b.Status == "COMPLETED" {
@@ -690,7 +736,7 @@ func SeedDatabase() {
 				// pencairan. Sebelumnya seeder membelah harga kotor menjadi dua
 				// tanpa memotong biaya layanan dan komisi, sehingga buku besar
 				// data contoh selalu dilaporkan selisih oleh job rekonsiliasi.
-				split := models.SplitBookingEarning(b.TotalPrice)
+				split := models.SplitBookingEarning(b.TotalPrice, b.PlatformFeePercent)
 
 				// Create held_settlements record
 				settlement := models.HeldSettlement{
@@ -913,6 +959,15 @@ func EnsureAllTestProvidersAndSeats() {
 	}
 
 	for _, p := range packagesToEnsure {
+		if !models.IsOpenTrip(p.TripType) {
+			if p.MinGuests <= 0 {
+				p.MinGuests = p.QuotaMin
+				if p.MinGuests <= 0 {
+					p.MinGuests = 1
+				}
+			}
+			p.QuotaMin = 0
+		}
 		var existing models.Package
 		if err := DB.Where("name = ?", p.Name).First(&existing).Error; err != nil {
 			DB.Create(&p)
@@ -922,6 +977,7 @@ func EnsureAllTestProvidersAndSeats() {
 				"trip_type":   p.TripType,
 				"quota_min":   p.QuotaMin,
 				"quota_max":   p.QuotaMax,
+				"min_guests":  p.MinGuests,
 				"price":       p.Price,
 				"category":    p.Category,
 				"destination": p.Destination,
@@ -941,7 +997,7 @@ func EnsureAllTestProvidersAndSeats() {
 			SELECT SUM(b.guests)
 			FROM bookings b
 			WHERE b.package_id = p.id
-			AND b.status IN ('PENDING_PAYMENT', 'PAID', 'CONFIRMED', 'COMPLETED')
+			AND b.status IN ('PENDING_PAYMENT', 'PAYMENT_REVIEW', 'PAID', 'CONFIRMED', 'COMPLETED')
 		), 0)
 	`).Error
 

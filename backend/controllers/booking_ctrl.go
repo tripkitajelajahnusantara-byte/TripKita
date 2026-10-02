@@ -3,13 +3,17 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"tripkita-provider/config"
 	"tripkita-provider/models"
@@ -17,12 +21,13 @@ import (
 )
 
 type BookingController struct {
-	service services.BookingService
-	cfg     *config.Config
+	service       services.BookingService
+	ipaymuService services.IPaymuService
+	cfg           *config.Config
 }
 
-func NewBookingController(service services.BookingService, cfg *config.Config) *BookingController {
-	return &BookingController{service: service, cfg: cfg}
+func NewBookingController(service services.BookingService, ipaymuService services.IPaymuService, cfg *config.Config) *BookingController {
+	return &BookingController{service: service, ipaymuService: ipaymuService, cfg: cfg}
 }
 
 func (ctrl *BookingController) GetAll(c *gin.Context) {
@@ -54,7 +59,11 @@ func (ctrl *BookingController) GetCustomerBookings(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, bookings)
+	views := make([]bookingWithDeadline, len(bookings))
+	for i := range bookings {
+		views[i] = withPaymentDeadline(&bookings[i])
+	}
+	c.JSON(http.StatusOK, views)
 }
 
 func (ctrl *BookingController) GetPublicStatus(c *gin.Context) {
@@ -79,18 +88,63 @@ func (ctrl *BookingController) GetPublicStatus(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki akses untuk melihat data pesanan ini"})
 			return
 		}
-		c.JSON(http.StatusOK, booking)
+		if callerRole == "PROVIDER" && (booking.Status == models.StatusPendingPayment || booking.Status == models.StatusPaymentReview) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Booking tidak ditemukan"})
+			return
+		}
+		c.JSON(http.StatusOK, withPaymentDeadline(booking))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"bookingCode":    booking.BookingCode,
-		"status":         booking.Status,
-		"tripDate":       booking.TripDate,
-		"guests":         booking.Guests,
-		"totalPrice":     booking.TotalPrice,
-		"packageDetails": gin.H{"name": booking.Package.Name},
-	})
+	c.JSON(http.StatusOK, guestBookingView(booking))
+}
+
+// bookingWithDeadline menambahkan batas bayar yang dihitung server supaya
+// frontend tidak menebak dari createdAt (batas dapat diperpanjang setelah
+// bukti ditolak admin).
+type bookingWithDeadline struct {
+	*models.Booking
+	PaymentDeadline *time.Time `json:"paymentDeadline,omitempty"`
+}
+
+func withPaymentDeadline(booking *models.Booking) bookingWithDeadline {
+	view := bookingWithDeadline{Booking: booking}
+	if booking.Status == models.StatusPendingPayment && !booking.CreatedAt.IsZero() {
+		deadline := models.PaymentDeadline(booking)
+		view.PaymentDeadline = &deadline
+	}
+	return view
+}
+
+// guestBookingView adalah tampilan booking tamu yang sengaja disamarkan: kode
+// booking tidak boleh cukup untuk membaca email, telepon, atau data peserta.
+func guestBookingView(booking *models.Booking) gin.H {
+	view := gin.H{
+		"bookingCode":             booking.BookingCode,
+		"status":                  booking.Status,
+		"createdAt":               booking.CreatedAt,
+		"tripDate":                booking.TripDate,
+		"guests":                  booking.Guests,
+		"totalPrice":              booking.TotalPrice,
+		"paymentMethod":           booking.PaymentMethod,
+		"paymentProofSubmittedAt": booking.PaymentProofSubmittedAt,
+		"paymentReviewDeadline":   booking.PaymentReviewDeadline,
+		"paymentReviewNotes":      booking.PaymentReviewNotes,
+		"packageDetails":          gin.H{"name": booking.Package.Name},
+	}
+	if booking.Status == models.StatusPendingPayment && !booking.CreatedAt.IsZero() {
+		view["paymentDeadline"] = models.PaymentDeadline(booking)
+	}
+	// Tawaran jadwal pengganti dan sebab pembatalan tidak memuat data pribadi,
+	// jadi pemesan tamu tetap dapat melihat apa yang terjadi pada tripnya.
+	if booking.Status == models.StatusRescheduleOffered {
+		view["rescheduleDate"] = booking.RescheduleDate
+		view["rescheduleResponseDeadline"] = booking.RescheduleResponseDeadline
+	}
+	if booking.CancellationReason != "" {
+		view["cancellationReason"] = booking.CancellationReason
+	}
+	return view
 }
 
 func (ctrl *BookingController) UpdateStatus(c *gin.Context) {
@@ -113,40 +167,24 @@ func (ctrl *BookingController) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	booking, err := ctrl.service.UpdateBookingStatus(uint(id), providerID.(uint), req.Status)
+	var booking *models.Booking
+	if req.Status == models.StatusCancelledByProvider {
+		// Pelanggan berhak tahu mengapa tripnya dibatalkan; alasan tampil di
+		// notifikasi, email, dan riwayat pesanannya.
+		booking, err = ctrl.service.CancelBookingByProvider(uint(id), providerID.(uint), req.CancellationReason)
+	} else {
+		booking, err = ctrl.service.UpdateBookingStatus(uint(id), providerID.(uint), req.Status)
+	}
 	if err != nil {
-		respondInternalError(c, "memperbarui status booking", err)
-		return
-	}
-
-	c.JSON(http.StatusOK, booking)
-}
-
-func (ctrl *BookingController) ProviderReschedule(c *gin.Context) {
-	providerID, exists := c.Get("provider_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
-		return
-	}
-
-	var req struct {
-		NewTripDate string `json:"newTripDate" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Tanggal baru diperlukan"})
-		return
-	}
-
-	booking, err := ctrl.service.ProviderReschedule(uint(id), providerID.(uint), req.NewTripDate)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		var inputErr *services.BookingInputError
+		switch {
+		case errors.As(err, &inputErr):
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Pesanan tidak ditemukan"})
+		default:
+			respondInternalError(c, "memperbarui status booking", err)
+		}
 		return
 	}
 
@@ -163,6 +201,9 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 		Guests          int       `json:"guests" binding:"required,gt=0"`
 		TripDate        time.Time `json:"tripDate" binding:"required"`
 		AddOnIDs        []string  `json:"addOnIds" binding:"max=10,dive,max=50"`
+		// Participants bersifat opsional agar klien lama tetap dapat checkout;
+		// bila dikirim, jumlahnya divalidasi terhadap jumlah tamu di service.
+		Participants []models.BookingParticipantInput `json:"participants" binding:"max=100,dive"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -171,6 +212,12 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 
 	if req.PackageID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "packageId wajib diisi"})
+		return
+	}
+	// Tanpa rekening tujuan customer tidak dapat membayar, sehingga booking
+	// hanya akan menahan kuota selama 24 jam tanpa guna.
+	if strings.TrimSpace(ctrl.cfg.ManualPaymentAccountNumber) == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Pembayaran sedang tidak tersedia. Silakan hubungi admin TemenTrip."})
 		return
 	}
 
@@ -182,8 +229,17 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 		CustomerInitial:  req.CustomerInitial,
 		Guests:           req.Guests,
 		TripDate:         req.TripDate,
-		PaymentMethod:    "Xendit Invoice",
+		PaymentMethod:    "Transfer Bank Manual",
 		SelectedAddOnIDs: req.AddOnIDs,
+	}
+	for _, p := range req.Participants {
+		booking.Participants = append(booking.Participants, models.BookingParticipant{
+			Name:         p.Name,
+			Phone:        p.Phone,
+			Gender:       p.Gender,
+			BirthDate:    p.BirthDate,
+			MedicalNotes: p.MedicalNotes,
+		})
 	}
 	if role, _ := c.Get("role"); role == "CUSTOMER" {
 		if customerID, exists := c.Get("provider_id"); exists {
@@ -213,6 +269,138 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, booking)
+}
+
+// GetCheckoutConfig memberi web dan aplikasi mobile angka checkout yang sama
+// dengan perhitungan backend, agar ringkasan pembayaran tidak menebak sendiri.
+func (ctrl *BookingController) GetCheckoutConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"serviceFee":               models.BookingServiceFee,
+		"paymentWindowSeconds":     int(models.PaymentWindow.Seconds()),
+		"adminReviewWindowSeconds": int(models.AdminPaymentReviewWindow.Seconds()),
+		"manualPayment": gin.H{
+			"bankName":      ctrl.cfg.ManualPaymentBankName,
+			"accountNumber": ctrl.cfg.ManualPaymentAccountNumber,
+			"accountHolder": ctrl.cfg.ManualPaymentAccountHolder,
+		},
+		"cancellationRefundDays": int(models.CancellationFullRefundWindow.Hours() / 24),
+	})
+}
+
+func (ctrl *BookingController) SubmitPaymentProof(c *gin.Context) {
+	booking, err := ctrl.service.GetBookingByCode(c.Param("code"))
+	if err != nil || booking == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Booking tidak ditemukan"})
+		return
+	}
+	if booking.CustomerID != nil && *booking.CustomerID > 0 {
+		callerID, hasID := c.Get("provider_id")
+		callerRole, _ := c.Get("role")
+		if !hasID || callerRole != "CUSTOMER" || callerID.(uint) != *booking.CustomerID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki akses untuk mengirim bukti pembayaran booking ini"})
+			return
+		}
+	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxDocumentSize+1024*1024)
+	if err := c.Request.ParseMultipartForm(maxDocumentSize); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Ukuran bukti transfer melebihi batas 5 MB"})
+		return
+	}
+	file, err := c.FormFile("file")
+	if err != nil || file.Size <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Bukti transfer wajib diunggah"})
+		return
+	}
+	ext, err := validateDocumentContent(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	filename, err := randomDocumentName(ext)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyiapkan penyimpanan bukti transfer"})
+		return
+	}
+	savePath := filepath.Join(ctrl.cfg.DocumentUploadDir(), filename)
+	if err := c.SaveUploadedFile(file, savePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan bukti transfer"})
+		return
+	}
+	if err := os.Chmod(savePath, 0o600); err != nil {
+		_ = os.Remove(savePath)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengamankan bukti transfer"})
+		return
+	}
+
+	updated, err := ctrl.service.SubmitPaymentProof(booking.ID, "/uploads/"+filename)
+	if err != nil {
+		_ = os.Remove(savePath)
+		var inputErr *services.BookingInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+			return
+		}
+		respondInternalError(c, "mengirim bukti pembayaran", err)
+		return
+	}
+	if updated.CustomerID == nil || *updated.CustomerID == 0 {
+		c.JSON(http.StatusOK, guestBookingView(updated))
+		return
+	}
+	c.JSON(http.StatusOK, withPaymentDeadline(updated))
+}
+
+func (ctrl *BookingController) ReviewManualPayment(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID booking tidak valid"})
+		return
+	}
+	adminID, exists := c.Get("provider_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi admin tidak valid"})
+		return
+	}
+	var req models.ReviewManualPaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Keputusan APPROVED atau REJECTED wajib dipilih"})
+		return
+	}
+	booking, err := ctrl.service.ReviewManualPayment(uint(id), adminID.(uint), &req)
+	if err != nil {
+		var inputErr *services.BookingInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+			return
+		}
+		respondInternalError(c, "mengonfirmasi pembayaran manual", err)
+		return
+	}
+	c.JSON(http.StatusOK, booking)
+}
+
+func (ctrl *BookingController) ResendBookingEmail(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID booking tidak valid"})
+		return
+	}
+	if err := ctrl.service.ResendBookingEmail(uint(id)); err != nil {
+		var inputErr *services.BookingInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+			return
+		}
+		var emailErr *services.BookingEmailError
+		if errors.As(err, &emailErr) {
+			c.JSON(http.StatusBadGateway, gin.H{"error": emailErr.Message})
+			return
+		}
+		respondInternalError(c, "mengirim ulang email booking", err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Email status booking berhasil dikirim ulang"})
 }
 
 func (ctrl *BookingController) CustomerCancelBooking(c *gin.Context) {
@@ -252,7 +440,7 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 			Guests:          2,
 			TotalPrice:      1500000,
 			TripDate:        time.Now().AddDate(0, 0, 7),
-			XenditInvoiceID: fmt.Sprintf("xendit_inv_%d", id),
+			XenditInvoiceID: fmt.Sprintf("ipaymu_mock_%d", id),
 			Package:         models.Package{Name: "Paket Wisata TemenTrip"},
 		}
 	}
@@ -260,14 +448,14 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 		booking.Package.Name = "Paket Wisata TemenTrip"
 	}
 
-	// Render a very premium Stripe/Xendit-like HTML checkout page
+	// Render halaman checkout iPaymu tiruan khusus development.
 	htmlContent := fmt.Sprintf(`
 	<!DOCTYPE html>
 	<html lang="id">
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>TemenTrip Invoice - Xendit Payment Simulator</title>
+		<title>TemenTrip Invoice - iPaymu Payment Simulator</title>
 		<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 		<style>
 			:root {
@@ -442,7 +630,7 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 		<div class="checkout-card">
 			<div class="header">
 				<div class="logo">Trip<span>Kita</span></div>
-				<div class="invoice-title">Xendit Payment Simulator</div>
+				<div class="invoice-title">iPaymu Payment Simulator</div>
 			</div>
 			
 			<div class="amount-display">Rp %d</div>
@@ -490,7 +678,7 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 				</div>
 			</div>
 
-			<form id="payment-form" action="/api/v1/public/xendit-mock-checkout/%d/pay" method="POST">
+			<form id="payment-form" action="/api/v1/public/ipaymu-mock-checkout/%d/pay" method="POST">
 				<input type="hidden" name="status" id="payment-status" value="PAID">
 				<input type="hidden" name="payment_method" id="selected-method" value="QRIS">
 				
@@ -505,7 +693,7 @@ func (ctrl *BookingController) RenderMockCheckout(c *gin.Context) {
 			</form>
 
 			<div class="footer">
-				Mock Invoice ID: %s &bull; Powered by Xendit Simulator
+				Mock Invoice ID: %s &bull; Powered by iPaymu Simulator
 			</div>
 		</div>
 
@@ -560,52 +748,74 @@ func (ctrl *BookingController) ProcessMockPayment(c *gin.Context) {
 }
 
 func (ctrl *BookingController) IPaymuWebhook(c *gin.Context) {
-	trxID := c.PostForm("trx_id")
-	referenceID := c.PostForm("reference_id")
-	status := c.PostForm("status")
-	via := c.PostForm("via")
-	statusCodeStr := c.PostForm("status_code")
-	totalStr := c.PostForm("total")
-
-	statusCode, _ := strconv.Atoi(statusCodeStr)
-	total, _ := strconv.ParseInt(totalStr, 10, 64)
-
-	if trxID == "" {
-		var req struct {
-			TrxID       interface{} `json:"trx_id"`
-			ReferenceID string      `json:"reference_id"`
-			StatusCode  interface{} `json:"status_code"`
-			Status      string      `json:"status"`
-			Via         string      `json:"via"`
-			Total       int64       `json:"total"`
-		}
-		if err := c.ShouldBindJSON(&req); err == nil {
-			trxID = fmt.Sprintf("%v", req.TrxID)
-			referenceID = req.ReferenceID
-			status = req.Status
-			via = req.Via
-			total = req.Total
-			switch v := req.StatusCode.(type) {
-			case float64:
-				statusCode = int(v)
-			case string:
-				statusCode, _ = strconv.Atoi(v)
-			}
-		}
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, 1024*1024))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Payload callback tidak dapat dibaca"})
+		return
+	}
+	payload, err := services.ParseIPaymuCallback(body, c.GetHeader("Content-Type"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	signature := c.GetHeader("X-Signature")
+	if ctrl.ipaymuService == nil || !ctrl.ipaymuService.VerifyCallbackSignature(signature, payload) {
+		log.Printf("[iPaymu Webhook] signature tidak valid; external_id=%s", c.GetHeader("X-External-ID"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Signature callback tidak valid"})
+		return
+	}
+	normalized, err := services.NormalizeIPaymuCallback(payload)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	if via == "" {
+	merchant := callbackString(normalized, "merchant")
+	if merchant != "" && merchant != "null" && ctrl.cfg != nil && merchant != ctrl.cfg.IPaymuVA {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Merchant callback tidak sesuai"})
+		return
+	}
+	trxID := callbackString(normalized, "trx_id")
+	referenceID := callbackString(normalized, "reference_id")
+	if referenceID == "" || referenceID == "null" {
+		referenceID = callbackString(normalized, "referenceId")
+	}
+	if trxID == "" || trxID == "null" || referenceID == "" || referenceID == "null" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "trx_id dan reference_id callback wajib diisi"})
+		return
+	}
+
+	status := strings.ToLower(strings.TrimSpace(callbackString(normalized, "status")))
+	statusCode, _ := strconv.Atoi(callbackString(normalized, "status_code"))
+	total, totalErr := strconv.ParseInt(callbackString(normalized, "total"), 10, 64)
+	via := strings.TrimSpace(callbackString(normalized, "via"))
+	channel := strings.TrimSpace(callbackString(normalized, "channel"))
+	if channel != "" && channel != "null" {
+		via = strings.TrimSpace(via + " " + channel)
+	}
+	if via == "" || via == "null" {
 		via = "iPaymu Payment"
+	} else {
+		via = "iPaymu " + via
 	}
 
 	paymentStatus := "PENDING"
-	if statusCode == 1 || strings.ToLower(status) == "berhasil" {
-		paymentStatus = "PAID"
-	} else if statusCode == 6 || strings.ToLower(status) == "batal" || strings.ToLower(status) == "expired" {
-		paymentStatus = "EXPIRED"
+	switch {
+	case statusCode == 1 || status == "berhasil" || status == "success":
+		if totalErr != nil || total <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Nominal callback pembayaran tidak valid"})
+			return
+		}
+		paymentStatus = models.StatusPaid
+	case statusCode == -2 || status == "expired" || status == "kedaluwarsa":
+		paymentStatus = models.StatusExpired
+	case status == "batal" || status == "cancel" || status == "cancelled" || status == "canceled":
+		paymentStatus = models.StatusCancelledByCustomer
+	case status == "gagal" || status == "failed" || status == "declined":
+		paymentStatus = models.StatusPaymentFailed
 	}
 
-	err := ctrl.service.UpdateStatusByWebhook(trxID, referenceID, paymentStatus, via, total, "IDR")
+	err = ctrl.service.UpdateStatusByWebhook(trxID, referenceID, paymentStatus, via, total, "IDR")
 	if err != nil {
 		log.Printf("[iPaymu Webhook Error] %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Webhook belum dapat diproses"})
@@ -613,6 +823,14 @@ func (ctrl *BookingController) IPaymuWebhook(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func callbackString(payload map[string]interface{}, key string) string {
+	value, exists := payload[key]
+	if !exists || value == nil {
+		return ""
+	}
+	return fmt.Sprint(value)
 }
 
 func (ctrl *BookingController) GetRefunds(c *gin.Context) {

@@ -9,11 +9,63 @@ import {
   Eye, 
   Check,
   X,
-  FileSpreadsheet
+  CalendarX2,
+  FileSpreadsheet,
+  LoaderCircle
 } from 'lucide-react';
-import type { Booking } from '../types';
+import type { Booking, BookingParticipant } from '../types';
 import { request } from '../utils/api';
-import { ForceMajeureForm } from '../components/ForceMajeureForm';
+import { SkeletonTableRows } from '../components/Skeleton';
+import { TripChangeModal } from '../components/TripChangeModal';
+import { useCustomAlert } from '../components/CustomAlertModal';
+import { jakartaToday } from '../utils/tripDates';
+import { useActionLock } from '../utils/useActionLock';
+
+// Format tanggal lahir peserta (YYYY-MM-DD) beserta umur saat ini
+const formatParticipantBirth = (birthDate?: string) => {
+  if (!birthDate) return '-';
+  const iso = birthDate.slice(0, 10);
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return birthDate;
+  const birth = new Date(y, m - 1, d);
+  if (isNaN(birth.getTime())) return birthDate;
+  const now = new Date();
+  let age = now.getFullYear() - y;
+  if (now.getMonth() < m - 1 || (now.getMonth() === m - 1 && now.getDate() < d)) age--;
+  const label = birth.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${label} (${Math.max(age, 0)} Tahun)`;
+};
+
+const isSettledPayment = (status: string, paidAt?: string) =>
+  Boolean(paidAt) || ['PAID', 'CONFIRMED', 'COMPLETED', 'REFUND_REQUIRED', 'REFUNDED'].includes(status);
+
+const getBookingStatusMeta = (status: string) => {
+  switch (status) {
+    case 'PENDING_PAYMENT':
+      return { label: 'Menunggu Pembayaran', shortLabel: 'Pending', background: '#fef3c7', color: '#b45309' };
+    case 'PAID':
+    case 'CONFIRMED':
+      return { label: 'Lunas & Aktif', shortLabel: 'Lunas', background: '#dcfce7', color: '#15803d' };
+    case 'COMPLETED':
+      return { label: 'Selesai', shortLabel: 'Selesai', background: '#ecfdf5', color: '#047857' };
+    case 'FAILED':
+      return { label: 'Pembayaran Gagal', shortLabel: 'Gagal', background: '#fee2e2', color: '#dc2626' };
+    case 'EXPIRED':
+      return { label: 'Pembayaran Kadaluwarsa', shortLabel: 'Kadaluwarsa', background: '#fff7ed', color: '#c2410c' };
+    case 'CANCELLED_BY_CUSTOMER':
+      return { label: 'Batal (Customer)', shortLabel: 'Batal', background: '#fee2e2', color: '#dc2626' };
+    case 'CANCELLED_BY_PROVIDER':
+      return { label: 'Batal (Mitra)', shortLabel: 'Batal', background: '#fee2e2', color: '#dc2626' };
+    case 'REFUND_REQUIRED':
+      return { label: 'Butuh Refund', shortLabel: 'Proses Refund', background: '#ffedd5', color: '#c2410c' };
+    case 'REFUNDED':
+      return { label: 'Refund Selesai', shortLabel: 'Refund', background: '#e0f2fe', color: '#0369a1' };
+    case 'RESCHEDULE_OFFERED':
+      return { label: 'Menunggu Jawaban Reschedule', shortLabel: 'Reschedule', background: '#ede9fe', color: '#6d28d9' };
+    default:
+      return { label: 'Status Tidak Dikenal', shortLabel: 'Tidak Dikenal', background: '#f1f5f9', color: '#475569' };
+  }
+};
 
 interface DashboardStats {
   totalPackages: number;
@@ -27,6 +79,7 @@ interface DashboardStats {
 
 export const ManageBookingPage: React.FC = () => {
   const { providerProfile } = useNavigation();
+  const { showAlert } = useCustomAlert();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('Semua');
 
@@ -37,12 +90,12 @@ export const ManageBookingPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // Cancel/Reschedule Modal States
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelBookingId, setCancelBookingId] = useState<number | null>(null);
-  const [cancelActionType, setCancelActionType] = useState<'REFUND' | 'RESCHEDULE' | null>(null);
-  const [newRescheduleDate, setNewRescheduleDate] = useState('');
-  const [cancelLoading, setCancelLoading] = useState(false);
+  // Pesanan yang sedang dibuka di dialog "Ubah atau batalkan trip".
+  const [changeBookingId, setChangeBookingId] = useState<number | null>(null);
+  // Satu kunci untuk semua aksi yang mengubah status booking agar klik ganda
+  // atau dua aksi berbeda tidak terkirim bersamaan.
+  const { pending, isBusy, run } = useActionLock();
+  const changeBooking = bookings.find(b => b.dbId === changeBookingId);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -74,11 +127,21 @@ export const ManageBookingPage: React.FC = () => {
           tripDate: b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
           guests: b.guests || 1,
           totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice || 0),
-          paymentMethod: b.paymentMethod || 'Xendit Invoice',
+          paymentMethod: b.paymentMethod || 'Transfer Bank Manual',
           createdAt: b.createdAt || '',
-          paidAt: b.updatedAt || '',
+          paidAt: b.paidAt || '',
           paymentUrl: b.paymentUrl,
           rawEndDate: b.tripEndDate,
+          rawTripDate: b.tripDate,
+          packageId: b.packageId || b.packageDetails?.id,
+          tripType: b.packageDetails?.tripType || '',
+          rescheduleCount: b.rescheduleCount || 0,
+          rescheduleDate: b.rescheduleDate || '',
+          rescheduleResponseDeadline: b.rescheduleResponseDeadline || '',
+          cancellationReason: b.cancellationReason || '',
+          participants: Array.isArray(b.participants)
+            ? [...b.participants].sort((x: BookingParticipant, y: BookingParticipant) => (x.position || 0) - (y.position || 0))
+            : [],
           status: b.status,
         }));
         setBookings(mapped);
@@ -95,31 +158,25 @@ export const ManageBookingPage: React.FC = () => {
   }, [providerProfile]);
 
   const handleAction = async (type: string, id: string | number) => {
-    if (type === 'approve') {
-      try {
-        await request(`/provider/bookings/${id}/status`, {
-          method: 'PUT',
-          body: JSON.stringify({ status: 'CONFIRMED' }),
-        });
-        loadData();
-      } catch (err: any) {
-        alert(err.message || 'Gagal menyetujui booking');
-      }
-    } else if (type === 'reject') {
-      setCancelBookingId(id as number);
-      setCancelActionType(null);
-      setNewRescheduleDate('');
-      setShowCancelModal(true);
+    if (type === 'change') {
+      if (isBusy) return;
+      setChangeBookingId(id as number);
     } else if (type === 'complete') {
-      try {
-        await request(`/provider/bookings/${id}/status`, {
-          method: 'PUT',
-          body: JSON.stringify({ status: 'COMPLETED' }),
-        });
-        loadData();
-      } catch (err: any) {
-        alert(err.message || 'Gagal menyelesaikan booking');
-      }
+      if (isBusy) return;
+      // Menyelesaikan trip tidak dapat dibatalkan dan melepas dana pelunasan,
+      // sehingga provider wajib mengonfirmasi terlebih dahulu.
+      if (!window.confirm('Tandai perjalanan ini sebagai selesai? Status tidak dapat dikembalikan.')) return;
+      await run(`complete-${id}`, async () => {
+        try {
+          await request(`/provider/bookings/${id}/status`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'COMPLETED' }),
+          });
+          await loadData();
+        } catch (err: any) {
+          alert(err.message || 'Gagal menyelesaikan booking');
+        }
+      });
     } else if (type === 'detail') {
       const found = bookings.find(b => b.id === id);
       if (found) {
@@ -130,35 +187,13 @@ export const ManageBookingPage: React.FC = () => {
     }
   };
 
-  const handleSubmitCancel = async () => {
-    if (!cancelBookingId || !cancelActionType) return;
-    setCancelLoading(true);
-    try {
-      if (cancelActionType === 'REFUND') {
-        await request(`/provider/bookings/${cancelBookingId}/status`, {
-          method: 'PUT',
-          body: JSON.stringify({ status: 'CANCELLED_BY_PROVIDER' }),
-        });
-        alert('Booking berhasil dibatalkan dan direfund 100%.');
-      } else if (cancelActionType === 'RESCHEDULE') {
-        if (!newRescheduleDate) {
-          alert('Silakan pilih tanggal reschedule.');
-          setCancelLoading(false);
-          return;
-        }
-        await request(`/provider/bookings/${cancelBookingId}/reschedule`, {
-          method: 'PUT',
-          body: JSON.stringify({ newTripDate: newRescheduleDate }),
-        });
-        alert('Jadwal booking berhasil diubah (Reschedule).');
-      }
-      setShowCancelModal(false);
-      loadData();
-    } catch (err: any) {
-      alert(err.message || 'Terjadi kesalahan saat memproses permintaan.');
-    } finally {
-      setCancelLoading(false);
-    }
+  // Open Trip berangkat bersama: tawaran jadwal pengganti berlaku untuk semua
+  // pesanan aktif pada paket dan tanggal yang sama.
+  const departureBookingCount = (target: Booking) => {
+    if (!target.packageId || !target.rawTripDate) return 1;
+    const day = jakartaToday(new Date(target.rawTripDate));
+    return bookings.filter(b => b.packageId === target.packageId && b.rawTripDate &&
+      (b.status === 'PAID' || b.status === 'CONFIRMED') && jakartaToday(new Date(b.rawTripDate)) === day).length || 1;
   };
 
   const filteredBookings = bookings.filter((b) => {
@@ -219,9 +254,6 @@ export const ManageBookingPage: React.FC = () => {
           </div>
         </header>
 
-        {/* Pembatalan keberangkatan karena keadaan kahar; seluruh data dari backend. */}
-        <ForceMajeureForm onSubmitted={loadData} />
-
 
         {/* Counters Block */}
         <section className="pkg-stats-row">
@@ -270,7 +302,8 @@ export const ManageBookingPage: React.FC = () => {
             >
               <option value="Semua">Semua Status</option>
               <option value="CONFIRMED">Lunas & Aktif</option>
-              <option value="PENDING_PAYMENT">Menunggu Pembayaran</option>
+              <option value="FAILED">Pembayaran Gagal</option>
+              <option value="EXPIRED">Pembayaran Kadaluwarsa</option>
               <option value="COMPLETED">Selesai</option>
               <option value="CANCELLED_BY_CUSTOMER">Batal (Customer)</option>
               <option value="CANCELLED_BY_PROVIDER">Batal (Mitra)</option>
@@ -297,24 +330,7 @@ export const ManageBookingPage: React.FC = () => {
               </thead>
               <tbody>
                 {isLoading ? (
-                  [1, 2, 3].map((n) => (
-                    <tr key={n} style={{ opacity: 0.6 }}>
-                      <td><span style={{ display: 'inline-block', width: '80px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                      <td>
-                        <div className="customer-cell">
-                          <span className="customer-avatar" style={{ backgroundColor: '#cbd5e1' }}>...</span>
-                          <span style={{ display: 'inline-block', width: '90px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span>
-                        </div>
-                      </td>
-                      <td><span style={{ display: 'inline-block', width: '120px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                      <td><span style={{ display: 'inline-block', width: '70px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                      <td><span style={{ display: 'inline-block', width: '30px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                      <td><span style={{ display: 'inline-block', width: '80px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                      <td><span style={{ display: 'inline-block', width: '60px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                      <td><span style={{ display: 'inline-block', width: '90px', height: '22px', backgroundColor: '#e2e8f0', borderRadius: '12px' }}></span></td>
-                      <td><span style={{ display: 'inline-block', width: '40px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                    </tr>
-                  ))
+                  <SkeletonTableRows rows={5} columns={8} />
                 ) : paginatedBookings.length > 0 ? (
                   paginatedBookings.map((b) => (
                     <tr key={b.id}>
@@ -337,48 +353,56 @@ export const ManageBookingPage: React.FC = () => {
                         </div>
                       </td>
                       <td>
-                        <span className={`status-pill`} style={{
-                          backgroundColor: 
-                            b.status === 'PENDING_PAYMENT' ? '#fef3c7' :
-                            (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#dcfce7' :
-                            b.status === 'COMPLETED' ? '#ecfdf5' :
-                            b.status === 'REFUND_REQUIRED' ? '#fee2e2' : '#f1f5f9',
-                          color:
-                            b.status === 'PENDING_PAYMENT' ? '#d97706' :
-                            (b.status === 'CONFIRMED' || b.status === 'PAID') ? '#15803d' :
-                            b.status === 'COMPLETED' ? '#047857' :
-                            b.status === 'REFUND_REQUIRED' ? '#dc2626' : '#475569',
-                        }}>
-                          {b.status === 'PENDING_PAYMENT' ? 'Menunggu Pembayaran' :
-                           (b.status === 'CONFIRMED' || b.status === 'PAID') ? 'Lunas & Aktif' :
-                           b.status === 'COMPLETED' ? 'Selesai' :
-                           b.status === 'CANCELLED_BY_CUSTOMER' ? 'Batal (Cust)' :
-                           b.status === 'CANCELLED_BY_PROVIDER' ? 'Batal (Mitra)' :
-                           b.status === 'REFUND_REQUIRED' ? 'Butuh Refund' :
-                           b.status === 'REFUNDED' ? 'Refund Selesai' : 'Expired / Dibatalkan'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="actions-cell">
-                          <button className="action-btn" onClick={() => handleAction('detail', b.id)} title="Lihat Detail Booking">
-                            <Eye size={14} />
-                          </button>
-                          {(b.status === 'CONFIRMED' || b.status === 'PAID') && b.dbId && (
+                        {(() => {
+                          const meta = getBookingStatusMeta(b.status);
+                          return (
                             <>
-                              {b.rawEndDate && new Date() >= new Date(b.rawEndDate) ? (
-                                <button className="action-btn text-green" title="Selesaikan Perjalanan" onClick={() => handleAction('complete', b.dbId!)}>
-                                  <Check size={14} />
-                                </button>
-                              ) : (
-                                <button className="action-btn text-gray" title="Perjalanan belum selesai" style={{ cursor: 'not-allowed', opacity: 0.5 }}>
-                                  <Check size={14} />
-                                </button>
+                              <span className="status-pill" style={{ backgroundColor: meta.background, color: meta.color }}>
+                                {meta.label}
+                              </span>
+                              {b.status === 'RESCHEDULE_OFFERED' && b.rescheduleDate && (
+                                <small style={{ display: 'block', marginTop: 6, fontSize: 11.5, lineHeight: 1.45, color: '#6d28d9', maxWidth: 180 }}>
+                                  Ditawarkan {new Date(b.rescheduleDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' })}
+                                  {b.rescheduleResponseDeadline && <> · jawab s/d {new Date(b.rescheduleResponseDeadline).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB</>}
+                                </small>
                               )}
                             </>
-                          )}
-                          {(b.status === 'CONFIRMED' || b.status === 'PAID' || b.status === 'PENDING_PAYMENT') && b.dbId && (
-                            <button className="action-btn text-red" title="Batalkan Pesanan" onClick={() => handleAction('reject', b.dbId!)}>
-                              <X size={14} />
+                          );
+                        })()}
+                      </td>
+                      <td>
+                        <div className="actions-cell" style={{ flexDirection: 'column', alignItems: 'flex-start', minWidth: 165 }}>
+                          <button className="action-btn" style={{ width: 'auto', borderRadius: 8, padding: '6px 10px', gap: 6 }} onClick={() => handleAction('detail', b.id)} title="Lihat Detail Booking">
+                            <Eye size={14} /> Detail
+                          </button>
+                          {(b.status === 'CONFIRMED' || b.status === 'PAID') && b.dbId && (() => {
+                            const end = b.rawEndDate ? new Date(b.rawEndDate) : null;
+                            const canComplete = Boolean(end && Number.isFinite(end.getTime()) && Date.now() >= end.getTime());
+                            const hint = canComplete ? 'Tandai perjalanan selesai.' : end && Number.isFinite(end.getTime())
+                              ? `Tersedia setelah ${end.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })} WIB.`
+                              : 'Jadwal selesai belum tersedia. Hubungi admin.';
+                            return <div style={{ display: 'grid', gap: 4, maxWidth: 190 }}>
+                              <button type="button" className={`action-btn ${canComplete ? 'text-green' : 'text-gray'}`}
+                                title={hint} aria-describedby={`complete-${b.dbId}-hint`}
+                                onClick={() => handleAction('complete', b.dbId!)} disabled={!canComplete || isBusy}
+                                aria-busy={pending === `complete-${b.dbId}`}
+                                style={{ width: 'auto', height: 'auto', borderRadius: 8, padding: '8px 10px', gap: 6, fontSize: 12, cursor: !canComplete || isBusy ? 'not-allowed' : 'pointer', opacity: !canComplete || isBusy ? 0.6 : 1 }}>
+                                {pending === `complete-${b.dbId}` ? <LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> : <Check size={14} />}
+                                Selesaikan Perjalanan
+                              </button>
+                              {!canComplete && <small id={`complete-${b.dbId}-hint`} style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4 }}>{hint}</small>}
+                            </div>;
+                          })()}
+                          {(b.status === 'CONFIRMED' || b.status === 'PAID' || b.status === 'RESCHEDULE_OFFERED') && b.dbId && (
+                            <button
+                              className="action-btn text-red"
+                              title="Jadwalkan ulang atau batalkan trip"
+                              aria-label={`Ubah jadwal atau batalkan pesanan ${b.id}`}
+                              onClick={() => handleAction('change', b.dbId!)}
+                              disabled={isBusy}
+                              style={{ width: 'auto', borderRadius: 8, padding: '6px 10px', gap: 6, cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy ? 0.5 : 1 }}
+                            >
+                              <CalendarX2 size={14} /> Ubah / Batalkan
                             </button>
                           )}
                         </div>
@@ -440,7 +464,11 @@ export const ManageBookingPage: React.FC = () => {
                             selectedBooking.status === 'CANCELLED_BY_PROVIDER' || 
                             selectedBooking.status === 'REFUND_REQUIRED' || 
                             selectedBooking.status === 'REFUNDED';
-        const isPending = selectedBooking.status === 'PENDING_PAYMENT' || selectedBooking.status === 'PAID';
+        const isPending = selectedBooking.status === 'PENDING_PAYMENT';
+        const isFailed = selectedBooking.status === 'FAILED';
+        const isExpired = selectedBooking.status === 'EXPIRED';
+        const paymentSettled = isSettledPayment(selectedBooking.status, selectedBooking.paidAt);
+        const statusMeta = getBookingStatusMeta(selectedBooking.status);
         const isCompleted = selectedBooking.status === 'COMPLETED';
         
         return (
@@ -461,23 +489,8 @@ export const ManageBookingPage: React.FC = () => {
                     <p className="detail-id" style={{ fontFamily: 'sans-serif' }}>Pemesanan oleh {selectedBooking.customerName}</p>
                   </div>
                   <div style={{ marginLeft: 'auto' }}>
-                    <span className={`status-pill`} style={{
-                      backgroundColor: 
-                        selectedBooking.status === 'PENDING_PAYMENT' ? '#fef3c7' :
-                        (selectedBooking.status === 'CONFIRMED' || selectedBooking.status === 'PAID') ? '#dcfce7' :
-                        selectedBooking.status === 'COMPLETED' ? '#ecfdf5' :
-                        (selectedBooking.status === 'CANCELLED_BY_CUSTOMER' || selectedBooking.status === 'CANCELLED_BY_PROVIDER') ? '#fee2e2' : '#f1f5f9',
-                      color:
-                        selectedBooking.status === 'PENDING_PAYMENT' ? '#d97706' :
-                        (selectedBooking.status === 'CONFIRMED' || selectedBooking.status === 'PAID') ? '#15803d' :
-                        selectedBooking.status === 'COMPLETED' ? '#047857' :
-                        (selectedBooking.status === 'CANCELLED_BY_CUSTOMER' || selectedBooking.status === 'CANCELLED_BY_PROVIDER') ? '#dc2626' : '#475569',
-                    }}>
-                      {selectedBooking.status === 'PENDING_PAYMENT' ? 'Pending' :
-                       (selectedBooking.status === 'CONFIRMED' || selectedBooking.status === 'PAID') ? 'Lunas' :
-                       selectedBooking.status === 'COMPLETED' ? 'Selesai' :
-                       (selectedBooking.status === 'CANCELLED_BY_CUSTOMER' || selectedBooking.status === 'CANCELLED_BY_PROVIDER') ? 'Batal' :
-                       (selectedBooking.status === 'REFUND_REQUIRED' || selectedBooking.status === 'REFUNDED') ? 'Refund' : 'Lainnya'}
+                    <span className="status-pill" style={{ backgroundColor: statusMeta.background, color: statusMeta.color }}>
+                      {statusMeta.shortLabel}
                     </span>
                   </div>
                 </div>
@@ -523,14 +536,16 @@ export const ManageBookingPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Status Pembayaran (data sebenarnya dari payment gateway) */}
+                  {/* Status pembayaran yang sudah lolos verifikasi admin */}
                   <div className="detail-item">
                     <span className="detail-label">Status Pembayaran</span>
                     <div className="proof-preview-container" style={{ display: 'block', padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginTop: '4px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#64748b' }}>Dibayar Pelanggan:</span>
-                          <span style={{ fontWeight: 700, color: '#10b981' }}>{selectedBooking.totalPrice}</span>
+                          <span style={{ fontWeight: 700, color: paymentSettled ? '#10b981' : '#64748b' }}>
+                            {paymentSettled ? selectedBooking.totalPrice : 'Rp0'}
+                          </span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#64748b' }}>Kanal:</span>
@@ -538,16 +553,65 @@ export const ManageBookingPage: React.FC = () => {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#64748b' }}>Status:</span>
-                          <span style={{ fontWeight: 700, color: isCancelled ? '#ef4444' : (isPending ? '#f59e0b' : '#10b981') }}>
-                            {isCancelled ? 'BATAL' : (isPending ? 'MENUNGGU PEMBAYARAN' : 'LUNAS')}
+                          <span style={{ fontWeight: 700, color: statusMeta.color }}>
+                            {isFailed ? 'GAGAL' : isExpired ? 'KADALUWARSA' : isPending ? 'MENUNGGU PEMBAYARAN' : paymentSettled ? 'LUNAS' : isCancelled ? 'BATAL' : statusMeta.shortLabel.toUpperCase()}
                           </span>
                         </div>
                       </div>
                       <p style={{ margin: '8px 0 0', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontSize: '9px', color: '#64748b', lineHeight: 1.5 }}>
-                        Pelanggan membayar penuh di muka melalui payment gateway. Dana diteruskan ke Anda
-                        melalui menu Keuangan sesuai jadwal pencairan, bukan melalui transfer langsung.
+                        {paymentSettled
+                          ? 'Pembayaran telah diverifikasi admin TemenTrip. Dana diteruskan melalui menu Keuangan sesuai jadwal pencairan.'
+                          : isFailed
+                            ? 'Pembayaran tidak berhasil diverifikasi. Tidak ada dana pelanggan yang dicatat sebagai lunas.'
+                            : isExpired
+                              ? 'Batas waktu tagihan telah habis dan tidak ada pembayaran yang tercatat.'
+                              : 'Pembayaran belum terverifikasi. Booking baru dapat diproses setelah disetujui admin TemenTrip.'}
                       </p>
                     </div>
+                  </div>
+
+                  {/* Data Peserta Trip */}
+                  <div className="detail-item full-width">
+                    <span className="detail-label" style={{ marginBottom: '8px', display: 'block' }}>
+                      Data Peserta ({selectedBooking.participants?.length || 0}/{selectedBooking.guests} Orang)
+                    </span>
+                    {selectedBooking.participants && selectedBooking.participants.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {selectedBooking.participants.map((p) => {
+                          const medical = (p.medicalNotes || '').trim();
+                          return (
+                            <div key={p.id ?? p.position} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px', backgroundColor: '#f8fafc' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                                  {p.position}. {p.name || '-'}
+                                </span>
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>{p.gender || '-'}</span>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '4px 12px', fontSize: '12px', color: '#475569' }}>
+                                <span>HP: <strong style={{ color: '#1e293b', fontWeight: 600 }}>{p.phone || '-'}</strong></span>
+                                <span>Lahir: <strong style={{ color: '#1e293b', fontWeight: 600 }}>{formatParticipantBirth(p.birthDate)}</strong></span>
+                              </div>
+                              <div style={{
+                                marginTop: '6px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: medical ? '#dc2626' : '#64748b',
+                                backgroundColor: medical ? '#fef2f2' : 'transparent',
+                                border: medical ? '1px solid #fecaca' : 'none',
+                                borderRadius: '6px',
+                                padding: medical ? '4px 8px' : 0
+                              }}>
+                                Riwayat Penyakit & Alergi: {medical || 'Tidak ada'}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+                        Data peserta tidak tersedia (pesanan lama)
+                      </span>
+                    )}
                   </div>
 
                   {/* Booking Timeline */}
@@ -666,76 +730,17 @@ export const ManageBookingPage: React.FC = () => {
         }
       `}</style>
 
-      {/* Cancel Action Modal */}
-      {showCancelModal && (
-        <div className="detail-modal-overlay">
-          <div className="detail-modal-card" style={{ maxWidth: '400px', padding: '24px' }}>
-            <div className="modal-header">
-              <h2>Tindakan Pembatalan</h2>
-              <button className="close-modal" onClick={() => setShowCancelModal(false)}>✕</button>
-            </div>
-            
-            <div style={{ marginBottom: '20px' }}>
-              <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>Pilih jenis pembatalan untuk pesanan ini. Anda dapat mengembalikan dana 100% atau menawarkan perubahan tanggal (reschedule).</p>
-              
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setCancelActionType('REFUND')}
-                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid', borderColor: cancelActionType === 'REFUND' ? '#dc2626' : '#cbd5e1', backgroundColor: cancelActionType === 'REFUND' ? '#fef2f2' : '#ffffff', color: cancelActionType === 'REFUND' ? '#dc2626' : '#475569', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Refund 100%
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setCancelActionType('RESCHEDULE')}
-                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid', borderColor: cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#cbd5e1', backgroundColor: cancelActionType === 'RESCHEDULE' ? '#f0fdfa' : '#ffffff', color: cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#475569', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Reschedule
-                </button>
-              </div>
-
-              {cancelActionType === 'RESCHEDULE' && (
-                <div className="input-group" style={{ marginBottom: '16px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>Pilih Tanggal Baru</label>
-                  <input 
-                    type="date" 
-                    value={newRescheduleDate} 
-                    onChange={(e) => setNewRescheduleDate(e.target.value)} 
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', marginTop: '6px' }}
-                  />
-                  <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>Maksimal penjadwalan ulang hanya diperbolehkan 1 kali.</p>
-                </div>
-              )}
-
-              {cancelActionType === 'REFUND' && (
-                <div style={{ padding: '12px', backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: '8px', marginBottom: '16px' }}>
-                  <p style={{ fontSize: '12px', color: '#c2410c', margin: 0 }}>
-                    <strong>Perhatian:</strong> Memilih refund 100% akan membatalkan booking ini secara permanen. Jika pembayaran sudah cair, saldo Anda akan dipotong sebesar nilai transaksi ini.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button 
-                type="button" 
-                onClick={() => setShowCancelModal(false)}
-                style={{ border: '1px solid var(--color-border)', backgroundColor: '#ffffff', color: '#334155', fontWeight: 600, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
-              >
-                Kembali
-              </button>
-              <button 
-                type="button" 
-                onClick={handleSubmitCancel}
-                disabled={cancelLoading || !cancelActionType}
-                style={{ width: 'auto', padding: '10px 24px', backgroundColor: cancelActionType === 'REFUND' ? '#dc2626' : (cancelActionType === 'RESCHEDULE' ? '#0d9488' : '#94a3b8'), color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: (cancelLoading || !cancelActionType) ? 'not-allowed' : 'pointer' }}
-              >
-                {cancelLoading ? 'Memproses...' : 'Konfirmasi Tindakan'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {changeBooking && (
+        <TripChangeModal
+          booking={changeBooking}
+          departureBookingCount={departureBookingCount(changeBooking)}
+          onClose={() => setChangeBookingId(null)}
+          onCompleted={(title, message) => {
+            setChangeBookingId(null);
+            showAlert({ type: 'success', title, message });
+            void loadData();
+          }}
+        />
       )}
     </div>
   );

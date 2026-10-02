@@ -219,7 +219,11 @@ const LegalSection: React.FC<{ number: string; title: string; children: React.Re
   </div>
 );
 
-export const GeneralTermsContent: React.FC = () => (
+interface RefundPolicyProps {
+  cancellationRefundDays?: number;
+}
+
+export const GeneralTermsContent: React.FC<RefundPolicyProps> = ({ cancellationRefundDays = 7 }) => (
   <div>
     {/* Intro Banner */}
     <div
@@ -233,33 +237,33 @@ export const GeneralTermsContent: React.FC = () => (
       }}
     >
       <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0' }}>
-        SYARAT DAN KETENTUAN PLATFORM TRIPKITA
+        SYARAT DAN KETENTUAN PLATFORM TEMENTRIP
       </h2>
       <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b', lineHeight: '1.6' }}>
-        Ketentuan yang berlaku bagi setiap pengguna platform TripKita. Dengan mengakses, mendaftar, atau menggunakan layanan TripKita, pengguna dianggap telah membaca, memahami, dan menyetujui seluruh ketentuan di bawah ini.
+        Ketentuan yang berlaku bagi setiap pengguna platform TemenTrip. Dengan mengakses, mendaftar, atau menggunakan layanan TemenTrip, pengguna dianggap telah membaca, memahami, dan menyetujui seluruh ketentuan di bawah ini.
       </p>
     </div>
 
     <LegalSection number="1" title="DEFINISI">
       <ul style={{ paddingLeft: '20px', margin: 0 }}>
-        <li><strong>TripKita:</strong> Platform digital beserta pengelola dan sistem pendukungnya.</li>
-        <li><strong>Customer:</strong> Pengguna yang mencari, memesan, atau menggunakan layanan perjalanan melalui TripKita.</li>
-        <li><strong>Provider:</strong> Pihak penyedia layanan perjalanan yang terdaftar di TripKita.</li>
-        <li><strong>Platform:</strong> Situs web, aplikasi, dan sarana digital lain milik TemenTrip / TripKita.</li>
+        <li><strong>TemenTrip:</strong> Platform digital beserta pengelola dan sistem pendukungnya.</li>
+        <li><strong>Customer:</strong> Pengguna yang mencari, memesan, atau menggunakan layanan perjalanan melalui TemenTrip.</li>
+        <li><strong>Provider:</strong> Pihak penyedia layanan perjalanan yang terdaftar di TemenTrip.</li>
+        <li><strong>Platform:</strong> Situs web, aplikasi, dan sarana digital lain milik TemenTrip.</li>
         <li><strong>Booking:</strong> Pemesanan layanan perjalanan yang dilakukan melalui Platform.</li>
         <li><strong>Force Majeure:</strong> Keadaan darurat di luar kendali wajar para pihak (bencana alam, cuaca ekstrem, dll).</li>
       </ul>
     </LegalSection>
 
-    <LegalSection number="2" title="LAYANAN TRIPKITA">
+    <LegalSection number="2" title="LAYANAN TEMENTRIP">
       <p style={{ margin: '0 0 8px 0' }}>
-        2.1 TripKita menyediakan sarana perantara bagi Customer dan Provider dalam proses pencarian hingga pemesanan trip.
+        2.1 TemenTrip menyediakan sarana perantara bagi Customer dan Provider dalam proses pencarian hingga pemesanan trip.
       </p>
       <p style={{ margin: '0 0 8px 0' }}>
         2.2 Kebenaran dan kelengkapan informasi perjalanan sepenuhnya menjadi tanggung jawab Provider yang mempublikasikannya.
       </p>
       <p style={{ margin: 0 }}>
-        2.3 TripKita berhak membatasi atau menangguhkan akun jika ditemukan aktivitas yang melanggar ketentuan hukum.
+        2.3 TemenTrip berhak membatasi atau menangguhkan akun jika ditemukan aktivitas yang melanggar ketentuan hukum.
       </p>
     </LegalSection>
 
@@ -277,11 +281,11 @@ export const GeneralTermsContent: React.FC = () => (
 
     <LegalSection number="5" title="PEMBATALAN, REFUND & RESCHEDULE">
       <p style={{ margin: '0 0 8px 0' }}>
-        5.1 <strong>Pembatalan oleh Customer (Strict H-7 Policy):</strong>
+        5.1 <strong>Pembatalan oleh Customer (H-{cancellationRefundDays} Policy):</strong>
       </p>
       <ul style={{ paddingLeft: '20px', margin: '0 0 8px 0' }}>
-        <li>Pembatalan dilakukan <strong>≥ 7 hari sebelum keberangkatan (H-7 atau lebih lama)</strong>: Customer berhak menerima pengembalian dana <strong>100% (Full Refund)</strong>.</li>
-        <li>Pembatalan dilakukan <strong>&lt; 7 hari sebelum keberangkatan (H-6 s/d H-0)</strong>: Dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>). Uang DP/pembayaran diteruskan ke Provider sebagai ganti rugi slot operasional.</li>
+        <li>Pembatalan dilakukan <strong>≥ {cancellationRefundDays} hari sebelum keberangkatan</strong>: Customer berhak menerima pengembalian dana <strong>100% (Full Refund)</strong>.</li>
+        <li>Pembatalan dilakukan <strong>&lt; {cancellationRefundDays} hari sebelum keberangkatan</strong>: Dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>). Pembayaran diteruskan ke Provider sebagai ganti rugi slot operasional.</li>
       </ul>
       <p style={{ margin: '0 0 8px 0' }}>
         5.2 <strong>Pembatalan oleh Provider / Cuaca Buruk / Kuota Tidak Terpenuhi:</strong>
@@ -291,7 +295,7 @@ export const GeneralTermsContent: React.FC = () => (
         <li>Penjadwalan ulang (Reschedule) akibat kuota kurang berlaku <strong>maksimal 1 (satu) kali</strong>. Jika pada jadwal pengganti kuota masih tidak terpenuhi di H-3, sistem akan melakukan Full Refund 100% otomatis.</li>
       </ul>
       <p style={{ margin: 0 }}>
-        5.3 <strong>Pengamanan DP 50% (Escrow System):</strong> Pembayaran DP ditahan di sistem TripKita. Uang DP 50% langsung dicairkan ke Provider begitu kuota minimal trip terpenuhi atau saat trip dikonfirmasi di H-3.
+        5.3 <strong>Pembayaran Penuh & Dana Tertahan:</strong> Customer membayar penuh di muka melalui transfer ke rekening TemenTrip dan mengunggah bukti pembayaran, tanpa uang muka (DP) dari customer. Booking diteruskan ke Provider setelah verifikasi admin. Setelah dipotong biaya layanan dan komisi platform, buku besar TemenTrip mencatat separuh hak Provider tersedia untuk diajukan sebagai biaya persiapan dan separuh sisanya baru tersedia setelah trip selesai.
       </p>
     </LegalSection>
   </div>
@@ -339,7 +343,7 @@ export const PrivacyPolicyContent: React.FC = () => (
   </div>
 );
 
-export const CustomerRegistrationTermsContent: React.FC = () => (
+export const CustomerRegistrationTermsContent: React.FC<RefundPolicyProps> = ({ cancellationRefundDays = 7 }) => (
   <div>
     <div
       style={{
@@ -358,7 +362,7 @@ export const CustomerRegistrationTermsContent: React.FC = () => (
         SYARAT & KETENTUAN PENDAFTARAN CUSTOMER
       </h2>
       <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b' }}>
-        Dokumen persetujuan pendaftaran akun Customer pada platform TemenTrip / TripKita.
+        Dokumen persetujuan pendaftaran akun Customer pada platform TemenTrip.
       </p>
     </div>
 
@@ -374,9 +378,9 @@ export const CustomerRegistrationTermsContent: React.FC = () => (
       <p style={{ margin: 0 }}>2.2 Customer wajib menjaga kerahasiaan kata sandi dan keamanan akun masing-masing.</p>
     </LegalSection>
 
-    <LegalSection number="3" title="Kebijakan Pembatalan & Refund (Strict H-7)">
-      <p style={{ margin: '0 0 6px 0' }}>3.1 Pembatalan oleh Pemesan ≥ 7 hari sebelum keberangkatan berhak atas <strong>100% Full Refund</strong>.</p>
-      <p style={{ margin: '0 0 6px 0' }}>3.2 Pembatalan oleh Pemesan &lt; 7 hari (H-6 s/d H-0) berstatus <strong>0% Refund (Uang Hangus)</strong>.</p>
+    <LegalSection number="3" title={`Kebijakan Pembatalan & Refund (H-${cancellationRefundDays})`}>
+      <p style={{ margin: '0 0 6px 0' }}>3.1 Pembatalan oleh Pemesan ≥ {cancellationRefundDays} hari sebelum keberangkatan berhak atas <strong>100% Full Refund</strong>.</p>
+      <p style={{ margin: '0 0 6px 0' }}>3.2 Pembatalan oleh Pemesan &lt; {cancellationRefundDays} hari berstatus <strong>0% Refund (Uang Hangus)</strong>.</p>
       <p style={{ margin: 0 }}>3.3 Jika trip dibatalkan oleh Provider/Cuaca/Kuota Kurang, Pemesan berhak atas <strong>100% Refund</strong> atau <strong>Reschedule Maks 1x</strong>.</p>
     </LegalSection>
 

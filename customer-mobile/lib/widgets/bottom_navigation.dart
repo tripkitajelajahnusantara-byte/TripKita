@@ -1,139 +1,50 @@
 import 'package:flutter/material.dart';
 
-class TripKitaBottomNavigation extends StatelessWidget {
-  final int currentIndex;
-  final Function(int) onTap;
+import 'package:customer_mobile/theme/app_theme.dart';
 
-  const TripKitaBottomNavigation({
-    Key? key,
-    required this.currentIndex,
-    required this.onTap,
-  }) : super(key: key);
+/// Tab utama aplikasi. Urutannya mengikuti menu customer di web.
+enum AppTab { beranda, cariTrip, booking, akun }
+
+class TripKitaBottomNavigation extends StatelessWidget {
+  final AppTab current;
+  final ValueChanged<AppTab> onSelect;
+
+  const TripKitaBottomNavigation({super.key, required this.current, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
-    const Color activeColor = Color(0xFF0F8B8D); // Teal
-    const Color inactiveColor = Color(0xFF6B7280); // Dark Gray
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: Colors.grey.shade200,
-            width: 1,
+    return NavigationBarTheme(
+      data: NavigationBarThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        indicatorColor: AppColors.accentLight,
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            fontSize: 12,
+            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
+            color: states.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
           ),
         ),
       ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                index: 0,
-                icon: Icons.home_outlined,
-                activeIcon: Icons.home,
-                label: 'Beranda',
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-              ),
-              _buildNavItem(
-                index: 1,
-                icon: Icons.explore_outlined,
-                activeIcon: Icons.explore,
-                label: 'Trip',
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-              ),
-              _buildNavItem(
-                index: 2,
-                icon: Icons.work_outline,
-                activeIcon: Icons.work,
-                label: 'Booking',
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-              ),
-              _buildNavItem(
-                index: 3,
-                icon: Icons.person_outline,
-                activeIcon: Icons.person,
-                label: 'Profile',
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required IconData activeIcon,
-    required String label,
-    required Color activeColor,
-    required Color inactiveColor,
-    int badgeCount = 0,
-  }) {
-    final bool isActive = currentIndex == index;
-    final Color color = isActive ? activeColor : inactiveColor;
-
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => onTap(index),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  isActive ? activeIcon : icon,
-                  color: color,
-                  size: 26,
-                ),
-                if (badgeCount > 0)
-                  Positioned(
-                    top: -4,
-                    right: -6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: Text(
-                        badgeCount.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
+        child: NavigationBar(
+          height: 66,
+          selectedIndex: current.index,
+          onDestinationSelected: (i) => onSelect(AppTab.values[i]),
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Beranda'),
+            NavigationDestination(icon: Icon(Icons.search), selectedIcon: Icon(Icons.travel_explore), label: 'Cari Trip'),
+            NavigationDestination(
+                icon: Icon(Icons.confirmation_number_outlined),
+                selectedIcon: Icon(Icons.confirmation_number),
+                label: 'Booking'),
+            NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Akun'),
           ],
         ),
       ),

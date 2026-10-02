@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { ArrowRight, CalendarCheck2, Eye, EyeOff, LoaderCircle, Lock, Mail, ShieldCheck, WalletCards } from 'lucide-react';
 import { request } from '../utils/api';
 
 export const LoginPage: React.FC = () => {
@@ -11,6 +11,7 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // Forgot Password States
@@ -19,6 +20,8 @@ export const LoginPage: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
   const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotError, setForgotError] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
 
@@ -32,7 +35,7 @@ export const LoginPage: React.FC = () => {
     try {
       await request('/public/auth/provider/forgot-password', {
         method: 'POST',
-        body: JSON.stringify({ email: forgotEmail })
+        body: JSON.stringify({ email: forgotEmail.trim() })
       });
       setForgotStep(2);
     } catch (err: any) {
@@ -51,20 +54,33 @@ export const LoginPage: React.FC = () => {
       setForgotError('Password minimal 12 karakter');
       return;
     }
+    // Password baru diketik tanpa terlihat, jadi salah ketik harus ketahuan di
+    // sini, bukan saat login pertama dengan password baru gagal.
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError('Konfirmasi password tidak sama dengan password baru');
+      return;
+    }
     setForgotLoading(true);
     setForgotError('');
     try {
       await request('/public/auth/provider/reset-password', {
         method: 'POST',
-        body: JSON.stringify({ email: forgotEmail, otp: forgotOtp, newPassword: forgotNewPassword })
+        body: JSON.stringify({ email: forgotEmail.trim(), otp: forgotOtp.trim(), newPassword: forgotNewPassword })
       });
-      
-      alert('Password berhasil direset! Silakan login dengan password baru.');
+
+      // Kosongkan password di form login: isian otomatis browser biasanya
+      // masih berisi password lama sehingga login pertama terlihat gagal.
+      setEmail(forgotEmail.trim());
+      setPassword('');
+      setError('');
+      setNotice('Password berhasil diganti. Masuk dengan password baru Anda.');
       setShowForgotModal(false);
       setForgotStep(1);
       setForgotEmail('');
       setForgotOtp('');
       setForgotNewPassword('');
+      setForgotConfirmPassword('');
+      setShowForgotPassword(false);
     } catch (err: any) {
       setForgotError(err.message || 'Kode OTP salah atau sudah kedaluwarsa');
     } finally {
@@ -82,6 +98,7 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     try {
       setError('');
+      setNotice('');
       await login(email, password);
     } catch (err: any) {
       setError(err.message || 'Email atau password salah');
@@ -97,28 +114,30 @@ export const LoginPage: React.FC = () => {
         {/* Left Side: Brand Highlights & Stats (Dark Teal Panel) */}
         <div className="login-sidebar">
           <div className="sidebar-brand-box">
-            <span className="brand-logo-icon">🛡️</span>
-            <span className="brand-name-text">TemenTrip Admin & Provider</span>
+            <span className="sidebar-logo-surface">
+              <img src="/tementrip_official_logo.png" alt="TemenTrip" />
+            </span>
+            <span className="portal-badge">{isAdminMode ? 'Portal Admin' : 'Portal Mitra'}</span>
           </div>
 
           <div className="sidebar-main-content">
             <h1 className="sidebar-title">
-              {isAdminMode ? 'Portal Administrator TemenTrip' : 'Selamat Datang Kembali, Partner!'}
+              {isAdminMode ? 'Portal administrator TemenTrip' : 'Masuk ke dashboard mitra'}
             </h1>
             <p className="sidebar-description">
-              {isAdminMode 
-                ? 'Kelola sistem, verifikasi mitra tour, pantau transaksi sistem, dan kelola saldo secara terpusat.' 
-                : 'Kelola paket wisata, pantau booking, dan tingkatkan pendapatan bisnis Anda dari satu dashboard terintegrasi.'}
+              {isAdminMode
+                ? 'Verifikasi mitra, cek transaksi, dan proses pencairan dana mitra.'
+                : 'Atur paket wisata, cek booking yang masuk, dan lihat status pencairan dana Anda.'}
             </p>
 
             <div className="stats-cards-grid">
               <div className="stat-card-item">
-                <span className="stat-number">2,500+</span>
-                <span className="stat-label">Provider Aktif</span>
+                <span className="stat-icon"><CalendarCheck2 size={19} /></span>
+                <span><strong>Booking dan jadwal</strong><small>Daftar peserta, tanggal trip, dan cek kuota H-3</small></span>
               </div>
               <div className="stat-card-item">
-                <span className="stat-number">850K+</span>
-                <span className="stat-label">Wisatawan</span>
+                <span className="stat-icon"><WalletCards size={19} /></span>
+                <span><strong>Pencairan dua tahap</strong><small>DP 50% setelah customer bayar, pelunasan setelah trip selesai</small></span>
               </div>
             </div>
           </div>
@@ -126,12 +145,12 @@ export const LoginPage: React.FC = () => {
           <div className="sidebar-footer">
             <div className="security-badge">
               <div className="security-icon-circle">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20 6L9 17L4 12" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <ShieldCheck size={15} />
               </div>
               <span className="security-text">
-                <strong>Keamanan terjamin.</strong> Sistem dilindungi dengan enkripsi SSL 256-bit.
+                {isAdminMode
+                  ? 'Akses ini hanya untuk admin TemenTrip.'
+                  : 'Akun mitra diverifikasi admin TemenTrip sebelum paket bisa tayang.'}
               </span>
             </div>
           </div>
@@ -146,6 +165,7 @@ export const LoginPage: React.FC = () => {
                 <p>{isAdminMode ? 'Masukkan email dan password akun administrator' : 'Masukkan email dan password akun provider Anda'}</p>
               </div>
 
+              {notice && !error && <div className="success-alert" role="status">{notice}</div>}
               {error && <div className="error-alert">{error}</div>}
 
               {/* Email Input Field */}
@@ -171,6 +191,7 @@ export const LoginPage: React.FC = () => {
                     <span className="forgot-password-link" onClick={() => {
                       setForgotStep(1);
                       setForgotError('');
+                      setForgotEmail(email.trim());
                       setShowForgotModal(true);
                     }}>
                       Lupa password?
@@ -210,13 +231,13 @@ export const LoginPage: React.FC = () => {
 
               {/* Submit Button */}
               <button type="submit" className="submit-form-btn" disabled={isLoading}>
-                {isLoading ? 'Memproses...' : (isAdminMode ? 'Masuk Portal Admin' : 'Masuk ke Dashboard')} <ArrowRight size={16} className="arrow-btn-icon" />
+                {isLoading ? <><LoaderCircle size={17} className="login-spinner" /> Memverifikasi akun</> : <>{isAdminMode ? 'Masuk Portal Admin' : 'Masuk ke Dashboard'} <ArrowRight size={16} className="arrow-btn-icon" /></>}
               </button>
 
               {/* Register Prompt */}
               {!isAdminMode && (
                 <p className="register-prompt-text">
-                  Belum punya akun Provider? <span onClick={() => navigateTo('provider-register')} className="register-link">Daftar Mitra gratis sekarang</span>
+                  Belum punya akun Provider? <span onClick={() => navigateTo('provider-register')} className="register-link">Daftar sebagai mitra</span>
                 </p>
               )}
 
@@ -291,14 +312,38 @@ export const LoginPage: React.FC = () => {
                     maxLength={6}
                   />
                 </div>
+                <div style={{ marginBottom: '15px' }}>
+                  <label htmlFor="forgot-new-password" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Password Baru</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      id="forgot-new-password"
+                      type={showForgotPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      value={forgotNewPassword}
+                      onChange={e => setForgotNewPassword(e.target.value)}
+                      style={{ width: '100%', padding: '10px 40px 10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                      placeholder="Minimal 12 karakter"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showForgotPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                      onClick={() => setShowForgotPassword(!showForgotPassword)}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '4px' }}
+                    >
+                      {showForgotPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
                 <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Password Baru</label>
-                  <input 
-                    type="password" 
-                    value={forgotNewPassword} 
-                    onChange={e => setForgotNewPassword(e.target.value)}
+                  <label htmlFor="forgot-confirm-password" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Ulangi Password Baru</label>
+                  <input
+                    id="forgot-confirm-password"
+                    type={showForgotPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={forgotConfirmPassword}
+                    onChange={e => setForgotConfirmPassword(e.target.value)}
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
-                    placeholder="Minimal 12 karakter"
+                    placeholder="Ketik ulang password baru"
                   />
                 </div>
                 <button 
@@ -307,6 +352,14 @@ export const LoginPage: React.FC = () => {
                   style={{ width: '100%', padding: '12px', background: '#00a896', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: forgotLoading ? 'not-allowed' : 'pointer' }}
                 >
                   {forgotLoading ? 'Memproses...' : 'Simpan Password Baru'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRequestOtp}
+                  disabled={forgotLoading}
+                  style={{ width: '100%', marginTop: '10px', background: 'none', border: 'none', color: '#007bff', fontSize: '13px', fontWeight: 600, cursor: forgotLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  Kirim ulang kode OTP
                 </button>
               </div>
             )}
@@ -331,13 +384,146 @@ export const LoginPage: React.FC = () => {
 
         /* Left Sidebar: Green/Teal Gradient Panel */
         .login-sidebar {
-          background: linear-gradient(180deg, #092c2e 0%, #061d1f 100%);
+          background:
+            radial-gradient(circle at 12% 18%, rgba(20, 184, 166, .18), transparent 34%),
+            radial-gradient(circle at 88% 85%, rgba(14, 116, 144, .13), transparent 38%),
+            linear-gradient(145deg, #073b3d 0%, #05272a 52%, #041c1f 100%);
           color: #ffffff;
-          padding: 64px;
+          padding: clamp(36px, 5vw, 72px);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           position: relative;
+          overflow: hidden;
+        }
+
+        .login-sidebar::after {
+          content: '';
+          position: absolute;
+          width: 360px;
+          height: 360px;
+          border: 1px solid rgba(255,255,255,.06);
+          border-radius: 50%;
+          right: -190px;
+          top: 22%;
+          box-shadow: 0 0 0 52px rgba(255,255,255,.018), 0 0 0 104px rgba(255,255,255,.012);
+          pointer-events: none;
+        }
+
+        .sidebar-brand-box {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .sidebar-logo-surface {
+          display: inline-flex;
+          align-items: center;
+          background: #ffffff;
+          border: 1px solid rgba(255,255,255,.55);
+          padding: 9px 13px;
+          border-radius: 13px;
+          box-shadow: 0 10px 30px rgba(0,0,0,.14);
+        }
+
+        .sidebar-logo-surface img {
+          display: block;
+          width: 144px;
+          height: 35px;
+          object-fit: contain;
+        }
+
+        .portal-badge {
+          border: 1px solid rgba(94, 234, 212, .28);
+          background: rgba(13, 148, 136, .2);
+          color: #99f6e4;
+          padding: 7px 11px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 750;
+          letter-spacing: .03em;
+        }
+
+        .sidebar-main-content {
+          position: relative;
+          z-index: 1;
+          width: min(100%, 560px);
+          margin: auto 0;
+          padding: 58px 0;
+        }
+
+        .sidebar-description {
+          max-width: 520px;
+          font-size: 16px;
+          color: rgba(255,255,255,.72);
+          line-height: 1.75;
+          margin: 0;
+        }
+
+        .stats-cards-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+          margin-top: 30px;
+        }
+
+        .stat-card-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-height: 84px;
+          padding: 16px;
+          background: rgba(255,255,255,.055);
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 15px;
+          backdrop-filter: blur(8px);
+        }
+
+        .stat-icon {
+          width: 38px;
+          height: 38px;
+          display: grid;
+          place-items: center;
+          border-radius: 11px;
+          background: rgba(45,212,191,.14);
+          color: #5eead4;
+          flex: 0 0 auto;
+        }
+
+        .stat-card-item strong {
+          display: block;
+          color: #ffffff;
+          font-size: 13px;
+          margin-bottom: 4px;
+        }
+
+        .stat-card-item small {
+          display: block;
+          color: rgba(255,255,255,.56);
+          font-size: 10.5px;
+          line-height: 1.45;
+        }
+
+        .sidebar-footer { position: relative; z-index: 1; }
+
+        .security-badge {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          color: rgba(255,255,255,.66);
+        }
+
+        .security-icon-circle {
+          width: 30px;
+          height: 30px;
+          display: grid;
+          place-items: center;
+          color: #5eead4;
+          background: rgba(45,212,191,.12);
+          border-radius: 9px;
+          flex: 0 0 auto;
         }
 
         .sidebar-logo {
@@ -469,7 +655,9 @@ export const LoginPage: React.FC = () => {
           align-items: center;
           justify-content: center;
           padding: 64px;
-          background-color: #ffffff;
+          background:
+            radial-gradient(circle at 90% 8%, rgba(20,184,166,.06), transparent 28%),
+            #f8fafc;
         }
 
         .form-inner-box {
@@ -478,8 +666,8 @@ export const LoginPage: React.FC = () => {
           background: #ffffff;
           padding: 40px;
           border-radius: 24px;
-          box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.04);
-          border: 1px solid #f1f5f9;
+          box-shadow: 0 24px 60px -32px rgba(15, 23, 42, .28);
+          border: 1px solid #e2e8f0;
         }
 
         .form-body {
@@ -640,6 +828,9 @@ export const LoginPage: React.FC = () => {
           box-shadow: none;
         }
 
+        .login-spinner { animation: login-spin .8s linear infinite; }
+        @keyframes login-spin { to { transform: rotate(360deg); } }
+
         .arrow-btn-icon {
           transition: transform 0.2s ease;
         }
@@ -649,6 +840,15 @@ export const LoginPage: React.FC = () => {
         }
 
         /* Error Alert */
+        .success-alert {
+          background-color: #ecfdf5;
+          border: 1px solid #a7f3d0;
+          color: #047857;
+          padding: 12px 16px;
+          border-radius: 12px;
+          font-size: 13px;
+        }
+
         .error-alert {
           background-color: #fef2f2;
           border: 1px solid #fee2e2;

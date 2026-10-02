@@ -9,11 +9,15 @@ import {
   TrendingUp,
   Star,
   ChevronRight,
-  ArrowUpRight
+  ArrowUpRight,
+  Users
 } from 'lucide-react';
 import type { Booking } from '../types';
 import { request } from '../utils/api';
+import { SkeletonTableRows } from '../components/Skeleton';
 import { TripDepartureAlert } from '../components/TripDepartureAlert';
+import { TripImage } from '../components/TripImage';
+import { getTripImage } from '../utils/tripImages';
 
 interface DashboardStats {
   totalPackages: number;
@@ -26,7 +30,7 @@ interface DashboardStats {
 }
 
 export const DashboardPage: React.FC = () => {
-  const { providerProfile, navigateTo } = useNavigation();
+  const { providerProfile, navigateTo, setEditingPackageId } = useNavigation();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('Semua');
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +39,13 @@ export const DashboardPage: React.FC = () => {
   const [popularPackages, setPopularPackages] = useState<any[]>([]);
 
   const providerName = providerProfile?.businessName || 'Mitra TemenTrip';
+  const [greeting] = useState(() => {
+    const hour = new Date().getHours();
+    if (hour < 11) return 'Selamat pagi';
+    if (hour < 15) return 'Selamat siang';
+    if (hour < 18) return 'Selamat sore';
+    return 'Selamat malam';
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -68,21 +79,17 @@ export const DashboardPage: React.FC = () => {
         }
 
         if (packagesRes.status === 'fulfilled' && Array.isArray(packagesRes.value)) {
-          const sortedPackages = packagesRes.value
-            .sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))
+          // Terpopuler = paling banyak dipesan; rating hanya pemecah seri.
+          const sortedPackages = [...packagesRes.value]
+            .sort((a: any, b: any) => ((b.quotaUsed || 0) - (a.quotaUsed || 0)) || ((b.rating || 0) - (a.rating || 0)))
             .slice(0, 3)
             .map((pkg: any) => ({
+              id: pkg.id,
               name: pkg.name,
               location: pkg.destination ? (pkg.destination.split(',').pop()?.trim() || pkg.destination) : 'Indonesia',
-              rating: pkg.rating || 5.0,
+              rating: Number(pkg.rating) > 0 ? Number(pkg.rating) : null,
               bookings: pkg.quotaUsed || 0,
-              img: (pkg.name || '').toLowerCase().includes('bromo')
-                ? 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&w=80&q=80'
-                : (pkg.name || '').toLowerCase().includes('baduy')
-                ? 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=80&q=80'
-                : (pkg.name || '').toLowerCase().includes('bandung')
-                ? 'https://images.unsplash.com/photo-1584810359583-96fc3448beaa?auto=format&fit=crop&w=80&q=80'
-                : 'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?auto=format&fit=crop&w=80&q=80',
+              img: getTripImage(pkg),
             }));
           setPopularPackages(sortedPackages);
 
@@ -118,7 +125,7 @@ export const DashboardPage: React.FC = () => {
         <header className="dashboard-header" style={{ position: 'relative' }}>
           <div className="header-welcome">
             <h1>Dashboard</h1>
-            <p>Selamat pagi, {providerName}! 👋</p>
+            <p>{greeting}, {providerName}.</p>
           </div>
           <div className="header-actions">
             <div className="search-bar">
@@ -135,7 +142,7 @@ export const DashboardPage: React.FC = () => {
           </div>
         </header>
 
-        {/* Keputusan H-3 keberangkatan open trip; isinya dari backend. */}
+        {/* Pertimbangan H-3: kuota Open Trip dan prakiraan cuaca trip non-Open-Trip. */}
         <TripDepartureAlert />
 
         {/* Stats Grid */}
@@ -145,10 +152,9 @@ export const DashboardPage: React.FC = () => {
               <div className="stat-icon-bg bg-cyan">
                 <Package size={20} color="#00a896" />
               </div>
-              <span className="trend-up">Aktif</span>
             </div>
             <div className="card-bottom">
-              <h3>{stats ? stats.totalPackages : '...'}</h3>
+              <h3>{stats ? stats.totalPackages : (isLoading ? '...' : '–')}</h3>
               <p>Total Paket</p>
             </div>
           </div>
@@ -158,10 +164,9 @@ export const DashboardPage: React.FC = () => {
               <div className="stat-icon-bg bg-blue">
                 <CalendarDays size={20} color="#3b82f6" />
               </div>
-              <span className="trend-up">Semua</span>
             </div>
             <div className="card-bottom">
-              <h3>{stats ? stats.totalBookings : '...'}</h3>
+              <h3>{stats ? stats.totalBookings : (isLoading ? '...' : '–')}</h3>
               <p>Total Booking</p>
             </div>
           </div>
@@ -171,10 +176,9 @@ export const DashboardPage: React.FC = () => {
               <div className="stat-icon-bg bg-green">
                 <CheckCircle size={20} color="#10b981" />
               </div>
-              <span className="trend-up">Selesai</span>
             </div>
             <div className="card-bottom">
-              <h3>{stats ? stats.completedBookings : '...'}</h3>
+              <h3>{stats ? stats.completedBookings : (isLoading ? '...' : '–')}</h3>
               <p>Booking Selesai</p>
             </div>
           </div>
@@ -184,11 +188,10 @@ export const DashboardPage: React.FC = () => {
               <div className="stat-icon-bg bg-purple">
                 <TrendingUp size={20} color="#8b5cf6" />
               </div>
-              <span className="trend-up">Total</span>
             </div>
             <div className="card-bottom">
               <h3 style={{ fontSize: '15px' }}>
-                {stats ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(stats.totalRevenue) : 'Rp ...'}
+                {stats ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(stats.totalRevenue) : (isLoading ? 'Rp ...' : '–')}
               </h3>
               <p>Total Pendapatan (Kotor)</p>
             </div>
@@ -199,11 +202,10 @@ export const DashboardPage: React.FC = () => {
               <div className="stat-icon-bg bg-yellow">
                 <Star size={20} color="#eab308" />
               </div>
-              <span className="trend-up">Rating</span>
             </div>
             <div className="card-bottom">
-              <h3>{stats ? stats.rating.toFixed(2) : '...'}</h3>
-              <p>Rating Provider</p>
+              <h3>{stats ? (Number(stats.rating) > 0 ? Number(stats.rating).toFixed(1) : '–') : (isLoading ? '...' : '–')}</h3>
+              <p>{stats && !(Number(stats.rating) > 0) ? 'Rating (belum ada ulasan)' : 'Rating Provider'}</p>
             </div>
           </div>
         </section>
@@ -218,7 +220,6 @@ export const DashboardPage: React.FC = () => {
                 {[
                   { value: 'Semua', label: 'Semua' },
                   { value: 'CONFIRMED', label: 'Dikonfirmasi / Lunas' },
-                  { value: 'PENDING_PAYMENT', label: 'Menunggu Pembayaran' },
                   { value: 'COMPLETED', label: 'Selesai' }
                 ].map((tab) => (
                   <button 
@@ -247,22 +248,7 @@ export const DashboardPage: React.FC = () => {
                 </thead>
                 <tbody>
                   {isLoading ? (
-                    [1, 2, 3].map((n) => (
-                      <tr key={n} style={{ opacity: 0.6 }}>
-                        <td><span style={{ display: 'inline-block', width: '80px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                        <td>
-                          <div className="customer-cell">
-                            <span className="customer-avatar" style={{ backgroundColor: '#cbd5e1' }}>...</span>
-                            <span style={{ display: 'inline-block', width: '90px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span>
-                          </div>
-                        </td>
-                        <td><span style={{ display: 'inline-block', width: '120px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                        <td><span style={{ display: 'inline-block', width: '70px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                        <td><span style={{ display: 'inline-block', width: '30px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                        <td><span style={{ display: 'inline-block', width: '80px', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}></span></td>
-                        <td><span style={{ display: 'inline-block', width: '90px', height: '22px', backgroundColor: '#e2e8f0', borderRadius: '12px' }}></span></td>
-                      </tr>
-                    ))
+                    <SkeletonTableRows rows={5} columns={7} />
                   ) : filteredBookings.length > 0 ? (
                     filteredBookings.map((b) => (
                       <tr key={b.id}>
@@ -275,7 +261,7 @@ export const DashboardPage: React.FC = () => {
                         </td>
                         <td className="package-cell">{b.package}</td>
                         <td>{b.tripDate}</td>
-                        <td>👥 {b.guests}</td>
+                        <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Users size={13} aria-hidden="true" /> {b.guests}</span></td>
                         <td className="price-cell">{b.totalPrice}</td>
                         <td>
                           <span className={`status-pill`} style={{
@@ -313,18 +299,18 @@ export const DashboardPage: React.FC = () => {
             <div className="quick-actions-card">
               <h3>Aksi Cepat</h3>
               <div className="action-links-list">
-                <div className="action-item" onClick={() => navigateTo('tambah-paket')}>
+                <button type="button" className="action-item" onClick={() => { setEditingPackageId(null); navigateTo('tambah-paket'); }}>
                   <span>Tambah Paket Baru</span>
                   <ChevronRight size={16} />
-                </div>
-                <div className="action-item" onClick={() => navigateTo('booking')}>
+                </button>
+                <button type="button" className="action-item" onClick={() => navigateTo('booking')}>
                   <span>Lihat Semua Booking</span>
                   <ChevronRight size={16} />
-                </div>
-                <div className="action-item" onClick={() => navigateTo('kelola-paket')}>
+                </button>
+                <button type="button" className="action-item" onClick={() => navigateTo('kelola-paket')}>
                   <span>Kelola Paket</span>
                   <ChevronRight size={16} />
-                </div>
+                </button>
               </div>
             </div>
 
@@ -332,12 +318,31 @@ export const DashboardPage: React.FC = () => {
             <div className="popular-packages-card">
               <h3>Paket Terpopuler</h3>
               <div className="packages-list">
-                {popularPackages.map((p, i) => (
-                  <div key={i} className="popular-package-item">
-                    <img src={p.img} alt={p.name} />
+                {!isLoading && popularPackages.length === 0 && (
+                  <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
+                    Belum ada paket.{' '}
+                    <button type="button" onClick={() => { setEditingPackageId(null); navigateTo('tambah-paket'); }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--color-accent)', fontWeight: 600, cursor: 'pointer' }}>
+                      Buat paket pertama Anda
+                    </button>
+                  </div>
+                )}
+                {popularPackages.map((p) => (
+                  <div key={p.id} className="popular-package-item">
+                    <TripImage
+                      src={p.img}
+                      alt={p.name}
+                      placeholderIconSize={18}
+                      placeholderShowText={false}
+                      style={{ width: 44, height: 44, borderRadius: 'var(--radius-sm)', objectFit: 'cover', flexShrink: 0 }}
+                    />
                     <div className="pack-details">
                       <h4>{p.name}</h4>
-                      <p>{p.location} • ⭐ {p.rating}</p>
+                      <p style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {p.location} ·{' '}
+                        {p.rating !== null
+                          ? <><Star size={13} aria-hidden="true" /> {p.rating.toFixed(1)}</>
+                          : 'Belum ada ulasan'}
+                      </p>
                     </div>
                     <span className="pack-bookings">{p.bookings} booking</span>
                   </div>
@@ -356,7 +361,7 @@ export const DashboardPage: React.FC = () => {
                   <div>
                     <span className="rev-label">Total Pendapatan</span>
                     <span className="rev-amount">
-                      {stats ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(stats.totalRevenue) : 'Rp 0'}
+                      {stats ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(stats.totalRevenue) : '–'}
                     </span>
                   </div>
                   <span className="rev-trend positive">

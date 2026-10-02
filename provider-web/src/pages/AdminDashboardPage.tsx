@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigation } from '../context/NavigationContext';
 import { 
   Users, 
@@ -17,11 +18,16 @@ import {
   Clock,
   ArrowRight,
   DollarSign,
-  Wallet
+  Wallet,
+  LoaderCircle,
+  TrendingUp
 } from 'lucide-react';
-import { getProtectedDocumentURL, request } from '../utils/api';
+import { getProtectedDocumentURL, openProtectedDocument, request } from '../utils/api';
 import { NotificationCenter, type NotificationItem } from '../components/NotificationCenter';
 import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
+import { useActionLock } from '../utils/useActionLock';
+import { Skeleton, SkeletonTable } from '../components/Skeleton';
+import { AdminRevenuePanel } from '../components/AdminRevenuePanel';
 
 
 interface ProviderAdminData {
@@ -45,9 +51,10 @@ interface ProviderAdminData {
   whatsapp: string;
   isVerified: boolean;
   role: string;
-  status: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'FAILED' | 'REJECTED';
+  status: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'FAILED' | 'REJECTED' | 'DISABLED';
   failureCode?: string;
   verificationNotes?: string;
+  platformFeePercent: number;
   createdAt: string;
 
   // New fields
@@ -57,6 +64,20 @@ interface ProviderAdminData {
   bankAccount?: string;
   bankAccountName?: string;
   contactLastUpdatedAt?: string;
+
+  pendingBusinessName?: string;
+  pendingBusinessCategory?: string;
+  pendingOperationalProvince?: string;
+  pendingOperationalCity?: string;
+  pendingDescription?: string;
+  pendingPicName?: string;
+  pendingEmail?: string;
+  pendingWhatsapp?: string;
+  pendingInstagram?: string;
+  pendingTiktok?: string;
+  pendingWebsite?: string;
+  profileVerificationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | '';
+  profileRejectionReason?: string;
 
   pendingNpwp?: string;
   pendingBankName?: string;
@@ -95,19 +116,60 @@ interface StatusHistoryItem {
   createdAt: string;
 }
 
+const hasPendingProviderReview = (provider: ProviderAdminData) => provider.status !== 'DISABLED' && (
+  provider.status === 'PENDING' ||
+  provider.profileVerificationStatus === 'PENDING' ||
+  provider.legalVerificationStatus === 'PENDING' ||
+  !!provider.pendingKtpPath || !!provider.pendingNibPath || !!provider.pendingDocumentPath ||
+  !!provider.pendingNpwpPath || !!provider.pendingAktaPath || !!provider.pendingSertifikatPath ||
+  provider.ktpStatus === 'PENDING' || provider.nibStatus === 'PENDING' || provider.siupStatus === 'PENDING' ||
+  provider.npwpDocStatus === 'PENDING' || provider.aktaStatus === 'PENDING' || provider.sertifikatStatus === 'PENDING'
+);
+
+const getPendingProfileChanges = (provider: ProviderAdminData) => [
+  ['Nama Bisnis', provider.businessName, provider.pendingBusinessName],
+  ['Kategori', provider.businessCategory, provider.pendingBusinessCategory],
+  ['Provinsi', provider.operationalProvince, provider.pendingOperationalProvince],
+  ['Kota', provider.operationalCity, provider.pendingOperationalCity],
+  ['Deskripsi', provider.description, provider.pendingDescription],
+  ['Nama PIC', provider.picName, provider.pendingPicName],
+  ['Email', provider.email, provider.pendingEmail],
+  ['WhatsApp', provider.whatsapp, provider.pendingWhatsapp],
+  ['Website', provider.website, provider.pendingWebsite],
+  ['Instagram', provider.instagram, provider.pendingInstagram],
+  ['TikTok', provider.tiktok, provider.pendingTiktok],
+].filter(([, active, pending]) => (active || '') !== (pending || '')) as Array<[string, string | undefined, string | undefined]>;
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  PENDING_PAYMENT: 'Menunggu Transfer',
+  PAYMENT_REVIEW: 'Menunggu Verifikasi',
+  PAID: 'Lunas',
+  CONFIRMED: 'Dikonfirmasi Mitra',
+  COMPLETED: 'Selesai',
+  EXPIRED: 'Kedaluwarsa',
+  FAILED: 'Gagal',
+  CANCELLED_BY_CUSTOMER: 'Dibatalkan Customer',
+  CANCELLED_BY_PROVIDER: 'Dibatalkan Mitra',
+  REFUND_REQUIRED: 'Perlu Refund',
+  REFUNDED: 'Sudah Direfund',
+  RESCHEDULE_OFFERED: 'Tawaran Jadwal Ulang',
+};
+
 export const AdminDashboardPage: React.FC = () => {
   const { providerProfile, logout, navigateTo } = useNavigation();
   const [providers, setProviders] = useState<ProviderAdminData[]>([]);
-  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider'>('kelola-provider');
+  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider' | 'penghasilan-platform'>('kelola-provider');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Semua Kategori');
   const [cityFilter, setCityFilter] = useState('Semua Kota');
-  const [statusTab, setStatusTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [statusTab, setStatusTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'DISABLED'>('PENDING');
   
   // Selection & Drawer States
   const [selectedProvider, setSelectedProvider] = useState<ProviderAdminData | null>(null);
   const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([]);
   const [adminNotes, setAdminNotes] = useState('');
+  const [platformFeePercent, setPlatformFeePercent] = useState('15');
+  const [savingPlatformFee, setSavingPlatformFee] = useState(false);
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewObjectUrl, setPreviewObjectUrl] = useState<string | null>(null);
   const [previewDocName, setPreviewDocName] = useState<string>('');
@@ -159,10 +221,31 @@ export const AdminDashboardPage: React.FC = () => {
   // Booking states for manual payments
   const [adminBookings, setAdminBookings] = useState<any[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
+  // Verifikasi pembayaran manual: filter tabel dan modal keputusan admin.
+  const [paymentFilter, setPaymentFilter] = useState<'review' | 'all'>('review');
+  const [paymentReviewTarget, setPaymentReviewTarget] = useState<{ booking: any; decision: 'APPROVED' | 'REJECTED' } | null>(null);
+  const [paymentReviewNotes, setPaymentReviewNotes] = useState('');
+  const [paymentReviewError, setPaymentReviewError] = useState('');
+  const [proofPreview, setProofPreview] = useState<{ url: string; isPdf: boolean } | null>(null);
+  const [proofPreviewLoading, setProofPreviewLoading] = useState(false);
+  const proofRequestRef = React.useRef(0);
 
   // Admin Payout States
   const [adminPayouts, setAdminPayouts] = useState<any[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(false);
+
+  // Satu kunci untuk semua aksi admin yang mengubah data (status provider,
+  // verifikasi, payout, nonaktifkan) agar klik berulang tidak mengirim
+  // permintaan ganda dan tombol lain tidak bisa dipakai selama proses berjalan.
+  const { pending: pendingAction, isBusy: actionBusy, run: runAction } = useActionLock();
+  // Verifikasi pembayaran memakai kunci tersendiri. Aksi admin lain (misalnya
+  // dialog upload bukti payout yang masih terbuka) tidak boleh membuat tombol
+  // Setujui/Tolak pembayaran ikut tidak dapat diklik.
+  const {
+    pending: pendingPaymentAction,
+    isBusy: paymentActionBusy,
+    run: runPaymentAction,
+  } = useActionLock();
 
   const fetchAdminPayouts = async () => {
     setPayoutLoading(true);
@@ -177,25 +260,56 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const handleProcessPayout = async (payoutId: number, status: 'APPROVED' | 'REJECTED') => {
+    if (actionBusy) return;
     const notesPrompt = window.prompt(`Masukkan catatan transfer/alasan (${status}):`, status === 'APPROVED' ? 'Pencairan disetujui' : 'Pengajuan ditolak');
     if (notesPrompt === null) return;
 
+    // Bukti dipilih sebelum kunci diambil: dialog file yang ditutup tanpa
+    // memilih tidak selalu memicu event, sehingga tidak boleh menahan kunci.
+    let proofFile: File | null = null;
+    if (status === 'APPROVED') {
+      proofFile = await new Promise<File | null>((resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/pdf,image/jpeg,image/png';
+        input.onchange = () => resolve(input.files?.[0] || null);
+        input.oncancel = () => resolve(null);
+        input.click();
+      });
+      if (!proofFile) {
+        setSuccessMsg('');
+        setError('Bukti transfer wajib dipilih sebelum payout disetujui.');
+        return;
+      }
+    }
+
+    await runAction(`payout-${payoutId}-${status}`, async () => {
     try {
       setError('');
       setSuccessMsg('');
+      let proofPath = '';
+      if (proofFile) {
+        const formData = new FormData();
+        formData.append('file', proofFile);
+        const upload = await request('/admin/upload', { method: 'POST', body: formData });
+        proofPath = upload?.documentPath || '';
+        if (!proofPath) throw new Error('Bukti transfer gagal disimpan.');
+      }
       const result = await request(`/admin/payouts/${payoutId}/process`, {
         method: 'PUT',
-        body: JSON.stringify({ status, notes: notesPrompt })
+        body: JSON.stringify({ status, notes: notesPrompt, proofPath })
       });
       setSuccessMsg(
         result?.status === 'PROCESSING'
-          ? 'Pencairan disetujui dan sedang diproses oleh Xendit.'
+          ? 'Pencairan disetujui dan sedang diproses oleh layanan transfer.'
           : `Berhasil memproses pencairan dana (${result?.status || status}).`
       );
-      fetchAdminPayouts();
+      await fetchAdminPayouts();
     } catch (err: any) {
       setError(err.message || 'Gagal memproses pencairan.');
+      fetchAdminPayouts();
     }
+    });
   };
 
   // Notifikasi admin memakai navigasi internal dashboard, bukan route global.
@@ -210,9 +324,12 @@ export const AdminDashboardPage: React.FC = () => {
         setActiveView('administrasi-refund');
         break;
       case 'PAYMENT':
+		setPaymentFilter('all');
         setActiveView('kelola-pembayaran');
+		fetchAdminBookings();
         break;
       case 'REGISTRATION':
+      case 'ACCOUNT':
         setStatusTab('PENDING');
         setActiveView('kelola-provider');
         fetchProviders();
@@ -223,7 +340,12 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const adminName = providerProfile?.picName || 'Administrator';
-  const adminEmail = providerProfile?.email || 'admin@tripkita.id';
+  const adminEmail = providerProfile?.email || '';
+  const visiblePaymentBookings = paymentFilter === 'review'
+    ? adminBookings
+      .filter((b) => b.status === 'PAYMENT_REVIEW')
+      .sort((a, b) => new Date(a.paymentReviewDeadline || 0).getTime() - new Date(b.paymentReviewDeadline || 0).getTime())
+    : adminBookings;
 
   const fetchProviders = async () => {
     setLoading(true);
@@ -272,15 +394,113 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  const closePaymentReview = () => {
+    // Batalkan respons pratinjau yang masih berjalan agar tidak muncul di modal berikutnya.
+    proofRequestRef.current += 1;
+    if (proofPreview) URL.revokeObjectURL(proofPreview.url);
+    setProofPreview(null);
+    setProofPreviewLoading(false);
+    setPaymentReviewTarget(null);
+    setPaymentReviewNotes('');
+    setPaymentReviewError('');
+  };
+
+  // Satu-satunya kunci scroll modal verifikasi. Dua effect yang sama-sama
+  // mengunci saling menyimpan "hidden" sebagai nilai awal, sehingga halaman
+  // tetap tidak bisa di-scroll setelah modal ditutup.
+  useEffect(() => {
+    if (!paymentReviewTarget) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !paymentActionBusy) closePaymentReview();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [paymentReviewTarget, paymentActionBusy]);
+
+  const openPaymentReview = (booking: any, decision: 'APPROVED' | 'REJECTED') => {
+    if (paymentActionBusy) return;
+    setPaymentReviewTarget({ booking, decision });
+    setPaymentReviewNotes('');
+    setPaymentReviewError('');
+    if (proofPreview) URL.revokeObjectURL(proofPreview.url);
+    setProofPreview(null);
+    const requestId = ++proofRequestRef.current;
+    if (!booking.paymentProof) return;
+    setProofPreviewLoading(true);
+    // Preview dimuat tanpa menahan event klik atau tombol keputusan. Admin
+    // tetap dapat bertindak bila browser gagal merender PDF/gambar.
+    getProtectedDocumentURL('admin', booking.paymentProof)
+      .then((url) => {
+        if (requestId !== proofRequestRef.current) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        setProofPreview({ url, isPdf: /\.pdf$/i.test(booking.paymentProof) });
+      })
+      .catch((err: any) => {
+        if (requestId === proofRequestRef.current) setPaymentReviewError(err.message || 'Bukti transfer tidak dapat dimuat.');
+      })
+      .finally(() => {
+        if (requestId === proofRequestRef.current) setProofPreviewLoading(false);
+      });
+  };
+
+  const submitPaymentReview = async () => {
+    if (!paymentReviewTarget || paymentActionBusy) return;
+    const { booking, decision } = paymentReviewTarget;
+    const notes = paymentReviewNotes.trim();
+    if (decision === 'REJECTED' && notes.length < 4) {
+      setPaymentReviewError('Tulis alasan penolakan (minimal 4 karakter) agar customer tahu apa yang harus diperbaiki.');
+      return;
+    }
+    await runPaymentAction(`payment-${booking.id}-${decision}`, async () => {
+      setError('');
+      setSuccessMsg('');
+      setPaymentReviewError('');
+      try {
+        await request(`/admin/bookings/${booking.id}/payment-review`, {
+          method: 'POST',
+          body: JSON.stringify({ decision, notes }),
+        });
+        setSuccessMsg(decision === 'APPROVED'
+          ? `Pembayaran ${booking.bookingCode} disetujui dan booking diteruskan ke provider.`
+          : `Bukti ${booking.bookingCode} ditolak. Customer diberi waktu unggah ulang minimal 6 jam.`);
+        closePaymentReview();
+        await fetchAdminBookings();
+      } catch (err: any) {
+        setPaymentReviewError(err.message || 'Konfirmasi pembayaran gagal disimpan.');
+      }
+    });
+  };
+
+  const resendBookingEmail = async (booking: any) => {
+    if (!booking || paymentActionBusy) return;
+    await runPaymentAction(`email-${booking.id}`, async () => {
+      setError('');
+      setSuccessMsg('');
+      try {
+        await request(`/admin/bookings/${booking.id}/resend-email`, { method: 'POST' });
+        setSuccessMsg(`Email status booking ${booking.bookingCode} berhasil dikirim ulang ke ${booking.customerEmail || 'customer'}.`);
+      } catch (err: any) {
+        setError(err.message || 'Email belum dapat dikirim ulang. Periksa konfigurasi layanan email backend.');
+      }
+    });
+  };
+
   const handleSubmitRefund = async () => {
-    if (!refundTarget) return;
+    if (!refundTarget || actionBusy) return;
     const amount = Number(refundForm.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       setRefundError('Nominal yang dikembalikan wajib diisi.');
       return;
     }
-    if (amount > (refundTarget.refundAmount || 0)) {
-      setRefundError('Nominal melebihi hak refund pelanggan.');
+    if (amount !== (refundTarget.refundAmount || 0)) {
+      setRefundError('Nominal wajib sama dengan hak refund pelanggan.');
       return;
     }
     if (refundForm.reference.trim().length < 4) {
@@ -288,6 +508,7 @@ export const AdminDashboardPage: React.FC = () => {
       return;
     }
 
+    await runAction(`refund-${refundTarget.id}`, async () => {
     setRefundSubmitting(true);
     try {
       setRefundError('');
@@ -307,9 +528,12 @@ export const AdminDashboardPage: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to complete refund:', err);
       setRefundError(err.message || 'Gagal memproses refund.');
+      // Refund mungkin sudah selesai oleh proses lain; tampilkan status terbaru.
+      fetchRefunds();
     } finally {
       setRefundSubmitting(false);
     }
+    });
   };
 
   const openRefundForm = (refund: any) => {
@@ -339,6 +563,7 @@ export const AdminDashboardPage: React.FC = () => {
   useEffect(() => {
     if (selectedProvider) {
       setAdminNotes(selectedProvider.verificationNotes || '');
+      setPlatformFeePercent(String(selectedProvider.platformFeePercent || 15));
       // Select KTP or other path as default preview doc
       if (selectedProvider.ktpPath) {
         setPreviewDocUrl(selectedProvider.ktpPath);
@@ -372,6 +597,7 @@ export const AdminDashboardPage: React.FC = () => {
       setPreviewDocUrl(null);
       setPreviewDocName('');
       setAdminNotes('');
+      setPlatformFeePercent('15');
     }
   }, [selectedProvider]);
 
@@ -380,12 +606,35 @@ export const AdminDashboardPage: React.FC = () => {
 
     // Alasan penolakan dikirim ke mitra sebagai notifikasi dan tersimpan di
     // riwayat status, jadi penolakan tanpa penjelasan tidak diterima.
+    if (actionBusy) return;
     if (status === 'REJECTED' && notesToSubmit.trim().length < 10) {
       setSuccessMsg('');
       setError('Isi "Catatan Admin" minimal 10 karakter sebagai alasan penolakan sebelum menolak provider.');
       return;
     }
 
+    const target = providers.find((p) => p.id === id) || selectedProvider;
+    if (status === 'APPROVED') {
+      const hasPendingReview = !!target && (
+        !!target.pendingKtpPath || !!target.pendingNibPath || !!target.pendingDocumentPath ||
+        !!target.pendingNpwpPath || !!target.pendingAktaPath || !!target.pendingSertifikatPath ||
+        target.ktpStatus === 'PENDING' || target.nibStatus === 'PENDING' || target.siupStatus === 'PENDING' ||
+        target.npwpDocStatus === 'PENDING' || target.aktaStatus === 'PENDING' || target.sertifikatStatus === 'PENDING' ||
+        target.legalVerificationStatus === 'PENDING' || target.profileVerificationStatus === 'PENDING'
+      );
+      const warning = hasPendingReview
+        ? '\n\nPerhatian: masih ada dokumen atau data legal/rekening yang menunggu verifikasi.'
+        : '';
+      if (!window.confirm(`Setujui ${target?.businessName || 'provider ini'}? Mitra akan menerima notifikasi dan dapat langsung beroperasi.${warning}`)) {
+        return;
+      }
+    } else if (status === 'PENDING') {
+      if (!window.confirm(`Nonaktifkan sementara ${target?.businessName || 'provider ini'}? Seluruh sesi login mitra diakhiri dan akses operasional ditutup sampai disetujui kembali.`)) {
+        return;
+      }
+    }
+
+    await runAction(`status-${status}`, async () => {
     try {
       setError('');
       setSuccessMsg('');
@@ -393,30 +642,72 @@ export const AdminDashboardPage: React.FC = () => {
         method: 'PUT',
         body: JSON.stringify({ status, verificationNotes: notesToSubmit }),
       });
-      setSuccessMsg(`Berhasil memperbarui status provider.`);
+      setSuccessMsg(
+        status === 'APPROVED' ? 'Provider berhasil disetujui.'
+          : status === 'REJECTED' ? 'Provider ditolak dan alasan telah dikirim ke mitra.'
+          : 'Provider dinonaktifkan sementara dan dikembalikan ke peninjauan.'
+      );
       
       // Refresh provider data
       const updatedProviders = await request('/admin/providers');
       setProviders(updatedProviders);
       
-      // Update selected provider details
+      // Perbarui detail hanya bila drawer provider ini masih terbuka.
       const found = updatedProviders.find((p: any) => p.id === id);
-      if (found) {
-        setSelectedProvider(found);
-      } else {
-        setSelectedProvider(null);
-      }
+      setSelectedProvider((current) => (current && current.id === id ? found || null : current));
     } catch (err: any) {
       console.error('Failed to update provider status:', err);
       setError(err.message || 'Gagal memperbarui status provider.');
+      // Status di server bisa sudah berubah (mis. 409 dari admin lain); muat
+      // ulang supaya tombol yang tampil sesuai status terbaru.
+      fetchProviders();
     }
+    });
   };
 
-  const handleDeleteProvider = async (id: number) => {
-    if (!window.confirm('Nonaktifkan provider ini? Seluruh paket akan dinonaktifkan, sedangkan booking dan data keuangan tetap disimpan untuk audit.')) {
+  const handleUpdatePlatformFee = async () => {
+    if (!selectedProvider || actionBusy) return;
+
+    const numericPercent = Number(platformFeePercent);
+    if (!/^\d{1,3}$/.test(platformFeePercent) || !Number.isInteger(numericPercent) || numericPercent < 1 || numericPercent > 100) {
+      setSuccessMsg('');
+      setError('Potongan platform harus berupa angka bulat antara 1 dan 100 persen.');
       return;
     }
 
+    // Id disimpan lebih dulu karena admin bisa berpindah provider selama
+    // permintaan berjalan; hasilnya tidak boleh ditempel ke drawer lain.
+    const providerId = selectedProvider.id;
+    await runAction('platform-fee', async () => {
+    setSavingPlatformFee(true);
+    try {
+      setError('');
+      setSuccessMsg('');
+      await request(`/admin/providers/${providerId}/platform-fee`, {
+        method: 'PUT',
+        body: JSON.stringify({ platformFeePercent: numericPercent }),
+      });
+
+      const updatedProviders = await request('/admin/providers');
+      setProviders(updatedProviders);
+      const updated = updatedProviders.find((provider: ProviderAdminData) => provider.id === providerId);
+      if (updated) setSelectedProvider((current) => (current && current.id === providerId ? updated : current));
+      setSuccessMsg(`Potongan platform ${numericPercent}% berhasil disimpan.`);
+    } catch (err: any) {
+      setError(err.message || 'Gagal memperbarui potongan platform.');
+    } finally {
+      setSavingPlatformFee(false);
+    }
+    });
+  };
+
+  const handleDeleteProvider = async (id: number) => {
+    if (actionBusy) return;
+    if (!window.confirm('Nonaktifkan provider ini? Seluruh paket disembunyikan dan tidak dapat diaktifkan oleh provider. Hanya admin dapat memulihkan akun. Booking dan data keuangan tetap disimpan.')) {
+      return;
+    }
+
+    await runAction('delete', async () => {
     try {
       setError('');
       setSuccessMsg('');
@@ -430,9 +721,11 @@ export const AdminDashboardPage: React.FC = () => {
       console.error('Failed to delete provider:', err);
       setError(err.message || 'Gagal menghapus provider.');
     }
+    });
   };
 
   const handleVerifyLegal = async (id: number, action: 'APPROVE' | 'REJECT') => {
+    if (actionBusy) return;
     let reason = '';
     if (action === 'REJECT') {
       const inputReason = window.prompt('Masukkan alasan penolakan data legal/rekening:');
@@ -448,6 +741,7 @@ export const AdminDashboardPage: React.FC = () => {
       }
     }
 
+    await runAction(`legal-${action}`, async () => {
     try {
       setError('');
       setSuccessMsg('');
@@ -461,14 +755,53 @@ export const AdminDashboardPage: React.FC = () => {
       const updatedProviders = await request('/admin/providers');
       setProviders(updatedProviders);
       const found = updatedProviders.find((p: any) => p.id === id);
-      if (found) setSelectedProvider(found);
+      if (found) setSelectedProvider((current) => (current && current.id === id ? found : current));
     } catch (err: any) {
       console.error('Failed to verify legal details:', err);
       setError(err.message || 'Gagal memproses verifikasi data legal.');
     }
+    });
+  };
+
+  const handleVerifyProfile = async (id: number, action: 'APPROVE' | 'REJECT') => {
+    if (actionBusy) return;
+    let reason = '';
+    if (action === 'REJECT') {
+      const inputReason = window.prompt('Masukkan alasan penolakan perubahan profil bisnis/kontak:');
+      if (inputReason === null) return;
+      if (inputReason.trim().length < 10) {
+        setError('Alasan penolakan perubahan profil minimal 10 karakter.');
+        return;
+      }
+      reason = inputReason.trim();
+    } else if (!window.confirm('Setujui perubahan profil bisnis dan kontak ini? Nilai baru akan langsung berlaku, termasuk email untuk login.')) {
+      return;
+    }
+
+    await runAction(`profile-${action}`, async () => {
+      try {
+        setError('');
+        setSuccessMsg('');
+        await request(`/admin/providers/${id}/verify-profile`, {
+          method: 'POST',
+          body: JSON.stringify({ action, reason }),
+        });
+        const updatedProviders = await request('/admin/providers');
+        setProviders(updatedProviders);
+        const found = updatedProviders.find((provider: ProviderAdminData) => provider.id === id);
+        if (found) setSelectedProvider((current) => (current?.id === id ? found : current));
+        setSuccessMsg(action === 'APPROVE'
+          ? 'Perubahan profil bisnis/kontak disetujui dan sudah berlaku.'
+          : 'Perubahan profil bisnis/kontak ditolak dan alasan telah dikirim ke mitra.');
+      } catch (err: any) {
+        setError(err.message || 'Gagal memproses perubahan profil.');
+        fetchProviders();
+      }
+    });
   };
 
   const handleVerifyDocument = async (id: number, docType: string, action: 'APPROVE' | 'REJECT') => {
+    if (actionBusy) return;
     let reason = '';
     if (action === 'REJECT') {
       const inputReason = window.prompt(`Masukkan alasan penolakan dokumen ${docType.toUpperCase()}:`);
@@ -484,6 +817,7 @@ export const AdminDashboardPage: React.FC = () => {
       }
     }
 
+    await runAction(`doc-${docType}-${action}`, async () => {
     try {
       setError('');
       setSuccessMsg('');
@@ -497,11 +831,12 @@ export const AdminDashboardPage: React.FC = () => {
       const updatedProviders = await request('/admin/providers');
       setProviders(updatedProviders);
       const found = updatedProviders.find((p: any) => p.id === id);
-      if (found) setSelectedProvider(found);
+      if (found) setSelectedProvider((current) => (current && current.id === id ? found : current));
     } catch (err: any) {
       console.error('Failed to verify document:', err);
       setError(err.message || 'Gagal memproses verifikasi dokumen.');
     }
+    });
   };
 
   const renderAdminDocRow = (
@@ -520,9 +855,9 @@ export const AdminDashboardPage: React.FC = () => {
     const isRejected = status === 'REJECTED';
 
     return (
-      <div className="doc-row-container" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div className="doc-row-container">
+        <div className="doc-row-heading">
+          <div className="doc-row-identity">
             <FileText size={16} color={color} />
             <div>
               <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>{label}</div>
@@ -540,10 +875,10 @@ export const AdminDashboardPage: React.FC = () => {
               </span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div className="doc-row-actions">
             {activePath && (
               <>
-                <button className="doc-action-btn" onClick={() => { setPreviewDocUrl(activePath); setPreviewDocName(`${filename}_active`); }} style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', cursor: 'pointer', background: 'white' }}>Lihat Aktif</button>
+                <button className="doc-action-btn" onClick={() => { setPreviewDocUrl(activePath); setPreviewDocName(filename); }} style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', cursor: 'pointer', background: 'white' }}>Lihat Aktif</button>
               </>
             )}
           </div>
@@ -557,31 +892,35 @@ export const AdminDashboardPage: React.FC = () => {
 
         {isPending && pendingPath && (
           <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '10px', marginTop: '4px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div className="doc-pending-header">
               <span style={{ fontSize: '11px', fontWeight: 700, color: '#b45309' }}>Berkas Baru:</span>
               <button 
                 className="doc-action-btn" 
-                onClick={() => { setPreviewDocUrl(pendingPath); setPreviewDocName(`${filename}_pending`); }} 
+                onClick={() => { setPreviewDocUrl(pendingPath); setPreviewDocName(`${filename} (Berkas Baru)`); }} 
                 style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #b45309', cursor: 'pointer', background: 'white', color: '#b45309', fontWeight: 600 }}
               >
                 Lihat Berkas Baru
               </button>
             </div>
             
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div className="doc-verification-actions">
               <button 
                 type="button"
                 style={{ flex: 1, padding: '5px', fontSize: '10px', fontWeight: 700, color: 'white', backgroundColor: '#10b981', border: 0, borderRadius: '4px', cursor: 'pointer' }}
                 onClick={() => handleVerifyDocument(selectedProvider!.id, docType, 'APPROVE')}
+                disabled={actionBusy}
+                aria-busy={pendingAction === `doc-${docType}-APPROVE`}
               >
-                Setujui
+                {pendingAction === `doc-${docType}-APPROVE` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Setujui'}
               </button>
               <button 
                 type="button"
                 style={{ flex: 1, padding: '5px', fontSize: '10px', fontWeight: 700, color: 'white', backgroundColor: '#ef4444', border: 0, borderRadius: '4px', cursor: 'pointer' }}
                 onClick={() => handleVerifyDocument(selectedProvider!.id, docType, 'REJECT')}
+                disabled={actionBusy}
+                aria-busy={pendingAction === `doc-${docType}-REJECT`}
               >
-                Tolak
+                {pendingAction === `doc-${docType}-REJECT` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Tolak'}
               </button>
             </div>
           </div>
@@ -597,7 +936,12 @@ export const AdminDashboardPage: React.FC = () => {
       p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.operationalCity.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = p.status === statusTab;
+    const pendingReview = hasPendingProviderReview(p);
+    const matchesStatus = statusTab === 'PENDING'
+      ? pendingReview
+      : statusTab === 'APPROVED'
+        ? p.status === 'APPROVED' && !pendingReview
+        : p.status === statusTab && !pendingReview;
     
     const matchesCategory = categoryFilter === 'Semua Kategori' || 
       p.businessCategory.toLowerCase() === categoryFilter.toLowerCase();
@@ -611,9 +955,9 @@ export const AdminDashboardPage: React.FC = () => {
   // Calculate statistics
   const stats = {
     total: providers.length,
-    pending: providers.filter(p => p.status === 'PENDING').length,
-    approved: providers.filter(p => p.status === 'APPROVED').length,
-    rejected: providers.filter(p => p.status === 'REJECTED').length,
+    pending: providers.filter(hasPendingProviderReview).length,
+    approved: providers.filter(p => p.status === 'APPROVED' && !hasPendingProviderReview(p)).length,
+    rejected: providers.filter(p => p.status === 'REJECTED' && !hasPendingProviderReview(p)).length,
   };
 
   // Categories list
@@ -638,10 +982,12 @@ export const AdminDashboardPage: React.FC = () => {
       {/* Sidebar Panel */}
       <aside className="admin-sidebar">
         <div>
-          <div className="sidebar-brand" onClick={() => navigateTo('beranda')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="/tementrip_official_logo.png" alt="TemenTrip" style={{ height: '34px', width: 'auto', objectFit: 'contain' }} />
-            <span className="logo-subtext" style={{ fontSize: '12px', color: '#ef4444', fontWeight: 700, backgroundColor: '#fee2e2', padding: '2px 8px', borderRadius: '10px' }}>Admin Panel</span>
-          </div>
+          <button type="button" className="sidebar-brand" onClick={() => navigateTo('beranda')}>
+            <span className="sidebar-logo-surface">
+              <img className="sidebar-brand-logo" src="/tementrip_official_logo.png" alt="TemenTrip" />
+            </span>
+            <span className="sidebar-context-badge admin">Admin</span>
+          </button>
 
           <nav className="sidebar-menu">
             <button 
@@ -673,6 +1019,12 @@ export const AdminDashboardPage: React.FC = () => {
               onClick={() => { setActiveView('pencairan-provider'); fetchAdminPayouts(); setSelectedProvider(null); }}
             >
               <Wallet size={18} /> Pencairan Dana Provider
+            </button>
+            <button
+              className={`menu-btn ${activeView === 'penghasilan-platform' ? 'active' : ''}`}
+              onClick={() => { setActiveView('penghasilan-platform'); setSelectedProvider(null); }}
+            >
+              <TrendingUp size={18} /> Penghasilan TemenTrip
             </button>
           </nav>
         </div>
@@ -719,19 +1071,23 @@ export const AdminDashboardPage: React.FC = () => {
                 {activeView === 'administrasi-refund' 
                   ? 'Administrasi Refund' 
                   : activeView === 'kelola-pembayaran'
-                  ? 'Monitor Pembayaran'
+                  ? 'Verifikasi Pembayaran Manual'
                   : activeView === 'pencairan-provider'
                   ? 'Pengajuan Pencairan Dana Provider (Payouts)'
-                  : 'Provider Verification Center'}
+                  : activeView === 'penghasilan-platform'
+                  ? 'Penghasilan TemenTrip'
+                  : 'Pusat Verifikasi Mitra'}
               </h1>
               <p>
                 {activeView === 'administrasi-refund' 
                   ? 'Pantau dan kelola proses refund dana customer.' 
                   : activeView === 'kelola-pembayaran'
-                  ? 'Pantau status pembayaran booking. Pembayaran diterima otomatis melalui payment gateway; tidak ada verifikasi manual.'
+                  ? 'Verifikasi bukti transfer manual maksimal 1×24 jam. Booking baru tampil ke provider setelah pembayaran disetujui admin.'
                   : activeView === 'pencairan-provider'
                   ? 'Kelola pengajuan pencairan saldo DP 50% & pelunasan dari mitra provider.'
-                  : 'Kelola dan verifikasi semua provider yang terdaftar di TripKita.'}
+                  : activeView === 'penghasilan-platform'
+                  ? 'Biaya layanan dan komisi TemenTrip dari setiap booking berbayar. Booking yang direfund penuh tidak dihitung.'
+                  : 'Kelola dan verifikasi semua mitra yang terdaftar di TemenTrip.'}
               </p>
             </div>
 
@@ -744,11 +1100,11 @@ export const AdminDashboardPage: React.FC = () => {
               <div className="dashboard-view-panel">
                 <div style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '32px', textAlign: 'center' }}>
                   <Building size={48} color="#3b82f6" style={{ marginBottom: '16px' }} />
-                  <h2>Ringkasan Platform TripKita</h2>
+                  <h2>Ringkasan Platform TemenTrip</h2>
                   <p style={{ color: 'var(--color-text-medium)', maxWidth: '500px', margin: '8px auto 24px' }}>
                     Gunakan menu "Kelola Provider" untuk memverifikasi dokumen kelayakan provider baru atau "Administrasi Refund" untuk memproses refund dana.
                   </p>
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                  <div className="admin-dashboard-actions">
                     <button className="submit-form-btn" onClick={() => setActiveView('kelola-provider')} style={{ width: 'auto', padding: '12px 24px', display: 'inline-flex' }}>
                       Menuju Pusat Verifikasi <ArrowRight size={16} style={{ marginLeft: '8px' }} />
                     </button>
@@ -759,11 +1115,31 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
             ) : activeView === 'kelola-pembayaran' ? (
-              /* View 4: Monitor Pembayaran (baca saja; settlement ditangani payment gateway) */
+              /* View 4: Verifikasi pembayaran transfer manual */
               <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
+                <div role="tablist" aria-label="Filter pembayaran" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                  {([
+                    ['review', `Menunggu Verifikasi (${adminBookings.filter((b) => b.status === 'PAYMENT_REVIEW').length})`],
+                    ['all', 'Semua Transaksi'],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={paymentFilter === key}
+                      onClick={() => setPaymentFilter(key)}
+                      style={{ padding: '8px 14px', borderRadius: 999, border: '1px solid', borderColor: paymentFilter === key ? '#0284c7' : 'var(--color-border)', background: paymentFilter === key ? '#e0f2fe' : '#fff', color: paymentFilter === key ? '#0369a1' : 'var(--color-text-medium)', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <button type="button" onClick={() => fetchAdminBookings()} disabled={bookingsLoading} style={{ marginLeft: 'auto', padding: '8px 14px', borderRadius: 999, border: '1px solid var(--color-border)', background: '#fff', fontWeight: 600, cursor: 'pointer' }}>
+                    Muat Ulang
+                  </button>
+                </div>
                 <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
                   {bookingsLoading ? (
-                    <div className="loading-state">Memuat data booking...</div>
+                    <SkeletonTable rows={6} columns={6} label="Memuat data booking" />
                   ) : (
                     <table className="admin-providers-table">
                       <thead>
@@ -774,31 +1150,57 @@ export const AdminDashboardPage: React.FC = () => {
                           <th>Total Pembayaran</th>
                           <th>Metode</th>
                           <th>Status</th>
+                          <th>Bukti & Tenggat</th>
+                          <th>Aksi Admin</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {adminBookings.length > 0 ? (
-                          adminBookings.map((b) => {
+                        {visiblePaymentBookings.length > 0 ? (
+                          visiblePaymentBookings.map((b) => {
                             return (
                               <tr key={b.id}>
                                 <td><strong>{b.bookingCode}</strong></td>
                                 <td>
                                   <div style={{ fontWeight: '600' }}>{b.customerName}</div>
-                                  <div style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>Initial: {b.customerInitial}</div>
+                                  {b.customerPhone && <div style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>{b.customerPhone}</div>}
                                 </td>
                                 <td>{b.packageDetails?.name || 'Paket Wisata'}</td>
                                 <td><strong style={{ color: '#00a896' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(b.totalPrice)}</strong></td>
                                 <td>{b.paymentMethod}</td>
                                 <td>
-                                  <span className={`status-badge-inline ${b.status.toLowerCase()}`}>{b.status}</span>
+                                  <span className={`status-badge-inline ${b.status.toLowerCase()}`}>{PAYMENT_STATUS_LABELS[b.status] || b.status}</span>
+                                </td>
+                                <td>
+                                  {b.paymentProof ? (
+                                    <button type="button" onClick={() => openProtectedDocument('admin', b.paymentProof).catch((err) => setError(err.message))} style={{ border: 0, background: 'transparent', color: '#0284c7', fontWeight: 700, cursor: 'pointer', padding: 0 }}>Lihat Bukti</button>
+                                  ) : <span style={{ color: '#94a3b8' }}>Belum diunggah</span>}
+                                  {b.status === 'PAYMENT_REVIEW' && b.paymentReviewDeadline && (
+                                    <div style={{ fontSize: 11, color: new Date(b.paymentReviewDeadline).getTime() < Date.now() ? '#dc2626' : '#b45309', marginTop: 5, fontWeight: 700 }}>
+                                      {new Date(b.paymentReviewDeadline).getTime() < Date.now() ? 'MELEWATI SLA · ' : 'Batas · '}
+                                      {new Date(b.paymentReviewDeadline).toLocaleString('id-ID')}
+                                    </div>
+                                  )}
+                                </td>
+                                <td>
+                                  <div className="payment-table-actions">
+                                    {b.status === 'PAYMENT_REVIEW' && (
+                                      <div>
+                                        <button type="button" disabled={paymentActionBusy} onClick={() => openPaymentReview(b, 'APPROVED')} className="payment-table-approve"><CheckCircle2 size={14} /> Setujui</button>
+                                        <button type="button" disabled={paymentActionBusy} onClick={() => openPaymentReview(b, 'REJECTED')} className="payment-table-reject"><XCircle size={14} /> Tolak</button>
+                                      </div>
+                                    )}
+                                    <button type="button" disabled={paymentActionBusy} onClick={() => resendBookingEmail(b)} className="payment-table-email" title="Kirim ulang email sesuai status booking saat ini">
+                                      {pendingPaymentAction === `email-${b.id}` ? <><LoaderCircle size={13} className="btn-spinner" /> Mengirim...</> : 'Kirim Ulang Email'}
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             );
                           })
                         ) : (
                           <tr>
-                            <td colSpan={6} className="empty-table-state" style={{ padding: '40px 0' }}>
-                              Tidak ada data transaksi pembayaran saat ini.
+                            <td colSpan={8} className="empty-table-state" style={{ padding: '40px 0' }}>
+                              {paymentFilter === 'review' ? 'Tidak ada bukti transfer yang menunggu verifikasi.' : 'Tidak ada data transaksi pembayaran saat ini.'}
                             </td>
                           </tr>
                         )}
@@ -806,6 +1208,104 @@ export const AdminDashboardPage: React.FC = () => {
                     </table>
                   )}
                 </div>
+
+                {paymentReviewTarget && (() => {
+                  const b = paymentReviewTarget.booking;
+                  const isApprove = paymentReviewTarget.decision === 'APPROVED';
+                  const busy = paymentActionBusy;
+                  const amount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(b.totalPrice);
+                  const rejectPresets = ['Nominal transfer tidak sesuai tagihan', 'Bukti transfer tidak terbaca/buram', 'Dana belum masuk ke rekening TemenTrip', 'Rekening tujuan bukan rekening TemenTrip'];
+                  return (
+                    createPortal(<div className="payment-review-overlay" role="dialog" aria-modal="true" aria-labelledby="payment-review-title" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) closePaymentReview(); }}>
+                      <div className="payment-review-dialog">
+                        <header className="payment-review-header">
+                          <div>
+                            <span className={`payment-review-mode ${isApprove ? 'approve' : 'reject'}`}>
+                              {isApprove ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                              {isApprove ? 'Konfirmasi dana masuk' : 'Minta perbaikan bukti'}
+                            </span>
+                            <h2 id="payment-review-title">{isApprove ? 'Setujui pembayaran?' : 'Tolak bukti transfer?'}</h2>
+                            <p><strong>{b.bookingCode}</strong> · {b.customerName}</p>
+                          </div>
+                          <button type="button" className="payment-review-close" onClick={closePaymentReview} disabled={busy} aria-label="Tutup dialog"><X size={20} /></button>
+                        </header>
+
+                        <div className="payment-review-body">
+                          <section className="payment-proof-column" aria-label="Bukti transfer">
+                            <div className="payment-section-heading">
+                              <div><strong>Bukti transfer</strong><span>Periksa nominal dan rekening tujuan</span></div>
+                              {proofPreview && <a href={proofPreview.url} target="_blank" rel="noopener noreferrer">Buka penuh</a>}
+                            </div>
+                            <div className="payment-proof-frame">
+                              {proofPreviewLoading ? (
+                                <span className="payment-proof-state"><LoaderCircle size={18} className="btn-spinner" aria-hidden="true" /> Memuat bukti transfer...</span>
+                              ) : proofPreview ? (
+                                proofPreview.isPdf
+                                  ? <iframe src={proofPreview.url} title="Bukti transfer" />
+                                  : <a href={proofPreview.url} target="_blank" rel="noopener noreferrer" title="Buka ukuran penuh"><img src={proofPreview.url} alt="Bukti transfer" /></a>
+                              ) : (
+                                <span className="payment-proof-state">Bukti transfer tidak tersedia.</span>
+                              )}
+                            </div>
+                          </section>
+
+                          <section className="payment-decision-column" aria-label="Keputusan pembayaran">
+                            <div className="payment-summary-grid">
+                              <div className="payment-summary-primary"><span>Nominal tagihan</span><strong>{amount}</strong></div>
+                              <div><span>Tanggal trip</span><strong>{b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</strong></div>
+                              <div><span>Bukti dikirim</span><strong>{b.paymentProofSubmittedAt ? new Date(b.paymentProofSubmittedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</strong></div>
+                              <div><span>Paket</span><strong>{b.packageDetails?.name || 'Paket Wisata'}</strong></div>
+                            </div>
+
+                            <div className={`payment-decision-notice ${isApprove ? 'approve' : 'reject'}`}>
+                              {isApprove ? <CheckCircle2 size={19} /> : <XCircle size={19} />}
+                              <div>
+                                <strong>{isApprove ? 'Pastikan dana benar-benar sudah masuk' : 'Customer akan diminta mengunggah ulang'}</strong>
+                                <span>{isApprove ? 'Booking diteruskan ke mitra dan saldo mitra langsung tercatat.' : 'Pilih alasan yang jelas agar customer tahu apa yang harus diperbaiki.'}</span>
+                              </div>
+                            </div>
+
+                            {!isApprove && (
+                              <div className="payment-reject-presets">
+                                <span>Alasan cepat</span>
+                                <div>
+                                  {rejectPresets.map((preset) => (
+                                    <button key={preset} type="button" onClick={() => setPaymentReviewNotes(preset)} className={paymentReviewNotes === preset ? 'selected' : ''}>{preset}</button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <label className="payment-review-notes-label" htmlFor="payment-review-notes">
+                              {isApprove ? 'Catatan untuk customer' : 'Alasan penolakan'}
+                              <span>{isApprove ? 'Opsional' : 'Wajib, minimal 4 karakter'}</span>
+                            </label>
+                            <textarea
+                              id="payment-review-notes"
+                              value={paymentReviewNotes}
+                              onChange={(e) => setPaymentReviewNotes(e.target.value)}
+                              maxLength={500}
+                              rows={4}
+                              placeholder={isApprove ? 'Contoh: Pembayaran sudah kami terima. (boleh dikosongkan)' : 'Jelaskan alasan bukti belum dapat diterima...'}
+                            />
+                            <div className="payment-notes-count">{paymentReviewNotes.length}/500</div>
+                            {paymentReviewError && <div className="alert-message error-alert payment-review-error">{paymentReviewError}</div>}
+                          </section>
+                        </div>
+
+                        <footer className="payment-review-footer">
+                          <span>Keputusan akan langsung memperbarui status booking.</span>
+                          <div>
+                            <button type="button" className="back-form-btn" onClick={closePaymentReview} disabled={busy}>Batal</button>
+                            <button type="button" className={`payment-decision-submit ${isApprove ? 'approve' : 'reject'}`} onClick={submitPaymentReview} disabled={busy}>
+                              {pendingPaymentAction ? <><LoaderCircle size={16} className="btn-spinner" aria-hidden="true" /> Memproses...</> : isApprove ? <><CheckCircle2 size={16} /> Ya, Setujui Pembayaran</> : <><XCircle size={16} /> Tolak & Minta Bukti Baru</>}
+                            </button>
+                          </div>
+                        </footer>
+                      </div>
+                    </div>, document.body)
+                  );
+                })()}
               </div>
             ) : activeView === 'administrasi-refund' ? (
               /* View 3: Administrasi Refund Panel */
@@ -827,8 +1327,9 @@ export const AdminDashboardPage: React.FC = () => {
                       <input
                         type="number"
                         value={refundForm.amount}
-                        onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })}
-                        style={{ width: '100%', padding: '10px', marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }}
+                        readOnly
+                        aria-readonly="true"
+                        style={{ width: '100%', padding: '10px', marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', backgroundColor: '#f8fafc' }}
                       />
 
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>Metode pengembalian</label>
@@ -838,7 +1339,6 @@ export const AdminDashboardPage: React.FC = () => {
                         style={{ width: '100%', padding: '10px', marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }}
                       >
                         <option value="MANUAL_TRANSFER">Transfer manual dari rekening platform</option>
-                        <option value="GATEWAY_REFUND">Refund via payment gateway</option>
                         <option value="GATEWAY_PAYOUT">Payout ke rekening pelanggan</option>
                       </select>
 
@@ -874,7 +1374,7 @@ export const AdminDashboardPage: React.FC = () => {
                           disabled={refundSubmitting}
                           style={{ width: 'auto', padding: '10px 18px', backgroundColor: '#0d9488' }}
                         >
-                          {refundSubmitting ? 'Menyimpan...' : 'Simpan Catatan Refund'}
+                          {refundSubmitting ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Simpan Catatan Refund'}
                         </button>
                       </div>
                     </div>
@@ -883,7 +1383,7 @@ export const AdminDashboardPage: React.FC = () => {
                 
                 <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
                   {refundLoading ? (
-                    <div className="loading-state">Memuat data refund...</div>
+                    <SkeletonTable rows={6} columns={8} label="Memuat data refund" />
                   ) : (
                     <table className="admin-providers-table">
                       <thead>
@@ -958,12 +1458,15 @@ export const AdminDashboardPage: React.FC = () => {
                   )}
                 </div>
               </div>
+            ) : activeView === 'penghasilan-platform' ? (
+              /* View 6: Penghasilan TemenTrip */
+              <AdminRevenuePanel />
             ) : activeView === 'pencairan-provider' ? (
               /* View 5: Pengajuan Pencairan Dana Provider */
               <div className="table-content-container animate-fade-in" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
                 <div className="providers-table-wrapper" style={{ marginTop: '0px' }}>
                   {payoutLoading ? (
-                    <div className="loading-state">Memuat data pengajuan pencairan...</div>
+                    <SkeletonTable rows={6} columns={8} label="Memuat data pengajuan pencairan" />
                   ) : (
                     <table className="admin-providers-table">
                       <thead>
@@ -987,13 +1490,16 @@ export const AdminDashboardPage: React.FC = () => {
                                 <td style={{ fontWeight: '700', color: '#0f172a' }}>#{p.id}</td>
                                 <td>
                                   <strong style={{ display: 'block', fontSize: '13.5px', color: '#0f172a' }}>
-                                    {p.provider?.businessName || 'Wisata Nusantara'}
+                                    {p.provider?.businessName || '(mitra tidak ditemukan)'}
                                   </strong>
                                   <span style={{ fontSize: '12px', color: '#64748b' }}>{p.provider?.email}</span>
                                 </td>
                                 <td>
                                   <span style={{ fontWeight: '700', color: '#0369a1' }}>
                                     {p.type === 'DP_50' ? 'Uang Muka (DP 50%)' : 'Pelunasan (50%)'}
+                                  </span>
+                                  <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>
+                                    {p.booking?.bookingCode ? `Trip ${p.booking.bookingCode}` : 'Pengajuan gabungan (lama)'}
                                   </span>
                                 </td>
                                 <td style={{ fontWeight: '800', color: '#0284c7' }}>
@@ -1019,28 +1525,39 @@ export const AdminDashboardPage: React.FC = () => {
                                       color: p.status === 'APPROVED' ? '#16a34a' : (p.status === 'REJECTED' || p.status === 'FAILED') ? '#dc2626' : p.status === 'PROCESSING' ? '#0284c7' : '#d97706'
                                     }}
                                   >
-                                    {p.status === 'APPROVED' ? '✓ Transfer Selesai' : p.status === 'PROCESSING' ? '↻ Diproses Xendit' : p.status === 'FAILED' ? '✕ Transfer Gagal' : p.status === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Admin'}
+                                    {p.status === 'APPROVED' ? '✓ Transfer Selesai' : p.status === 'PROCESSING' ? '↻ Transfer Diproses' : p.status === 'FAILED' ? '✕ Transfer Gagal' : p.status === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Admin'}
                                   </span>
                                 </td>
                                 <td>
                                   {isPending ? (
-                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                    <div className="payout-actions" style={{ display: 'flex', gap: '6px' }}>
                                       <button 
                                         className="approve-action-btn"
                                         onClick={() => handleProcessPayout(p.id, 'APPROVED')}
+                                        disabled={actionBusy}
+                                        aria-busy={pendingAction === `payout-${p.id}-APPROVED`}
                                         style={{ padding: '6px 10px', fontSize: '12px', width: 'auto', backgroundColor: '#0284c7' }}
                                       >
-                                        Setujui & Transfer
+                                        {pendingAction === `payout-${p.id}-APPROVED` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Setujui & Transfer'}
                                       </button>
                                       <button 
                                         onClick={() => handleProcessPayout(p.id, 'REJECTED')}
+                                        disabled={actionBusy}
+                                        aria-busy={pendingAction === `payout-${p.id}-REJECTED`}
                                         style={{ padding: '6px 10px', fontSize: '12px', width: 'auto', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '700' }}
                                       >
-                                        Tolak
+                                        {pendingAction === `payout-${p.id}-REJECTED` ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Tolak'}
                                       </button>
                                     </div>
                                   ) : (
-                                    <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Telah Diproses</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Telah Diproses</span>
+                                      {p.proofPath && (
+                                        <button type="button" onClick={() => openProtectedDocument('admin', p.proofPath).catch((err) => setError(err.message))} style={{ padding: 0, background: 'none', border: 'none', color: '#0284c7', fontSize: '12px', fontWeight: 700, cursor: 'pointer', textAlign: 'left', textDecoration: 'underline' }}>
+                                          Lihat bukti transfer
+                                        </button>
+                                      )}
+                                    </div>
                                   )}
                                 </td>
                               </tr>
@@ -1139,6 +1656,9 @@ export const AdminDashboardPage: React.FC = () => {
                     >
                       Provider Ditolak <span className="badge-count red">{stats.rejected}</span>
                     </button>
+                    <button className={`tab-filter-btn ${statusTab === 'DISABLED' ? 'active' : ''}`} onClick={() => setStatusTab('DISABLED')}>
+                      Dinonaktifkan <span className="badge-count red">{providers.filter(p => p.status === 'DISABLED').length}</span>
+                    </button>
                   </div>
 
                   {/* Filter / Search Bar */}
@@ -1169,7 +1689,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {/* Main Providers Table */}
                   <div className="providers-table-wrapper">
                     {loading ? (
-                      <div className="loading-state">Memuat data mitra...</div>
+                      <SkeletonTable rows={6} columns={8} label="Memuat data mitra" />
                     ) : (
                       <table className="admin-providers-table">
                         <thead>
@@ -1178,6 +1698,7 @@ export const AdminDashboardPage: React.FC = () => {
                             <th>PIC / Kontak</th>
                             <th>Kategori</th>
                             <th>Kota</th>
+                            <th>Potongan</th>
                             <th>Tanggal Daftar</th>
                             <th>Status</th>
                             <th>Aksi</th>
@@ -1207,6 +1728,7 @@ export const AdminDashboardPage: React.FC = () => {
                                 </td>
                                 <td style={{ textTransform: 'capitalize' }}>{p.businessCategory}</td>
                                 <td>{p.operationalCity}{p.operationalProvince ? `, ${p.operationalProvince}` : ''}</td>
+                                <td><strong>{p.platformFeePercent || 15}%</strong></td>
                                 <td>
                                   {new Date(p.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}<br/>
                                   <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>
@@ -1214,8 +1736,8 @@ export const AdminDashboardPage: React.FC = () => {
                                   </span>
                                 </td>
                                 <td>
-                                  <span className={`status-pill-small ${p.status.toLowerCase()}`}>
-                                    {p.status === 'APPROVED' ? 'Approved' : p.status === 'PENDING' ? 'Pending' : 'Rejected'}
+                                  <span className={`status-pill-small ${hasPendingProviderReview(p) ? 'pending' : p.status.toLowerCase()}`}>
+                                    {p.status === 'DISABLED' ? 'Dinonaktifkan' : p.status === 'PENDING' ? 'Akun Baru' : hasPendingProviderReview(p) ? 'Menunggu Perubahan' : p.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
                                   </span>
                                 </td>
                                 <td>
@@ -1227,7 +1749,7 @@ export const AdminDashboardPage: React.FC = () => {
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={7} className="empty-table-state">
+                              <td colSpan={8} className="empty-table-state">
                                 Tidak ada data provider yang sesuai dengan kriteria.
                               </td>
                             </tr>
@@ -1274,8 +1796,8 @@ export const AdminDashboardPage: React.FC = () => {
                   <div>
                     <h3>{selectedProvider.businessName}</h3>
                     <p>{selectedProvider.businessCategory}</p>
-                    <span className={`drawer-status-badge ${selectedProvider.status.toLowerCase()}`}>
-                      {selectedProvider.status === 'APPROVED' ? 'Approved' : selectedProvider.status === 'PENDING' ? 'Pending Approval' : 'Rejected'}
+                    <span className={`drawer-status-badge ${hasPendingProviderReview(selectedProvider) ? 'pending' : selectedProvider.status.toLowerCase()}`}>
+                      {selectedProvider.status === 'DISABLED' ? 'Dinonaktifkan' : selectedProvider.status === 'PENDING' ? 'Akun Menunggu Persetujuan' : hasPendingProviderReview(selectedProvider) ? 'Perubahan Menunggu Persetujuan' : selectedProvider.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
                     </span>
                   </div>
                 </div>
@@ -1333,7 +1855,111 @@ export const AdminDashboardPage: React.FC = () => {
                       )}
                     </tbody>
                   </table>
-                </div>                  {/* Section 1.5: Data Legal & Rekening */}
+                </div>
+
+                {/* Perubahan profil umum menunggu keputusan tanpa mengganti data aktif. */}
+                <div className="drawer-section">
+                  <h4 className="section-title">Pengajuan Profil Bisnis & Kontak</h4>
+                  <div style={{ marginBottom: '12px' }}>
+                    <span className={`drawer-status-badge ${
+                      selectedProvider.profileVerificationStatus === 'APPROVED' ? 'approved' :
+                      selectedProvider.profileVerificationStatus === 'PENDING' ? 'pending' :
+                      selectedProvider.profileVerificationStatus === 'REJECTED' ? 'rejected' : 'approved'
+                    }`}>
+                      {selectedProvider.profileVerificationStatus === 'PENDING' ? 'Menunggu Persetujuan' :
+                       selectedProvider.profileVerificationStatus === 'REJECTED' ? 'Perubahan Ditolak' : 'Tidak Ada Pengajuan'}
+                    </span>
+                    {selectedProvider.profileVerificationStatus === 'REJECTED' && selectedProvider.profileRejectionReason && (
+                      <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '6px' }}>
+                        Alasan ditolak: “{selectedProvider.profileRejectionReason}”
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedProvider.profileVerificationStatus === 'PENDING' ? (
+                    <div>
+                      <p style={{ margin: '0 0 8px', fontSize: '12px', color: '#64748b' }}>
+                        Hanya nilai yang berubah ditampilkan. Data lama tetap aktif sampai disetujui.
+                      </p>
+                      <table className="info-table" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', marginBottom: '12px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f8fafc' }}>
+                            <th style={{ padding: '6px 8px', fontSize: '10px', textAlign: 'left' }}>Field</th>
+                            <th style={{ padding: '6px 8px', fontSize: '10px', textAlign: 'left' }}>Aktif</th>
+                            <th style={{ padding: '6px 8px', fontSize: '10px', textAlign: 'left', color: '#b45309' }}>Diajukan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {getPendingProfileChanges(selectedProvider).map(([label, active, pending]) => (
+                            <tr key={label}>
+                              <td className="field-label" style={{ padding: '6px 8px', fontSize: '11px' }}>{label}</td>
+                              <td style={{ padding: '6px 8px', fontSize: '11px', wordBreak: 'break-word' }}>{active || '—'}</td>
+                              <td style={{ padding: '6px 8px', fontSize: '11px', color: '#b45309', fontWeight: 700, wordBreak: 'break-word' }}>{pending || '— (dikosongkan)'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="legal-verification-actions">
+                        <button
+                          type="button"
+                          style={{ padding: '6px 12px', fontSize: '11px', flex: 1, backgroundColor: '#10b981', color: 'white', border: 0, borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                          onClick={() => handleVerifyProfile(selectedProvider.id, 'APPROVE')}
+                          disabled={actionBusy}
+                          aria-busy={pendingAction === 'profile-APPROVE'}
+                        >
+                          {pendingAction === 'profile-APPROVE' ? <><LoaderCircle size={14} className="btn-spinner" /> Memproses...</> : 'Setujui Perubahan'}
+                        </button>
+                        <button
+                          type="button"
+                          style={{ padding: '6px 12px', fontSize: '11px', flex: 1, backgroundColor: '#ef4444', color: 'white', border: 0, borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                          onClick={() => handleVerifyProfile(selectedProvider.id, 'REJECT')}
+                          disabled={actionBusy}
+                          aria-busy={pendingAction === 'profile-REJECT'}
+                        >
+                          {pendingAction === 'profile-REJECT' ? <><LoaderCircle size={14} className="btn-spinner" /> Memproses...</> : 'Tolak Perubahan'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '12px' }}>Belum ada perubahan profil bisnis atau kontak yang perlu diputuskan.</p>
+                  )}
+                </div>
+
+                {/* Hanya admin yang dapat mengubah potongan platform provider. */}
+                <div className="drawer-section">
+                  <h4 className="section-title">Potongan Platform</h4>
+                  <p style={{ margin: '0 0 12px', color: '#64748b', fontSize: '13px', lineHeight: 1.5 }}>
+                    Persentase keuntungan TemenTrip dari nilai paket, di luar biaya layanan tetap. Perubahan hanya berlaku untuk booking baru.
+                  </p>
+                  <div className="platform-fee-form">
+                    <div className="platform-fee-input-wrap">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={3}
+                      aria-label="Potongan platform provider"
+                      value={platformFeePercent}
+                      onChange={(event) => setPlatformFeePercent(event.target.value.replace(/\D/g, ''))}
+                      disabled={savingPlatformFee}
+                      placeholder="Contoh: 8 atau 10"
+                      className="platform-fee-input"
+                    />
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontWeight: 700 }}>%</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="platform-fee-save-btn"
+                      onClick={handleUpdatePlatformFee}
+                      disabled={actionBusy || Number(platformFeePercent) === (selectedProvider.platformFeePercent || 15)}
+                      aria-busy={savingPlatformFee}
+                    >
+                      {savingPlatformFee ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Simpan Potongan'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 1.5: Data Legal & Rekening */}
                 <div className="drawer-section">
                   <h4 className="section-title">Data Legal & Rekening</h4>
                   
@@ -1391,22 +2017,26 @@ export const AdminDashboardPage: React.FC = () => {
                           </tr>
                         </tbody>
                       </table>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div className="legal-verification-actions">
                         <button 
                           type="button"
                           className="action-btn approve-btn" 
                           style={{ padding: '6px 12px', fontSize: '11px', flex: 1, backgroundColor: '#10b981', color: 'white', border: 0, borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                           onClick={() => handleVerifyLegal(selectedProvider.id, 'APPROVE')}
+                          disabled={actionBusy}
+                          aria-busy={pendingAction === 'legal-APPROVE'}
                         >
-                          Setujui
+                          {pendingAction === 'legal-APPROVE' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Setujui'}
                         </button>
                         <button 
                           type="button"
                           className="action-btn reject-btn" 
                           style={{ padding: '6px 12px', fontSize: '11px', flex: 1, backgroundColor: '#ef4444', color: 'white', border: 0, borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                           onClick={() => handleVerifyLegal(selectedProvider.id, 'REJECT')}
+                          disabled={actionBusy}
+                          aria-busy={pendingAction === 'legal-REJECT'}
                         >
-                          Tolak
+                          {pendingAction === 'legal-REJECT' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Tolak'}
                         </button>
                       </div>
                     </div>
@@ -1437,7 +2067,7 @@ export const AdminDashboardPage: React.FC = () => {
                 {/* Section 2: Dokumen Legalitas */}
                 <div className="drawer-section">
                   <h4 className="section-title">Dokumen Legalitas</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="document-list-rows">
                     {renderAdminDocRow('KTP PIC/Pemilik', 'KTP_PIC.jpg', selectedProvider.ktpPath, selectedProvider.pendingKtpPath, selectedProvider.ktpStatus, selectedProvider.ktpRejectionReason, 'ktp', '#3b82f6')}
                     {renderAdminDocRow('NIB', 'NIB.pdf', selectedProvider.nibPath, selectedProvider.pendingNibPath, selectedProvider.nibStatus, selectedProvider.nibRejectionReason, 'nib', '#f59e0b')}
                     {renderAdminDocRow('SIUP (Dokumen Pendukung)', 'SIUP_NIB.pdf', selectedProvider.documentPath, selectedProvider.pendingDocumentPath, selectedProvider.siupStatus, selectedProvider.siupRejectionReason, 'siup', '#10b981')}
@@ -1467,7 +2097,7 @@ export const AdminDashboardPage: React.FC = () => {
                           </div>
                         </div>
                       ) : !previewObjectUrl ? (
-                        <div style={{ padding: '24px', color: '#64748b' }}>Memuat dokumen...</div>
+                        <div style={{ padding: '16px', width: '100%' }} role="status"><span className="sr-only">Memuat dokumen</span><Skeleton height={420} radius={10} /></div>
                       ) : previewDocName.toLowerCase().includes('.pdf') ? (
                         <iframe 
                           src={previewObjectUrl}
@@ -1525,24 +2155,20 @@ export const AdminDashboardPage: React.FC = () => {
                 <div className="drawer-actions-row">
                   {selectedProvider.status === 'PENDING' ? (
                     <>
-                      <button className="action-btn approve-btn" onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED')}>
-                        Approve Provider
+                      <button className="action-btn approve-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-APPROVED'} onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED')}>
+                        {pendingAction === 'status-APPROVED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyetujui...</> : 'Setujui Mitra'}
                       </button>
-                      <button className="action-btn reject-btn" onClick={() => handleUpdateStatus(selectedProvider.id, 'REJECTED')}>
-                        Reject Provider
+                      <button className="action-btn reject-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-REJECTED'} onClick={() => handleUpdateStatus(selectedProvider.id, 'REJECTED')}>
+                        {pendingAction === 'status-REJECTED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menolak...</> : 'Tolak Mitra'}
                       </button>
                     </>
-                  ) : selectedProvider.status === 'APPROVED' ? (
-                    <button className="action-btn disable-btn" onClick={() => handleUpdateStatus(selectedProvider.id, 'PENDING', 'Verifikasi ditangguhkan oleh Administrator.')}>
-                      Disable Provider
+                  ) : selectedProvider.status !== 'APPROVED' ? (
+                    <button className="action-btn approve-btn" disabled={actionBusy} aria-busy={pendingAction === 'status-APPROVED'} onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED', 'Mitra diaktifkan kembali oleh Administrator.')}>
+                      {pendingAction === 'status-APPROVED' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyetujui...</> : 'Setujui Mitra'}
                     </button>
-                  ) : (
-                    <button className="action-btn approve-btn" onClick={() => handleUpdateStatus(selectedProvider.id, 'APPROVED', 'Mitra diaktifkan kembali oleh Administrator.')}>
-                      Approve Provider
-                    </button>
-                  )}
-                  <button className="action-btn delete-btn" onClick={() => handleDeleteProvider(selectedProvider.id)}>
-                    Delete Provider
+                  ) : null}
+                  <button className="action-btn delete-btn" disabled={actionBusy || selectedProvider.status === 'DISABLED'} aria-busy={pendingAction === 'delete'} onClick={() => handleDeleteProvider(selectedProvider.id)}>
+                    {pendingAction === 'delete' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menonaktifkan...</> : 'Nonaktifkan Provider'}
                   </button>
                 </div>
 
@@ -1674,6 +2300,7 @@ export const AdminDashboardPage: React.FC = () => {
           display: flex;
           flex-direction: column;
           min-height: 100vh;
+          min-width: 0;
         }
 
         .admin-top-header {
@@ -1771,6 +2398,7 @@ export const AdminDashboardPage: React.FC = () => {
           display: flex;
           flex: 1;
           position: relative;
+          min-width: 0;
         }
 
         .admin-main-content {
@@ -1793,6 +2421,291 @@ export const AdminDashboardPage: React.FC = () => {
         .verification-header-box p {
           font-size: 14px;
           color: #64748b;
+        }
+
+        .admin-dashboard-actions {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .admin-dashboard-actions > button {
+          min-height: 42px;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .admin-layout .submit-form-btn,
+        .admin-layout .back-form-btn,
+        .admin-layout .approve-action-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          min-height: 38px;
+          padding: 9px 16px;
+          border-radius: 8px;
+          border: 1px solid transparent;
+          font-size: 13px;
+          line-height: 1.2;
+          font-weight: 700;
+          white-space: normal;
+          text-align: center;
+          cursor: pointer;
+          transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+        }
+
+        .admin-layout .submit-form-btn,
+        .admin-layout .approve-action-btn {
+          background: #2563eb;
+          color: #ffffff;
+        }
+
+        .admin-layout .submit-form-btn:hover:not(:disabled),
+        .admin-layout .approve-action-btn:hover:not(:disabled) {
+          background: #1d4ed8;
+        }
+
+        .admin-layout .back-form-btn {
+          background: #ffffff;
+          border-color: #cbd5e1;
+          color: #334155;
+        }
+
+        .admin-layout .back-form-btn:hover:not(:disabled) {
+          background: #f8fafc;
+          border-color: #94a3b8;
+        }
+
+        .admin-layout .submit-form-btn:disabled,
+        .admin-layout .back-form-btn:disabled,
+        .admin-layout .approve-action-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+        }
+
+        .payment-table-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+        .payment-table-actions > div { display: flex; flex-wrap: wrap; gap: 6px; }
+        .payment-table-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 32px; padding: 6px 9px; border-radius: 7px; font-size: 11px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+        .payment-table-actions button:disabled { cursor: not-allowed; opacity: 0.55; }
+        .payment-table-approve { color: #ffffff; background: #059669; border: 1px solid #059669; }
+        .payment-table-approve:hover:not(:disabled) { background: #047857; border-color: #047857; }
+        .payment-table-reject { color: #b91c1c; background: #ffffff; border: 1px solid #fca5a5; }
+        .payment-table-reject:hover:not(:disabled) { background: #fef2f2; }
+        .payment-table-email { min-height: 28px !important; padding: 4px 8px !important; color: #0369a1; background: #f0f9ff; border: 1px solid #bae6fd; }
+        .payment-table-email:hover:not(:disabled) { background: #e0f2fe; border-color: #7dd3fc; }
+
+        .payment-review-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 10000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: rgba(15, 23, 42, 0.68);
+          backdrop-filter: blur(3px);
+        }
+
+        .payment-review-dialog {
+          width: min(980px, 100%);
+          max-height: calc(100vh - 48px);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 18px;
+          box-shadow: 0 28px 70px rgba(15, 23, 42, 0.3);
+        }
+
+        .payment-review-header {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 20px;
+          padding: 20px 24px 17px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .payment-review-mode {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 7px;
+          padding: 4px 9px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+        }
+
+        .payment-review-mode.approve { color: #047857; background: #d1fae5; }
+        .payment-review-mode.reject { color: #b91c1c; background: #fee2e2; }
+        .payment-review-header h2 { margin: 0; color: #0f172a; font-size: 21px; line-height: 1.25; }
+        .payment-review-header p { margin: 5px 0 0; color: #64748b; font-size: 13px; }
+
+        .payment-review-close {
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          width: 36px;
+          height: 36px;
+          padding: 0;
+          color: #64748b;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          cursor: pointer;
+        }
+
+        .payment-review-close:hover:not(:disabled) { color: #0f172a; background: #f1f5f9; }
+
+        .payment-review-body {
+          min-height: 0;
+          display: grid;
+          grid-template-columns: minmax(0, 1.12fr) minmax(330px, 0.88fr);
+          gap: 0;
+          overflow: auto;
+        }
+
+        .payment-proof-column,
+        .payment-decision-column { min-width: 0; padding: 20px 24px; }
+        .payment-proof-column { background: #f8fafc; border-right: 1px solid #e2e8f0; }
+
+        .payment-section-heading {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+
+        .payment-section-heading div { display: flex; flex-direction: column; gap: 2px; }
+        .payment-section-heading strong { color: #0f172a; font-size: 14px; }
+        .payment-section-heading span { color: #64748b; font-size: 11px; }
+        .payment-section-heading a { flex: 0 0 auto; color: #0284c7; font-size: 12px; font-weight: 800; text-decoration: none; }
+
+        .payment-proof-frame {
+          height: clamp(260px, 45vh, 430px);
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          background: #e2e8f0;
+          border: 1px solid #cbd5e1;
+          border-radius: 12px;
+        }
+
+        .payment-proof-frame > a { width: 100%; height: 100%; display: grid; place-items: center; }
+        .payment-proof-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+        .payment-proof-frame iframe { width: 100%; height: 100%; border: 0; background: #ffffff; }
+        .payment-proof-state { display: inline-flex; align-items: center; gap: 8px; color: #64748b; font-size: 13px; }
+
+        .payment-summary-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 9px;
+          margin-bottom: 13px;
+        }
+
+        .payment-summary-grid > div {
+          min-width: 0;
+          padding: 10px 11px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+        }
+
+        .payment-summary-grid span { display: block; margin-bottom: 3px; color: #64748b; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+        .payment-summary-grid strong { display: block; overflow: hidden; color: #1e293b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+        .payment-summary-grid .payment-summary-primary { grid-column: 1 / -1; background: #eff6ff; border-color: #bfdbfe; }
+        .payment-summary-grid .payment-summary-primary strong { color: #0369a1; font-size: 20px; }
+
+        .payment-decision-notice {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          margin-bottom: 13px;
+          padding: 11px 12px;
+          border: 1px solid;
+          border-radius: 10px;
+        }
+
+        .payment-decision-notice svg { flex: 0 0 auto; margin-top: 1px; }
+        .payment-decision-notice div { display: flex; flex-direction: column; gap: 2px; }
+        .payment-decision-notice strong { font-size: 12px; }
+        .payment-decision-notice span { font-size: 11px; line-height: 1.45; }
+        .payment-decision-notice.approve { color: #065f46; background: #ecfdf5; border-color: #a7f3d0; }
+        .payment-decision-notice.reject { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+
+        .payment-reject-presets > span { display: block; margin-bottom: 6px; color: #475569; font-size: 11px; font-weight: 800; }
+        .payment-reject-presets > div { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .payment-reject-presets button { padding: 6px 8px; color: #9f1239; background: #fff; border: 1px solid #fecdd3; border-radius: 7px; font-size: 10px; font-weight: 700; cursor: pointer; }
+        .payment-reject-presets button:hover,
+        .payment-reject-presets button.selected { background: #ffe4e6; border-color: #fb7185; }
+
+        .payment-review-notes-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; color: #334155; font-size: 12px; font-weight: 800; }
+        .payment-review-notes-label span { color: #94a3b8; font-size: 10px; font-weight: 600; }
+        .payment-decision-column textarea { width: 100%; min-height: 82px; resize: vertical; box-sizing: border-box; padding: 10px 11px; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 9px; outline: none; font: inherit; font-size: 12px; line-height: 1.45; }
+        .payment-decision-column textarea:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12); }
+        .payment-notes-count { margin-top: 3px; color: #94a3b8; font-size: 10px; text-align: right; }
+        .payment-review-error { margin: 9px 0 0; }
+
+        .payment-review-footer {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 14px 24px;
+          background: #ffffff;
+          border-top: 1px solid #e2e8f0;
+        }
+
+        .payment-review-footer > span { color: #64748b; font-size: 11px; }
+        .payment-review-footer > div { display: flex; align-items: center; gap: 9px; }
+        .payment-review-footer .back-form-btn { width: auto; min-height: 40px; padding: 9px 17px; }
+
+        .payment-decision-submit {
+          min-height: 40px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 9px 17px;
+          color: #ffffff;
+          border: 0;
+          border-radius: 9px;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+          box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+        }
+
+        .payment-decision-submit.approve { background: #059669; }
+        .payment-decision-submit.approve:hover:not(:disabled) { background: #047857; }
+        .payment-decision-submit.reject { background: #dc2626; }
+        .payment-decision-submit.reject:hover:not(:disabled) { background: #b91c1c; }
+        .payment-decision-submit:disabled,
+        .payment-review-close:disabled { cursor: not-allowed; opacity: 0.55; }
+
+        @media (max-width: 780px) {
+          .payment-review-overlay { align-items: flex-end; padding: 0; }
+          .payment-review-dialog { width: 100%; max-height: 96vh; border-radius: 18px 18px 0 0; }
+          .payment-review-header { padding: 17px 18px 14px; }
+          .payment-review-header h2 { font-size: 18px; }
+          .payment-review-body { display: block; }
+          .payment-proof-column,
+          .payment-decision-column { padding: 16px 18px; }
+          .payment-proof-column { border-right: 0; border-bottom: 1px solid #e2e8f0; }
+          .payment-proof-frame { height: min(34vh, 300px); }
+          .payment-review-footer { align-items: stretch; flex-direction: column; padding: 12px 18px 16px; }
+          .payment-review-footer > span { display: none; }
+          .payment-review-footer > div { display: grid; grid-template-columns: 0.7fr 1.3fr; }
+          .payment-decision-submit { padding-inline: 12px; }
         }
 
         /* Stats Row */
@@ -2152,6 +3065,8 @@ export const AdminDashboardPage: React.FC = () => {
         /* Detail Provider Drawer */
         .detail-provider-drawer {
           width: 440px;
+          min-width: 0;
+          flex: 0 0 440px;
           background-color: #ffffff;
           border-left: 1px solid #e2e8f0;
           box-shadow: -4px 0 20px rgba(0, 0, 0, 0.05);
@@ -2159,6 +3074,7 @@ export const AdminDashboardPage: React.FC = () => {
           top: 64px;
           height: calc(100vh - 64px);
           overflow-y: auto;
+          overflow-x: hidden;
           z-index: 5;
         }
 
@@ -2167,6 +3083,7 @@ export const AdminDashboardPage: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 24px;
+          min-width: 0;
         }
 
         .drawer-header-row {
@@ -2205,6 +3122,16 @@ export const AdminDashboardPage: React.FC = () => {
           border: 1px solid #e2e8f0;
           border-radius: 12px;
           padding: 16px;
+          min-width: 0;
+        }
+
+        .drawer-profile-card > div:last-child {
+          min-width: 0;
+        }
+
+        .drawer-profile-card h3,
+        .drawer-profile-card p {
+          overflow-wrap: anywhere;
         }
 
         .profile-logo-avatar {
@@ -2280,6 +3207,62 @@ export const AdminDashboardPage: React.FC = () => {
         .info-table .field-value {
           color: #0f172a;
           font-weight: 600;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        .platform-fee-form {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .platform-fee-input-wrap {
+          position: relative;
+          min-width: 0;
+        }
+
+        .platform-fee-input {
+          width: 100%;
+          box-sizing: border-box;
+          padding: 10px 36px 10px 12px;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          background: #ffffff;
+        }
+
+        .platform-fee-save-btn {
+          min-height: 40px;
+          width: auto;
+          padding: 8px 14px;
+          border: 0;
+          border-radius: 8px;
+          background: #10b981;
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .platform-fee-save-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+        }
+
+        .legal-verification-actions {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+
+        .legal-verification-actions .action-btn {
+          width: 100%;
+          height: auto;
+          min-width: 0;
+          min-height: 36px;
+          border-radius: 7px;
         }
 
         .social-link {
@@ -2296,6 +3279,44 @@ export const AdminDashboardPage: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 12px;
+        }
+
+        .doc-row-container {
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 12px;
+          background-color: #ffffff;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .doc-row-heading,
+        .doc-pending-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .doc-row-identity {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+
+        .doc-row-identity > div {
+          min-width: 0;
+        }
+
+        .doc-row-actions,
+        .doc-verification-actions {
+          display: flex;
+          gap: 6px;
+          flex-shrink: 0;
         }
 
         .doc-row {
@@ -2318,6 +3339,7 @@ export const AdminDashboardPage: React.FC = () => {
           font-size: 12px;
           font-weight: 700;
           color: #334155;
+          overflow-wrap: anywhere;
         }
 
         .doc-badge {
@@ -2361,6 +3383,14 @@ export const AdminDashboardPage: React.FC = () => {
           align-items: center;
           justify-content: space-between;
           margin-bottom: 8px;
+          gap: 12px;
+          min-width: 0;
+        }
+
+        .preview-header-row .section-title {
+          min-width: 0;
+          margin-bottom: 0;
+          overflow-wrap: anywhere;
         }
 
         .preview-controls {
@@ -2501,12 +3531,16 @@ export const AdminDashboardPage: React.FC = () => {
         /* Drawer Actions Row */
         .drawer-actions-row {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 8px;
           margin-top: 12px;
         }
 
         .drawer-actions-row .action-btn {
+          width: 100%;
+          height: auto;
+          min-width: 0;
+          min-height: 42px;
           padding: 10px;
           border-radius: 8px;
           font-size: 12px;
@@ -2515,6 +3549,8 @@ export const AdminDashboardPage: React.FC = () => {
           text-align: center;
           border: none;
           transition: all 0.2s;
+          line-height: 1.25;
+          white-space: normal;
         }
 
         .drawer-actions-row .approve-btn {
@@ -2551,7 +3587,7 @@ export const AdminDashboardPage: React.FC = () => {
           background-color: #ffffff;
           border: 1px solid #ef4444;
           color: #ef4444;
-          grid-column: span 1;
+          grid-column: 1 / -1;
         }
 
         .drawer-actions-row .delete-btn:hover {
@@ -2563,6 +3599,183 @@ export const AdminDashboardPage: React.FC = () => {
           padding: 60px !important;
           color: #94a3b8;
           font-style: italic;
+        }
+
+        @media (max-width: 1200px) {
+          .detail-provider-drawer {
+            position: fixed;
+            top: 64px;
+            right: 0;
+            width: min(520px, 100vw);
+            height: calc(100dvh - 64px);
+            flex-basis: auto;
+            z-index: 30;
+            box-shadow: -12px 0 32px rgba(15, 23, 42, 0.18);
+          }
+        }
+
+        @media (max-width: 900px) {
+          .admin-layout {
+            grid-template-columns: minmax(0, 1fr);
+          }
+
+          .admin-sidebar,
+          .admin-main-wrapper {
+            min-width: 0;
+            max-width: 100vw;
+          }
+
+          .admin-sidebar {
+            position: relative;
+            top: auto;
+            height: auto;
+            padding: 16px;
+            gap: 12px;
+          }
+
+          .admin-sidebar .sidebar-brand {
+            max-width: 220px;
+            margin-bottom: 14px;
+            padding: 0;
+          }
+
+          .admin-sidebar .sidebar-menu {
+            flex-direction: row;
+            overflow-x: auto;
+            padding-bottom: 4px;
+          }
+
+          .admin-sidebar .menu-btn {
+            width: auto;
+            flex: 0 0 auto;
+            white-space: nowrap;
+          }
+
+          .admin-sidebar .sidebar-bottom {
+            align-items: flex-start;
+          }
+
+          .admin-top-header {
+            padding: 0 16px;
+          }
+
+          .admin-top-header .hamburger-btn {
+            display: none;
+          }
+
+          .admin-main-content {
+            padding: 24px 18px;
+          }
+
+          .stats-cards-row {
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+          }
+
+          .tab-filters-row {
+            overflow-x: auto;
+            padding: 0 8px;
+          }
+
+          .tab-filter-btn {
+            flex: 0 0 auto;
+            white-space: nowrap;
+          }
+
+          .filter-controls-row {
+            flex-wrap: wrap;
+          }
+
+          .search-input-box {
+            flex-basis: 100%;
+          }
+        }
+
+        @media (max-width: 560px) {
+          .detail-provider-drawer {
+            left: 0;
+            width: 100vw;
+          }
+
+          .drawer-inner {
+            padding: 20px 16px 28px;
+            gap: 20px;
+          }
+
+          .drawer-profile-card {
+            align-items: flex-start;
+          }
+
+          .info-table,
+          .info-table tbody,
+          .info-table tr,
+          .info-table td {
+            display: block;
+            width: 100%;
+          }
+
+          .info-table tr {
+            padding: 7px 0;
+          }
+
+          .info-table td {
+            padding: 0;
+          }
+
+          .info-table .field-label {
+            width: auto;
+            margin-bottom: 2px;
+            font-size: 12px;
+          }
+
+          .platform-fee-form {
+            grid-template-columns: 1fr;
+          }
+
+          .platform-fee-save-btn {
+            width: 100%;
+          }
+
+          .doc-row-heading,
+          .doc-pending-header {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .doc-row-actions,
+          .doc-row-actions .doc-action-btn {
+            width: 100%;
+          }
+
+          .preview-header-row {
+            align-items: flex-start;
+          }
+
+          .drawer-actions-row {
+            grid-template-columns: 1fr;
+          }
+
+          .drawer-actions-row .action-btn {
+            grid-column: 1;
+          }
+
+          .admin-top-header .profile-details {
+            display: none;
+          }
+
+          .verification-header-box h1 {
+            font-size: 21px;
+          }
+
+          .admin-dashboard-actions,
+          .admin-dashboard-actions > button,
+          .filter-select,
+          .filter-btn-outline {
+            width: 100% !important;
+          }
+
+          .legal-verification-actions {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </div>

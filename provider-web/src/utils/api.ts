@@ -11,10 +11,6 @@ const isSameOriginApiPath = !!configuredApiBaseURL
   && configuredApiBaseURL.startsWith('/')
   && !configuredApiBaseURL.startsWith('//');
 
-if (!configuredApiBaseURL && !isLocalBrowser) {
-  throw new Error('VITE_API_BASE_URL wajib diisi dengan URL absolut backend pada deployment');
-}
-
 if (configuredApiBaseURL && !isSameOriginApiPath) {
   let parsedApiURL: URL;
   try {
@@ -27,8 +23,18 @@ if (configuredApiBaseURL && !isSameOriginApiPath) {
   }
 }
 
+// Tanpa VITE_API_BASE_URL: di browser lokal (Vite dev server) API diasumsikan
+// berjalan pada host yang sama port 8080, selain itu memakai path satu origin
+// /api/v1 di belakang reverse proxy (lihat README).
+function defaultApiBaseURL(): string {
+  if (typeof window !== 'undefined' && isLocalBrowser) {
+    return `${window.location.protocol}//${window.location.hostname}:8080/api/v1`;
+  }
+  return '/api/v1';
+}
+
 export const API_BASE_URL = (
-  configuredApiBaseURL || 'http://localhost:8080/api/v1'
+  configuredApiBaseURL || defaultApiBaseURL()
 ).replace(/\/+$/, '');
 
 export function getProviderToken(): string | null {
@@ -235,6 +241,14 @@ export async function request(endpoint: string, options: RequestInit = {}) {
     );
   }
 
+  // Respons HTML berarti request tidak sampai ke API (mis. VITE_API_BASE_URL
+  // kosong sehingga /api/v1 dilayani SPA). Gagal dengan jelas, jangan diam-diam
+  // dianggap data kosong.
+  const contentType = response.headers.get('Content-Type') || '';
+  if (contentType.includes('text/html')) {
+    console.error(`[API] ${API_BASE_URL}${endpoint} mengembalikan HTML; periksa konfigurasi VITE_API_BASE_URL.`);
+    throw new ApiError('Server tidak dapat dihubungi dengan benar. Silakan coba lagi nanti.', response.status, response.headers.get('X-Request-ID'));
+  }
   return response.json().catch(() => ({}));
 }
 

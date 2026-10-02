@@ -6,7 +6,7 @@ import { Mail, Phone, MapPin, Clock, ShieldCheck, ChevronRight } from 'lucide-re
 export const Footer: React.FC = () => {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
-  const { navigateTo } = useNavigation();
+  const { navigateTo, route } = useNavigation();
 
   return (
     <footer className="site-footer">
@@ -16,25 +16,25 @@ export const Footer: React.FC = () => {
           <div className="footer-col brand-col">
             <div className="logo-brand">
               <img src="/tementrip_official_logo.png" alt="TemenTrip" className="footer-logo" />
-              <span className="logo-badge">Partner</span>
+              {route === 'partner-landing' && <span className="logo-badge">Partner</span>}
             </div>
             <p className="brand-description">
-              TemenTrip (PT TripKita Jelajah Nusantara) adalah platform penyedia paket perjalanan wisata terpercaya di Indonesia. Temukan Open Trip, Private Trip, dan paket liburan impian dengan transaksi transparan & garansi DP 50%.
+              TemenTrip (PT TripKita Jelajah Nusantara) adalah platform untuk memesan paket wisata dari mitra lokal di Indonesia: Open Trip, Private Trip, serta trip keluarga dan rombongan.
             </p>
             <div className="security-badge">
               <ShieldCheck size={16} color="#00c9a7" />
-              <span>Sistem Pembayaran Resmi & Terverifikasi</span>
+              <span>Pembayaran transfer diverifikasi admin TemenTrip</span>
             </div>
           </div>
 
-          {/* Column 2: Kontak Resmi (Xendit Compliance Requirement) */}
+          {/* Column 2: Kontak resmi */}
           <div className="footer-col contact-col">
-            <h4 className="footer-col-title">Kontak & Operasional</h4>
+            <h4 className="footer-col-title">Kontak</h4>
             <ul className="contact-info-list">
               <li>
                 <Mail size={16} className="contact-icon email-icon" />
                 <div>
-                  <span className="contact-label">Email Dukungan Resmi:</span>
+                  <span className="contact-label">Email:</span>
                   <a href="mailto:tripkitajelajahnusantara@gmail.com" className="contact-link">
                     tripkitajelajahnusantara@gmail.com
                   </a>
@@ -43,7 +43,7 @@ export const Footer: React.FC = () => {
               <li>
                 <Phone size={16} className="contact-icon wa-icon" />
                 <div>
-                  <span className="contact-label">WhatsApp Fast Response:</span>
+                  <span className="contact-label">WhatsApp:</span>
                   <a href="https://wa.me/628132008875" target="_blank" rel="noreferrer" className="contact-link">
                     +62 813 2008 875
                   </a>
@@ -52,14 +52,14 @@ export const Footer: React.FC = () => {
               <li>
                 <Clock size={16} className="contact-icon time-icon" />
                 <div>
-                  <span className="contact-label">Jam Operasional CS:</span>
-                  <span className="contact-text">24 Jam / 7 Hari Seminggu (Senin - Minggu)</span>
+                  <span className="contact-label">Layanan pelanggan:</span>
+                  <span className="contact-text">Hubungi kami melalui WhatsApp atau email.</span>
                 </div>
               </li>
               <li>
                 <MapPin size={16} className="contact-icon map-icon" />
                 <div>
-                  <span className="contact-label">Alamat Operasional Resmi:</span>
+                  <span className="contact-label">Alamat:</span>
                   <span className="contact-text">
                     Jl. Puskesmas No.35-22, RT.11/RW.7, Duri Kosambi, Kec. Cengkareng, Kota Jakarta Barat, DKI Jakarta 11750
                   </span>
@@ -93,7 +93,7 @@ export const Footer: React.FC = () => {
                 </button>
               </li>
               <li>
-                <button type="button" onClick={() => navigateTo('partner-landing')} className="footer-nav-btn Highlight-partner">
+                <button type="button" onClick={() => navigateTo('partner-landing')} className="footer-nav-btn highlight-partner">
                   <ChevronRight size={14} /> Jadi Mitra Provider
                 </button>
               </li>
@@ -133,7 +133,7 @@ export const Footer: React.FC = () => {
       <div className="footer-bottom">
         <div className="container footer-bottom-container">
           <span className="copyright-text">
-            © 2026 TemenTrip (PT TripKita Jelajah Nusantara). Hak cipta dilindungi undang-undang.
+            © {new Date().getFullYear()} TemenTrip (PT TripKita Jelajah Nusantara). Hak cipta dilindungi undang-undang.
           </span>
           <div className="footer-legal-links">
             <button type="button" onClick={() => setShowPrivacy(true)} className="footer-legal-btn">
@@ -151,7 +151,7 @@ export const Footer: React.FC = () => {
       <LegalModalContainer
         isOpen={showTerms}
         onClose={() => setShowTerms(false)}
-        title="Syarat & Ketentuan Platform TripKita"
+        title="Syarat & Ketentuan TemenTrip"
       >
         <GeneralTermsContent />
       </LegalModalContainer>

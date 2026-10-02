@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -35,8 +36,8 @@ func principalIDFromContext(c *gin.Context) (uint, bool) {
 	return id, true
 }
 
-// GetProviderDepartures mengembalikan seluruh keberangkatan open trip milik
-// mitra yang pernah ditinjau pada batas H-3, termasuk yang sudah diputuskan.
+// GetProviderDepartures mengembalikan peninjauan H-3 milik mitra: kuota Open
+// Trip dan prakiraan cuaca untuk trip non-Open-Trip, termasuk yang diputuskan.
 func (ctrl *DepartureController) GetProviderDepartures(c *gin.Context) {
 	providerID, ok := principalIDFromContext(c)
 	if !ok {
@@ -46,7 +47,7 @@ func (ctrl *DepartureController) GetProviderDepartures(c *gin.Context) {
 
 	departures, err := ctrl.service.ListForProvider(providerID)
 	if err != nil {
-		respondInternalError(c, "memuat keberangkatan open trip", err)
+		respondInternalError(c, "memuat pertimbangan keberangkatan", err)
 		return
 	}
 	c.JSON(http.StatusOK, departures)
@@ -191,5 +192,53 @@ func (ctrl *DepartureController) DeclareForceMajeure(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "Pembatalan tercatat. Seluruh pelanggan telah dikirimi notifikasi dan email untuk menerima jadwal pengganti atau meminta pengembalian dana.",
 		"departure": departure,
+	})
+}
+
+// OfferBookingReschedule mengirim tawaran jadwal pengganti untuk satu pesanan
+// (seluruh keberangkatan bila Open Trip). Pelanggan memilih menerima tanggal
+// baru atau menolak dengan refund penuh.
+func (ctrl *DepartureController) OfferBookingReschedule(c *gin.Context) {
+	providerID, ok := principalIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	bookingID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID booking tidak valid"})
+		return
+	}
+
+	var req models.ProviderRescheduleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tanggal pengganti dan alasan (10–200 karakter) wajib diisi"})
+		return
+	}
+
+	result, err := ctrl.service.OfferBookingReschedule(uint(bookingID), providerID, &req)
+	if err != nil {
+		var inputErr *services.DepartureInputError
+		if errors.As(err, &inputErr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+			return
+		}
+		respondInternalError(c, "mengirim tawaran jadwal pengganti", err)
+		return
+	}
+
+	message := "Tawaran jadwal pengganti terkirim. Pelanggan menerima email dan notifikasi untuk menerima jadwal baru atau meminta refund penuh."
+	if result.Offered > 1 {
+		message = fmt.Sprintf("Tawaran jadwal pengganti terkirim ke %d pesanan pada keberangkatan ini. Setiap pelanggan menerima email dan notifikasi untuk menerima jadwal baru atau meminta refund penuh.", result.Offered)
+	}
+	if result.Refunded > 0 {
+		message += fmt.Sprintf(" %d pesanan yang sudah pernah dijadwalkan ulang langsung diteruskan ke refund penuh.", result.Refunded)
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message":          message,
+		"offered":          result.Offered,
+		"refunded":         result.Refunded,
+		"responseDeadline": result.Departure.ResponseDeadline,
+		"proposedDate":     result.Departure.ProposedDate,
 	})
 }

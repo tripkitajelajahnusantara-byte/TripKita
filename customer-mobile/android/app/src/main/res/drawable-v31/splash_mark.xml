@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ menskalakan ikon splash ke 240dp. Inset 27.5% membuat simbol
+     "7" tampil 54dp, sama dengan splash lama dan frame pertama Flutter. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@mipmap/ic_launcher_foreground"
+    android:inset="27.5%" />

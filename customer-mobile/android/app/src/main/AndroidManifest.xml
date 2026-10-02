@@ -1,10 +1,9 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.tementrip.mobileapp">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="TemenTrip"
         android:name="${applicationName}"
-        android:icon="@drawable/launch_background">
+        android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -26,4 +25,12 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+    <!-- Android 11+ mewajibkan deklarasi ini agar url_launcher dapat membuka
+         invoice Xendit, WhatsApp, dan Google Maps di aplikasi lain. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
 </manifest>

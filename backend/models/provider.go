@@ -28,8 +28,12 @@ type Provider struct {
 	Role                string    `gorm:"size:50;not null;default:'PROVIDER'" json:"role"`
 	Status              string    `gorm:"size:50;not null;default:'PENDING'" json:"status"`
 	VerificationNotes   string    `gorm:"type:text" json:"verificationNotes"`
+	PlatformFeePercent  int64     `gorm:"not null;default:15" json:"platformFeePercent"`
 	CreatedAt           time.Time `json:"createdAt"`
 	UpdatedAt           time.Time `json:"updatedAt"`
+	// Explicit soft delete keeps the provider available to historical bookings.
+	// Only the admin status endpoint may clear this timestamp.
+	DeletedAt *time.Time `gorm:"index" json:"deletedAt"`
 
 	// New fields: Website, active bank details, NPWP number
 	Website              string     `gorm:"size:255" json:"website"`
@@ -41,6 +45,24 @@ type Provider struct {
 	BirthDate            string     `gorm:"size:50" json:"birthDate"`
 	WishlistData         string     `gorm:"type:text" json:"wishlistData"`
 	ContactLastUpdatedAt *time.Time `json:"contactLastUpdatedAt"`
+
+	// Perubahan profil bisnis dan kontak tidak langsung mengganti data yang
+	// sedang tayang. Seluruh nilai di bawah ini merupakan satu snapshot lengkap
+	// yang baru diterapkan setelah disetujui admin. Snapshot lengkap juga
+	// memungkinkan kolom opsional (mis. website) sengaja dikosongkan.
+	PendingBusinessName        string `gorm:"size:255" json:"pendingBusinessName"`
+	PendingBusinessCategory    string `gorm:"size:100" json:"pendingBusinessCategory"`
+	PendingOperationalProvince string `gorm:"size:255" json:"pendingOperationalProvince"`
+	PendingOperationalCity     string `gorm:"size:255" json:"pendingOperationalCity"`
+	PendingDescription         string `gorm:"type:text" json:"pendingDescription"`
+	PendingPicName             string `gorm:"size:255" json:"pendingPicName"`
+	PendingEmail               string `gorm:"size:255" json:"pendingEmail"`
+	PendingWhatsApp            string `gorm:"size:50" json:"pendingWhatsapp"`
+	PendingInstagram           string `gorm:"size:255" json:"pendingInstagram"`
+	PendingTikTok              string `gorm:"size:255" json:"pendingTiktok"`
+	PendingWebsite             string `gorm:"size:255" json:"pendingWebsite"`
+	ProfileVerificationStatus  string `gorm:"size:50;default:''" json:"profileVerificationStatus"` // PENDING, APPROVED, REJECTED
+	ProfileRejectionReason     string `gorm:"type:text" json:"profileRejectionReason"`
 
 	// Pending bank details & legal verification status
 	PendingNPWP             string `gorm:"size:100" json:"pendingNpwp"`
@@ -85,9 +107,23 @@ type ProviderStatusHistory struct {
 	CreatedAt  time.Time `json:"createdAt"`
 }
 
+// CanAuthenticate menentukan siapa yang boleh memiliki sesi. Mitra yang
+// ditolak tetap boleh masuk agar dapat membaca catatan admin dan memperbaiki
+// dokumen; rute operasional tetap mewajibkan status APPROVED.
+func (p *Provider) CanAuthenticate() bool {
+	if p == nil || p.DeletedAt != nil {
+		return false
+	}
+	return p.Status == "APPROVED" || (p.Role == "PROVIDER" && (p.Status == "PENDING" || p.Status == "REJECTED"))
+}
+
 type UpdateProviderStatusRequest struct {
 	Status            string `json:"status" binding:"required,oneof=APPROVED REJECTED PENDING"`
 	VerificationNotes string `json:"verificationNotes"`
+}
+
+type UpdateProviderPlatformFeeRequest struct {
+	PlatformFeePercent int64 `json:"platformFeePercent" binding:"required,gte=1,lte=100"`
 }
 
 type RegisterRequest struct {
