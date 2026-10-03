@@ -85,8 +85,8 @@ func (r *providerRepository) Update(provider *models.Provider) error {
 }
 
 func (r *providerRepository) FindAllProviders() ([]models.Provider, error) {
-	var providers []models.Provider
-	err := r.db.Where("role = ?", "PROVIDER").Order("created_at desc").Find(&providers).Error
+	providers := []models.Provider{}
+	err := r.db.Where("role = ?", "PROVIDER").Order("created_at DESC, id DESC").Find(&providers).Error
 	if err != nil {
 		return nil, err
 	}

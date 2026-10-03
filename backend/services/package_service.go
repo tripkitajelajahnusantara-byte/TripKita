@@ -68,6 +68,9 @@ func validatePackagePhotos(image, images string) error {
 }
 
 func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackageRequest) (*models.Package, error) {
+	if err := validatePackageItinerary(req.Itinerary); err != nil {
+		return nil, err
+	}
 	if err := validatePackagePhotos(req.Image, req.Images); err != nil {
 		return nil, err
 	}
@@ -319,6 +322,9 @@ func (s *packageService) GetPackageByID(id uint, providerID uint) (*models.Packa
 }
 
 func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.UpdatePackageRequest) (*models.Package, error) {
+	if err := validatePackageItinerary(req.Itinerary); err != nil {
+		return nil, err
+	}
 	pkg, err := s.repo.FindByIDAndProvider(id, providerID)
 	if err != nil {
 		return nil, err

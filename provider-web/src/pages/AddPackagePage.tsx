@@ -3,6 +3,8 @@ import { useNavigation } from '../context/NavigationContext';
 import { Sidebar } from '../components/Sidebar';
 import { 
   ArrowLeft, 
+  ArrowUp,
+  ArrowDown,
   Save, 
   Send, 
   Sparkles,
@@ -274,7 +276,7 @@ export const AddPackagePage: React.FC = () => {
 
   // Itinerary helper actions
   const handleAddActivity = (day: number) => {
-    if (!newActivityTime || !newActivityTitle) return;
+    if (!newActivityTime.trim() || !newActivityTitle.trim()) return;
     setItineraries(prev => {
       const existingDay = prev.find(it => it.day === day);
       if (existingDay) {
@@ -295,6 +297,27 @@ export const AddPackagePage: React.FC = () => {
       ? { ...it, activities: it.activities.filter((_, i) => i !== idx) }
       : it
     ));
+  };
+
+  const handleEditActivity = (day: number, idx: number, field: 'time' | 'title', value: string) => {
+    setItineraries(prev => prev.map(it => it.day === day
+      ? { ...it, activities: it.activities.map((activity, i) => i === idx ? { ...activity, [field]: value } : activity) }
+      : it));
+  };
+
+  const handleMoveActivity = (day: number, idx: number, direction: -1 | 1) => {
+    setItineraries(prev => prev.map(it => {
+      if (it.day !== day || idx + direction < 0 || idx + direction >= it.activities.length) return it;
+      const activities = [...it.activities];
+      [activities[idx], activities[idx + direction]] = [activities[idx + direction], activities[idx]];
+      return { ...it, activities };
+    }));
+  };
+
+  const handleInsertActivity = (day: number, idx: number) => {
+    setItineraries(prev => prev.map(it => it.day === day
+      ? { ...it, activities: [...it.activities.slice(0, idx + 1), { time: '', title: '' }, ...it.activities.slice(idx + 1)] }
+      : it));
   };
 
   // Facilities helper actions
@@ -450,6 +473,13 @@ export const AddPackagePage: React.FC = () => {
       return;
     }
 
+    const incompleteDay = itineraries.find(day => day.activities.some(activity => !activity.time.trim() || !activity.title.trim()));
+    if (incompleteDay) {
+      setSelectedItineraryDay(incompleteDay.day);
+      showValidation(`Lengkapi waktu dan judul setiap kegiatan pada hari ${incompleteDay.day}, atau hapus kegiatan yang tidak diperlukan.`, 'itinerary');
+      return;
+    }
+
     if (status === 'publish') {
       if (!packageName.trim()) {
 		showValidation('Nama paket wisata wajib diisi sebelum paket dipublikasikan.', 'info');
@@ -571,7 +601,7 @@ export const AddPackagePage: React.FC = () => {
           description: description,
           includedFacilities: includedFacilities.join('\n'),
           excludedFacilities: excludedFacilities.join('\n'),
-          itinerary: JSON.stringify(itineraries),
+          itinerary: JSON.stringify(itineraries.map(day => ({ ...day, activities: day.activities.map(activity => ({ time: activity.time.trim(), title: activity.title.trim() })) }))),
           image: packagePhotos[0] || '',
           images: packagePhotos.join(','),
         };
@@ -806,6 +836,7 @@ export const AddPackagePage: React.FC = () => {
               <div className="form-section-body animate-fade-in">
                 <h3>Itinerary Perjalanan</h3>
                 <p className="section-subtitle">Buat rencana perjalanan detail hari demi hari sesuai durasi paket ({duration} Hari)</p>
+                <p className="section-subtitle">Waktu dan kegiatan bisa diedit langsung. Gunakan panah untuk mengubah urutan atau sisipkan kegiatan di tengah. Perubahan tersimpan saat paket disimpan.</p>
                 
                 <div className="itinerary-tab-layout">
                   <div className="itinerary-days-nav">
@@ -836,15 +867,25 @@ export const AddPackagePage: React.FC = () => {
                         }
                         return acts.map((act, idx) => (
                           <div key={idx} className="timeline-activity-item">
-                            <span className="activity-time-badge"><Clock size={10} /> {act.time}</span>
+                            <label className="activity-time-badge"><Clock size={12} />
+                              <input aria-label={`Waktu kegiatan ${idx + 1} hari ${selectedItineraryDay}`} placeholder="08:00 - 10:00 WIB" value={act.time}
+                                onChange={event => handleEditActivity(selectedItineraryDay, idx, 'time', event.target.value)} />
+                            </label>
                             <div className="activity-details">
-                              <p>{act.title}</p>
+                              <input aria-label={`Judul kegiatan ${idx + 1} hari ${selectedItineraryDay}`} placeholder="Nama kegiatan" value={act.title}
+                                onChange={event => handleEditActivity(selectedItineraryDay, idx, 'title', event.target.value)} />
+                            </div>
+                            <div className="activity-actions">
+                              <button type="button" disabled={idx === 0} aria-label={`Naikkan kegiatan ${idx + 1}`} onClick={() => handleMoveActivity(selectedItineraryDay, idx, -1)}><ArrowUp size={14} /> Naik</button>
+                              <button type="button" disabled={idx === acts.length - 1} aria-label={`Turunkan kegiatan ${idx + 1}`} onClick={() => handleMoveActivity(selectedItineraryDay, idx, 1)}><ArrowDown size={14} /> Turun</button>
+                              <button type="button" onClick={() => handleInsertActivity(selectedItineraryDay, idx)}><Plus size={14} /> Sisipkan setelahnya</button>
                               <button 
                                 type="button"
                                 className="delete-activity-btn" 
+                                aria-label={`Hapus kegiatan ${idx + 1}`}
                                 onClick={() => handleDeleteActivity(selectedItineraryDay, idx)}
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={14} /> Hapus
                               </button>
                             </div>
                           </div>
@@ -1346,6 +1387,7 @@ export const AddPackagePage: React.FC = () => {
 
         /* Form card body */
         .form-content-card {
+          min-width: 0;
           background: #ffffff;
           border: 1px solid var(--color-border);
           border-radius: var(--radius-lg);
@@ -1427,7 +1469,7 @@ export const AddPackagePage: React.FC = () => {
         /* Itinerary style */
         .itinerary-tab-layout {
           display: grid;
-          grid-template-columns: 100px 1fr;
+          grid-template-columns: 100px minmax(0, 1fr);
           gap: 24px;
           border-top: 1px solid var(--color-border);
           padding-top: 20px;
@@ -1460,6 +1502,7 @@ export const AddPackagePage: React.FC = () => {
         }
 
         .day-activities-panel {
+          min-width: 0;
           background: var(--color-bg-light);
           border-radius: var(--radius-md);
           padding: 20px;
@@ -1538,6 +1581,24 @@ export const AddPackagePage: React.FC = () => {
           flex: 1;
         }
 
+        .activity-time-badge input, .activity-details input {
+          width: 100%; min-width: 0; border: 1px solid #cbd5e1; border-radius: 6px;
+          padding: 9px; background: white; font: inherit; font-size: 12px; color: #0f172a;
+        }
+        .activity-time-badge { font-size: 12px; }
+        .activity-time-badge input { max-width: 240px; color: #0369a1; }
+        .activity-details { padding: 0; border: none; }
+        .activity-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .activity-actions button {
+          display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px;
+          border: 1px solid #e2e8f0; border-radius: 6px; background: white; color: #475569; font-size: 11px;
+        }
+        .activity-actions button:disabled { opacity: .4; cursor: default; }
+        .activity-actions .delete-activity-btn { color: #b91c1c; }
+        .activity-time-badge input:focus-visible, .activity-details input:focus-visible, .activity-actions button:focus-visible {
+          outline: 2px solid #0284c7; outline-offset: 2px;
+        }
+
         .delete-activity-btn {
           color: var(--color-text-light);
           cursor: pointer;
@@ -1575,6 +1636,7 @@ export const AddPackagePage: React.FC = () => {
         }
 
         .add-activity-inputs input {
+          min-width: 0;
           font-size: 12px;
           padding: 8px 10px;
           border: 1px solid var(--color-border);
@@ -1781,6 +1843,13 @@ export const AddPackagePage: React.FC = () => {
         }
 
         @media (max-width: 640px) {
+          .form-content-card { padding: 20px; }
+          .itinerary-tab-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+          .itinerary-days-nav { flex-direction: row; flex-wrap: wrap; }
+          .day-nav-btn { width: auto; }
+          .day-activities-panel { padding: 14px; }
+          .add-activity-inputs { grid-template-columns: minmax(0, 1fr); }
+          .add-act-submit-btn { padding: 10px; }
           .photos-gallery-grid {
             grid-template-columns: repeat(2, 1fr);
           }
@@ -1812,7 +1881,7 @@ export const AddPackagePage: React.FC = () => {
 
         @media (max-width: 992px) {
           .add-pkg-split {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
           }
         }
       `}</style>
