@@ -20,6 +20,24 @@ func NewAdminController(service services.AdminService) *AdminController {
 	return &AdminController{service: service}
 }
 
+func (ctrl *AdminController) MonitorBookings(c *gin.Context) {
+	filter := models.AdminBookingFilter{Page: 1, PageSize: 20}
+	if err := c.ShouldBindQuery(&filter); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Filter booking tidak valid. Periksa provider, status, pencarian, dan halaman."})
+		return
+	}
+	result, err := ctrl.service.MonitorBookings(filter)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Provider tidak ditemukan"})
+		return
+	}
+	if err != nil {
+		respondInternalError(c, "memuat monitoring booking", err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 func (ctrl *AdminController) ListProviders(c *gin.Context) {
 	providers, err := ctrl.service.ListProviders()
 	if err != nil {

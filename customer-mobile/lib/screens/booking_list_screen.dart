@@ -7,6 +7,7 @@ import 'package:customer_mobile/screens/trip_detail_screen.dart';
 import 'package:customer_mobile/services/api_service.dart';
 import 'package:customer_mobile/services/auth_session.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
+import 'package:customer_mobile/utils/external_links.dart';
 import 'package:customer_mobile/utils/formatters.dart';
 import 'package:customer_mobile/widgets/common.dart';
 

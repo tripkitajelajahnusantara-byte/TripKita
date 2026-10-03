@@ -175,6 +175,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 		admin.Use(middleware.AuthMiddleware(db, cfg), middleware.AdminRequired())
 		{
 			admin.GET("/providers", adminCtrl.ListProviders)
+			admin.GET("/booking-monitor", adminCtrl.MonitorBookings)
 			admin.GET("/documents", uploadCtrl.GetAdminDocument)
 			admin.POST("/upload", middleware.RateLimit(20, time.Hour), uploadCtrl.UploadDocument)
 			admin.PUT("/providers/:id/status", adminCtrl.UpdateProviderStatus)

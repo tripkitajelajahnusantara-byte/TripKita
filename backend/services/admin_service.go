@@ -17,6 +17,7 @@ import (
 )
 
 type AdminService interface {
+	MonitorBookings(filter models.AdminBookingFilter) (*models.AdminBookingMonitor, error)
 	ListProviders() ([]models.Provider, error)
 	UpdateProviderStatus(id uint, status string, notes string) error
 	UpdateProviderPlatformFee(id uint, platformFeePercent int64) error

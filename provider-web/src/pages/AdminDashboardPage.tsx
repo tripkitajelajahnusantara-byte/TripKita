@@ -28,6 +28,7 @@ import { OFFICIAL_CATEGORIES } from '../utils/tripImages';
 import { useActionLock } from '../utils/useActionLock';
 import { Skeleton, SkeletonTable } from '../components/Skeleton';
 import { AdminRevenuePanel } from '../components/AdminRevenuePanel';
+import { AdminBookingMonitor } from '../components/AdminBookingMonitor';
 
 
 interface ProviderAdminData {
@@ -158,11 +159,12 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 export const AdminDashboardPage: React.FC = () => {
   const { providerProfile, logout, navigateTo } = useNavigation();
   const [providers, setProviders] = useState<ProviderAdminData[]>([]);
-  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider' | 'penghasilan-platform'>('kelola-provider');
+  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider' | 'penghasilan-platform' | 'monitoring-booking'>('kelola-provider');
+  const [monitorProviderId, setMonitorProviderId] = useState<number | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Semua Kategori');
   const [cityFilter, setCityFilter] = useState('Semua Kota');
-  const [statusTab, setStatusTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'DISABLED'>('PENDING');
+  const [statusTab, setStatusTab] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'DISABLED'>('ALL');
   
   // Selection & Drawer States
   const [selectedProvider, setSelectedProvider] = useState<ProviderAdminData | null>(null);
@@ -937,11 +939,9 @@ export const AdminDashboardPage: React.FC = () => {
       p.operationalCity.toLowerCase().includes(searchTerm.toLowerCase());
 
     const pendingReview = hasPendingProviderReview(p);
-    const matchesStatus = statusTab === 'PENDING'
+    const matchesStatus = statusTab === 'ALL' || (statusTab === 'PENDING'
       ? pendingReview
-      : statusTab === 'APPROVED'
-        ? p.status === 'APPROVED' && !pendingReview
-        : p.status === statusTab && !pendingReview;
+      : p.status === statusTab);
     
     const matchesCategory = categoryFilter === 'Semua Kategori' || 
       p.businessCategory.toLowerCase() === categoryFilter.toLowerCase();
@@ -956,8 +956,8 @@ export const AdminDashboardPage: React.FC = () => {
   const stats = {
     total: providers.length,
     pending: providers.filter(hasPendingProviderReview).length,
-    approved: providers.filter(p => p.status === 'APPROVED' && !hasPendingProviderReview(p)).length,
-    rejected: providers.filter(p => p.status === 'REJECTED' && !hasPendingProviderReview(p)).length,
+    approved: providers.filter(p => p.status === 'APPROVED').length,
+    rejected: providers.filter(p => p.status === 'REJECTED').length,
   };
 
   // Categories list
@@ -1001,6 +1001,12 @@ export const AdminDashboardPage: React.FC = () => {
               onClick={() => { setActiveView('kelola-provider'); setSelectedProvider(null); }}
             >
               <CheckCircle2 size={18} /> Kelola Provider
+            </button>
+            <button
+              className={`menu-btn ${activeView === 'monitoring-booking' ? 'active' : ''}`}
+              onClick={() => { setMonitorProviderId(undefined); setActiveView('monitoring-booking'); setSelectedProvider(null); }}
+            >
+              <FileText size={18} /> Monitoring Pesanan
             </button>
             <button 
               className={`menu-btn ${activeView === 'administrasi-refund' ? 'active' : ''}`}
@@ -1068,7 +1074,9 @@ export const AdminDashboardPage: React.FC = () => {
             {/* Header Title */}
             <div className="verification-header-box">
               <h1>
-                {activeView === 'administrasi-refund' 
+                {activeView === 'monitoring-booking'
+                  ? 'Monitoring Pesanan'
+                  : activeView === 'administrasi-refund'
                   ? 'Administrasi Refund' 
                   : activeView === 'kelola-pembayaran'
                   ? 'Verifikasi Pembayaran Manual'
@@ -1079,7 +1087,9 @@ export const AdminDashboardPage: React.FC = () => {
                   : 'Pusat Verifikasi Mitra'}
               </h1>
               <p>
-                {activeView === 'administrasi-refund' 
+                {activeView === 'monitoring-booking'
+                  ? 'Pantau booking terbaru dan status pesanan dari seluruh provider.'
+                  : activeView === 'administrasi-refund'
                   ? 'Pantau dan kelola proses refund dana customer.' 
                   : activeView === 'kelola-pembayaran'
                   ? 'Verifikasi bukti transfer manual maksimal 1×24 jam. Booking baru tampil ke provider setelah pembayaran disetujui admin.'
@@ -1096,7 +1106,10 @@ export const AdminDashboardPage: React.FC = () => {
             {error && <div className="alert-message error-alert">{error}</div>}
 
             {/* View 1: Dashboard Overview */}
-            {activeView === 'dashboard' ? (
+            {activeView === 'monitoring-booking' ? (
+              <AdminBookingMonitor key={monitorProviderId ?? 'all'} providers={providers} providerId={monitorProviderId}
+                onProviderSelect={id => setSelectedProvider(providers.find(provider => provider.id === id) || null)} />
+            ) : activeView === 'dashboard' ? (
               <div className="dashboard-view-panel">
                 <div style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '32px', textAlign: 'center' }}>
                   <Building size={48} color="#3b82f6" style={{ marginBottom: '16px' }} />
@@ -1598,11 +1611,11 @@ export const AdminDashboardPage: React.FC = () => {
                       <div className="stat-icon-bg bg-orange">
                         <Clock size={20} color="#f59e0b" />
                       </div>
-                      <span className="card-label">Pending Approval</span>
+                      <span className="card-label">Perlu Ditinjau</span>
                     </div>
                     <div className="card-bottom">
                       <h3>{stats.pending.toLocaleString('id-ID')}</h3>
-                      <p>Menunggu persetujuan</p>
+                      <p>Akun baru / pengajuan perubahan</p>
                     </div>
                   </div>
 
@@ -1638,6 +1651,9 @@ export const AdminDashboardPage: React.FC = () => {
                   
                   {/* Status Tab Filter Bar */}
                   <div className="tab-filters-row">
+                    <button className={`tab-filter-btn ${statusTab === 'ALL' ? 'active' : ''}`} onClick={() => setStatusTab('ALL')}>
+                      Semua Provider <span className="badge-count">{stats.total}</span>
+                    </button>
                     <button 
                       className={`tab-filter-btn ${statusTab === 'PENDING' ? 'active' : ''}`}
                       onClick={() => setStatusTab('PENDING')}
@@ -1736,9 +1752,10 @@ export const AdminDashboardPage: React.FC = () => {
                                   </span>
                                 </td>
                                 <td>
-                                  <span className={`status-pill-small ${hasPendingProviderReview(p) ? 'pending' : p.status.toLowerCase()}`}>
-                                    {p.status === 'DISABLED' ? 'Dinonaktifkan' : p.status === 'PENDING' ? 'Akun Baru' : hasPendingProviderReview(p) ? 'Menunggu Perubahan' : p.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
+                                  <span className={`status-pill-small ${p.status.toLowerCase()}`}>
+                                    {p.status === 'DISABLED' ? 'Dinonaktifkan' : p.status === 'PENDING' ? 'Akun Baru' : p.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
                                   </span>
+                                  {p.status !== 'PENDING' && hasPendingProviderReview(p) && <div className="category-subtext">Perubahan menunggu persetujuan</div>}
                                 </td>
                                 <td>
                                   <button className="detail-view-btn" onClick={() => setSelectedProvider(p)}>
@@ -1796,10 +1813,19 @@ export const AdminDashboardPage: React.FC = () => {
                   <div>
                     <h3>{selectedProvider.businessName}</h3>
                     <p>{selectedProvider.businessCategory}</p>
-                    <span className={`drawer-status-badge ${hasPendingProviderReview(selectedProvider) ? 'pending' : selectedProvider.status.toLowerCase()}`}>
-                      {selectedProvider.status === 'DISABLED' ? 'Dinonaktifkan' : selectedProvider.status === 'PENDING' ? 'Akun Menunggu Persetujuan' : hasPendingProviderReview(selectedProvider) ? 'Perubahan Menunggu Persetujuan' : selectedProvider.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
+                    <span className={`drawer-status-badge ${selectedProvider.status.toLowerCase()}`}>
+                      {selectedProvider.status === 'DISABLED' ? 'Dinonaktifkan' : selectedProvider.status === 'PENDING' ? 'Akun Menunggu Persetujuan' : selectedProvider.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
                     </span>
+                    {selectedProvider.status !== 'PENDING' && hasPendingProviderReview(selectedProvider) && <p>Perubahan menunggu persetujuan</p>}
                   </div>
+                </div>
+
+                <div className="drawer-section">
+                  <AdminBookingMonitor key={selectedProvider.id} providerId={selectedProvider.id} compact onViewAll={() => {
+                    setMonitorProviderId(selectedProvider.id);
+                    setActiveView('monitoring-booking');
+                    setSelectedProvider(null);
+                  }} />
                 </div>
 
                 {/* Section 1: Informasi Bisnis */}
