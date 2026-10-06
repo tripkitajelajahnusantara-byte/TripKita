@@ -5,20 +5,22 @@ import (
 )
 
 type Booking struct {
-	ID              uint      `gorm:"primaryKey" json:"id"`
-	BookingCode     string    `gorm:"size:100;uniqueIndex;not null" json:"bookingCode"` // e.g. TK-2824-1891
-	ProviderID      uint      `gorm:"not null" json:"providerId"`
-	PackageID       uint      `gorm:"not null" json:"packageId"`
-	Package         Package   `gorm:"foreignKey:PackageID" json:"packageDetails,omitempty"`
-	CustomerID      *uint     `gorm:"index" json:"customerId,omitempty"`
-	CustomerName    string    `gorm:"size:255;not null" json:"customerName"`
-	CustomerPhone   string    `gorm:"size:50" json:"customerPhone"`
-	CustomerEmail   string    `gorm:"size:255" json:"customerEmail"`
-	CustomerInitial string    `gorm:"size:10" json:"customerInitial"`
-	TripDate        time.Time `gorm:"not null" json:"tripDate"`
-	TripEndDate     time.Time `gorm:"not null" json:"tripEndDate"`
-	Guests          int       `gorm:"not null" json:"guests"`
-	TotalPrice      int64     `gorm:"not null" json:"totalPrice"`
+	ID                 uint      `gorm:"primaryKey" json:"id"`
+	BookingCode        string    `gorm:"size:100;uniqueIndex;not null" json:"bookingCode"` // e.g. TK-2824-1891
+	ProviderID         uint      `gorm:"not null" json:"providerId"`
+	PackageID          uint      `gorm:"not null" json:"packageId"`
+	Package            Package   `gorm:"foreignKey:PackageID" json:"packageDetails,omitempty"`
+	CustomerID         *uint     `gorm:"index" json:"customerId,omitempty"`
+	CustomerName       string    `gorm:"size:255;not null" json:"customerName"`
+	CustomerPhone      string    `gorm:"size:50" json:"customerPhone"`
+	CustomerEmail      string    `gorm:"size:255" json:"customerEmail"`
+	CustomerInitial    string    `gorm:"size:10" json:"customerInitial"`
+	TripDate           time.Time `gorm:"not null" json:"tripDate"`
+	TripEndDate        time.Time `gorm:"not null" json:"tripEndDate"`
+	Guests             int       `gorm:"not null" json:"guests"`
+	PickupMode         string    `gorm:"size:20;not null;default:'MEETING_POINT'" json:"pickupMode"`
+	PickupInstructions string    `gorm:"type:text" json:"pickupInstructions"`
+	TotalPrice         int64     `gorm:"not null" json:"totalPrice"`
 	// PlatformFeePercent adalah snapshot tarif provider saat booking dibuat.
 	// Nilai ini tidak ikut berubah saat admin mengganti tarif provider di kemudian hari.
 	PlatformFeePercent      int64      `gorm:"not null;default:15" json:"platformFeePercent"`

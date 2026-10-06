@@ -40,11 +40,13 @@ type BookingParticipant struct {
 	Gender       string    `gorm:"size:20;not null" json:"gender"`
 	BirthDate    string    `gorm:"size:10;not null" json:"birthDate"`
 	MedicalNotes string    `gorm:"size:255;not null;default:''" json:"medicalNotes"`
+	PickupPoint  string    `gorm:"size:500;not null;default:''" json:"pickupPoint"`
 	CreatedAt    time.Time `json:"createdAt"`
 }
 
 // BookingParticipantInput adalah data peserta yang dikirim saat checkout.
 type BookingParticipantInput struct {
+	PickupPoint  string `json:"pickupPoint" binding:"max=500"`
 	Name         string `json:"name" binding:"required,max=255"`
 	Phone        string `json:"phone" binding:"required,max=50"`
 	Gender       string `json:"gender" binding:"required,oneof=Laki-laki Perempuan"`

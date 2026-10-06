@@ -14,16 +14,8 @@ import {
   MeetingPointMap,
 } from '../components/MeetingPointMap';
 import { isCustomerVisiblePackage } from '../utils/publicPackages';
-
-// Format tanggal lokal ke YYYY-MM-DD (tanpa pergeseran zona waktu UTC)
-const toLocalIsoDate = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-// Parse YYYY-MM-DD sebagai tanggal lokal
-const parseLocalIsoDate = (iso: string) => {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-};
+import { upcomingDepartures } from '../utils/departures';
+import { FlexiblePickupDetails } from '../components/TripPickup';
 
 // Ambil bagian tanggal (YYYY-MM-DD) dari string tanggal paket, '' bila tidak valid
 const normalizeIsoDate = (value: unknown) => {
@@ -170,7 +162,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  const todayIso = isOpenTrip ? toLocalIsoDate(new Date()) : jakartaToday();
+  const todayIso = jakartaToday();
   const h7MinDateStr = addDays(todayIso, 7);
 
   // Periode paket yang diatur mitra (YYYY-MM-DD). Backend menolak tanggal trip di luar periode ini.
@@ -242,29 +234,11 @@ export const CustomerPackageDetailPage: React.FC = () => {
   // Add-on dinonaktifkan sampai katalog dan harga dikelola dari database.
   const addOnsList: AddOn[] = [];
 
-  // Open Trip hanya memiliki SATU keberangkatan yang diatur mitra (startDate..endDate).
-  // endDate kosong/tidak valid -> startDate + durasi - 1.
-  const getOpenTripDeparture = () => {
-    if (!pkgStartIso) return null;
-    const durationDays = Math.max(1, Number(pkg.duration) || 1);
-    const start = parseLocalIsoDate(pkgStartIso);
-    let endIso = pkgEndIso;
-    if (!endIso || endIso < pkgStartIso) {
-      const end = new Date(start);
-      end.setDate(end.getDate() + durationDays - 1);
-      endIso = toLocalIsoDate(end);
-    }
-    const end = parseLocalIsoDate(endIso);
-    const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    const label = pkgStartIso === endIso
-      ? `${start.getDate()} ${months[start.getMonth()]} ${start.getFullYear()} (1 Hari)`
-      : `${start.getDate()} ${months[start.getMonth()]}–${end.getDate()} ${months[end.getMonth()]} ${end.getFullYear()} (${totalDays} Hari)`;
-    return { startIso: pkgStartIso, endIso, label };
-  };
-
-  const openTripDeparture = isOpenTrip ? getOpenTripDeparture() : null;
-  const hasUpcomingDeparture = !!openTripDeparture && openTripDeparture.startIso > todayIso;
+  const departureOptions = isOpenTrip ? upcomingDepartures(pkg, todayIso) : [];
+  const selectedDeparture = departureOptions.find(d => d.date === customStartDate)
+    || departureOptions.find(d => d.seatsLeft >= minRequiredGuests) || departureOptions[0];
+  const openTripDeparture = selectedDeparture ? { startIso: selectedDeparture.date, endIso: selectedDeparture.endDate, label: formatTripRange(selectedDeparture.date, selectedDeparture.endDate) } : null;
+  const hasUpcomingDeparture = !!openTripDeparture;
   const openTripUnavailable = isOpenTrip && !hasUpcomingDeparture;
 
   if (!availabilityCheckPending && !selectedPackageForDetail && (deepLinkError || !/[?&]id=\d+/.test(window.location.hash))) {
@@ -312,7 +286,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
     );
   }
 
-  const totalQuotaUsed = Math.max(0, Number(pkg.quotaUsed) || 0);
+  const totalQuotaUsed = selectedDeparture?.quotaUsed ?? Math.max(0, Number(pkg.quotaUsed) || 0);
   const availableSeats = isOpenTrip ? Math.max(0, totalQuotaMax - totalQuotaUsed) : Math.min(totalQuotaMax, Number(pkg.maxGuests) || totalQuotaMax);
 
   // Pemesanan diblokir bila jadwal/tanggal tidak valid
@@ -839,8 +813,9 @@ export const CustomerPackageDetailPage: React.FC = () => {
             </div>
             )}
 
+            <FlexiblePickupDetails pkg={pkg} />
             {/* Titik Kumpul / Google Maps Embed (Posisi Tepat Dibawah Layanan Tambahan) */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
+            {pkg.pickupMode !== 'FLEXIBLE' && <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <MapPin size={18} color="#0284c7" /> Lokasi Titik Kumpul (Meeting Point)
               </h2>
@@ -872,6 +847,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
               )}
             </div>
 
+            }
             {/* Profil Provider Penyelenggara Section */}
             {(() => {
               const pId = Number(pkg.providerId || pkg.provider?.id);
@@ -1143,16 +1119,14 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   Jadwal Keberangkatan (Open Trip)
                 </label>
                 
-                {hasUpcomingDeparture && openTripDeparture ? (
-                  <div style={{ padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #007bff', fontSize: '13.5px', fontWeight: '700', color: '#0f172a', backgroundColor: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Calendar size={15} color="#007bff" /> {openTripDeparture.label}
-                  </div>
-                ) : (
-                  <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '10px 12px', borderRadius: '8px', color: '#92400e', fontSize: '12px', fontWeight: '700', lineHeight: '1.5' }}>
-                    <AlertTriangle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />Belum ada jadwal keberangkatan yang akan datang untuk Open Trip ini.
-                  </div>
-                )}
-
+                {departureOptions.length > 0 ? <div className="departure-list" role="group" aria-label="Pilih tanggal keberangkatan">
+                  {departureOptions.map(departure => <button key={departure.date} type="button" className="departure-row" aria-pressed={selectedDeparture?.date === departure.date}
+                    disabled={departure.seatsLeft < minRequiredGuests} onClick={() => { setCustomStartDate(departure.date); setCustomEndDate(departure.endDate); }}>
+                    <strong>{formatTripRange(departure.date, departure.endDate)}</strong>
+                    <span>{departure.closed ? 'Jadwal ditutup' : departure.seatsLeft < minRequiredGuests ? 'Kuota tidak mencukupi' : `${departure.seatsLeft} kursi tersisa`}</span>
+                  </button>)}
+                </div> : <p>Belum ada jadwal keberangkatan yang tersedia.</p>}
+                <p style={{ fontSize: 12, color: '#475569' }}>Kuota dan jumlah peserta di bawah mengikuti tanggal yang dipilih.</p>
                 {hasUpcomingDeparture && typeof pkg.schedule === 'string' && pkg.schedule.trim() && (
                   <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-line' }}>
                     {pkg.schedule.trim()}
@@ -1261,7 +1235,6 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Guest Counter */}
             <div style={{ marginBottom: '16px' }}>
               {(() => {
-                const remainingAfterSelect = Math.max(0, availableSeats - guestsCount);
                 return (
                   <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
                     <span>Jumlah Peserta</span>
@@ -1270,7 +1243,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                         ? 'Sisa 0 seat' 
                         : guestsCount > availableSeats 
                         ? `Melebihi Kuota (${availableSeats} seat)` 
-                        : `Sisa ${remainingAfterSelect} seat`}
+                        : `Tersedia ${availableSeats} kursi`}
                     </span>
                   </label>
                 );

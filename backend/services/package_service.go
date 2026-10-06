@@ -13,6 +13,7 @@ import (
 
 type PackageService interface {
 	CreatePackage(providerID uint, req *models.CreatePackageRequest) (*models.Package, error)
+	DuplicatePackage(id uint, providerID uint) (*models.Package, error)
 	GetAllPackages(providerID uint) ([]models.Package, error)
 	GetAllPublic() ([]models.Package, error)
 	GetPublicProviderProfile(id uint) (*models.PublicProviderProfile, error)
@@ -74,9 +75,6 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 	if err := validatePackagePhotos(req.Image, req.Images); err != nil {
 		return nil, err
 	}
-	if err := validateMeetingPointCoordinates(req.MeetingPointLat, req.MeetingPointLng, req.Status == "Aktif"); err != nil {
-		return nil, err
-	}
 	req.QuotaMin = quotaMinimumForTripType(req.TripType, req.QuotaMin)
 	if req.Price < 0 || req.QuotaMin < 0 || req.QuotaMax < 0 || req.Duration < 0 || req.MinGuests < 0 || req.MaxGuests < 0 || req.MinAge < 0 || req.MaxAge < 0 {
 		return nil, packageValidationErrorf("harga, kuota, durasi, jumlah peserta, dan umur tidak boleh bernilai negatif")
@@ -93,9 +91,6 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 	if models.IsOpenTrip(req.TripType) && req.QuotaMin > 0 && req.QuotaMax < req.QuotaMin {
 		return nil, packageValidationErrorf("kuota maksimal (%d) tidak boleh lebih kecil dari kuota minimal (%d)", req.QuotaMax, req.QuotaMin)
 	}
-	if req.MaxGuests > 0 && req.MinGuests > req.MaxGuests {
-		return nil, packageValidationErrorf("jumlah tamu minimal tidak boleh melebihi jumlah tamu maksimal")
-	}
 	if req.MaxAge > 0 && req.MinAge > req.MaxAge {
 		return nil, packageValidationErrorf("usia minimal tidak boleh melebihi usia maksimal")
 	}
@@ -104,6 +99,10 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 	}
 
 	pkg := &models.Package{
+		PickupMode:         req.PickupMode,
+		PickupArea:         req.PickupArea,
+		PickupNotes:        req.PickupNotes,
+		PickupPoints:       req.PickupPoints,
 		ProviderID:         providerID,
 		Name:               req.Name,
 		Destination:        req.Destination,
@@ -132,6 +131,21 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 		Itinerary:          req.Itinerary,
 		Image:              req.Image,
 		Images:             req.Images,
+	}
+	if err := validatePackagePickup(pkg); err != nil {
+		return nil, err
+	}
+	// Draft Open Trip boleh disimpan tanpa jadwal agar provider dapat
+	// melengkapinya nanti. Paket yang langsung aktif tetap harus punya
+	// sedikitnya satu tanggal keberangkatan.
+	if req.DepartureDates != nil && (len(req.DepartureDates) > 0 || req.Status == "Aktif") {
+		if err := configureOpenTripDates(pkg, req.DepartureDates, nil, time.Now()); err != nil {
+			return nil, err
+		}
+	}
+	pkg.NormalizeBookingLimits()
+	if err := validateBookingLimits(pkg); err != nil {
+		return nil, err
 	}
 	if pkg.Status == "Aktif" {
 		if err := validateActivePackage(pkg); err != nil {
@@ -166,7 +180,7 @@ func (s *packageService) GetAllPackages(providerID uint) ([]models.Package, erro
 }
 
 func (s *packageService) GetAllPublic() ([]models.Package, error) {
-	today := time.Now().Format("2006-01-02")
+	today := time.Now().In(models.BookingLocation).Format("2006-01-02")
 	packages, err := s.repo.FindAllPublic(today)
 	if err != nil {
 		return nil, err
@@ -181,7 +195,6 @@ func (s *packageService) GetAllPublic() ([]models.Package, error) {
 func filterCurrentPublicPackages(packages []models.Package, today string) []models.Package {
 	visible := make([]models.Package, 0, len(packages))
 	for _, pkg := range packages {
-		startDate := strings.TrimSpace(pkg.StartDate)
 		endDate := strings.TrimSpace(pkg.EndDate)
 		if pkg.Status != "Aktif" || len(endDate) != len("2006-01-02") || endDate < today {
 			continue
@@ -189,13 +202,16 @@ func filterCurrentPublicPackages(packages []models.Package, today string) []mode
 		if _, err := time.Parse("2006-01-02", endDate); err != nil {
 			continue
 		}
-		// Open Trip memiliki jadwal keberangkatan tetap. Setelah tanggal mulai
-		// lewat, paket tidak lagi dapat dibeli walaupun tanggal akhirnya belum lewat.
+		// Keep the package visible as long as it has an upcoming departure.
 		if models.IsOpenTrip(pkg.TripType) {
-			if len(startDate) != len("2006-01-02") || startDate < today {
-				continue
+			upcoming := false
+			for _, day := range pkg.OpenTripDates() {
+				if _, err := time.Parse("2006-01-02", day); err == nil && day >= today {
+					upcoming = true
+					break
+				}
 			}
-			if _, err := time.Parse("2006-01-02", startDate); err != nil {
+			if !upcoming {
 				continue
 			}
 		}
@@ -204,11 +220,16 @@ func filterCurrentPublicPackages(packages []models.Package, today string) []mode
 	return visible
 }
 
-// attachDates melengkapi daftar paket dengan tanggal keberangkatannya dalam satu
-// query, bukan satu query per paket.
+// attachDates loads calendar and departure availability in batches.
 func (s *packageService) attachDates(packages []models.Package) ([]models.Package, error) {
+	if s.repo != nil {
+		if err := s.repo.LoadDepartureAvailability(packages); err != nil {
+			return nil, err
+		}
+	}
 	for i := range packages {
 		packages[i].QuotaMin = quotaMinimumForTripType(packages[i].TripType, packages[i].QuotaMin)
+		packages[i].NormalizeBookingLimits()
 	}
 	if s.dateRepo == nil || len(packages) == 0 {
 		return packages, nil
@@ -330,6 +351,19 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 		return nil, err
 	}
 	previousStart, previousEnd, previousType := pkg.StartDate, pkg.EndDate, pkg.TripType
+	previousDepartures := pkg.OpenTripDates()
+	if req.PickupMode != nil {
+		pkg.PickupMode = *req.PickupMode
+	}
+	if req.PickupArea != nil {
+		pkg.PickupArea = *req.PickupArea
+	}
+	if req.PickupNotes != nil {
+		pkg.PickupNotes = *req.PickupNotes
+	}
+	if req.PickupPoints != nil {
+		pkg.PickupPoints = *req.PickupPoints
+	}
 
 	if req.Name != nil {
 		pkg.Name = strings.TrimSpace(*req.Name)
@@ -345,9 +379,6 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	}
 	if req.MeetingPointLng != nil {
 		pkg.MeetingPointLng = req.MeetingPointLng
-	}
-	if err := validateMeetingPointCoordinates(pkg.MeetingPointLat, pkg.MeetingPointLng, false); err != nil {
-		return nil, err
 	}
 	if req.Category != nil {
 		pkg.Category = strings.TrimSpace(*req.Category)
@@ -396,20 +427,41 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	if req.Duration != nil {
 		pkg.Duration = *req.Duration
 	}
+	targetStatus := pkg.Status
+	if req.Status != nil {
+		targetStatus = *req.Status
+	}
+	if req.DepartureDates != nil {
+		if len(*req.DepartureDates) == 0 && models.IsOpenTrip(pkg.TripType) {
+			if targetStatus == "Aktif" {
+				return nil, packageValidationErrorf("pilih minimal satu tanggal keberangkatan Open Trip sebelum paket diaktifkan")
+			}
+			pkg.DepartureDates = nil
+		} else if err := configureOpenTripDates(pkg, *req.DepartureDates, previousDepartures, time.Now()); err != nil {
+			return nil, err
+		}
+	} else if !models.IsOpenTrip(pkg.TripType) {
+		pkg.DepartureDates = nil
+	} else if len(pkg.DepartureDates) > 0 {
+		if err := configureOpenTripDates(pkg, pkg.DepartureDates, previousDepartures, time.Now()); err != nil {
+			return nil, err
+		}
+	}
 	if req.MinGuests != nil {
 		pkg.MinGuests = *req.MinGuests
 	}
 	if req.MaxGuests != nil {
 		pkg.MaxGuests = *req.MaxGuests
 	}
+	pkg.NormalizeBookingLimits()
 	if req.MinAge != nil {
 		pkg.MinAge = *req.MinAge
 	}
 	if req.MaxAge != nil {
 		pkg.MaxAge = *req.MaxAge
 	}
-	if pkg.MaxGuests > 0 && pkg.MinGuests > pkg.MaxGuests {
-		return nil, packageValidationErrorf("jumlah tamu minimal tidak boleh melebihi jumlah tamu maksimal")
+	if err := validateBookingLimits(pkg); err != nil {
+		return nil, err
 	}
 	if pkg.MaxAge > 0 && pkg.MinAge > pkg.MaxAge {
 		return nil, packageValidationErrorf("usia minimal tidak boleh melebihi usia maksimal")
@@ -437,6 +489,9 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	}
 	if req.Images != "" {
 		pkg.Images = req.Images
+	}
+	if err := validatePackagePickup(pkg); err != nil {
+		return nil, err
 	}
 	if pkg.Status == "Aktif" {
 		if err := validateActivePackage(pkg); err != nil {
@@ -469,13 +524,20 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	return pkg, nil
 }
 
+func validateBookingLimits(pkg *models.Package) error {
+	if pkg.MinGuests < 1 || pkg.MaxGuests < pkg.MinGuests || pkg.MaxGuests > pkg.QuotaMax {
+		return packageValidationErrorf("batas peserta per booking harus minimal 1, maksimum tidak boleh di bawah minimum atau melebihi kuota maksimal")
+	}
+	return nil
+}
+
 func validateActivePackage(pkg *models.Package) error {
 	if strings.TrimSpace(pkg.Name) == "" || strings.TrimSpace(pkg.Destination) == "" ||
-		strings.TrimSpace(pkg.MeetingPoint) == "" || strings.TrimSpace(pkg.Category) == "" ||
+		strings.TrimSpace(pkg.Category) == "" ||
 		strings.TrimSpace(pkg.TripType) == "" || strings.TrimSpace(pkg.Description) == "" {
-		return packageValidationErrorf("nama, destinasi, titik kumpul, kategori, tipe trip, dan deskripsi wajib diisi sebelum paket diaktifkan")
+		return packageValidationErrorf("nama, destinasi, kategori, tipe trip, dan deskripsi wajib diisi sebelum paket diaktifkan")
 	}
-	if err := validateMeetingPointCoordinates(pkg.MeetingPointLat, pkg.MeetingPointLng, true); err != nil {
+	if err := validatePackagePickup(pkg); err != nil {
 		return err
 	}
 	if pkg.Price <= 0 {
@@ -498,6 +560,9 @@ func validateActivePackage(pkg *models.Package) error {
 	}
 	if pkg.StartDate == "" || pkg.EndDate == "" {
 		return packageValidationErrorf("tanggal mulai dan tanggal selesai wajib diisi sebelum paket diaktifkan")
+	}
+	if models.IsOpenTrip(pkg.TripType) && len(pkg.OpenTripDates()) == 0 {
+		return packageValidationErrorf("pilih minimal satu tanggal keberangkatan Open Trip sebelum paket diaktifkan")
 	}
 	return validatePackageDates(pkg.StartDate, pkg.EndDate)
 }

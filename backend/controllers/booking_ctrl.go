@@ -239,6 +239,7 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 			Gender:       p.Gender,
 			BirthDate:    p.BirthDate,
 			MedicalNotes: p.MedicalNotes,
+			PickupPoint:  p.PickupPoint,
 		})
 	}
 	if role, _ := c.Get("role"); role == "CUSTOMER" {

@@ -8,8 +8,12 @@ import { ShareModal } from '../components/ShareModal';
 import { TripImage } from '../components/TripImage';
 import { Skeleton } from '../components/Skeleton';
 import { filterCustomerVisiblePackages } from '../utils/publicPackages';
+import { upcomingDepartures, type Departure } from '../utils/departures';
+import { formatTripRange } from '../utils/tripDates';
 
 interface TripPackage {
+  departureDates?: string[];
+  departures?: Departure[];
   id: number;
   providerId: number;
   name: string;
@@ -155,6 +159,7 @@ export const CustomerSearchPage: React.FC = () => {
     if (selectedTypes.length > 0 && !selectedTypes.includes(pkg.tripType || 'Open Trip')) {
       return false;
     }
+    if (searchParams.date && pkg.tripType === 'Open Trip' && !upcomingDepartures(pkg).some(d => d.date === searchParams.date && d.seatsLeft > 0)) return false;
     return true;
   });
 
@@ -299,12 +304,15 @@ export const CustomerSearchPage: React.FC = () => {
             {processedPackages.map((pkg) => {
               // Calculate active reserved seats from pending/paid/completed bookings
               const totalQuotaMax = Math.max(0, Number(pkg.quotaMax) || 0);
-              const totalQuotaUsed = Math.max(0, Number(pkg.quotaUsed) || 0);
-              const availableSeats = Math.max(0, totalQuotaMax - totalQuotaUsed);
+              const departures = upcomingDepartures(pkg);
+              const nextDeparture = (searchParams.date ? departures.find(d => d.date === searchParams.date) : null) || departures.find(d => d.seatsLeft > 0) || departures[0];
+              const availableSeats = pkg.tripType === 'Open Trip' ? nextDeparture?.seatsLeft || 0 : totalQuotaMax;
               const periodText = pkg.startDate
                 ? `${formatShortDate(pkg.startDate)}${pkg.endDate && pkg.endDate.slice(0, 10) !== pkg.startDate.slice(0, 10) ? ` - ${formatShortDate(pkg.endDate)}` : ''}`
                 : '';
-              const scheduleText = (pkg.schedule || '').trim() || periodText;
+              const scheduleText = pkg.tripType === 'Open Trip' && nextDeparture
+                ? `${formatTripRange(nextDeparture.date, nextDeparture.endDate)}${departures.length > 1 ? ` · ${departures.length} pilihan jadwal` : ''}`
+                : (pkg.schedule || '').trim() || periodText;
 
               const badge = getBadgeColor(pkg.category);
               const isFavorite = wishlistIds.includes(Number(pkg.id));
@@ -445,7 +453,7 @@ export const CustomerSearchPage: React.FC = () => {
                         </span>
                         <span style={{ color: '#cbd5e1' }}>|</span>
                         <span style={{ color: availableSeats < 5 ? '#ef4444' : '#10b981', fontWeight: '700' }}>
-                          {pkg.tripType === 'Open Trip' ? (availableSeats > 0 ? `Sisa ${availableSeats} seat` : 'Kuota habis') : 'Pilih tanggal tersedia'}
+                          {pkg.tripType === 'Open Trip' ? (availableSeats > 0 ? `${availableSeats} kursi pada jadwal terpilih` : 'Kuota habis') : 'Pilih tanggal tersedia'}
                         </span>
                       </div>
 

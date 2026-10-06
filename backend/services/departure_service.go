@@ -526,7 +526,13 @@ func (s *departureService) decideReschedule(departure *models.TripDeparture, boo
 
 func (s *departureService) checkExclusiveOffer(pkg *models.Package, bookings []models.Booking, proposed time.Time) error {
 	if models.IsOpenTrip(pkg.TripType) {
-		return nil
+		guests := 0
+		for _, booking := range bookings {
+			if booking.RescheduleCount < 1 {
+				guests += booking.Guests
+			}
+		}
+		return asDepartureInputError(ensureOpenTripCapacityTx(s.db, pkg, proposed, guests, 0), "kuota tanggal pengganti tidak cukup untuk seluruh peserta; pilih tanggal lain")
 	}
 	for _, booking := range bookings {
 		start, end := proposedTripRange(booking, proposed)
@@ -682,6 +688,9 @@ func (s *departureService) offerRescheduleToBooking(booking *models.Booking, dep
 		if locked.Status != models.StatusPaid && locked.Status != models.StatusConfirmed {
 			return fmt.Errorf("status booking %s tidak dapat ditawari jadwal pengganti", locked.Status)
 		}
+		if err := ensureOpenTripCapacityTx(tx, &pkg, proposed, locked.Guests, locked.ID); err != nil {
+			return err
+		}
 		if !models.IsOpenTrip(pkg.TripType) {
 			start, end := proposedTripRange(locked, proposed)
 			if err := ensureNoExclusiveConflictTx(tx, pkg.ProviderID, start, end, locked.ID); err != nil {
@@ -787,6 +796,9 @@ func (s *departureService) acceptReschedule(booking *models.Booking) (*models.Bo
 		}
 		original := locked.TripDate
 		newTripEnd := proposed.Add(tripDuration)
+		if err := ensureOpenTripCapacityTx(tx, &lockedPackage, proposed, locked.Guests, locked.ID); err != nil {
+			return asDepartureInputError(err, "kuota tanggal pengganti sudah tidak tersedia; hubungi penyelenggara")
+		}
 		// Tanggal pengganti sudah ditahan sejak tawaran dikirim. Pemeriksaan
 		// ini tetap ada untuk tawaran lama yang dibuat sebelum penahanan.
 		if !models.IsOpenTrip(lockedPackage.TripType) {

@@ -1,7 +1,4 @@
-const localTodayIso = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
+import { jakartaToday } from './tripDates.ts';
 
 const validIsoDate = (value: unknown) => {
   if (typeof value !== 'string') return '';
@@ -16,14 +13,14 @@ const validIsoDate = (value: unknown) => {
 
 // Guard sisi web untuk mencegah respons cache lama menampilkan paket yang
 // sudah tidak layak tampil. Filter otoritatif tetap berada di backend.
-export const isCustomerVisiblePackage = (pkg: any, today = localTodayIso()) => {
+export const isCustomerVisiblePackage = (pkg: any, today = jakartaToday()) => {
   if (!pkg || pkg.status !== 'Aktif') return false;
   const endDate = validIsoDate(pkg.endDate);
   if (!endDate || endDate < today) return false;
   const tripType = String(pkg.tripType || '').replace(/\s+/g, '').toLowerCase();
   if (tripType === 'opentrip') {
-    const startDate = validIsoDate(pkg.startDate);
-    if (!startDate || startDate < today) return false;
+    const dates = pkg.departureDates?.length ? pkg.departureDates : [pkg.startDate];
+    if (!dates.some((day: string) => validIsoDate(day) && day >= today)) return false;
   }
 
   const provider = pkg.provider;
@@ -33,5 +30,5 @@ export const isCustomerVisiblePackage = (pkg: any, today = localTodayIso()) => {
   return true;
 };
 
-export const filterCustomerVisiblePackages = <T,>(packages: T[], today = localTodayIso()): T[] =>
+export const filterCustomerVisiblePackages = <T,>(packages: T[], today = jakartaToday()): T[] =>
   packages.filter((pkg) => isCustomerVisiblePackage(pkg, today));

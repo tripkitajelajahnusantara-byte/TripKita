@@ -483,6 +483,7 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		if pkg.Price <= 0 {
 			return &BookingInputError{Message: "harga paket tidak valid"}
 		}
+		pkg.NormalizeBookingLimits()
 		if booking.Guests <= 0 || (pkg.MinGuests > 0 && booking.Guests < pkg.MinGuests) || (pkg.MaxGuests > 0 && booking.Guests > pkg.MaxGuests) {
 			return &BookingInputError{Message: "jumlah peserta tidak valid"}
 		}
@@ -495,7 +496,18 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		if err := validateBookingSchedule(&pkg, booking.TripDate, calculatePackageTripEnd(&pkg, booking.TripDate), time.Now(), false); err != nil {
 			return err
 		}
-		if err := validateBookingCapacity(&pkg, booking.Guests); err != nil {
+		// Quota is shared by customers on the same departure, never by months.
+		capacityPackage := pkg
+		if models.IsOpenTrip(pkg.TripType) {
+			capacityPackage.QuotaUsed = 0
+		}
+		if err := validateBookingCapacity(&capacityPackage, booking.Guests); err != nil {
+			return err
+		}
+		if err := ensureOpenTripCapacityTx(tx, &pkg, booking.TripDate, booking.Guests, 0); err != nil {
+			return err
+		}
+		if err := snapshotBookingPickup(booking, &pkg); err != nil {
 			return err
 		}
 		if err := ensureExclusiveDateTx(tx, &pkg, booking.TripDate, calculatePackageTripEnd(&pkg, booking.TripDate), 0); err != nil {
@@ -804,6 +816,14 @@ func validateBookingSchedule(pkg *models.Package, start, end, now time.Time, res
 	startDay := start.In(models.BookingLocation).Format("2006-01-02")
 	endDay := end.In(models.BookingLocation).Format("2006-01-02")
 	if models.IsOpenTrip(pkg.TripType) {
+		if !reschedule {
+			for _, day := range pkg.OpenTripDates() {
+				if day == startDay {
+					return nil
+				}
+			}
+			return &BookingInputError{Message: "pilih tanggal keberangkatan yang dibuka penyelenggara"}
+		}
 		tripDay, todayStr := start.Format("2006-01-02"), now.Format("2006-01-02")
 		if pkg.StartDate != "" && pkg.StartDate >= todayStr && tripDay < pkg.StartDate {
 			return &BookingInputError{Message: "tanggal perjalanan berada sebelum periode paket"}
