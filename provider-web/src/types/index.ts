@@ -57,6 +57,7 @@ export interface TripPlan {
 }
 
 export interface BookingParticipant {
+  pickupPoint?: string;
   id?: number;
   position: number;
   name: string;
@@ -68,6 +69,8 @@ export interface BookingParticipant {
 }
 
 export interface Booking {
+  pickupMode?: string;
+  pickupInstructions?: string;
   id: string;
   dbId?: number;
   customerId?: number;

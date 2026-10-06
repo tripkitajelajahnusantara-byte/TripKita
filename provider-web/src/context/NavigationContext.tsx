@@ -225,7 +225,7 @@ interface NavigationContextType {
     tripDate?: string;
     tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
+    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string; pickupPoint?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
   } | null;
   setBookingFormData: React.Dispatch<React.SetStateAction<{
@@ -233,7 +233,7 @@ interface NavigationContextType {
     tripDate?: string;
     tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
+    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string; pickupPoint?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
   } | null>>;
   isAuthModalOpen: boolean;
@@ -293,7 +293,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     tripDate?: string;
     tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
+    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string; pickupPoint?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
   } | null>(() => {
     try {
@@ -309,7 +309,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     tripDate?: string;
     tripEndDate?: string;
     pemesan: { nama: string; email: string; whatsapp: string };
-    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string }>;
+    peserta: Array<{ nama: string; hp: string; gender: string; tanggalLahir?: string; riwayatPenyakit?: string; pickupPoint?: string }>;
     selectedAddOns?: Array<{ id: string; name: string; price: number }>;
   } | null>> = (valueOrFn) => {
     setBookingFormDataState((prev) => {

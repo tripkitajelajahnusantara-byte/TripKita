@@ -663,9 +663,6 @@ func SeedDatabase() {
 		}
 	}
 
-	// Auto deduplicate packages table to keep only unique master packages
-	DB.Exec(`DELETE FROM packages WHERE id NOT IN (SELECT MIN(id) FROM packages GROUP BY name);`)
-
 	// 4. Seed Bookings for each provider
 	bookingsList := []models.Booking{
 		{

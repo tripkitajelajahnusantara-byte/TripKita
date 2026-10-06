@@ -6,8 +6,12 @@ import { useActionLock } from '../utils/useActionLock';
 import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, MessageSquare, Star, LoaderCircle } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
 import { RescheduleOfferCard } from '../components/RescheduleOfferCard';
+import { BookingPickupSummary } from '../components/TripPickup';
 
 interface BookingItem {
+  pickupMode?: string;
+  pickupInstructions?: string;
+  participants?: { name: string; pickupPoint?: string }[];
   id: number;
   bookingCode: string;
   customerName: string;
@@ -740,6 +744,10 @@ export const CustomerHistoryPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {booking.pickupMode === 'FLEXIBLE' && <details style={{ margin: '12px 0' }}>
+                    <summary style={{ cursor: 'pointer', fontSize: 13, color: '#0369a1', fontWeight: 600 }}>Lihat rencana penjemputan</summary>
+                    <BookingPickupSummary mode={booking.pickupMode} instructions={booking.pickupInstructions} participants={booking.participants} />
+                  </details>}
                   {booking.status === 'RESCHEDULE_OFFERED' && (
                     <RescheduleOfferCard
                       booking={booking}

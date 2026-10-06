@@ -11,6 +11,7 @@ import {
   Package, 
   Edit3, 
   Eye,
+  Copy,
   MoreHorizontal,
   LoaderCircle
 } from 'lucide-react';
@@ -20,6 +21,8 @@ import { SkeletonTableRows } from '../components/Skeleton';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
 import { useActionLock } from '../utils/useActionLock';
+import { useCustomAlert } from '../components/CustomAlertModal';
+import { formatTripRange } from '../utils/tripDates';
 
 // Pilihan status di menu aksi. Status yang sedang berlaku disembunyikan agar
 // provider tidak mengirim perubahan yang tidak mengubah apa pun.
@@ -32,6 +35,7 @@ const STATUS_OPTIONS: { value: 'Aktif' | 'Nonaktif' | 'Draft'; label: string; co
 
 export const KelolaPaketPage: React.FC = () => {
   const { navigateTo, setEditingPackageId, providerProfile } = useNavigation();
+  const { showAlert } = useCustomAlert();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Semua' | 'Aktif' | 'Draft' | 'Nonaktif'>('Semua');
 
@@ -70,8 +74,8 @@ export const KelolaPaketPage: React.FC = () => {
           category: pkg.category || '',
           destination: pkg.destination,
           price: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price || 0),
-          quota: `${pkg.quotaUsed || 0}/${pkg.quotaMax || 0}`,
-          schedule: pkg.schedule,
+          quota: pkg.departureDates?.length > 1 ? `${pkg.quotaMax || 0} / keberangkatan` : `${pkg.departures?.[0]?.quotaUsed ?? pkg.quotaUsed ?? 0}/${pkg.quotaMax || 0}`,
+          schedule: pkg.departures?.length ? `${pkg.departures.length} jadwal · mulai ${formatTripRange(pkg.departures[0].date)}` : pkg.schedule,
           status: pkg.status,
           rating: pkg.rating > 0 ? pkg.rating : undefined,
         }));
@@ -106,8 +110,8 @@ export const KelolaPaketPage: React.FC = () => {
   };
 
   const handleAction = async (type: string, id: string) => {
+    if (isBusy) return;
     if (type === 'delete') {
-      if (isBusy) return;
       if (confirm('Apakah Anda yakin ingin menghapus paket ini?')) {
         await run(`delete:${id}`, async () => {
           try {
@@ -119,6 +123,23 @@ export const KelolaPaketPage: React.FC = () => {
           }
         });
       }
+    } else if (type === 'duplicate') {
+      await run(`duplicate:${id}`, async () => {
+        try {
+          const copy = await request(`/provider/packages/${id}/duplicate`, { method: 'POST' });
+          if (!copy?.id || copy.status !== 'Draft') throw new Error('Salinan paket belum berhasil dibuat.');
+          setEditingPackageId(String(copy.id));
+          navigateTo('tambah-paket');
+          showAlert({
+            title: 'Trip Berhasil Diduplikat',
+            message: `“${copy.name}” tersimpan sebagai Draft. Sesuaikan nama, titik kumpul, jadwal, dan harga sebelum dipublikasikan.`,
+            type: 'success',
+            confirmText: 'Edit Salinan',
+          });
+        } catch (err: unknown) {
+          showAlert({ title: 'Gagal Menduplikat Trip', message: err instanceof Error ? err.message : 'Silakan coba lagi.', type: 'error' });
+        }
+      });
     } else if (type === 'edit') {
       setEditingPackageId(id);
       navigateTo('tambah-paket');
@@ -337,10 +358,20 @@ export const KelolaPaketPage: React.FC = () => {
                                 zIndex: 100,
                                 display: 'flex',
                                 flexDirection: 'column',
-                                width: '130px',
+                                width: '150px',
                                 padding: '4px 0'
                               }}
                             >
+                              <button
+                                onClick={() => handleAction('duplicate', pkg.id)}
+                                disabled={isBusy}
+                                aria-busy={pending === `duplicate:${pkg.id}`}
+                                style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, textAlign: 'left', color: 'var(--color-accent)', background: 'transparent', border: 0, cursor: isBusy ? 'not-allowed' : 'pointer', opacity: isBusy ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                              >
+                                {pending === `duplicate:${pkg.id}`
+                                  ? <><LoaderCircle size={12} className="btn-spinner" aria-hidden="true" /> Menyalin...</>
+                                  : <><Copy size={12} /> Duplikat Trip</>}
+                              </button>
                               {STATUS_OPTIONS.filter(opt => opt.value !== pkg.status).map(opt => (
                                 <button
                                   key={opt.value}

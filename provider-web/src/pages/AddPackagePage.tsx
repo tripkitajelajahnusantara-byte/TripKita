@@ -28,6 +28,8 @@ import { useActionLock } from '../utils/useActionLock';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { getMeetingPointCoordinates, type MeetingPointCoordinates } from '../components/MeetingPointMap';
 import { MeetingPointPicker } from '../components/MeetingPointPicker';
+import { PickupModeEditor } from '../components/TripPickup';
+import { OpenTripScheduleEditor } from '../components/OpenTripScheduleEditor';
 
 /** Open Trip berangkat bersama pada jadwal tetap; tipe lain eksklusif per tanggal. */
 function isOpenTripType(tripType: string): boolean {
@@ -38,7 +40,7 @@ function suggestedMinimumGuests(tripType: string): string {
   if (tripType === 'Honeymoon' || tripType === 'Private Trip') return '2';
   if (tripType === 'Family') return '3';
   if (tripType === 'Corporate') return '10';
-  return '1';
+  return '2';
 }
 export const CATEGORIES = OFFICIAL_CATEGORIES;
 export const TRIP_TYPES = OFFICIAL_TRIP_TYPES;
@@ -85,6 +87,12 @@ export const AddPackagePage: React.FC = () => {
   const [duration, setDuration] = useState('');
   const [location, setLocation] = useState('');
   const [meetPoint, setMeetPoint] = useState('');
+  const [pickupMode, setPickupMode] = useState('MEETING_POINT');
+  const [pickupArea, setPickupArea] = useState('');
+  const [pickupNotes, setPickupNotes] = useState('');
+  const [pickupPoints, setPickupPoints] = useState('');
+  const [departureDates, setDepartureDates] = useState<string[]>([]);
+  const [bookedDepartures, setBookedDepartures] = useState<string[]>([]);
   const [mapPosition, setMapPosition] = useState<MeetingPointCoordinates | null>(null);
   const [description, setDescription] = useState('');
   const [minGuests, setMinGuests] = useState('1');
@@ -94,11 +102,14 @@ export const AddPackagePage: React.FC = () => {
   const [maxAge, setMaxAge] = useState('');
 
   // New fields mapping to backend
-  const todayStr = isOpenTripType(tripType) ? new Date().toISOString().split('T')[0] : jakartaToday();
+  const todayStr = jakartaToday();
   const latestDate = threeMonthLimit(todayStr);
   const [price, setPrice] = useState('');
   const [quotaMin, setQuotaMin] = useState('');
   const [quotaMax, setQuotaMax] = useState('');
+  // Backend menyimpan opsi minimum melalui minGuests; nilai 1 berarti tanpa batas khusus.
+  const hasCustomBookingLimits = useMinimumBooking && Number(minGuests) !== 1;
+  const effectiveMaxGuests = hasCustomBookingLimits ? maxGuests : quotaMax;
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [bookedPackageDates, setBookedPackageDates] = useState<string[]>([]);
@@ -132,32 +143,15 @@ export const AddPackagePage: React.FC = () => {
     showValidation(`${fieldLabel} hanya boleh diisi angka bulat tanpa huruf, tanda minus, atau desimal.`, step);
   };
 
-  const handleStartDateChange = (val: string) => {
-    setStartDate(val);
-    if (val && isOpenTripType(tripType)) {
-      const durNum = parseInt(duration, 10) || 1;
-      const d = new Date(val);
-      if (!isNaN(d.getTime())) {
-        d.setDate(d.getDate() + Math.max(0, durNum - 1));
-        const calculatedEnd = d.toISOString().split('T')[0];
-        setEndDate(calculatedEnd);
-        setSchedule(`${val} s/d ${calculatedEnd} (${durNum} Hari)`);
-      }
-    }
-  };
-
   React.useEffect(() => {
-    if (startDate && isOpenTripType(tripType)) {
-      const durNum = parseInt(duration, 10) || 1;
-      const d = new Date(startDate);
-      if (!isNaN(d.getTime())) {
-        d.setDate(d.getDate() + Math.max(0, durNum - 1));
-        const calculatedEnd = d.toISOString().split('T')[0];
-        setEndDate(calculatedEnd);
-        setSchedule(`${startDate} s/d ${calculatedEnd} (${durNum} Hari)`);
-      }
+    if (isOpenTripType(tripType)) {
+      setStartDate(departureDates[0] || '');
+      setEndDate(departureDates.length ? tripEndDate(departureDates[departureDates.length - 1], Number(duration) || 1) : '');
+    } else {
+      setStartDate(availabilityDates[0] || '');
+      setEndDate(availabilityDates[availabilityDates.length - 1] || '');
     }
-  }, [duration]);
+  }, [duration, departureDates, availabilityDates, tripType]);
 
   // Itinerary states
   // Paket baru dimulai kosong: contoh hanya muncul sebagai placeholder agar
@@ -175,6 +169,7 @@ export const AddPackagePage: React.FC = () => {
   // Mode edit: bila data paket gagal dimuat, penyimpanan dikunci supaya form
   // kosong tidak menimpa paket asli.
   const [packageLoadError, setPackageLoadError] = useState('');
+  const [isLoadingPackage, setIsLoadingPackage] = useState(Boolean(editingPackageId));
   const [packageLoadAttempt, setPackageLoadAttempt] = useState(0);
   const [newIncludedFacility, setNewIncludedFacility] = useState('');
   const [newExcludedFacility, setNewExcludedFacility] = useState('');
@@ -193,13 +188,20 @@ export const AddPackagePage: React.FC = () => {
   ] as const;
 
   React.useEffect(() => {
+    let cancelled = false;
     async function loadPackage() {
       if (editingPackageId) {
+        setIsLoadingPackage(true);
         try {
           const pkg = await request(`/provider/packages/${editingPackageId}`);
+          if (cancelled) return;
           setPackageName(pkg.name || '');
           setLocation(pkg.destination || '');
           setMeetPoint(pkg.meetingPoint || '');
+          setPickupMode(pkg.pickupMode || 'MEETING_POINT');
+          setPickupArea(pkg.pickupArea || '');
+          setPickupNotes(pkg.pickupNotes || '');
+          setPickupPoints((pkg.pickupPoints || []).join('\n'));
           const savedCoordinates = getMeetingPointCoordinates(pkg);
           if (savedCoordinates) {
             setMapPosition(savedCoordinates);
@@ -213,6 +215,10 @@ export const AddPackagePage: React.FC = () => {
           if (pkg.startDate) setStartDate(pkg.startDate);
           if (pkg.endDate) setEndDate(pkg.endDate);
           setBookedPackageDates(Array.isArray(pkg.bookedDates) ? pkg.bookedDates : []);
+          if (isOpenTripType(loadedTripType)) {
+            setDepartureDates(pkg.departureDates?.length ? [...pkg.departureDates].sort() : pkg.startDate ? [pkg.startDate] : []);
+            setBookedDepartures((pkg.departures || []).filter((d: { quotaUsed: number }) => d.quotaUsed > 0).map((d: { date: string }) => d.date));
+          }
           if (!isOpenTripType(loadedTripType)) {
             const configured: string[] = (pkg.configuredDates || pkg.availableDates || []).filter((day: string) => day >= jakartaToday());
             configured.sort();
@@ -254,12 +260,19 @@ export const AddPackagePage: React.FC = () => {
           }
           setPackageLoadError('');
         } catch (err: any) {
+          if (cancelled) return;
           console.error('Failed to load package details:', err);
           setPackageLoadError(err?.message || 'Data paket gagal dimuat.');
+        } finally {
+          if (!cancelled) setIsLoadingPackage(false);
         }
+      } else {
+        setIsLoadingPackage(false);
+        setPackageLoadError('');
       }
     }
     loadPackage();
+    return () => { cancelled = true; };
   }, [editingPackageId, packageLoadAttempt]);
 
   React.useEffect(() => {
@@ -417,13 +430,13 @@ export const AddPackagePage: React.FC = () => {
   };
 
   const handleSubmit = async (status: 'draft' | 'publish') => {
-    if (isBusy) return;
+    if (isBusy || isLoadingPackage) return;
 
 	const priceValue = price === '' ? Number.NaN : Number(price);
 	const qMin = quotaMin === '' ? Number.NaN : Number(quotaMin);
 	const qMax = quotaMax === '' ? Number.NaN : Number(quotaMax);
 	const minG = useMinimumBooking ? (minGuests === '' ? Number.NaN : Number(minGuests)) : 1;
-	const maxG = maxGuests === '' ? Number.NaN : Number(maxGuests);
+	const maxG = effectiveMaxGuests === '' ? Number.NaN : Number(effectiveMaxGuests);
 	const durationValue = Number(duration);
 	const minAgeValue = minAge === '' ? 0 : Number(minAge);
 	const maxAgeValue = maxAge === '' ? 0 : Number(maxAge);
@@ -448,7 +461,7 @@ export const AddPackagePage: React.FC = () => {
 	  ['Kuota minimal', quotaMin, qMin],
 	  ['Kuota maksimal', quotaMax, qMax],
 	  ['Minimum peserta', useMinimumBooking ? minGuests : '1', minG],
-	  ['Maksimum peserta', maxGuests, maxG],
+	  ['Maksimum peserta', effectiveMaxGuests, maxG],
 	] as const;
 	const invalidPricing = enteredPricingValues.find(([label, raw, value]) =>
 	  (label !== 'Kuota minimal' || requiresMinimumQuota) &&
@@ -493,11 +506,11 @@ export const AddPackagePage: React.FC = () => {
 		showValidation('Lokasi destinasi wajib dipilih sebelum paket dipublikasikan.', 'info');
         return;
       }
-	  if (!meetPoint.trim()) {
+	  if (pickupMode === 'MEETING_POINT' && !meetPoint.trim()) {
 		showValidation('Pin titik kumpul wajib dipilih pada peta.', 'info');
 		return;
 	  }
-	  if (!mapPosition) {
+	  if (pickupMode === 'MEETING_POINT' && !mapPosition) {
 		showValidation('Klik peta untuk menentukan koordinat latitude dan longitude titik kumpul.', 'info');
 		return;
 	  }
@@ -541,7 +554,7 @@ export const AddPackagePage: React.FC = () => {
 		showValidation('Tanggal mulai dan tanggal selesai keberangkatan wajib diisi.', 'pricing');
         return;
       }
-      if (startDate < todayStr) {
+      if (!requiresMinimumQuota && startDate < todayStr) {
 		showValidation('Tanggal mulai keberangkatan tidak boleh menggunakan tanggal yang sudah lewat.', 'pricing');
         return;
       }
@@ -564,6 +577,19 @@ export const AddPackagePage: React.FC = () => {
       }
     }
 
+    if (pickupMode === 'FLEXIBLE' && !pickupArea.trim()) {
+      showValidation('Isi area atau rute penjemputan agar customer mengetahui batas lokasi yang dilayani.', 'info');
+      return;
+    }
+    const pickupPointList = [...new Set(pickupPoints.split('\n').map(point => point.trim()).filter(Boolean))];
+    if (pickupPointList.length > 30 || pickupPointList.some(point => point.length < 5 || point.length > 255)) {
+      showValidation('Isi maksimal 30 pilihan titik jemput, masing-masing 5–255 karakter.', 'info');
+      return;
+    }
+    if (requiresMinimumQuota && !departureDates.some(day => day >= todayStr)) {
+      showValidation('Pilih setidaknya satu tanggal keberangkatan yang belum lewat.', 'pricing');
+      return;
+    }
     if (!isOpenTripType(tripType) && (!availabilityDates.length || availabilityDates.some(day => day < todayStr || day > latestDate) ||
       !availabilityDates.some(day => rangeAvailable(day, tripEndDate(day, durationValue || 1), todayStr, latestDate, availabilityDates)))) {
       showValidation('Buka tanggal availability maksimal tiga bulan ke depan. Sediakan setidaknya satu periode yang cukup untuk durasi perjalanan.', 'pricing');
@@ -573,14 +599,15 @@ export const AddPackagePage: React.FC = () => {
     await run(status, async () => {
       try {
         const dbStatus = status === 'draft' ? 'Draft' : 'Aktif';
-        const finalSchedule = isOpenTripType(tripType) ? (schedule.trim() || (startDate && endDate ? `${startDate} s/d ${endDate} (${duration} Hari)` : 'Jadwal Fleksibel')) : 'Sesuai kalender availability';
+        const finalSchedule = isOpenTripType(tripType) ? (schedule.trim() || 'Sesuai pilihan tanggal keberangkatan') : 'Sesuai kalender availability';
 
         const payload = {
           name: packageName,
           destination: location,
-          meetingPoint: meetPoint,
-          meetingPointLatitude: mapPosition?.lat ?? null,
-          meetingPointLongitude: mapPosition?.lng ?? null,
+          pickupMode, pickupArea, pickupNotes, pickupPoints: pickupPointList,
+          meetingPoint: pickupMode === 'MEETING_POINT' ? meetPoint : '',
+          meetingPointLatitude: pickupMode === 'MEETING_POINT' ? mapPosition?.lat ?? null : null,
+          meetingPointLongitude: pickupMode === 'MEETING_POINT' ? mapPosition?.lng ?? null : null,
           category: category,
           tripType: tripType,
 		  price: Number.isFinite(priceValue) ? priceValue : 0,
@@ -591,6 +618,7 @@ export const AddPackagePage: React.FC = () => {
           startDate: startDate,
           endDate: endDate,
           ...(!isOpenTripType(tripType) ? { availableDates: availabilityDates } : {}),
+          departureDates: isOpenTripType(tripType) ? departureDates : [],
           schedule: finalSchedule,
 		  duration: duration === '' ? 1 : durationValue,
           minGuests: Number.isFinite(minG) ? minG : 0,
@@ -624,8 +652,13 @@ export const AddPackagePage: React.FC = () => {
 		if (!savedPackage?.id || savedPackage.status !== dbStatus || savedPackage.name !== payload.name ||
 		    savedPackage.category !== payload.category || savedPackage.tripType !== payload.tripType ||
 		    Number(savedPackage.quotaMin) !== payload.quotaMin ||
+		    Number(savedPackage.minGuests) !== payload.minGuests ||
+		    Number(savedPackage.maxGuests) !== payload.maxGuests ||
 		    Number(savedPackage.duration) !== payload.duration ||
-		    (mapPosition && (
+            savedPackage.pickupMode !== payload.pickupMode ||
+            savedPackage.pickupArea !== payload.pickupArea.trim() ||
+            JSON.stringify(savedPackage.departureDates || []) !== JSON.stringify(payload.departureDates) ||
+		    (pickupMode === 'MEETING_POINT' && mapPosition && (
 		      !Number.isFinite(Number(savedPackage.meetingPointLatitude)) ||
 		      !Number.isFinite(Number(savedPackage.meetingPointLongitude)) ||
 		      Math.abs(Number(savedPackage.meetingPointLatitude) - mapPosition.lat) > 0.0000001 ||
@@ -676,7 +709,7 @@ export const AddPackagePage: React.FC = () => {
             <button
               className="action-outline-btn"
               onClick={() => handleSubmit('draft')}
-              disabled={isBusy}
+              disabled={isBusy || isLoadingPackage || Boolean(packageLoadError)}
               aria-busy={pending === 'draft'}
               title={isUploadingPhoto ? 'Tunggu hingga unggah foto selesai' : undefined}
             >
@@ -687,7 +720,7 @@ export const AddPackagePage: React.FC = () => {
             <button
               className="action-solid-btn"
               onClick={() => handleSubmit('publish')}
-              disabled={isBusy}
+              disabled={isBusy || isLoadingPackage || Boolean(packageLoadError)}
               aria-busy={pending === 'publish'}
               title={isUploadingPhoto ? 'Tunggu hingga unggah foto selesai' : undefined}
             >
@@ -816,8 +849,20 @@ export const AddPackagePage: React.FC = () => {
                 </div>
 
                 <div className="input-group">
-                  <label>Alamat Titik Kumpul *</label>
-                  <MeetingPointPicker address={meetPoint} position={mapPosition} onAddressChange={setMeetPoint} onSelect={setMapPosition} />
+                  <label>Pengaturan Penjemputan *</label>
+                  <PickupModeEditor mode={pickupMode} onChange={setPickupMode} />
+                  {pickupMode === 'MEETING_POINT' ? <>
+                    <label>Alamat Titik Kumpul *</label>
+                    <MeetingPointPicker address={meetPoint} position={mapPosition} onAddressChange={setMeetPoint} onSelect={setMapPosition} />
+                  </> : <>
+                    <label htmlFor="pickup-area">Area / rute yang dilayani *</label>
+                    <textarea id="pickup-area" rows={2} maxLength={500} value={pickupArea} onChange={e => setPickupArea(e.target.value)} placeholder="Contoh: Jabodetabek, sepanjang rute Bekasi–Cikampek menuju Dieng" />
+                    <label htmlFor="pickup-points" style={{ marginTop: 16 }}>Pilihan titik jemput (opsional)</label>
+                    <textarea id="pickup-points" rows={5} value={pickupPoints} onChange={e => setPickupPoints(e.target.value)} placeholder={'Satu lokasi per baris, maksimal 30. Contoh:\nBogor, Exit Tol Citeureup\nDepok, Exit Tol Cisalak\nJakarta, RS UKI'} />
+                    <label htmlFor="pickup-notes" style={{ marginTop: 16 }}>Ketentuan penjemputan (opsional)</label>
+                    <textarea id="pickup-notes" rows={3} maxLength={1000} value={pickupNotes} onChange={e => setPickupNotes(e.target.value)} placeholder="Contoh: lokasi harus searah. Jam jemput disepakati melalui WhatsApp sebelum keberangkatan." />
+                    <p style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6, color: '#64748b' }}>Customer dapat memilih lokasi di atas atau mengusulkan titik lain dalam area. Lokasi setiap peserta akan tercatat di detail booking untuk dikonfirmasi bersama.</p>
+                  </>}
                 </div>
 
                 <div className="input-group">
@@ -1031,44 +1076,10 @@ export const AddPackagePage: React.FC = () => {
                 </div>
 
                 {isOpenTripType(tripType) ? (<>
-                <div className="input-group">
-                  <label>Jadwal Keberangkatan (Durasi {duration} Hari) *</label>
-                  <div className="input-range-row">
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '2px', display: 'block' }}>Tanggal Mulai</label>
-                      <input 
-                        type="date" 
-                        min={todayStr}
-                        value={startDate} 
-                        onChange={(e) => handleStartDateChange(e.target.value)}
-                        style={{ width: '100%', textAlign: 'left' }}
-                      />
-                    </div>
-                    <span style={{ alignSelf: 'flex-end', marginBottom: '8px' }}>s/d</span>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '2px', display: 'block' }}>Tanggal Selesai</label>
-                      <input 
-                        type="date" 
-                        min={startDate || todayStr}
-                        value={endDate} 
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setEndDate(val);
-                          if (startDate && val) {
-                            setSchedule(`${startDate} s/d ${val}`);
-                          }
-                        }}
-                        style={{ width: '100%', textAlign: 'left' }}
-                      />
-                    </div>
+                  <div className="input-group">
+                    <label>Jadwal Keberangkatan *</label>
+                    <OpenTripScheduleEditor dates={departureDates} booked={bookedDepartures} min={todayStr} max={latestDate} duration={Number(duration) || 1} disabled={isBusy} onChange={setDepartureDates} />
                   </div>
-                  {startDate && startDate < todayStr && (
-                    <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                      ⚠️ Tanggal mulai tidak boleh tanggal yang sudah lewat dari hari ini
-                    </span>
-                  )}
-                </div>
-
                 </>) : (
                   <div className="input-group">
                     <label>Availability Calendar *</label>
@@ -1096,13 +1107,14 @@ export const AddPackagePage: React.FC = () => {
                         const checked = e.target.checked;
                         setUseMinimumBooking(checked);
                         setMinGuests(checked ? suggestedMinimumGuests(tripType) : '1');
+                        setMaxGuests(quotaMax);
                       }}
                       style={{ width: '16px', height: '16px', margin: 0 }}
                     />
                     Terapkan minimum peserta per booking
                   </label>
                   <span style={{ color: '#64748b', fontSize: '12px', marginTop: '5px' }}>
-                    Jika tidak dicentang, pelanggan dapat memesan mulai dari 1 orang.
+                    Jika tidak dicentang, pelanggan dapat memesan mulai dari 1 orang hingga kuota maksimal.
                   </span>
                 </div>
 
@@ -1130,17 +1142,23 @@ export const AddPackagePage: React.FC = () => {
                       type="number" 
                       min={useMinimumBooking ? (minGuests || "1") : "1"}
                       max={quotaMax || undefined}
-                      value={maxGuests} 
+                      value={effectiveMaxGuests}
+                      readOnly={!hasCustomBookingLimits}
                       onChange={(e) => setMaxGuests(e.target.value)}
                       placeholder="12"
                     />
-                    {parseInt(maxGuests, 10) < (useMinimumBooking ? parseInt(minGuests, 10) : 1) ? (
-                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                        ⚠️ Maksimum peserta ({maxGuests}) harus &gt;= minimum peserta ({minGuests})
+                    {!hasCustomBookingLimits && (
+                      <span style={{ color: '#64748b', fontSize: '12px', marginTop: '5px' }}>
+                        Otomatis mengikuti kuota maksimal saat minimum peserta 1 orang.
                       </span>
-                    ) : parseInt(quotaMax, 10) > 0 && parseInt(maxGuests, 10) > parseInt(quotaMax, 10) ? (
+                    )}
+                    {parseInt(effectiveMaxGuests, 10) < (useMinimumBooking ? parseInt(minGuests, 10) : 1) ? (
                       <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                        ⚠️ Maksimum peserta per booking ({maxGuests}) tidak boleh melebihi kuota maksimal ({quotaMax})
+                        ⚠️ Maksimum peserta ({effectiveMaxGuests}) harus &gt;= minimum peserta ({minGuests})
+                      </span>
+                    ) : parseInt(quotaMax, 10) > 0 && parseInt(effectiveMaxGuests, 10) > parseInt(quotaMax, 10) ? (
+                      <span className="field-error-text" style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                        ⚠️ Maksimum peserta per booking ({effectiveMaxGuests}) tidak boleh melebihi kuota maksimal ({quotaMax})
                       </span>
                     ) : null}
                   </div>

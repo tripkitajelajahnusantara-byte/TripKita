@@ -25,6 +25,7 @@ func TestBookingScheduleBoundaryRules(t *testing.T) {
 	}
 	pkg.TripType = "Open Trip"
 	start := now.AddDate(0, 0, 8)
+	pkg.DepartureDates = []string{start.Format("2006-01-02")}
 	if err := validateBookingSchedule(pkg, start, calculatePackageTripEnd(pkg, start), now, false); err != nil {
 		t.Fatalf("Open Trip period rule changed: %v", err)
 	}

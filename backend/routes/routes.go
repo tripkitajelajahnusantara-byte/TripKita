@@ -130,6 +130,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 				// Satu paket butuh 3-20 foto, jadi batasnya lebih longgar dari dokumen.
 				packages.POST("/photos", middleware.RateLimit(300, time.Hour), uploadCtrl.UploadPackagePhoto)
 				packages.POST("", packageCtrl.Create)
+				packages.POST("/:id/duplicate", packageCtrl.Duplicate)
 				packages.GET("", packageCtrl.GetAll)
 				packages.GET("/:id", packageCtrl.GetByID)
 				packages.PUT("/:id", packageCtrl.Update)

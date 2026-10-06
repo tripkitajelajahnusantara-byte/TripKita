@@ -10,6 +10,7 @@ import (
 )
 
 type PackageRepository interface {
+	LoadDepartureAvailability(packages []models.Package) error
 	Create(pkg *models.Package) error
 	FindAllByProvider(providerID uint) ([]models.Package, error)
 	FindAllPublic(today string) ([]models.Package, error)
@@ -104,6 +105,9 @@ func (r *packageRepository) Update(pkg *models.Package) error {
 		}
 		// Checkout may have changed the quota since the edit form was read.
 		pkg.QuotaUsed = current.QuotaUsed
+		if err := protectOpenTripBookingsTx(tx, &current, pkg); err != nil {
+			return err
+		}
 		if !models.IsOpenTrip(current.TripType) && (current.Duration != pkg.Duration || current.TripType != pkg.TripType) {
 			var booked int64
 			if err := tx.Model(&models.PackageDate{}).Where("package_id = ? AND status = ?", pkg.ID, models.PackageDateBooked).Count(&booked).Error; err != nil {

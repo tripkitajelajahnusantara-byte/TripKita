@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"tripkita-provider/models"
 	"tripkita-provider/services"
@@ -42,6 +43,29 @@ func (ctrl *PackageController) Create(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusCreated, pkg)
+}
+
+func (ctrl *PackageController) Duplicate(c *gin.Context) {
+	providerID, ok := principalIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID paket tidak valid"})
+		return
+	}
+	pkg, err := ctrl.service.DuplicatePackage(uint(id), providerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Paket tidak ditemukan"})
+			return
+		}
+		respondInternalError(c, "menduplikat paket", err)
+		return
+	}
 	c.JSON(http.StatusCreated, pkg)
 }
 

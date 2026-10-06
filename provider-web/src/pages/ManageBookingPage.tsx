@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { Booking, BookingParticipant } from '../types';
 import { request } from '../utils/api';
+import { BookingPickupSummary } from '../components/TripPickup';
 import { SkeletonTableRows } from '../components/Skeleton';
 import { TripChangeModal } from '../components/TripChangeModal';
 import { useCustomAlert } from '../components/CustomAlertModal';
@@ -139,6 +140,8 @@ export const ManageBookingPage: React.FC = () => {
           rescheduleDate: b.rescheduleDate || '',
           rescheduleResponseDeadline: b.rescheduleResponseDeadline || '',
           cancellationReason: b.cancellationReason || '',
+          pickupMode: b.pickupMode,
+          pickupInstructions: b.pickupInstructions,
           participants: Array.isArray(b.participants)
             ? [...b.participants].sort((x: BookingParticipant, y: BookingParticipant) => (x.position || 0) - (y.position || 0))
             : [],
@@ -614,6 +617,7 @@ export const ManageBookingPage: React.FC = () => {
                     )}
                   </div>
 
+                  <div className="detail-item full-width"><BookingPickupSummary mode={selectedBooking.pickupMode} instructions={selectedBooking.pickupInstructions} participants={selectedBooking.participants} /></div>
                   {/* Booking Timeline */}
                   <div className="detail-item full-width">
                     <span className="detail-label" style={{ marginBottom: '8px', display: 'block' }}>Timeline Pemesanan</span>

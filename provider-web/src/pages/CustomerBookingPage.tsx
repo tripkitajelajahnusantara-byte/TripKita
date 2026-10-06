@@ -11,6 +11,7 @@ import {
   MeetingPointMap,
 } from '../components/MeetingPointMap';
 import { fetchCheckoutConfig } from '../utils/checkoutConfig';
+import { FlexiblePickupDetails, ParticipantPickupInput } from '../components/TripPickup';
 
 // Tanggal hari ini (zona waktu lokal) dalam format YYYY-MM-DD untuk validasi tanggal lahir
 const getTodayIso = () => {
@@ -57,6 +58,7 @@ const getBirthDateError = (value: string, label: string, tripDate = '', minAge =
 };
 
 interface Participant {
+  pickupPoint: string;
   nama: string;
   hp: string;
   gender: string;
@@ -116,7 +118,8 @@ export const CustomerBookingPage: React.FC = () => {
         hp: normalizeIndonesianPhone(p.hp || ''),
         gender: p.gender || '',
         tanggalLahir: p.tanggalLahir || '',
-        riwayatPenyakit: p.riwayatPenyakit || ''
+        riwayatPenyakit: p.riwayatPenyakit || '',
+        pickupPoint: p.pickupPoint || ''
       }));
     }
     return [];
@@ -158,7 +161,8 @@ export const CustomerBookingPage: React.FC = () => {
             hp: isFirst && customerProfile ? normalizeIndonesianPhone(customerProfile.whatsapp || '') : '',
             gender: isFirst && customerProfile ? (customerProfile.gender || '') : '',
             tanggalLahir: isFirst && customerProfile ? (customerProfile.birthDate || '') : '',
-            riwayatPenyakit: ''
+            riwayatPenyakit: '',
+            pickupPoint: ''
           });
         }
       } else if (updated.length > guestsCount) {
@@ -178,7 +182,8 @@ export const CustomerBookingPage: React.FC = () => {
           hp: pemesanPhone,
           gender: pemesanGender,
           tanggalLahir: pemesanBirthDate,
-          riwayatPenyakit: prev[0]?.riwayatPenyakit || ''
+          riwayatPenyakit: prev[0]?.riwayatPenyakit || '',
+          pickupPoint: prev[0]?.pickupPoint || ''
         };
         return copy;
       });
@@ -257,6 +262,9 @@ export const CustomerBookingPage: React.FC = () => {
 
     // Validate Participants
     participants.forEach((p, idx) => {
+      if (pkg.pickupMode === 'FLEXIBLE' && (p.pickupPoint.trim().length < 5 || p.pickupPoint.trim().length > 500)) {
+        newErrors[`p_pickup_${idx}`] = 'Isi titik jemput 5–500 karakter, dengan alamat atau patokan yang jelas.';
+      }
       if (!p.nama || p.nama.trim().length < 3) {
         newErrors[`p_nama_${idx}`] = `Nama Peserta ${idx + 1} minimal 3 karakter.`;
       } else if (!/^[a-zA-Z\s]+$/.test(p.nama)) {
@@ -295,15 +303,15 @@ export const CustomerBookingPage: React.FC = () => {
       return;
     }
 
-    if (!isOpenTrip && !validDate(selectedTripDate)) {
+    if (!validDate(selectedTripDate)) {
       showAlert({type: 'warning', title: 'Pilih Tanggal', message: 'Kembali ke detail paket dan pilih tanggal pada kalender.'});
       return;
     }
     // Save into NavigationContext for Step 5 Confirmation
     setBookingFormData({
       packageId: currentPackageId,
-      tripDate: isOpenTrip ? (pkg.bookingDate || pkg.schedule) : selectedTripDate,
-      ...(!isOpenTrip ? { tripEndDate: pkg.bookingEndDate || tripEndDate(selectedTripDate, pkg.duration) } : {}),
+      tripDate: selectedTripDate,
+      tripEndDate: pkg.bookingEndDate || tripEndDate(selectedTripDate, pkg.duration),
       pemesan: {
         nama: pemesanName,
         email: pemesanEmail,
@@ -343,7 +351,7 @@ export const CustomerBookingPage: React.FC = () => {
           Data Pemesan & Peserta Trip
         </h1>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '30px', alignItems: 'flex-start' }}>
+        <div className="trip-checkout-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '30px', alignItems: 'flex-start' }}>
           
           {/* Left Column: Form Pemesan & Peserta */}
           <form onSubmit={handleSubmitData} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -668,6 +676,9 @@ export const CustomerBookingPage: React.FC = () => {
                       </div>
                     </div>
 
+                    {pkg.pickupMode === 'FLEXIBLE' && <ParticipantPickupInput id={`pickup-${idx}`} value={p.pickupPoint} points={pkg.pickupPoints || []}
+                      onChange={value => handleParticipantChange(idx, 'pickupPoint', value)} error={errors[`p_pickup_${idx}`]}
+                      previous={idx > 0 ? participants[0]?.pickupPoint : undefined} onCopy={() => handleParticipantChange(idx, 'pickupPoint', participants[0]?.pickupPoint || '')} />}
                     <div style={{ marginTop: '12px' }}>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
                         Riwayat Penyakit & Alergi <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '400' }}>(Maks. 255 Karakter, opsional)</span>
@@ -730,7 +741,7 @@ export const CustomerBookingPage: React.FC = () => {
               </strong>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569' }}>
                 <Calendar size={15} color="#94a3b8" />
-                <span>{isOpenTrip ? (pkg.bookingDate || pkg.schedule || 'Jadwal Fleksibel') : formatTripRange(pkg.bookingDate, pkg.bookingEndDate)}</span>
+                <span>{formatTripRange(selectedTripDate, pkg.bookingEndDate || tripEndDate(selectedTripDate, pkg.duration))}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569' }}>
                 <Users size={15} color="#94a3b8" />
@@ -738,6 +749,7 @@ export const CustomerBookingPage: React.FC = () => {
               </div>
             </div>
 
+            <FlexiblePickupDetails pkg={pkg} />
             {(meetingPointCoordinates || meetingPointAddress) && (
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginBottom: '18px' }}>
                 <strong style={{ display: 'block', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>Titik Kumpul</strong>

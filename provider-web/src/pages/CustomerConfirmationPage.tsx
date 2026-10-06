@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { fetchCheckoutConfig } from '../utils/checkoutConfig';
+import { FlexiblePickupDetails } from '../components/TripPickup';
 import { useActionLock } from '../utils/useActionLock';
 import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck, LoaderCircle } from 'lucide-react';
 import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsContent } from '../components/LegalModals';
@@ -145,45 +146,11 @@ export const CustomerConfirmationPage: React.FC = () => {
 	const nowIso = new Date().toISOString();
 
     try {
-      const parseTripDateToFuture = (dateInput?: string) => {
-        if (dateInput) {
-          const d = new Date(dateInput);
-          if (!isNaN(d.getTime()) && d.getTime() > Date.now()) {
-            return d;
-          }
-
-          const monthsMap: { [key: string]: number } = {
-            jan: 0, januari: 0, feb: 1, februari: 1, mar: 2, maret: 2,
-            apr: 3, april: 3, mei: 4, jun: 5, juni: 5, jul: 6, juli: 6,
-            agu: 7, agustus: 7, sep: 8, september: 8, okt: 9, oktober: 9,
-            nov: 10, november: 10, des: 11, desember: 11
-          };
-
-          const match = dateInput.match(/(\d{1,2})[^\d]+([a-zA-Z]+)[^\d]+(\d{4})/);
-          if (match) {
-            const day = parseInt(match[1], 10);
-            const monthStr = match[2].toLowerCase();
-            const year = parseInt(match[3], 10);
-            if (monthsMap[monthStr] !== undefined) {
-              const parsed = new Date(year, monthsMap[monthStr], day, 8, 0, 0);
-              if (!isNaN(parsed.getTime())) {
-                return parsed;
-              }
-            }
-          }
-        }
-
-        // Jangan menebak tanggal: pesanan untuk tanggal yang tidak dipilih
-        // pelanggan lebih merugikan daripada menghentikan checkout.
-        throw new Error('Tanggal perjalanan tidak terbaca. Silakan kembali ke detail paket dan pilih tanggal lagi.');
-      };
-
-      const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
-      const selectedTripSchedule = bookingFormData.tripDate || pkg.bookingDate || (isOpenTrip ? pkg.schedule : '') || '';
-      if (!isOpenTrip && (!validDate(selectedTripSchedule) || Number(bookingFormData.packageId) !== Number(pkg.id))) {
+      const selectedTripSchedule = bookingFormData.tripDate || pkg.bookingDate || '';
+      if (!validDate(selectedTripSchedule) || Number(bookingFormData.packageId) !== Number(pkg.id)) {
         throw new Error('Pilihan tanggal tidak valid untuk paket ini. Kembali ke detail paket dan pilih tanggal pada kalender.');
       }
-      const tripTimestamp = isOpenTrip ? parseTripDateToFuture(selectedTripSchedule).toISOString() : bookingTimestamp(selectedTripSchedule);
+      const tripTimestamp = bookingTimestamp(selectedTripSchedule);
 
 	  const rawPkgId = Number(pkg.id);
 	  if (!Number.isInteger(rawPkgId) || rawPkgId <= 0) {
@@ -206,7 +173,8 @@ export const CustomerConfirmationPage: React.FC = () => {
             phone: String(p.hp || '').trim(),
             gender: p.gender,
             birthDate: p.tanggalLahir,
-            medicalNotes: (medical === '' || medical === '-' || medical.toLowerCase() === 'tidak ada') ? '' : medical
+            medicalNotes: (medical === '' || medical === '-' || medical.toLowerCase() === 'tidak ada') ? '' : medical,
+            pickupPoint: p.pickupPoint || ''
           };
         })
       };
@@ -327,6 +295,11 @@ export const CustomerConfirmationPage: React.FC = () => {
             </div>
           </div>
 
+          <FlexiblePickupDetails pkg={pkg} />
+          {pkg.pickupMode === 'FLEXIBLE' && <section className="trip-option-panel">
+            <h4>Titik jemput yang diajukan</h4>
+            <dl className="pickup-manifest">{bookingFormData.peserta.map((p, i) => <div key={i}><dt>{p.nama}</dt><dd>{p.pickupPoint || 'Belum diisi — kembali ke data peserta untuk melengkapi.'}</dd></div>)}</dl>
+          </section>}
           {meetingPointCoordinates && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
               <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px' }}>
@@ -364,7 +337,7 @@ export const CustomerConfirmationPage: React.FC = () => {
               </h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>
                 <Calendar size={14} color="#94a3b8" />
-                <span>{!pkg.tripType || pkg.tripType === 'Open Trip' ? (bookingFormData.tripDate || pkg.bookingDate || pkg.schedule || 'Jadwal Fleksibel') : formatTripRange(bookingFormData.tripDate || pkg.bookingDate, bookingFormData.tripEndDate || pkg.bookingEndDate)}</span>
+                <span>{formatTripRange(bookingFormData.tripDate || pkg.bookingDate, bookingFormData.tripEndDate || pkg.bookingEndDate)}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b' }}>
                 <Users size={14} color="#94a3b8" />
