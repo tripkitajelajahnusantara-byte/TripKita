@@ -97,6 +97,10 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 	if err := validatePackageDates(req.StartDate, req.EndDate); err != nil {
 		return nil, err
 	}
+	destinations, err := normalizePackageDestinations(req.Destinations)
+	if err != nil {
+		return nil, err
+	}
 
 	pkg := &models.Package{
 		PickupMode:         req.PickupMode,
@@ -106,6 +110,7 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 		ProviderID:         providerID,
 		Name:               req.Name,
 		Destination:        req.Destination,
+		Destinations:       destinations,
 		MeetingPoint:       req.MeetingPoint,
 		MeetingPointLat:    req.MeetingPointLat,
 		MeetingPointLng:    req.MeetingPointLng,
@@ -370,6 +375,13 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	}
 	if req.Destination != nil {
 		pkg.Destination = strings.TrimSpace(*req.Destination)
+	}
+	if req.Destinations != nil {
+		destinations, err := normalizePackageDestinations(*req.Destinations)
+		if err != nil {
+			return nil, err
+		}
+		pkg.Destinations = destinations
 	}
 	if req.MeetingPoint != nil {
 		pkg.MeetingPoint = strings.TrimSpace(*req.MeetingPoint)

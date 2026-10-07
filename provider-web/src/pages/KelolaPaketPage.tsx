@@ -73,6 +73,7 @@ export const KelolaPaketPage: React.FC = () => {
           name: pkg.name,
           category: pkg.category || '',
           destination: pkg.destination,
+          destinations: Array.isArray(pkg.destinations) ? pkg.destinations : [],
           price: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price || 0),
           quota: pkg.departureDates?.length > 1 ? `${pkg.quotaMax || 0} / keberangkatan` : `${pkg.departures?.[0]?.quotaUsed ?? pkg.quotaUsed ?? 0}/${pkg.quotaMax || 0}`,
           schedule: pkg.departures?.length ? `${pkg.departures.length} jadwal · mulai ${formatTripRange(pkg.departures[0].date)}` : pkg.schedule,
@@ -156,6 +157,7 @@ export const KelolaPaketPage: React.FC = () => {
   const filteredPackages = packages.filter((pkg) => {
     const matchesSearch = pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           pkg.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (pkg.destinations || []).some(name => name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                           pkg.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'Semua' || pkg.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -466,8 +468,16 @@ export const KelolaPaketPage: React.FC = () => {
 
               <div className="detail-grid">
                 <div className="detail-item full-width">
-                  <span className="detail-label">Destinasi</span>
+                  <span className="detail-label">Provinsi Destinasi</span>
                   <span className="detail-value">{selectedPackage.destination}</span>
+                </div>
+                <div className="detail-item full-width">
+                  <span className="detail-label">Tempat yang Dikunjungi</span>
+                  {selectedPackage.destinations?.length ? (
+                    <span className="detail-value">{selectedPackage.destinations.join(' → ')}</span>
+                  ) : (
+                    <span className="detail-value" style={{ color: '#94a3b8', fontWeight: 500 }}>Belum diisi. Lengkapi melalui Edit Paket.</span>
+                  )}
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Harga</span>

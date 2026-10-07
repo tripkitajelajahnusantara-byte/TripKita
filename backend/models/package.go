@@ -11,6 +11,7 @@ type Package struct {
 	ProviderID         uint               `gorm:"not null" json:"providerId"`
 	Name               string             `gorm:"size:255;not null" json:"name"`
 	Destination        string             `gorm:"size:255;not null" json:"destination"`
+	Destinations       []string           `gorm:"serializer:json;type:text" json:"destinations"` // tempat yang dikunjungi, urut sesuai rute; Destination tetap menyimpan provinsi
 	MeetingPoint       string             `gorm:"size:255;default:''" json:"meetingPoint"`
 	MeetingPointLat    *float64           `gorm:"column:meeting_point_latitude;type:double precision" json:"meetingPointLatitude,omitempty"`
 	MeetingPointLng    *float64           `gorm:"column:meeting_point_longitude;type:double precision" json:"meetingPointLongitude,omitempty"`
@@ -74,6 +75,7 @@ type CreatePackageRequest struct {
 	AvailableDates     []string `json:"availableDates" binding:"omitempty,max=100,dive,datetime=2006-01-02"`
 	Name               string   `json:"name" binding:"required,max=255"`
 	Destination        string   `json:"destination" binding:"required,max=255"`
+	Destinations       []string `json:"destinations" binding:"max=30,dive,max=100"`
 	MeetingPoint       string   `json:"meetingPoint" binding:"max=255"`
 	MeetingPointLat    *float64 `json:"meetingPointLatitude"`
 	MeetingPointLng    *float64 `json:"meetingPointLongitude"`
@@ -108,6 +110,7 @@ type UpdatePackageRequest struct {
 	AvailableDates     *[]string `json:"availableDates" binding:"omitempty,max=100,dive,datetime=2006-01-02"`
 	Name               *string   `json:"name"`
 	Destination        *string   `json:"destination"`
+	Destinations       *[]string `json:"destinations" binding:"omitempty,max=30,dive,max=100"`
 	MeetingPoint       *string   `json:"meetingPoint"`
 	MeetingPointLat    *float64  `json:"meetingPointLatitude"`
 	MeetingPointLng    *float64  `json:"meetingPointLongitude"`

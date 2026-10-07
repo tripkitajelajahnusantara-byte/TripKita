@@ -28,6 +28,7 @@ func TestDuplicateCopiesDefinitionWithoutCopyingBookingState(t *testing.T) {
 	source.Schedule = "Jumat sampai Minggu"
 	source.Itinerary = `[{"day":1,"activities":[{"time":"07:00","title":"Berangkat"}]}]`
 	source.IncludedFacilities, source.ExcludedFacilities = "Transport\nMakan", "Pengeluaran pribadi"
+	source.Destinations = []string{"Pulau Padar", "Pink Beach"}
 	source.Image, source.Images = "https://example.com/one.jpg", "https://example.com/one.jpg,https://example.com/two.jpg"
 	source.CreatedAt, source.UpdatedAt = time.Now().Add(-time.Hour), time.Now()
 	source.AvailableDates, source.BookedDates, source.ConfiguredDates = []string{"2026-10-01"}, []string{"2026-10-02"}, []string{"2026-10-01"}

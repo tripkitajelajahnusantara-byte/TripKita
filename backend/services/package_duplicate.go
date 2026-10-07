@@ -27,6 +27,7 @@ func (s *packageService) DuplicatePackage(id uint, providerID uint) (*models.Pac
 		ProviderID:         providerID,
 		Name:               string(name) + suffix,
 		Destination:        source.Destination,
+		Destinations:       append([]string(nil), source.Destinations...),
 		MeetingPoint:       source.MeetingPoint,
 		MeetingPointLat:    source.MeetingPointLat,
 		MeetingPointLng:    source.MeetingPointLng,
