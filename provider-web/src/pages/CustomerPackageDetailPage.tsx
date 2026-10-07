@@ -349,6 +349,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
     return [];
   };
 
+  // Tempat yang dikunjungi, urut sesuai rute. Paket lama belum memilikinya.
+  const displayDestinations: string[] = Array.isArray(pkg.destinations)
+    ? pkg.destinations.map((name: unknown) => String(name ?? '').trim()).filter(Boolean)
+    : [];
   const displayItinerary = getDynamicItinerary();
   const displayIncludedFacilities = getDynamicIncludedFacilities();
   const displayExcludedFacilities = getDynamicExcludedFacilities();
@@ -669,6 +673,31 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 {pkg.description || 'Deskripsi paket belum dilengkapi oleh provider.'}
               </p>
             </div>
+
+            {/* Destinasi yang Dikunjungi */}
+            {displayDestinations.length > 0 && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
+              <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
+                Destinasi yang Dikunjungi
+              </h2>
+              <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
+                {displayDestinations.length} tempat, urut sesuai rute perjalanan
+              </p>
+              <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {displayDestinations.map((name, idx) => (
+                  <li
+                    key={`${idx}-${name}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 14px 7px 7px', borderRadius: '999px', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', fontSize: '13.5px', fontWeight: 600, color: '#0f172a', maxWidth: '100%' }}
+                  >
+                    <span aria-hidden="true" style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#007bff', color: '#ffffff', fontSize: '11px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {idx + 1}
+                    </span>
+                    <span style={{ overflowWrap: 'anywhere' }}>{name}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            )}
 
             {/* Itinerary */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>

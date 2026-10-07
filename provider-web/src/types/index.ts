@@ -115,6 +115,7 @@ export interface PackageItem {
   id: string;
   name: string;
   destination: string;
+  destinations?: string[];
   price: string;
   quota: string;
   schedule: string;

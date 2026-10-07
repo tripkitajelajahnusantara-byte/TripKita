@@ -9,6 +9,8 @@ import {
   Send, 
   Sparkles,
   MapPin,
+  MapPinned,
+  Route,
   Trash2,
   Plus,
   Clock,
@@ -45,6 +47,17 @@ function suggestedMinimumGuests(tripType: string): string {
 export const CATEGORIES = OFFICIAL_CATEGORIES;
 export const TRIP_TYPES = OFFICIAL_TRIP_TYPES;
 
+// Batas yang sama ditegakkan backend (normalizePackageDestinations).
+const MAX_DESTINATIONS = 30;
+const MIN_DESTINATION_LENGTH = 2;
+const MAX_DESTINATION_LENGTH = 100;
+
+// Rapikan nama destinasi persis seperti backend agar hasil simpan dapat
+// dibandingkan dengan payload.
+function cleanDestinationName(value: string): string {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
 // Foto lama bisa tersimpan sebagai URL absolut ber-host lokal (mis. saat
 // development). Ubah menjadi path "/uploads/..." agar tidak ikut tersimpan ulang.
 function toStoredPhotoPath(raw: string): string {
@@ -76,7 +89,7 @@ function isSavablePhotoRef(ref: string): boolean {
 export const AddPackagePage: React.FC = () => {
   const { navigateTo, editingPackageId } = useNavigation();
   const { showAlert } = useCustomAlert();
-  const [activeStep, setActiveStep] = useState<'info' | 'itinerary' | 'facilities' | 'pricing' | 'photos'>('info');
+  const [activeStep, setActiveStep] = useState<'info' | 'destinations' | 'itinerary' | 'facilities' | 'pricing' | 'photos'>('info');
 
   // Form states
   const [packageName, setPackageName] = useState('');
@@ -163,6 +176,11 @@ export const AddPackagePage: React.FC = () => {
   const [newActivityTitle, setNewActivityTitle] = useState('');
   const [selectedItineraryDay, setSelectedItineraryDay] = useState(1);
 
+  // Destinations states: tempat yang dikunjungi, berurutan sesuai rute.
+  const [destinations, setDestinations] = useState<string[]>([]);
+  const [newDestination, setNewDestination] = useState('');
+  const [destinationError, setDestinationError] = useState('');
+
   // Facilities states
   const [includedFacilities, setIncludedFacilities] = useState<string[]>([]);
   const [excludedFacilities, setExcludedFacilities] = useState<string[]>([]);
@@ -181,6 +199,7 @@ export const AddPackagePage: React.FC = () => {
 
   const steps = [
     { id: 'info', label: 'Info Dasar' },
+    { id: 'destinations', label: 'Destinasi' },
     { id: 'itinerary', label: 'Itinerary' },
     { id: 'facilities', label: 'Fasilitas' },
     { id: 'pricing', label: 'Jadwal & Harga' },
@@ -197,6 +216,7 @@ export const AddPackagePage: React.FC = () => {
           if (cancelled) return;
           setPackageName(pkg.name || '');
           setLocation(pkg.destination || '');
+          setDestinations(Array.isArray(pkg.destinations) ? pkg.destinations : []);
           setMeetPoint(pkg.meetingPoint || '');
           setPickupMode(pkg.pickupMode || 'MEETING_POINT');
           setPickupArea(pkg.pickupArea || '');
@@ -331,6 +351,45 @@ export const AddPackagePage: React.FC = () => {
     setItineraries(prev => prev.map(it => it.day === day
       ? { ...it, activities: [...it.activities.slice(0, idx + 1), { time: '', title: '' }, ...it.activities.slice(idx + 1)] }
       : it));
+  };
+
+  // Destinations helper actions
+  const handleAddDestination = () => {
+    const name = cleanDestinationName(newDestination);
+    if (!name) return;
+    if (destinations.length >= MAX_DESTINATIONS) {
+      setDestinationError(`Maksimal ${MAX_DESTINATIONS} destinasi per paket.`);
+      return;
+    }
+    if (Array.from(name).length < MIN_DESTINATION_LENGTH) {
+      setDestinationError(`Nama destinasi minimal ${MIN_DESTINATION_LENGTH} karakter.`);
+      return;
+    }
+    if (destinations.some(existing => cleanDestinationName(existing).toLowerCase() === name.toLowerCase())) {
+      setDestinationError(`“${name}” sudah ada di daftar destinasi.`);
+      return;
+    }
+    setDestinations(prev => [...prev, name]);
+    setNewDestination('');
+    setDestinationError('');
+  };
+
+  const handleEditDestination = (idx: number, value: string) => {
+    setDestinations(prev => prev.map((name, i) => i === idx ? value : name));
+  };
+
+  const handleMoveDestination = (idx: number, direction: -1 | 1) => {
+    setDestinations(prev => {
+      if (idx + direction < 0 || idx + direction >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[idx + direction]] = [next[idx + direction], next[idx]];
+      return next;
+    });
+  };
+
+  const handleRemoveDestination = (idx: number) => {
+    setDestinations(prev => prev.filter((_, i) => i !== idx));
+    setDestinationError('');
   };
 
   // Facilities helper actions
@@ -493,6 +552,24 @@ export const AddPackagePage: React.FC = () => {
       return;
     }
 
+    const pendingDestination = cleanDestinationName(newDestination);
+    if (pendingDestination) {
+      showValidation(`Destinasi “${pendingDestination}” belum masuk daftar. Klik Tambah atau kosongkan kolomnya terlebih dahulu.`, 'destinations');
+      return;
+    }
+    const destinationList = destinations.map(cleanDestinationName);
+    const shortDestinationIdx = destinationList.findIndex(name => Array.from(name).length < MIN_DESTINATION_LENGTH);
+    if (shortDestinationIdx >= 0) {
+      showValidation(`Nama destinasi ke-${shortDestinationIdx + 1} masih kosong atau terlalu pendek. Isi minimal ${MIN_DESTINATION_LENGTH} karakter atau hapus destinasi tersebut.`, 'destinations');
+      return;
+    }
+    const duplicateDestination = destinationList.find((name, idx) =>
+      destinationList.findIndex(other => other.toLowerCase() === name.toLowerCase()) !== idx);
+    if (duplicateDestination) {
+      showValidation(`Destinasi “${duplicateDestination}” tercantum lebih dari sekali. Hapus salah satunya.`, 'destinations');
+      return;
+    }
+
     if (status === 'publish') {
       if (!packageName.trim()) {
 		showValidation('Nama paket wisata wajib diisi sebelum paket dipublikasikan.', 'info');
@@ -504,6 +581,10 @@ export const AddPackagePage: React.FC = () => {
 	  }
       if (!location.trim()) {
 		showValidation('Lokasi destinasi wajib dipilih sebelum paket dipublikasikan.', 'info');
+        return;
+      }
+      if (destinationList.length === 0) {
+		showValidation('Tambahkan minimal satu tempat yang dikunjungi pada langkah Destinasi sebelum paket dipublikasikan.', 'destinations');
         return;
       }
 	  if (pickupMode === 'MEETING_POINT' && !meetPoint.trim()) {
@@ -604,6 +685,7 @@ export const AddPackagePage: React.FC = () => {
         const payload = {
           name: packageName,
           destination: location,
+          destinations: destinationList,
           pickupMode, pickupArea, pickupNotes, pickupPoints: pickupPointList,
           meetingPoint: pickupMode === 'MEETING_POINT' ? meetPoint : '',
           meetingPointLatitude: pickupMode === 'MEETING_POINT' ? mapPosition?.lat ?? null : null,
@@ -658,6 +740,7 @@ export const AddPackagePage: React.FC = () => {
             savedPackage.pickupMode !== payload.pickupMode ||
             savedPackage.pickupArea !== payload.pickupArea.trim() ||
             JSON.stringify(savedPackage.departureDates || []) !== JSON.stringify(payload.departureDates) ||
+            JSON.stringify(savedPackage.destinations || []) !== JSON.stringify(payload.destinations) ||
 		    (pickupMode === 'MEETING_POINT' && mapPosition && (
 		      !Number.isFinite(Number(savedPackage.meetingPointLatitude)) ||
 		      !Number.isFinite(Number(savedPackage.meetingPointLongitude)) ||
@@ -846,6 +929,10 @@ export const AddPackagePage: React.FC = () => {
                       ))}
                     </select>
                   </div>
+                  <span className="field-hint">
+                    Tempat-tempat yang dikunjungi (mis. Pulau Padar, Pink Beach) diisi pada langkah{' '}
+                    <button type="button" className="inline-link-btn" onClick={() => setActiveStep('destinations')}>Destinasi</button>.
+                  </span>
                 </div>
 
                 <div className="input-group">
@@ -873,6 +960,90 @@ export const AddPackagePage: React.FC = () => {
                     rows={6}
                     placeholder="Tuliskan deskripsi paket wisata secara detail..."
                   />
+                </div>
+              </div>
+            )}
+
+            {activeStep === 'destinations' && (
+              <div className="form-section-body animate-fade-in">
+                <h3>Destinasi Wisata</h3>
+                <p className="section-subtitle">Tambahkan tempat-tempat yang dikunjungi peserta selama trip. Urutkan sesuai rute agar pelanggan mudah membayangkan perjalanannya.</p>
+
+                <div className={`destination-province-bar ${location ? '' : 'is-empty'}`}>
+                  <MapPin size={15} aria-hidden="true" />
+                  {location
+                    ? <span>Provinsi: <strong>{location}</strong></span>
+                    : <span>Provinsi destinasi belum dipilih.</span>}
+                  <button type="button" className="inline-link-btn" onClick={() => setActiveStep('info')}>
+                    {location ? 'Ubah di Info Dasar' : 'Pilih di Info Dasar'}
+                  </button>
+                </div>
+
+                <div className="destination-panel">
+                  <div className="destination-panel-header">
+                    <h4><MapPinned size={15} aria-hidden="true" /> Tempat yang Dikunjungi *</h4>
+                    <span className="destination-counter">{destinations.length}/{MAX_DESTINATIONS}</span>
+                  </div>
+
+                  {destinations.length === 0 ? (
+                    <div className="destination-empty">
+                      <Route size={28} aria-hidden="true" />
+                      <strong>Belum ada destinasi</strong>
+                      <p>Tambahkan minimal 1 tempat, contoh: Pulau Padar, Pink Beach, Pulau Komodo.</p>
+                    </div>
+                  ) : (
+                    <ol className="destination-list">
+                      {destinations.map((name, idx) => (
+                        <li key={idx} className="destination-item">
+                          <span className="destination-number" aria-hidden="true">{idx + 1}</span>
+                          <input
+                            type="text"
+                            value={name}
+                            maxLength={MAX_DESTINATION_LENGTH}
+                            aria-label={`Nama destinasi ${idx + 1}`}
+                            onChange={(e) => handleEditDestination(idx, e.target.value)}
+                          />
+                          <div className="destination-actions">
+                            <button type="button" disabled={idx === 0} aria-label={`Naikkan destinasi ${idx + 1}`} title="Naikkan" onClick={() => handleMoveDestination(idx, -1)}>
+                              <ArrowUp size={14} />
+                            </button>
+                            <button type="button" disabled={idx === destinations.length - 1} aria-label={`Turunkan destinasi ${idx + 1}`} title="Turunkan" onClick={() => handleMoveDestination(idx, 1)}>
+                              <ArrowDown size={14} />
+                            </button>
+                            <button type="button" className="destination-remove-btn" aria-label={`Hapus destinasi ${idx + 1}`} title="Hapus" onClick={() => handleRemoveDestination(idx)}>
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+
+                  <div className="destination-add-row">
+                    <input
+                      type="text"
+                      value={newDestination}
+                      maxLength={MAX_DESTINATION_LENGTH}
+                      disabled={destinations.length >= MAX_DESTINATIONS}
+                      aria-label="Nama destinasi baru"
+                      aria-invalid={Boolean(destinationError)}
+                      aria-describedby="destination-help"
+                      placeholder={destinations.length >= MAX_DESTINATIONS ? `Batas ${MAX_DESTINATIONS} destinasi tercapai` : 'Ketik nama tempat, contoh: Pulau Padar'}
+                      onChange={(e) => { setNewDestination(e.target.value); setDestinationError(''); }}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddDestination())}
+                    />
+                    <button
+                      type="button"
+                      className="destination-add-btn"
+                      disabled={!newDestination.trim() || destinations.length >= MAX_DESTINATIONS}
+                      onClick={handleAddDestination}
+                    >
+                      <Plus size={14} /> Tambah
+                    </button>
+                  </div>
+                  {destinationError
+                    ? <p id="destination-help" className="destination-error" role="alert">{destinationError}</p>
+                    : <p id="destination-help" className="destination-hint">Tekan Enter untuk menambahkan. Nama dapat diubah langsung pada daftar, dan urutan diatur dengan tombol panah.</p>}
                 </div>
               </div>
             )}
@@ -1786,6 +1957,292 @@ export const AddPackagePage: React.FC = () => {
           background-color: var(--color-accent-hover);
         }
 
+        /* Destinations style */
+        .field-hint {
+          font-size: 12px;
+          color: var(--color-text-medium);
+          line-height: 1.5;
+        }
+
+        .inline-link-btn {
+          background: none;
+          border: none;
+          padding: 0;
+          font: inherit;
+          font-weight: 600;
+          color: var(--color-accent);
+          text-decoration: underline;
+          text-underline-offset: 2px;
+          cursor: pointer;
+        }
+
+        .inline-link-btn:hover {
+          color: var(--color-accent-hover);
+        }
+
+        .destination-province-bar {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
+          padding: 10px 14px;
+          margin-bottom: 20px;
+          background: var(--color-info-bg);
+          border: 1px solid var(--color-accent-light);
+          border-radius: var(--radius-md);
+          font-size: 12px;
+          color: var(--color-text-dark);
+        }
+
+        .destination-province-bar svg {
+          color: var(--color-accent);
+          flex-shrink: 0;
+        }
+
+        .destination-province-bar .inline-link-btn {
+          margin-left: auto;
+          font-size: 12px;
+        }
+
+        .destination-province-bar.is-empty {
+          background: var(--color-warning-bg);
+          border-color: #fde68a;
+        }
+
+        .destination-province-bar.is-empty svg {
+          color: var(--color-warning);
+        }
+
+        .destination-panel {
+          background: var(--color-bg-light);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-md);
+          padding: 16px;
+        }
+
+        .destination-panel-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+
+        .destination-panel-header h4 {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin: 0;
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--color-primary-dark);
+        }
+
+        .destination-panel-header h4 svg {
+          color: var(--color-accent);
+        }
+
+        .destination-counter {
+          padding: 2px 10px;
+          border-radius: var(--radius-full);
+          border: 1px solid var(--color-border);
+          background: #ffffff;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--color-text-medium);
+        }
+
+        .destination-empty {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+          padding: 24px 16px;
+          margin-bottom: 14px;
+          text-align: center;
+          background: #ffffff;
+          border: 1px dashed var(--color-border);
+          border-radius: var(--radius-md);
+          color: var(--color-text-light);
+        }
+
+        .destination-empty strong {
+          font-size: 13px;
+          color: var(--color-text-dark);
+        }
+
+        .destination-empty p {
+          margin: 0;
+          font-size: 12px;
+          color: var(--color-text-medium);
+        }
+
+        .destination-list {
+          list-style: none;
+          margin: 0 0 14px;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .destination-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 6px 8px 6px 10px;
+          background: #ffffff;
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-sm);
+        }
+
+        .destination-number {
+          width: 24px;
+          height: 24px;
+          flex-shrink: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: var(--color-accent);
+          color: #ffffff;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .destination-item input {
+          flex: 1;
+          min-width: 0;
+          padding: 7px 8px;
+          border: 1px solid transparent;
+          border-radius: 6px;
+          background: transparent;
+          font: inherit;
+          font-size: 13px;
+          color: var(--color-text-dark);
+        }
+
+        .destination-item input:hover {
+          border-color: var(--color-border);
+        }
+
+        .destination-item input:focus {
+          outline: none;
+          border-color: var(--color-accent);
+          background: #ffffff;
+        }
+
+        .destination-actions {
+          display: flex;
+          gap: 4px;
+          flex-shrink: 0;
+        }
+
+        .destination-actions button {
+          width: 30px;
+          height: 30px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--color-border);
+          border-radius: 6px;
+          background: #ffffff;
+          color: var(--color-text-medium);
+          cursor: pointer;
+          transition: var(--transition-fast);
+        }
+
+        .destination-actions button:hover:not(:disabled) {
+          color: var(--color-accent);
+          border-color: var(--color-accent);
+        }
+
+        .destination-actions .destination-remove-btn:hover:not(:disabled) {
+          color: #ef4444;
+          border-color: #fecaca;
+          background: #fef2f2;
+        }
+
+        .destination-actions button:disabled {
+          opacity: .4;
+          cursor: default;
+        }
+
+        .destination-actions button:focus-visible, .inline-link-btn:focus-visible, .destination-add-btn:focus-visible {
+          outline: 2px solid #0284c7;
+          outline-offset: 2px;
+        }
+
+        .destination-add-row {
+          display: flex;
+          gap: 8px;
+        }
+
+        .destination-add-row input {
+          flex: 1;
+          min-width: 0;
+          padding: 9px 12px;
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-sm);
+          background: #ffffff;
+          font-size: 13px;
+          outline: none;
+        }
+
+        .destination-add-row input:focus {
+          border-color: var(--color-accent);
+          box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.12);
+        }
+
+        .destination-add-row input[aria-invalid="true"] {
+          border-color: #ef4444;
+        }
+
+        .destination-add-row input:disabled {
+          background: var(--color-bg-light);
+          cursor: not-allowed;
+        }
+
+        .destination-add-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 0 16px;
+          border: none;
+          border-radius: var(--radius-sm);
+          background: var(--color-accent);
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+          cursor: pointer;
+          transition: var(--transition-fast);
+        }
+
+        .destination-add-btn:hover:not(:disabled) {
+          background: var(--color-accent-hover);
+        }
+
+        .destination-add-btn:disabled {
+          opacity: .5;
+          cursor: not-allowed;
+        }
+
+        .destination-hint, .destination-error {
+          margin: 8px 0 0;
+          font-size: 11.5px;
+          line-height: 1.5;
+        }
+
+        .destination-hint {
+          color: var(--color-text-medium);
+        }
+
+        .destination-error {
+          color: #dc2626;
+          font-weight: 500;
+        }
+
         /* Photos style */
         .photos-tab-layout {
           display: flex;
@@ -1868,6 +2325,10 @@ export const AddPackagePage: React.FC = () => {
           .day-activities-panel { padding: 14px; }
           .add-activity-inputs { grid-template-columns: minmax(0, 1fr); }
           .add-act-submit-btn { padding: 10px; }
+          .destination-panel { padding: 12px; }
+          .destination-item { gap: 8px; padding: 6px; }
+          .destination-actions button { width: 28px; height: 28px; }
+          .destination-province-bar .inline-link-btn { margin-left: 0; }
           .photos-gallery-grid {
             grid-template-columns: repeat(2, 1fr);
           }
