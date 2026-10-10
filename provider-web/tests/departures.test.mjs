@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { upcomingDepartures, weeklyDepartures } from '../src/utils/departures.ts';
-import { isCustomerVisiblePackage } from '../src/utils/publicPackages.ts';
+import { isCustomerVisiblePackage, isPackageExpired, sortBookableFirst } from '../src/utils/publicPackages.ts';
 
 test('weekly schedules span three calendar months and preserve irregular dates', () => {
   const dates = weeklyDepartures('2026-10-06', '2026-12-31', [5]);
@@ -12,8 +12,10 @@ test('weekly schedules span three calendar months and preserve irregular dates',
 });
 test('a later departure stays visible after the first departure passed', () => {
   const pkg = { status:'Aktif', tripType:'Open Trip', startDate:'2026-10-02', endDate:'2026-12-27', departureDates:['2026-10-02','2026-12-25'] };
-  assert.equal(isCustomerVisiblePackage(pkg, '2026-11-01'), true);
-  assert.equal(isCustomerVisiblePackage(pkg, '2026-12-28'), false);
+  assert.equal(isCustomerVisiblePackage(pkg), true);
+  assert.equal(isPackageExpired(pkg, '2026-11-01'), false);
+  assert.equal(isPackageExpired(pkg, '2026-12-26'), true); // periode masih jalan, keberangkatan habis
+  assert.equal(isPackageExpired(pkg, '2026-12-28'), true);
   assert.deepEqual(upcomingDepartures(pkg,'2026-11-01'), []); // missing live counts fails closed
 });
 test('seats belong to each selected departure; legacy single departures still work', () => {
@@ -21,4 +23,13 @@ test('seats belong to each selected departure; legacy single departures still wo
   assert.deepEqual(upcomingDepartures(pkg, '2026-10-06').map(d => d.seatsLeft), [0,13]);
   assert.equal(upcomingDepartures(pkg,'2026-10-12')[0].date, '2026-11-06');
   assert.equal(upcomingDepartures({startDate:'2026-10-31',duration:3,quotaMax:15,quotaUsed:2},'2026-10-06')[0].endDate,'2026-11-02');
+});
+test('expired packages stay visible but sort after bookable ones', () => {
+  const expired = { id: 1, status: 'Aktif', tripType: 'Private Trip', endDate: '2026-10-01' };
+  const current = { id: 2, status: 'Aktif', tripType: 'Private Trip', endDate: '2026-12-01' };
+  assert.equal(isCustomerVisiblePackage(expired), true);
+  assert.equal(isCustomerVisiblePackage({ ...expired, endDate: 'salah' }), false);
+  assert.equal(isPackageExpired(expired, '2026-10-10'), true);
+  assert.equal(isPackageExpired({ ...current, isExpired: true }, '2026-10-10'), true);
+  assert.deepEqual(sortBookableFirst([expired, current], '2026-10-10').map(p => p.id), [2, 1]);
 });

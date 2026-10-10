@@ -11,17 +11,23 @@ const validIsoDate = (value: unknown) => {
     : '';
 };
 
+// Paket yang seluruh jadwalnya sudah lewat tetap ditampilkan sebagai referensi,
+// tetapi tidak boleh dipesan. Dihitung ulang di web agar respons cache lama
+// tidak membuat paket kedaluwarsa terlihat masih bisa dipesan.
+export const isPackageExpired = (pkg: any, today = jakartaToday()) => {
+  if (pkg?.isExpired) return true;
+  const endDate = validIsoDate(pkg?.endDate);
+  if (!endDate || endDate < today) return true;
+  const tripType = String(pkg.tripType || '').replace(/\s+/g, '').toLowerCase();
+  if (tripType !== 'opentrip') return false;
+  const dates = pkg.departureDates?.length ? pkg.departureDates : [pkg.startDate];
+  return !dates.some((day: string) => validIsoDate(day) && day >= today);
+};
+
 // Guard sisi web untuk mencegah respons cache lama menampilkan paket yang
 // sudah tidak layak tampil. Filter otoritatif tetap berada di backend.
-export const isCustomerVisiblePackage = (pkg: any, today = jakartaToday()) => {
-  if (!pkg || pkg.status !== 'Aktif') return false;
-  const endDate = validIsoDate(pkg.endDate);
-  if (!endDate || endDate < today) return false;
-  const tripType = String(pkg.tripType || '').replace(/\s+/g, '').toLowerCase();
-  if (tripType === 'opentrip') {
-    const dates = pkg.departureDates?.length ? pkg.departureDates : [pkg.startDate];
-    if (!dates.some((day: string) => validIsoDate(day) && day >= today)) return false;
-  }
+export const isCustomerVisiblePackage = (pkg: any) => {
+  if (!pkg || pkg.status !== 'Aktif' || !validIsoDate(pkg.endDate)) return false;
 
   const provider = pkg.provider;
   if (provider && (provider.status !== 'APPROVED' || provider.isVerified === false)) return false;
@@ -30,5 +36,9 @@ export const isCustomerVisiblePackage = (pkg: any, today = jakartaToday()) => {
   return true;
 };
 
-export const filterCustomerVisiblePackages = <T,>(packages: T[], today = jakartaToday()): T[] =>
-  packages.filter((pkg) => isCustomerVisiblePackage(pkg, today));
+export const filterCustomerVisiblePackages = <T,>(packages: T[]): T[] =>
+  packages.filter((pkg) => isCustomerVisiblePackage(pkg));
+
+// Paket yang masih bisa dipesan selalu didahulukan; urutan lain dipertahankan.
+export const sortBookableFirst = <T,>(packages: T[], today = jakartaToday()): T[] =>
+  [...packages].sort((a, b) => Number(isPackageExpired(a, today)) - Number(isPackageExpired(b, today)));

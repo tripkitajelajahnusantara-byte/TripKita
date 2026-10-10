@@ -13,6 +13,13 @@ export const Header: React.FC = () => {
     setMobileMenuOpen(false);
   };
 
+  // Menu Rencana Trip terlihat oleh semua pengunjung; tamu diminta masuk/daftar dulu.
+  const openTripPlanner = () => {
+    setMobileMenuOpen(false);
+    if (customerProfile) navigateTo('rencana-trip');
+    else openAuthModal('login', () => navigateTo('rencana-trip'));
+  };
+
   const isProviderRoute = ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard', 'provider-login', 'provider-register'].includes(route);
   const handleLogoClick = () => {
     // Halaman login dan pendaftaran mitra adalah halaman publik. Logo di
@@ -58,6 +65,12 @@ export const Header: React.FC = () => {
               onClick={() => handleNav('beranda')}
             >
               Home
+            </button>
+            <button 
+              className={`nav-link ${route === 'rencana-trip' ? 'active' : ''}`}
+              onClick={openTripPlanner}
+            >
+              Rencana Trip
             </button>
             <button 
               className={`nav-link ${route === 'riwayat-booking' ? 'active' : ''}`}
@@ -299,6 +312,12 @@ export const Header: React.FC = () => {
               Home
             </button>
             <button 
+              className={`mobile-nav-link ${route === 'rencana-trip' ? 'active' : ''}`}
+              onClick={openTripPlanner}
+            >
+              Rencana Trip
+            </button>
+            <button 
               className={`mobile-nav-link ${route === 'riwayat-booking' ? 'active' : ''}`}
               onClick={() => handleNav('riwayat-booking')}
             >
@@ -322,14 +341,6 @@ export const Header: React.FC = () => {
             >
               Bantuan
             </button>
-            {customerProfile && (
-              <button 
-                className={`mobile-nav-link ${route === 'rencana-trip' ? 'active' : ''}`}
-                onClick={() => handleNav('rencana-trip')}
-              >
-                Rencana Trip
-              </button>
-            )}
             {customerProfile && (
               <button 
                 className={`mobile-nav-link ${route === 'pengaturan' ? 'active' : ''}`}
@@ -450,6 +461,27 @@ export const Header: React.FC = () => {
           color: #007bff;
           font-weight: 700;
           background-color: #e0f2fe;
+        }
+
+        @media (max-width: 1100px) {
+          .main-nav {
+            gap: 2px;
+          }
+          .nav-link {
+            font-size: 13.5px;
+            padding: 8px 10px;
+            white-space: nowrap;
+          }
+        }
+
+        @media (max-width: 960px) {
+          .main-nav {
+            gap: 0;
+          }
+          .nav-link {
+            font-size: 13px;
+            padding: 6px 7px;
+          }
         }
 
         .auth-buttons {

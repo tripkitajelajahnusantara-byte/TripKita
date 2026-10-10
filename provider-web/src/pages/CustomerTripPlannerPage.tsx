@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
-import { filterCustomerVisiblePackages } from '../utils/publicPackages';
+import { filterCustomerVisiblePackages, isPackageExpired } from '../utils/publicPackages';
 import { useActionLock } from '../utils/useActionLock';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
@@ -364,7 +364,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
       request('/public/packages')
         .then((data: any) => {
           const apiList: PackageItem[] = Array.isArray(data) ? data : (data?.data || []);
-          const active = filterCustomerVisiblePackages(apiList);
+          // Rekomendasi hanya paket yang masih bisa dipesan.
+          const active = filterCustomerVisiblePackages(apiList).filter((pkg) => !isPackageExpired(pkg));
           setMatchingPackages(filterMatchingPackages(active, activePlan.destination));
         })
         .catch(err => {

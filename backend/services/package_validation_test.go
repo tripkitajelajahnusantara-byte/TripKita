@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ func validActivePackage() *models.Package {
 	}
 }
 
-func TestFilterCurrentPublicPackagesHidesExpiredAndInvalidDates(t *testing.T) {
+func TestFilterCurrentPublicPackagesKeepsExpiredLastAndHidesInvalidDates(t *testing.T) {
 	today := "2026-09-29"
 	packages := []models.Package{
 		{ID: 1, Status: "Aktif", TripType: "Private Trip", EndDate: "2026-09-28"},
@@ -34,8 +35,14 @@ func TestFilterCurrentPublicPackagesHidesExpiredAndInvalidDates(t *testing.T) {
 	}
 
 	visible := filterCurrentPublicPackages(packages, today)
-	if len(visible) != 3 || visible[0].ID != 2 || visible[1].ID != 3 || visible[2].ID != 8 {
-		t.Fatalf("paket publik yang tersisa tidak sesuai: %+v", visible)
+	var ids []uint
+	var expired []bool
+	for _, pkg := range visible {
+		ids = append(ids, pkg.ID)
+		expired = append(expired, pkg.IsExpired)
+	}
+	if fmt.Sprint(ids) != "[2 3 8 1 7]" || fmt.Sprint(expired) != "[false false false true true]" {
+		t.Fatalf("paket publik tidak sesuai: ids=%v expired=%v", ids, expired)
 	}
 }
 

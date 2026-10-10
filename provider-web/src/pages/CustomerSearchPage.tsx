@@ -7,7 +7,7 @@ import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 import { ShareModal } from '../components/ShareModal';
 import { TripImage } from '../components/TripImage';
 import { Skeleton } from '../components/Skeleton';
-import { filterCustomerVisiblePackages } from '../utils/publicPackages';
+import { filterCustomerVisiblePackages, isPackageExpired } from '../utils/publicPackages';
 import { upcomingDepartures, type Departure } from '../utils/departures';
 import { formatTripRange } from '../utils/tripDates';
 
@@ -160,6 +160,8 @@ export const CustomerSearchPage: React.FC = () => {
       return false;
     }
     if (searchParams.date && pkg.tripType === 'Open Trip' && !upcomingDepartures(pkg).some(d => d.date === searchParams.date && d.seatsLeft > 0)) return false;
+    // Pencarian bertanggal hanya relevan untuk paket yang masih bisa dipesan.
+    if (searchParams.date && isPackageExpired(pkg)) return false;
     return true;
   });
 
@@ -181,6 +183,8 @@ export const CustomerSearchPage: React.FC = () => {
       return Math.abs(timeA - targetTime) - Math.abs(timeB - targetTime);
     });
   }
+  // Paket yang jadwalnya sudah lewat tetap tampil, tetapi selalu di urutan akhir.
+  processedPackages.sort((a, b) => Number(isPackageExpired(a)) - Number(isPackageExpired(b)));
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '24px 20px 80px 20px', fontFamily: 'Inter, sans-serif' }}>
@@ -316,6 +320,7 @@ export const CustomerSearchPage: React.FC = () => {
 
               const badge = getBadgeColor(pkg.category);
               const isFavorite = wishlistIds.includes(Number(pkg.id));
+              const expired = isPackageExpired(pkg);
 
               return (
                 <div 
@@ -339,8 +344,13 @@ export const CustomerSearchPage: React.FC = () => {
                     <TripImage 
                       src={getImageUrl(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image)} 
                       alt={pkg.name} 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', filter: expired ? 'grayscale(1)' : undefined, opacity: expired ? 0.8 : 1 }}
                     />
+                    {expired && (
+                      <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#ffffff', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700' }}>
+                        Jadwal sudah lewat
+                      </span>
+                    )}
                     <button 
                       onClick={(e) => toggleFavorite(e, pkg)}
                       style={{ 
@@ -371,7 +381,7 @@ export const CustomerSearchPage: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span 
                           style={{ 
-                            backgroundColor: badge.bg, 
+                            backgroundColor: expired ? '#64748b' : badge.bg, 
                             color: badge.text, 
                             padding: '4px 12px', 
                             borderRadius: '6px', 
@@ -440,7 +450,7 @@ export const CustomerSearchPage: React.FC = () => {
                       {scheduleText && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: '500' }}>
                           <Calendar size={14} color="#94a3b8" />
-                          <span>Jadwal tersedia: <strong>{scheduleText}</strong></span>
+                          <span>{expired ? 'Jadwal' : 'Jadwal tersedia'}: <strong>{scheduleText}</strong></span>
                         </div>
                       )}
                     </div>
@@ -452,9 +462,13 @@ export const CustomerSearchPage: React.FC = () => {
                           <Star size={14} fill="#f59e0b" color="#f59e0b" /> {pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Baru'}
                         </span>
                         <span style={{ color: '#cbd5e1' }}>|</span>
-                        <span style={{ color: availableSeats < 5 ? '#ef4444' : '#10b981', fontWeight: '700' }}>
-                          {pkg.tripType === 'Open Trip' ? (availableSeats > 0 ? `${availableSeats} kursi pada jadwal terpilih` : 'Kuota habis') : 'Pilih tanggal tersedia'}
-                        </span>
+                        {expired ? (
+                          <span style={{ color: '#64748b', fontWeight: '700' }}>Tidak bisa dipesan</span>
+                        ) : (
+                          <span style={{ color: availableSeats < 5 ? '#ef4444' : '#10b981', fontWeight: '700' }}>
+                            {pkg.tripType === 'Open Trip' ? (availableSeats > 0 ? `${availableSeats} kursi pada jadwal terpilih` : 'Kuota habis') : 'Pilih tanggal tersedia'}
+                          </span>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

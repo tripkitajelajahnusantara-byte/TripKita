@@ -13,7 +13,7 @@ import {
   getMeetingPointCoordinates,
   MeetingPointMap,
 } from '../components/MeetingPointMap';
-import { isCustomerVisiblePackage } from '../utils/publicPackages';
+import { isCustomerVisiblePackage, isPackageExpired } from '../utils/publicPackages';
 import { upcomingDepartures } from '../utils/departures';
 import { FlexiblePickupDetails } from '../components/TripPickup';
 
@@ -98,7 +98,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
           setSelectedPackageForDetail({ ...found, ...(preservedBookingDate ? { bookingDate: preservedBookingDate } : {}) });
         } else {
           setSelectedPackageForDetail(null);
-          setDeepLinkError('Paket tidak tersedia, tanggal perjalanannya sudah lewat, atau provider sedang dinonaktifkan.');
+          setDeepLinkError('Paket tidak tersedia atau provider sedang dinonaktifkan.');
         }
       })
       .catch((err: any) => {
@@ -240,6 +240,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const openTripDeparture = selectedDeparture ? { startIso: selectedDeparture.date, endIso: selectedDeparture.endDate, label: formatTripRange(selectedDeparture.date, selectedDeparture.endDate) } : null;
   const hasUpcomingDeparture = !!openTripDeparture;
   const openTripUnavailable = isOpenTrip && !hasUpcomingDeparture;
+  // Paket yang seluruh jadwalnya sudah lewat tetap bisa dilihat, tetapi tidak bisa dipesan.
+  const isExpired = isPackageExpired(pkg, todayIso);
 
   if (!availabilityCheckPending && !selectedPackageForDetail && (deepLinkError || !/[?&]id=\d+/.test(window.location.hash))) {
     return (
@@ -290,9 +292,9 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const availableSeats = isOpenTrip ? Math.max(0, totalQuotaMax - totalQuotaUsed) : Math.min(totalQuotaMax, Number(pkg.maxGuests) || totalQuotaMax);
 
   // Pemesanan diblokir bila jadwal/tanggal tidak valid
-  const dateBlocked = isOpenTrip
+  const dateBlocked = isExpired || (isOpenTrip
     ? openTripUnavailable
-    : (isRangeBooked || isSelectedDateClosed || isDateOutsidePeriod);
+    : (isRangeBooked || isSelectedDateClosed || isDateOutsidePeriod));
 
   const toggleAddOn = (id: string) => {
     setSelectedAddOnIds(prev =>
@@ -379,6 +381,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
   };
 
   const continueBooking = () => {
+    if (isExpired) {
+      showAlert({ type: 'warning', title: 'Jadwal Sudah Lewat', message: 'Jadwal paket ini sudah lewat sehingga tidak dapat dipesan. Silakan pilih paket wisata lain.' });
+      return;
+    }
     if (openTripUnavailable) {
       showAlert({ type: 'warning', title: 'Belum Ada Jadwal', message: 'Belum ada jadwal keberangkatan yang akan datang untuk Open Trip ini.' });
       return;
@@ -1141,6 +1147,22 @@ export const CustomerPackageDetailPage: React.FC = () => {
               </span>
             </div>
 
+            {isExpired && (
+              <div role="status" style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '12px 14px', marginBottom: '16px', fontSize: '12.5px', color: '#334155', lineHeight: '1.5' }}>
+                <strong style={{ display: 'block', color: '#0f172a', marginBottom: '2px' }}>Jadwal paket ini sudah lewat</strong>
+                Paket tetap ditampilkan sebagai referensi, tetapi tidak dapat dipesan lagi.
+                <button
+                  type="button"
+                  onClick={() => navigateTo('cari-trip')}
+                  style={{ display: 'block', marginTop: '8px', background: 'none', border: 'none', padding: 0, color: '#0284c7', fontWeight: '700', fontSize: '12.5px', cursor: 'pointer' }}
+                >
+                  Cari trip lain yang tersedia
+                </button>
+              </div>
+            )}
+
+            {/* Jadwal, peserta, dan estimasi biaya tidak relevan untuk paket yang jadwalnya sudah lewat */}
+            {!isExpired && (<>
             {/* Jadwal Keberangkatan */}
             {isOpenTrip ? (
               <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', border: '1px solid #dbeafe' }}>
@@ -1335,6 +1357,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 <span style={{ color: '#007bff' }}>{formatIDR(pkg.price * guestsCount + totalAddOnsCost)}</span>
               </div>
             </div>
+            </>)}
 
             {/* Pesan Sekarang Button (Directly Visible!) */}
             <button
@@ -1354,7 +1377,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 transition: 'all 0.2s'
               }}
             >
-              {availableSeats <= 0 ? 'Kuota Habis (Tidak Bisa Dipesan)' :
+              {isExpired ? 'Jadwal Sudah Lewat (Tidak Bisa Dipesan)' :
+               availableSeats <= 0 ? 'Kuota Habis (Tidak Bisa Dipesan)' :
                guestsCount > availableSeats ? 'Peserta Melebihi Kuota' :
                openTripUnavailable ? 'Belum Ada Jadwal Keberangkatan' :
                (!isOpenTrip && isRangeBooked) ? 'Tanggal Terbooking (Tidak Tersedia)' :
@@ -1408,7 +1432,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
             whiteSpace: 'nowrap'
           }}
         >
-          {availableSeats <= 0 ? 'Kuota Habis' : openTripUnavailable ? 'Belum Ada Jadwal' : 'Pesan Sekarang'}
+          {isExpired ? 'Jadwal Lewat' : availableSeats <= 0 ? 'Kuota Habis' : openTripUnavailable ? 'Belum Ada Jadwal' : 'Pesan Sekarang'}
         </button>
       </div>
 

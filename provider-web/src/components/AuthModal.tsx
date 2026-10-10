@@ -193,7 +193,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </h2>
           <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: '1.4' }}>
             {mode === 'login'
-              ? 'Silakan masuk untuk melanjutkan pemesanan paket wisata.'
+              ? 'Silakan masuk atau daftar akun untuk melanjutkan.'
               : 'Daftar akun baru untuk pesan open trip & kelola tiket Anda.'
             }
           </p>
