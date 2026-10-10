@@ -54,6 +54,9 @@ type Package struct {
 	AvailableDates  []string `gorm:"-" json:"availableDates"`
 	BookedDates     []string `gorm:"-" json:"bookedDates"`
 	ConfiguredDates []string `gorm:"-" json:"configuredDates,omitempty"`
+	// IsExpired menandai paket publik yang seluruh jadwalnya sudah lewat:
+	// tetap ditampilkan sebagai referensi, tetapi tidak dapat dipesan.
+	IsExpired bool `gorm:"-" json:"isExpired"`
 }
 
 // Tanpa minimum khusus (min_guests <= 1), satu booking dapat mengisi seluruh

@@ -86,7 +86,7 @@ func TestDisableIsAtomicAndRetainsAuditData(t *testing.T) {
 func TestPublicPackagesExcludeSoftDeletedProviders(t *testing.T) {
 	db, mock := mockRepositoryDB(t)
 	mock.ExpectQuery(`SELECT .*JOIN providers.*providers.deleted_at IS NULL`).WillReturnRows(sqlmock.NewRows([]string{"id"}))
-	if _, err := NewPackageRepository(db).FindAllPublic("2026-09-30"); err != nil {
+	if _, err := NewPackageRepository(db).FindAllPublic(); err != nil {
 		t.Fatal(err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {

@@ -8,7 +8,7 @@ import { TripImage } from '../components/TripImage';
 import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin, LoaderCircle } from 'lucide-react';
 import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
 import { isValidIndonesianMobilePhone } from '../utils/phone';
-import { filterCustomerVisiblePackages } from '../utils/publicPackages';
+import { filterCustomerVisiblePackages, isPackageExpired } from '../utils/publicPackages';
 
 export const CustomerSettingsPage: React.FC = () => {
   const { customerProfile, setCustomerProfile, navigateTo, setSelectedPackageForDetail } = useNavigation();
@@ -52,7 +52,8 @@ export const CustomerSettingsPage: React.FC = () => {
         }
 
         // Favorit berisi snapshot lokal. Cocokkan ID-nya dengan katalog
-        // publik terbaru agar paket kedaluwarsa/provider nonaktif ikut hilang.
+        // publik terbaru agar paket nonaktif/provider nonaktif ikut hilang.
+        // Paket yang jadwalnya lewat tetap ada dan ditandai tidak bisa dipesan.
         const publicPackages = await request('/public/packages');
         const visibleById = new Map(
           filterCustomerVisiblePackages(Array.isArray(publicPackages) ? publicPackages : [])
@@ -440,14 +441,21 @@ export const CustomerSettingsPage: React.FC = () => {
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-                    {wishlistItems.map((pkg: any) => (
+                    {wishlistItems.map((pkg: any) => {
+                      const expired = isPackageExpired(pkg);
+                      return (
                       <div key={pkg.id} style={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
                         <div style={{ height: '160px', overflow: 'hidden', position: 'relative' }}>
                           <TripImage
                             src={getTripImage(pkg.id, pkg.name || '', pkg.category || '', pkg.image)}
                             alt={pkg.name}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', filter: expired ? 'grayscale(1)' : undefined, opacity: expired ? 0.8 : 1 }}
                           />
+                          {expired && (
+                            <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#ffffff', padding: '4px 9px', borderRadius: '6px', fontSize: '10.5px', fontWeight: '700' }}>
+                              Jadwal sudah lewat
+                            </span>
+                          )}
                           <button
                             onClick={() => handleRemoveWishlist(pkg.id)}
                             style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(255, 255, 255, 0.9)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
@@ -479,7 +487,8 @@ export const CustomerSettingsPage: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -186,42 +186,45 @@ func (s *packageService) GetAllPackages(providerID uint) ([]models.Package, erro
 
 func (s *packageService) GetAllPublic() ([]models.Package, error) {
 	today := time.Now().In(models.BookingLocation).Format("2006-01-02")
-	packages, err := s.repo.FindAllPublic(today)
+	packages, err := s.repo.FindAllPublic()
 	if err != nil {
 		return nil, err
 	}
 	// Pertahanan kedua untuk implementasi repository lain dan data legacy:
-	// respons publik tidak pernah membawa paket tanpa tanggal akhir valid atau
-	// paket yang seluruh periodenya sudah lewat.
+	// respons publik tidak pernah membawa paket tanpa tanggal akhir valid.
 	packages = filterCurrentPublicPackages(packages, today)
 	return s.attachDates(packages)
 }
 
+// filterCurrentPublicPackages membuang paket nonaktif atau bertanggal rusak.
+// Paket yang jadwalnya sudah lewat tetap tampil dengan IsExpired=true dan
+// diletakkan setelah paket yang masih bisa dipesan.
+//
+// shortcut: paket kedaluwarsa tampil tanpa batas usia; batasi (mis. 90 hari) bila daftar publik jadi terlalu panjang.
 func filterCurrentPublicPackages(packages []models.Package, today string) []models.Package {
 	visible := make([]models.Package, 0, len(packages))
 	for _, pkg := range packages {
 		endDate := strings.TrimSpace(pkg.EndDate)
-		if pkg.Status != "Aktif" || len(endDate) != len("2006-01-02") || endDate < today {
+		if pkg.Status != "Aktif" || len(endDate) != len("2006-01-02") {
 			continue
 		}
 		if _, err := time.Parse("2006-01-02", endDate); err != nil {
 			continue
 		}
-		// Keep the package visible as long as it has an upcoming departure.
-		if models.IsOpenTrip(pkg.TripType) {
-			upcoming := false
+		pkg.IsExpired = endDate < today
+		// Open Trip masih bisa dipesan selama ada keberangkatan yang akan datang.
+		if !pkg.IsExpired && models.IsOpenTrip(pkg.TripType) {
+			pkg.IsExpired = true
 			for _, day := range pkg.OpenTripDates() {
 				if _, err := time.Parse("2006-01-02", day); err == nil && day >= today {
-					upcoming = true
+					pkg.IsExpired = false
 					break
 				}
-			}
-			if !upcoming {
-				continue
 			}
 		}
 		visible = append(visible, pkg)
 	}
+	sort.SliceStable(visible, func(i, j int) bool { return !visible[i].IsExpired && visible[j].IsExpired })
 	return visible
 }
 

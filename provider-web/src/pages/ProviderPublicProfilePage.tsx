@@ -5,7 +5,7 @@ import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
 import { Skeleton, SkeletonCards } from '../components/Skeleton';
 import { ArrowLeft, MapPin, Star, Package, MessageSquare, Award } from 'lucide-react';
-import { filterCustomerVisiblePackages } from '../utils/publicPackages';
+import { filterCustomerVisiblePackages, isPackageExpired, sortBookableFirst } from '../utils/publicPackages';
 
 interface TripPackage {
   id: number;
@@ -82,7 +82,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
           request('/public/packages')
         ]);
         const filtered = Array.isArray(allPkgs)
-          ? filterCustomerVisiblePackages(allPkgs as TripPackage[]).filter((p: TripPackage) => p.providerId === selectedProviderId)
+          ? sortBookableFirst(filterCustomerVisiblePackages(allPkgs as TripPackage[]).filter((p: TripPackage) => p.providerId === selectedProviderId))
           : [];
         const reviewResponses = await Promise.all(
           filtered.map((pkg: TripPackage) => request(`/public/reviews/package/${pkg.id}`).catch(() => []))
@@ -340,6 +340,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' }}>
               {packages.map((pkg) => {
                 const highlights = getHighlightsForPackage(pkg).slice(0, 3);
+                const expired = isPackageExpired(pkg);
                 return (
                   <div 
                     key={pkg.id}
@@ -363,14 +364,19 @@ export const ProviderPublicProfilePage: React.FC = () => {
                       <TripImage
                         src={getTripImage(pkg.id, pkg.name, pkg.category, (pkg as any).images || (pkg as any).image || (pkg as any).imageUrl)}  
                         alt={pkg.name} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', filter: expired ? 'grayscale(1)' : undefined, opacity: expired ? 0.8 : 1 }}
                       />
+                      {expired && (
+                        <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#ffffff', padding: '4px 9px', borderRadius: '6px', fontSize: '10.5px', fontWeight: '700' }}>
+                          Jadwal sudah lewat
+                        </span>
+                      )}
                       <span 
                         style={{ 
                           position: 'absolute', 
                           bottom: '10px', 
                           left: '10px', 
-                          backgroundColor: '#007bff', 
+                          backgroundColor: expired ? '#64748b' : '#007bff', 
                           color: '#ffffff', 
                           padding: '3px 8px', 
                           borderRadius: '6px', 
@@ -423,9 +429,13 @@ export const ProviderPublicProfilePage: React.FC = () => {
                           <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Belum ada'}</span>
                         </div>
 
-                        <span style={{ fontSize: '13px', fontWeight: '800', color: '#007bff' }}>
-                          {formatIDR(pkg.price)}
-                        </span>
+                        {expired ? (
+                          <span style={{ fontSize: '11.5px', fontWeight: '700', color: '#94a3b8' }}>Tidak bisa dipesan</span>
+                        ) : (
+                          <span style={{ fontSize: '13px', fontWeight: '800', color: '#007bff' }}>
+                            {formatIDR(pkg.price)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
