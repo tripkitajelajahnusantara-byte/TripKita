@@ -11,6 +11,7 @@ type Provider struct {
 	OperationalProvince string    `gorm:"size:255;not null;default:''" json:"operationalProvince"`
 	OperationalCity     string    `gorm:"size:255;not null;default:''" json:"operationalCity"`
 	Description         string    `gorm:"type:text" json:"description"`
+	ProfilePhoto        string    `gorm:"size:500;not null;default:''" json:"profilePhoto"` // Foto profil publik; tayang tanpa persetujuan admin, diubah hanya lewat endpoint foto profil
 	DocumentUploaded    bool      `gorm:"default:false" json:"documentUploaded"`
 	DocumentPath        string    `gorm:"size:500" json:"documentPath"` // SIUP document path
 	KtpPath             string    `gorm:"size:500" json:"ktpPath"`      // KTP Pemilik path

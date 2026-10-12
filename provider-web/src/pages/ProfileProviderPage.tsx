@@ -15,10 +15,15 @@ import {
   FileCheck,
   Upload,
   Clock,
-  LoaderCircle
+  LoaderCircle,
+  Camera
 } from 'lucide-react';
 import { openProtectedDocument, request } from '../utils/api';
 import { useActionLock } from '../utils/useActionLock';
+import { ProviderAvatar } from '../components/ProviderAvatar';
+import { useCustomAlert } from '../components/CustomAlertModal';
+
+const MAX_PROFILE_PHOTO_SIZE = 5 * 1024 * 1024; // sama dengan batas backend
 
 interface DashboardStats {
   totalPackages: number;
@@ -41,7 +46,8 @@ interface ProviderReview {
 }
 
 export const ProfileProviderPage: React.FC = () => {
-  const { providerProfile, updateProfile } = useNavigation();
+  const { providerProfile, setProviderProfile, updateProfile } = useNavigation();
+  const { showAlert, showConfirm } = useCustomAlert();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [reviews, setReviews] = useState<ProviderReview[]>([]);
 
@@ -51,6 +57,7 @@ export const ProfileProviderPage: React.FC = () => {
   const { pending, isBusy, run } = useActionLock();
   const isSaving = pending === 'save';
   const isUploading = pending === 'upload';
+  const isSavingPhoto = pending === 'photo';
   const [activeModalTab, setActiveModalTab] = useState<'bisnis' | 'kontak' | 'legal'>('bisnis');
   const [editFields, setEditFields] = useState({
     businessName: '',
@@ -193,6 +200,59 @@ export const ProfileProviderPage: React.FC = () => {
       }
     });
     input.value = '';
+  };
+
+  const photoInputRef = React.useRef<HTMLInputElement>(null);
+  const profilePhoto = providerProfile?.profilePhoto || '';
+
+  // Foto profil langsung tayang (tanpa persetujuan admin), jadi cukup perbarui
+  // profil di context dengan path yang dikembalikan server.
+  const applyProfilePhoto = (photo: string) => {
+    if (providerProfile) setProviderProfile({ ...providerProfile, profilePhoto: photo });
+  };
+
+  const handleProfilePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    // Reset agar memilih berkas yang sama lagi tetap memicu onChange.
+    input.value = '';
+    if (!file) return;
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      showAlert({ type: 'warning', title: 'Format Foto Tidak Didukung', message: 'Gunakan foto berformat JPG atau PNG.' });
+      return;
+    }
+    if (file.size > MAX_PROFILE_PHOTO_SIZE) {
+      showAlert({ type: 'warning', title: 'Ukuran Foto Terlalu Besar', message: `Ukuran foto ${(file.size / (1024 * 1024)).toFixed(1)} MB. Maksimal 5 MB.` });
+      return;
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    await run('photo', async () => {
+      try {
+        const res = await request('/provider/profile/photo', { method: 'POST', body: formData });
+        applyProfilePhoto(res?.profilePhoto || '');
+      } catch (err: unknown) {
+        showAlert({ type: 'error', title: 'Foto Gagal Diunggah', message: err instanceof Error && err.message ? err.message : 'Coba unggah ulang beberapa saat lagi.' });
+      }
+    });
+  };
+
+  const handleRemoveProfilePhoto = () => {
+    showConfirm({
+      title: 'Hapus Foto Profil?',
+      message: 'Avatar akan kembali menampilkan inisial nama bisnis Anda.',
+      confirmText: 'Hapus Foto',
+      onConfirm: () => {
+        void run('photo', async () => {
+          try {
+            await request('/provider/profile/photo', { method: 'DELETE' });
+            applyProfilePhoto('');
+          } catch (err: unknown) {
+            showAlert({ type: 'error', title: 'Foto Gagal Dihapus', message: err instanceof Error && err.message ? err.message : 'Coba lagi beberapa saat lagi.' });
+          }
+        });
+      },
+    });
   };
 
   const formatDate = (date: Date) => {
@@ -403,7 +463,33 @@ export const ProfileProviderPage: React.FC = () => {
             <div className="summary-profile-card">
               <div className="card-banner" />
               <div className="profile-badge-area">
-                <div className="profile-avatar-large">{providerName.substring(0, 2).toUpperCase()}</div>
+                <div className="profile-avatar-edit" aria-busy={isSavingPhoto}>
+                  <ProviderAvatar className="profile-avatar-large" photo={profilePhoto}>
+                    {providerName.substring(0, 2).toUpperCase()}
+                  </ProviderAvatar>
+                  {isSavingPhoto && (
+                    <div className="profile-avatar-busy">
+                      <LoaderCircle size={22} className="btn-spinner" aria-hidden="true" />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="profile-avatar-camera"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={isBusy}
+                    aria-label={profilePhoto ? 'Ganti foto profil' : 'Unggah foto profil'}
+                    title={profilePhoto ? 'Ganti foto profil' : 'Unggah foto profil'}
+                  >
+                    <Camera size={14} />
+                  </button>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    onChange={handleProfilePhotoChange}
+                    style={{ display: 'none' }}
+                  />
+                </div>
                 <span
                   className="status-badge-verified"
                   style={
@@ -419,6 +505,17 @@ export const ProfileProviderPage: React.FC = () => {
               </div>
               <div className="profile-details-info">
                 <h3>{providerName}</h3>
+                <div className="profile-photo-actions">
+                  <button type="button" onClick={() => photoInputRef.current?.click()} disabled={isBusy}>
+                    {isSavingPhoto ? 'Menyimpan foto...' : profilePhoto ? 'Ganti foto' : 'Unggah foto profil'}
+                  </button>
+                  {profilePhoto && !isSavingPhoto && (
+                    <button type="button" className="danger" onClick={handleRemoveProfilePhoto} disabled={isBusy}>
+                      Hapus foto
+                    </button>
+                  )}
+                  <span>JPG/PNG, maks. 5 MB · tampil di profil publik</span>
+                </div>
                 <p className="tagline">{providerProfile?.description?.trim() || 'Deskripsi bisnis belum diisi.'}</p>
                 <div className="loc-rating">
                   <span className="loc">
@@ -1040,6 +1137,85 @@ export const ProfileProviderPage: React.FC = () => {
           display: flex;
           align-items: center;
           justify-content: center;
+        }
+
+        .profile-avatar-edit {
+          position: relative;
+          flex-shrink: 0;
+        }
+
+        .profile-avatar-busy {
+          position: absolute;
+          inset: 4px;
+          border-radius: 50%;
+          background: rgba(15, 23, 42, 0.45);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .profile-avatar-camera {
+          position: absolute;
+          right: 0;
+          bottom: 2px;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          border: 2px solid #ffffff;
+          background: var(--color-accent);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
+          transition: transform 0.15s;
+        }
+
+        .profile-avatar-camera:hover:not(:disabled) {
+          transform: scale(1.08);
+        }
+
+        .profile-avatar-camera:disabled,
+        .profile-photo-actions button:disabled {
+          cursor: not-allowed;
+          opacity: 0.6;
+        }
+
+        .profile-avatar-camera:focus-visible,
+        .profile-photo-actions button:focus-visible {
+          outline: 2px solid var(--color-accent);
+          outline-offset: 2px;
+        }
+
+        .profile-photo-actions {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 4px 12px;
+          margin: 2px 0 10px;
+          font-size: 12px;
+        }
+
+        .profile-photo-actions button {
+          border: 0;
+          background: transparent;
+          padding: 0;
+          font: inherit;
+          font-weight: 600;
+          color: var(--color-accent);
+          cursor: pointer;
+        }
+
+        .profile-photo-actions button.danger {
+          color: #dc2626;
+        }
+
+        .profile-photo-actions span {
+          flex-basis: 100%;
+          color: var(--color-text-light);
+          font-size: 11px;
         }
 
         .profile-details-info {

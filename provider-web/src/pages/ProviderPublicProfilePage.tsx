@@ -3,6 +3,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
+import { ProviderAvatar } from '../components/ProviderAvatar';
 import { Skeleton, SkeletonCards } from '../components/Skeleton';
 import { ArrowLeft, MapPin, Star, Package, MessageSquare, Award } from 'lucide-react';
 import { filterCustomerVisiblePackages, isPackageExpired, sortBookableFirst } from '../utils/publicPackages';
@@ -42,6 +43,7 @@ interface PublicProviderProfile {
   operationalProvince: string;
   operationalCity: string;
   description: string;
+  profilePhoto?: string;
   isVerified: boolean;
   rating: number;
   totalTravelers: number;
@@ -210,8 +212,9 @@ export const ProviderPublicProfilePage: React.FC = () => {
         >
           <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
             {/* Provider Logo Avatar */}
-            <div 
-              style={{ 
+            <ProviderAvatar
+              photo={providerInfo.profilePhoto}
+              style={{
                 width: '88px', 
                 height: '88px', 
                 borderRadius: '20px', 
@@ -227,7 +230,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
               }}
             >
               {providerInfo.businessName.charAt(0)}
-            </div>
+            </ProviderAvatar>
 
             {/* Provider Basic Info */}
             <div style={{ flex: '1 1 300px' }}>

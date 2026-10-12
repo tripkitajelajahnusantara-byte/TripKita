@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
 
 import 'package:customer_mobile/theme/app_theme.dart';
+import 'package:customer_mobile/widgets/common.dart';
 
-/// Tab utama aplikasi. Urutannya mengikuti menu customer di web.
-enum AppTab { beranda, cariTrip, booking, akun }
+/// Tab utama aplikasi, urutannya mengikuti navigasi bawah desain Figma.
+enum AppTab { beranda, cariTrip, booking, rencanaTrip, akun }
+
+/// Label, ikon biasa, dan ikon aktif tiap tab.
+const _tabs = {
+  AppTab.beranda: ('Beranda', 'house', 'house_fill'),
+  AppTab.cariTrip: ('Cari Trip', 'nav_search', 'magnifying_glass_fill'),
+  AppTab.booking: ('Booking', 'ticket', 'ticket_fill'),
+  AppTab.rencanaTrip: ('Rencana Trip', 'calendar_heart', 'calendar_heart_fill'),
+  AppTab.akun: ('Profil', 'user', 'user_fill'),
+};
 
 class TripKitaBottomNavigation extends StatelessWidget {
   final AppTab current;
@@ -13,39 +23,59 @@ class TripKitaBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NavigationBarTheme(
-      data: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        indicatorColor: AppColors.accentLight,
-        labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => TextStyle(
-            fontSize: 12,
-            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
-            color: states.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
-          ),
-        ),
-        iconTheme: WidgetStateProperty.resolveWith(
-          (states) => IconThemeData(
-            color: states.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
-          ),
-        ),
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(color: Color(0x0F000000), offset: Offset(0, -2), blurRadius: 2),
+          BoxShadow(color: Color(0x1A000000), offset: Offset(0, -4), blurRadius: 4),
+        ],
       ),
-      child: DecoratedBox(
-        decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
-        child: NavigationBar(
-          height: 66,
-          selectedIndex: current.index,
-          onDestinationSelected: (i) => onSelect(AppTab.values[i]),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Beranda'),
-            NavigationDestination(icon: Icon(Icons.search), selectedIcon: Icon(Icons.travel_explore), label: 'Cari Trip'),
-            NavigationDestination(
-                icon: Icon(Icons.confirmation_number_outlined),
-                selectedIcon: Icon(Icons.confirmation_number),
-                label: 'Booking'),
-            NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Akun'),
-          ],
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(children: [
+            for (final MapEntry(key: tab, value: (label, icon, activeIcon)) in _tabs.entries)
+              Expanded(
+                child: Semantics(
+                  selected: tab == current,
+                  child: InkWell(
+                    onTap: () => onSelect(tab),
+                    child: Stack(alignment: Alignment.topCenter, children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          AppIcon(tab == current ? activeIcon : icon,
+                              color: tab == current ? AppColors.brand : AppColors.textLight),
+                          const SizedBox(height: 4),
+                          Text(label,
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.visible,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 20 / 12,
+                                letterSpacing: 0,
+                                fontWeight: tab == current ? FontWeight.w600 : FontWeight.w400,
+                                color: tab == current ? AppColors.brand : AppColors.textLight,
+                              )),
+                        ]),
+                      ),
+                      if (tab == current)
+                        Container(
+                          width: 46,
+                          height: 3,
+                          decoration: const BoxDecoration(
+                            color: AppColors.brand,
+                            borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+                          ),
+                        ),
+                    ]),
+                  ),
+                ),
+              ),
+          ]),
         ),
       ),
     );

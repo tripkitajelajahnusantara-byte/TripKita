@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Palet warna yang sama dengan web customer (`provider-web/src/index.css`
@@ -47,12 +48,45 @@ class AppColors {
   static const honeymoon = Color(0xFFE11D48);
   static const corporate = Color(0xFF059669);
   static const family = Color(0xFFD97706);
+
+  // Token desain Figma "Temen Trip" untuk beranda dan Cari Trip.
+  static const brand = Color(0xFF0084C7); // Primary/500
+  static const brandSoft = Color(0xFFE6F5FB); // Primary/50
+  static const brandDeep = Color(0xFF004766);
+  static const heading = Color(0xFF181D27); // text-primary (900)
+  static const ink = Color(0xFF131214);
+  static const menuText = Color(0xFF414651);
+  static const menuTextActive = Color(0xFF252B37);
+  static const cardBorder = Color(0xFFE9EAEB);
+  static const calendarDay = Color(0xFF5A5A5A);
+  static const calendarWeekday = Color(0xFF666666);
+  static const errorStrong = Color(0xFFB42318);
+  static const favorite = Color(0xFFD92D20);
 }
 
 class AppTheme {
+  /// Ikon status bar terang di atas header biru; navigasi sistem putih.
+  static const lightBars = SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
+    systemNavigationBarColor: Colors.white,
+    systemNavigationBarIconBrightness: Brightness.dark,
+  );
+
+  /// Ikon status bar gelap di atas header putih.
+  static const darkBars = SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.white,
+    systemNavigationBarIconBrightness: Brightness.dark,
+  );
+
   static ThemeData light() {
     final base = ThemeData(
       useMaterial3: true,
+      fontFamily: 'Roboto',
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.accent,
         primary: AppColors.accent,
@@ -63,7 +97,8 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.background,
     );
 
-    final bodyText = GoogleFonts.interTextTheme(base.textTheme).apply(
+    // Teks isi memakai Roboto (aset lokal) mengikuti desain Figma.
+    final bodyText = base.textTheme.apply(
       bodyColor: AppColors.textDark,
       displayColor: AppColors.textDark,
     );

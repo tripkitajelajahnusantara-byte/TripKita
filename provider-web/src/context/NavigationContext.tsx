@@ -119,6 +119,7 @@ interface ProviderProfile {
   operationalProvince: string;
   operationalCity: string;
   description: string;
+  profilePhoto?: string;
   documentUploaded: boolean;
   documentPath?: string;
   ktpPath?: string;
@@ -218,8 +219,8 @@ interface NavigationContextType {
   setSelectedProviderId: (id: number | null) => void;
   selectedBookingForInvoice: any;
   setSelectedBookingForInvoice: (booking: any) => void;
-  searchParams: { destination: string; date: string; type: string; category: string };
-  setSearchParams: React.Dispatch<React.SetStateAction<{ destination: string; date: string; type: string; category: string }>>;
+  searchParams: { destination: string; date: string; type: string; category: string; keyword: string };
+  setSearchParams: React.Dispatch<React.SetStateAction<{ destination: string; date: string; type: string; category: string; keyword: string }>>;
   bookingFormData: {
     packageId?: number | string;
     tripDate?: string;
@@ -285,7 +286,8 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     destination: '',
     date: '',
     type: 'Semua Tipe',
-    category: 'Semua Kategori'
+    category: 'Semua Kategori',
+    keyword: ''
   });
 
   const [bookingFormData, setBookingFormDataState] = useState<{

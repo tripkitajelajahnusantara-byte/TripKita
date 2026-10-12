@@ -8,10 +8,11 @@ import { ShareModal } from '../components/ShareModal';
 import { TripImage } from '../components/TripImage';
 import { Skeleton } from '../components/Skeleton';
 import { filterCustomerVisiblePackages, isPackageExpired } from '../utils/publicPackages';
-import { upcomingDepartures, type Departure } from '../utils/departures';
+import { bookableDates, nearestDate, upcomingDepartures, type Departure } from '../utils/departures';
 import { formatTripRange } from '../utils/tripDates';
 
 interface TripPackage {
+  availableDates?: string[];
   departureDates?: string[];
   departures?: Departure[];
   id: number;
@@ -134,10 +135,10 @@ export const CustomerSearchPage: React.FC = () => {
     return { bg: '#007bff', text: '#ffffff' };
   };
 
-  const handleSelectPackage = (pkg: TripPackage) => {
+  const handleSelectPackage = (pkg: TripPackage, date: string) => {
     const updatedPkg = {
       ...pkg,
-      bookingDate: searchParams.date || pkg.startDate || ''
+      bookingDate: date || pkg.startDate || ''
     };
     setSelectedPackageForDetail(updatedPkg);
     navigateTo('paket-detail');
@@ -148,9 +149,16 @@ export const CustomerSearchPage: React.FC = () => {
     ? searchParams.type.split(',').map((t: string) => t.trim()).filter(Boolean)
     : [];
 
+  const keyword = (searchParams.keyword || '').toLowerCase();
+  const targetDate = searchParams.date;
+
   // Filter packages based on active search parameters
-  const processedPackages = packages.filter((pkg) => {
+  const matchingPackages = packages.filter((pkg) => {
     if (searchParams.destination && !pkg.destination.toLowerCase().includes(searchParams.destination.toLowerCase())) {
+      return false;
+    }
+    // Kata kunci bebas dari beranda, mis. "Dieng": cocok dengan nama trip atau destinasi.
+    if (keyword && !pkg.name.toLowerCase().includes(keyword) && !pkg.destination.toLowerCase().includes(keyword)) {
       return false;
     }
     if (searchParams.category && searchParams.category !== 'Semua Kategori' && !pkg.category.toLowerCase().includes(searchParams.category.toLowerCase())) {
@@ -159,11 +167,20 @@ export const CustomerSearchPage: React.FC = () => {
     if (selectedTypes.length > 0 && !selectedTypes.includes(pkg.tripType || 'Open Trip')) {
       return false;
     }
-    if (searchParams.date && pkg.tripType === 'Open Trip' && !upcomingDepartures(pkg).some(d => d.date === searchParams.date && d.seatsLeft > 0)) return false;
-    // Pencarian bertanggal hanya relevan untuk paket yang masih bisa dipesan.
-    if (searchParams.date && isPackageExpired(pkg)) return false;
     return true;
   });
+
+  // Pencarian bertanggal hanya relevan untuk paket yang masih bisa dipesan.
+  const packagesOnDate = targetDate
+    ? matchingPackages.filter((pkg) => !isPackageExpired(pkg) && bookableDates(pkg).includes(targetDate))
+    : matchingPackages;
+  // Tidak ada trip pada tanggal itu: tawarkan paket yang cocok dengan jadwal terdekat.
+  const noTripOnDate = !!targetDate && packagesOnDate.length === 0;
+  const processedPackages = noTripOnDate
+    ? matchingPackages.filter((pkg) => !isPackageExpired(pkg) && bookableDates(pkg).length > 0)
+    : packagesOnDate;
+  const preferredDate = (pkg: TripPackage) => (noTripOnDate ? nearestDate(bookableDates(pkg), targetDate) : targetDate);
+  const dateDistance = (pkg: TripPackage) => Math.abs(Date.parse(preferredDate(pkg)) - Date.parse(targetDate));
 
   // Dynamic sorting based on dropdown selection
   if (sortBy === 'Terpopuler') {
@@ -174,14 +191,8 @@ export const CustomerSearchPage: React.FC = () => {
     processedPackages.sort((a, b) => b.price - a.price);
   } else if (sortBy === 'Termurah') {
     processedPackages.sort((a, b) => a.price - b.price);
-  } else if (searchParams.date) {
-    // Sort by closest start date to user selected date
-    const targetTime = new Date(searchParams.date).getTime();
-    processedPackages.sort((a, b) => {
-      const timeA = a.startDate ? new Date(a.startDate).getTime() : 0;
-      const timeB = b.startDate ? new Date(b.startDate).getTime() : 0;
-      return Math.abs(timeA - targetTime) - Math.abs(timeB - targetTime);
-    });
+  } else if (noTripOnDate) {
+    processedPackages.sort((a, b) => dateDistance(a) - dateDistance(b));
   }
   // Paket yang jadwalnya sudah lewat tetap tampil, tetapi selalu di urutan akhir.
   processedPackages.sort((a, b) => Number(isPackageExpired(a)) - Number(isPackageExpired(b)));
@@ -223,7 +234,7 @@ export const CustomerSearchPage: React.FC = () => {
             </h2>
             <span style={{ fontSize: '13px', color: '#64748b' }}>
               Menampilkan <strong>{processedPackages.length}</strong> paket wisata
-              {searchParams.destination ? ` untuk "${searchParams.destination}"` : ''}
+              {searchParams.keyword || searchParams.destination ? ` untuk "${searchParams.keyword || searchParams.destination}"` : ''}
             </span>
           </div>
 
@@ -261,8 +272,20 @@ export const CustomerSearchPage: React.FC = () => {
         <ShareModal 
           isOpen={isShareModalOpen} 
           onClose={() => setIsShareModalOpen(false)} 
-          pkg={selectedPackageForShare} 
+          pkg={selectedPackageForShare}
         />
+
+        {!loading && !loadError && noTripOnDate && (
+          <div role="status" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '14px 18px', marginBottom: '20px', color: '#92400e' }}>
+            <Calendar size={18} style={{ flexShrink: 0, marginTop: '1px' }} />
+            <div>
+              <strong style={{ display: 'block', fontSize: '14px' }}>Tidak ada trip pada tanggal yang Anda pilih.</strong>
+              {processedPackages.length > 0 && (
+                <span style={{ fontSize: '13px' }}>Berikut rekomendasi trip dengan tanggal keberangkatan terdekat dari {formatTripRange(targetDate)}.</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div role="status" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -309,14 +332,15 @@ export const CustomerSearchPage: React.FC = () => {
               // Calculate active reserved seats from pending/paid/completed bookings
               const totalQuotaMax = Math.max(0, Number(pkg.quotaMax) || 0);
               const departures = upcomingDepartures(pkg);
-              const nextDeparture = (searchParams.date ? departures.find(d => d.date === searchParams.date) : null) || departures.find(d => d.seatsLeft > 0) || departures[0];
+              const pkgDate = preferredDate(pkg);
+              const nextDeparture = (pkgDate ? departures.find(d => d.date === pkgDate) : null) || departures.find(d => d.seatsLeft > 0) || departures[0];
               const availableSeats = pkg.tripType === 'Open Trip' ? nextDeparture?.seatsLeft || 0 : totalQuotaMax;
               const periodText = pkg.startDate
                 ? `${formatShortDate(pkg.startDate)}${pkg.endDate && pkg.endDate.slice(0, 10) !== pkg.startDate.slice(0, 10) ? ` - ${formatShortDate(pkg.endDate)}` : ''}`
                 : '';
               const scheduleText = pkg.tripType === 'Open Trip' && nextDeparture
                 ? `${formatTripRange(nextDeparture.date, nextDeparture.endDate)}${departures.length > 1 ? ` · ${departures.length} pilihan jadwal` : ''}`
-                : (pkg.schedule || '').trim() || periodText;
+                : (noTripOnDate && pkgDate ? formatTripRange(pkgDate) : (pkg.schedule || '').trim() || periodText);
 
               const badge = getBadgeColor(pkg.category);
               const isFavorite = wishlistIds.includes(Number(pkg.id));
@@ -502,7 +526,7 @@ export const CustomerSearchPage: React.FC = () => {
                         </button>
 
                         <button 
-                          onClick={() => handleSelectPackage(pkg)}
+                          onClick={() => handleSelectPackage(pkg, pkgDate)}
                           style={{
                             backgroundColor: '#ffffff',
                             border: '1.5px solid #0284c7',

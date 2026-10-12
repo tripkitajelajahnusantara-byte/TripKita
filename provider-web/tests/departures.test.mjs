@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { upcomingDepartures, weeklyDepartures } from '../src/utils/departures.ts';
+import { bookableDates, nearestDate, upcomingDepartures, weeklyDepartures } from '../src/utils/departures.ts';
 import { isCustomerVisiblePackage, isPackageExpired, sortBookableFirst } from '../src/utils/publicPackages.ts';
 
 test('weekly schedules span three calendar months and preserve irregular dates', () => {
@@ -32,4 +32,20 @@ test('expired packages stay visible but sort after bookable ones', () => {
   assert.equal(isPackageExpired(expired, '2026-10-10'), true);
   assert.equal(isPackageExpired({ ...current, isExpired: true }, '2026-10-10'), true);
   assert.deepEqual(sortBookableFirst([expired, current], '2026-10-10').map(p => p.id), [2, 1]);
+});
+test('bookable dates skip full departures and private dates inside H-7', () => {
+  const open = { tripType: 'Open Trip', departures: [
+    { date: '2026-10-20', endDate: '2026-10-22', quotaUsed: 10, seatsLeft: 0 },
+    { date: '2026-10-27', endDate: '2026-10-29', quotaUsed: 2, seatsLeft: 8 },
+    { date: '2026-11-03', endDate: '2026-11-05', quotaUsed: 0, seatsLeft: 10, closed: true },
+  ] };
+  assert.deepEqual(bookableDates(open, '2026-10-12'), ['2026-10-27']);
+  const privateTrip = { tripType: 'Private Trip', availableDates: ['2026-11-01', '2026-10-15', 'salah'] };
+  assert.deepEqual(bookableDates(privateTrip, '2026-10-12'), ['2026-11-01']);
+  assert.deepEqual(bookableDates({ tripType: 'Family' }, '2026-10-12'), []);
+});
+test('nearest date looks both ways and prefers the earlier date on a tie', () => {
+  assert.equal(nearestDate(['2026-11-10', '2026-10-20'], '2026-10-25'), '2026-10-20');
+  assert.equal(nearestDate(['2026-10-23', '2026-10-27'], '2026-10-25'), '2026-10-23');
+  assert.equal(nearestDate([], '2026-10-25'), '');
 });

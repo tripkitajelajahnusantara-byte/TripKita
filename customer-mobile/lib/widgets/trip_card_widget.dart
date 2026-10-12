@@ -152,9 +152,8 @@ class _HighlightPill extends StatelessWidget {
   final String text;
   final Color color;
   final Color background;
-  final double fontSize;
 
-  const _HighlightPill(this.text, this.color, this.background, {this.fontSize = 10});
+  const _HighlightPill(this.text, this.color, this.background);
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +163,7 @@ class _HighlightPill extends StatelessWidget {
       child: Text(text,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600, color: color)),
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
     );
   }
 }
@@ -280,8 +279,228 @@ class TripGridCard extends StatelessWidget {
   }
 }
 
-/// Kartu paket memanjang pada halaman Cari Trip (`search-card-item` di web,
-/// tampilan satu kolom pada layar kecil).
+// ---- Kartu desain Figma "Temen Trip" (beranda & Cari Trip) ----
+
+const _cardShadow = [
+  BoxShadow(color: Color(0x1A0A0D12), offset: Offset(0, 1), blurRadius: 3),
+  BoxShadow(color: Color(0x1A0A0D12), offset: Offset(0, 1), blurRadius: 2, spreadRadius: -1),
+];
+
+/// Bingkai kartu paket: putih, border Neutral/200, sudut 12, bayangan kecil.
+class _TripCardFrame extends StatelessWidget {
+  final VoidCallback onTap;
+  final Widget child;
+
+  const _TripCardFrame({required this.onTap, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), boxShadow: _cardShadow),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: onTap, child: DefaultTextStyle.merge(style: figmaTextStyle, child: child)),
+      ),
+    );
+  }
+}
+
+/// Label kategori biru di kiri atas foto.
+class _CategoryLabel extends StatelessWidget {
+  final String text;
+
+  const _CategoryLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 21.37,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: AppColors.brand,
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(9999)),
+      ),
+      child: Text(text,
+          style: const TextStyle(fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w500, color: Colors.white)),
+    );
+  }
+}
+
+/// Badge putih di kiri bawah foto: "Baru" atau rating paket.
+class _RatingBadge extends StatelessWidget {
+  final TripPackage pkg;
+  final bool large;
+
+  const _RatingBadge(this.pkg, {this.large = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: large ? 8 : 6, vertical: large ? 3 : 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(pkg.rating > 0 ? '★ ${ratingLabel(pkg)}' : 'Baru',
+          style: TextStyle(
+            fontSize: large ? 14 : 12,
+            height: large ? 20 / 14 : 18 / 12,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textMedium,
+          )),
+    );
+  }
+}
+
+/// Ikon hati favorit di kanan atas foto.
+class _FavoriteHeart extends StatelessWidget {
+  final TripPackage pkg;
+  final double size;
+
+  const _FavoriteHeart(this.pkg, {required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: WishlistStore.instance,
+      builder: (context, _) {
+        final active = WishlistStore.instance.contains(pkg.id);
+        return Semantics(
+          button: true,
+          label: active ? 'Hapus dari favorit' : 'Tambah ke favorit',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => WishlistStore.instance.toggle(pkg, syncToAccount: AuthSession.instance.isLoggedIn),
+            child: AppIcon(active ? 'heart_active' : 'heart', size: size),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Isi teks kartu: tipe & durasi, nama, lokasi, dan fasilitas.
+class _TripSummary extends StatelessWidget {
+  final TripPackage pkg;
+
+  /// Tinggi tetap judul (3 baris) agar kartu sejajar di daftar mendatar.
+  final bool fixedTitleHeight;
+
+  const _TripSummary(this.pkg, {required this.fixedTitleHeight});
+
+  @override
+  Widget build(BuildContext context) {
+    final facilities = pkg.includedFacilities.take(3).toList();
+    final title = Text(pkg.name,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 18, height: 26 / 18, fontWeight: FontWeight.w600, color: AppColors.heading));
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${pkg.durationDays} hari',
+          style: const TextStyle(fontSize: 12, height: 18 / 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
+      const SizedBox(height: 2),
+      fixedTitleHeight ? SizedBox(height: 78, child: title) : title,
+      Row(children: [
+        const AppIcon('map_pin', size: 14),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(pkg.destination,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMedium)),
+        ),
+      ]),
+      if (facilities.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 40),
+          child: Wrap(
+            clipBehavior: Clip.hardEdge,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (var i = 0; i < facilities.length; i++) ...[
+                if (i > 0)
+                  const SizedBox(
+                    width: 12,
+                    child: Text('•',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14, height: 18 / 14, color: AppColors.borderStrong)),
+                  ),
+                Text(facilities[i],
+                    style: const TextStyle(fontSize: 12, height: 18 / 12, color: AppColors.textLight)),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ]);
+  }
+}
+
+/// Harga per pax rata kanan.
+class _PriceTag extends StatelessWidget {
+  final TripPackage pkg;
+
+  const _PriceTag(this.pkg);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+      Text(formatPrice(pkg.price),
+          textAlign: TextAlign.right,
+          style: const TextStyle(fontSize: 20, height: 24 / 20, fontWeight: FontWeight.w700, color: AppColors.brand)),
+      const Text('per pax',
+          textAlign: TextAlign.right,
+          style: TextStyle(fontSize: 14, height: 16 / 14, color: AppColors.textLight)),
+    ]);
+  }
+}
+
+/// Kartu "Trip Populer" selebar 242 pada daftar mendatar beranda.
+class TripPopularCard extends StatelessWidget {
+  final TripPackage pkg;
+  final VoidCallback onTap;
+
+  const TripPopularCard({super.key, required this.pkg, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 242,
+      child: _TripCardFrame(
+        onTap: onTap,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          SizedBox(
+            height: 136,
+            child: Stack(fit: StackFit.expand, children: [
+              NetworkPhoto(coverImageFor(pkg)),
+              if (pkg.category.isNotEmpty) Positioned(left: 0, top: 12, child: _CategoryLabel(pkg.category)),
+              Positioned(right: 12, top: 12, child: _FavoriteHeart(pkg, size: 20)),
+              Positioned(left: 12, bottom: 12, child: _RatingBadge(pkg)),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              _TripSummary(pkg, fixedTitleHeight: true),
+              const SizedBox(height: 8),
+              _PriceTag(pkg),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Kartu paket satu kolom pada halaman Cari Trip.
 class TripListCard extends StatelessWidget {
   final TripPackage pkg;
   final VoidCallback onTap;
@@ -290,144 +509,101 @@ class TripListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dateLabel = tripDateLabel(pkg);
     final seats = pkg.availableSeats;
-    return SectionCard(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          GestureDetector(
-            onTap: onTap,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                height: 180,
-                width: double.infinity,
-                child: Stack(fit: StackFit.expand, children: [
-                  NetworkPhoto(coverImageFor(pkg)),
-                  Positioned(top: 10, right: 10, child: FavoriteButton(pkg)),
+    final lowQuota = pkg.quotaMax > 0 && seats > 0 && seats <= 5;
+    return _TripCardFrame(
+      onTap: onTap,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SizedBox(
+          height: 185,
+          child: _PhotoCarousel(pkg),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _TripSummary(pkg, fixedTitleHeight: false),
+            if (dateLabel != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(6)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const AppIcon('calendar_blank', size: 14, color: AppColors.textMuted),
+                  const SizedBox(width: 4),
+                  Text(dateLabel, style: const TextStyle(fontSize: 12, height: 18 / 12, color: AppColors.textMedium)),
                 ]),
               ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Flexible(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6)),
-                  child: Text(
-                    pkg.tripType.isNotEmpty ? '${pkg.tripType} • ${pkg.category}' : pkg.category,
-                    maxLines: 2,
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text('Mulai dari', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                  Text.rich(TextSpan(children: [
-                    TextSpan(
-                        text: formatIDR(pkg.price),
-                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.accent)),
-                    const TextSpan(text: ' / orang', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                  ])),
-                ],
-              ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(pkg.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textDark)),
-          const SizedBox(height: 4),
-          Row(children: [
-            const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textLight),
-            const SizedBox(width: 4),
-            Expanded(child: Text(pkg.destination, style: const TextStyle(fontSize: 13, color: AppColors.textMuted))),
-          ]),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final hl in highlightsFor(pkg).take(3))
-                _HighlightPill(hl, AppColors.primary, AppColors.accentLight, fontSize: 11),
-            ],
-          ),
-          if (pkg.description.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(pkg.description,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.4)),
-          ],
-          if (pkg.schedule.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textLight),
-              const SizedBox(width: 6),
               Expanded(
-                child: Text.rich(TextSpan(
-                  text: 'Jadwal tersedia: ',
-                  style: const TextStyle(fontSize: 13, color: AppColors.textMedium),
-                  children: [TextSpan(text: pkg.schedule, style: const TextStyle(fontWeight: FontWeight.w700))],
-                )),
+                child: lowQuota
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text('$seats kuota tersisa',
+                            style: const TextStyle(
+                                fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.errorStrong)),
+                      )
+                    : const SizedBox.shrink(),
               ),
+              _PriceTag(pkg),
             ]),
-          ],
-          const Divider(height: 24),
-          Row(children: [
-            const Icon(Icons.star, size: 15, color: AppColors.warning),
-            const SizedBox(width: 3),
-            Text(ratingLabel(pkg), style: const TextStyle(color: AppColors.warning, fontWeight: FontWeight.w700, fontSize: 13)),
-            const SizedBox(width: 8),
-            const Text('|', style: TextStyle(color: AppColors.borderStrong)),
-            const SizedBox(width: 8),
-            Text('Sisa $seats seat',
-                style: TextStyle(
-                  color: seats < 5 ? AppColors.danger : AppColors.success,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                )),
           ]),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: AppColors.divider,
-                  foregroundColor: AppColors.textBody,
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () => showSharePackageSheet(context, pkg),
-                icon: const Icon(Icons.share_outlined, size: 16),
-                label: const Text('Bagikan'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary, width: 1.5),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: onTap,
-                child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text('Lihat Detail'),
-                  SizedBox(width: 4),
-                  Icon(Icons.chevron_right, size: 18),
-                ]),
-              ),
-            ),
-          ]),
-        ],
-      ),
+        ),
+      ]),
     );
+  }
+}
+
+/// Foto paket yang bisa digeser, dengan label, favorit, badge, dan titik
+/// penanda halaman.
+class _PhotoCarousel extends StatefulWidget {
+  final TripPackage pkg;
+
+  const _PhotoCarousel(this.pkg);
+
+  @override
+  State<_PhotoCarousel> createState() => _PhotoCarouselState();
+}
+
+class _PhotoCarouselState extends State<_PhotoCarousel> {
+  int _page = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final pkg = widget.pkg;
+    final photos = pkg.photos;
+    return Stack(fit: StackFit.expand, children: [
+      photos.length > 1
+          ? PageView.builder(
+              itemCount: photos.length,
+              onPageChanged: (i) => setState(() => _page = i),
+              itemBuilder: (_, i) => NetworkPhoto(photos[i]),
+            )
+          : NetworkPhoto(coverImageFor(pkg)),
+      if (pkg.category.isNotEmpty) Positioned(left: 0, top: 12, child: _CategoryLabel(pkg.category)),
+      Positioned(right: 12, top: 12, child: _FavoriteHeart(pkg, size: 24)),
+      Positioned(left: 12, bottom: 12, child: _RatingBadge(pkg, large: true)),
+      if (photos.length > 1)
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 12,
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            for (var i = 0; i < photos.length; i++)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: i == _page ? 12 : 4,
+                height: 4,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  color: i == _page ? AppColors.brandDeep : AppColors.borderStrong,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+          ]),
+        ),
+    ]);
   }
 }

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { getTripImage, getHighlightsForPackage, OFFICIAL_CATEGORIES, OFFICIAL_TRIP_TYPES } from '../utils/tripImages';
-import { Search, ShieldCheck, CreditCard, RotateCcw, MessageSquare, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight, Share2, Target } from 'lucide-react';
+import { Search, ShieldCheck, CreditCard, RotateCcw, MessageSquare, Star, MapPin, Calendar, LayoutGrid, Heart, Users, ChevronRight, Share2, Target, Check } from 'lucide-react';
 import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 import { ShareModal } from '../components/ShareModal';
 import { TripImage } from '../components/TripImage';
@@ -57,7 +57,9 @@ const indonesiaProvinces = [
 const tripTypesList = ['Semua Tipe', ...OFFICIAL_TRIP_TYPES];
 const categoriesList = ['Semua Kategori', ...OFFICIAL_CATEGORIES];
 
-const PACKAGES_PER_PAGE = 12;
+const HOME_PACKAGE_LIMIT = 12;
+// Opsi tanggal untuk melihat-lihat paket tanpa menentukan tanggal keberangkatan.
+const ALL_DATES = 'Semua Tanggal';
 
 // Warna badge & highlight per tipe trip pada kartu beranda.
 const TRIP_TYPE_STYLES: Record<string, { badge: string; pillText: string; pillBg: string }> = {
@@ -82,7 +84,6 @@ export const CustomerLandingPage: React.FC = () => {
   const { navigateTo, setSelectedPackageForDetail, setSearchParams, customerProfile, openAuthModal } = useNavigation();
   const [packages, setPackages] = useState<TripPackage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [visibleCount, setVisibleCount] = useState(PACKAGES_PER_PAGE);
 
   const openTripPlanner = () => customerProfile
     ? navigateTo('rencana-trip')
@@ -93,6 +94,8 @@ export const CustomerLandingPage: React.FC = () => {
   const [searchDate, setSearchDate] = useState(getTodayIsoDate()); 
   const [searchType, setSearchType] = useState('Semua Tipe');   
   const [searchCategory, setSearchCategory] = useState('Semua Kategori');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [dateMenuOpen, setDateMenuOpen] = useState(false);
 
   const [dateError, setDateError] = useState('');
 
@@ -107,11 +110,18 @@ export const CustomerLandingPage: React.FC = () => {
     setDateError('');
     setSearchParams({
       destination: searchDest,
-      date: searchDate,
+      date: searchDate === ALL_DATES ? '' : searchDate,
       type: searchType,
-      category: searchCategory
+      category: searchCategory,
+      keyword: searchKeyword.trim()
     });
     navigateTo('cari-trip');
+  };
+
+  const pickDate = (value: string) => {
+    setSearchDate(value);
+    setDateError('');
+    setDateMenuOpen(false);
   };
 
   const [loadError, setLoadError] = useState('');
@@ -121,7 +131,9 @@ export const CustomerLandingPage: React.FC = () => {
     try {
       const data = await request('/public/packages');
       const list: TripPackage[] = Array.isArray(data) ? data : [];
-      return { list: sortBookableFirst(filterCustomerVisiblePackages(list)), error: '' };
+      // Beranda: rating tertinggi dulu, paket yang masih bisa dipesan tetap didahulukan.
+      const byRating = filterCustomerVisiblePackages(list).sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
+      return { list: sortBookableFirst(byRating).slice(0, HOME_PACKAGE_LIMIT), error: '' };
     } catch (err: unknown) {
       console.error('Failed to load packages:', err);
       return { list: [], error: err instanceof Error && err.message ? err.message : 'Gagal memuat paket wisata.' };
@@ -163,7 +175,7 @@ export const CustomerLandingPage: React.FC = () => {
   const handleSelectPackage = (pkg: TripPackage) => {
     const updatedPkg = {
       ...pkg,
-      bookingDate: searchDate
+      bookingDate: searchDate === ALL_DATES ? '' : searchDate
     };
     setSelectedPackageForDetail(updatedPkg);
     navigateTo('paket-detail');
@@ -203,8 +215,6 @@ export const CustomerLandingPage: React.FC = () => {
   const getImageUrl = (pkgId: number, name: string, category: string, uploadedImage?: string) => {
     return getTripImage(pkgId, name, category, uploadedImage);
   };
-
-  const dateInputRef = React.useRef<HTMLInputElement>(null);
 
   // Home page grid displays all packages of every trip type; search filter executes on search page
   const processedPackages = packages;
@@ -308,19 +318,12 @@ export const CustomerLandingPage: React.FC = () => {
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
                 <Calendar size={16} color="#007bff" /> Tanggal <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <div 
-                onClick={() => {
-                  if (dateInputRef.current) {
-                    if (typeof dateInputRef.current.showPicker === 'function') {
-                      dateInputRef.current.showPicker();
-                    } else {
-                      dateInputRef.current.focus();
-                    }
-                  }
-                }}
-                style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
-              >
-                <div
+              <div style={{ position: 'relative', width: '100%' }}>
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  aria-expanded={dateMenuOpen}
+                  onClick={() => setDateMenuOpen((open) => !open)}
                   style={{
                     width: '100%',
                     padding: '11px 14px',
@@ -333,31 +336,51 @@ export const CustomerLandingPage: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit'
                   }}
                 >
-                  <span>{formatDateIndo(searchDate)}</span>
+                  <span>{searchDate === ALL_DATES ? ALL_DATES : formatDateIndo(searchDate)}</span>
                   <Calendar size={16} color="#007bff" />
-                </div>
-                <input 
-                  ref={dateInputRef}
-                  type="date" 
-                  min={todayStr}
-                  value={searchDate}
-                  onChange={(e) => {
-                    setSearchDate(e.target.value);
-                    if (e.target.value) setDateError('');
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    opacity: 0,
-                    cursor: 'pointer'
-                  }}
-                />
+                </button>
+                {dateMenuOpen && (
+                  <>
+                    {/* Klik di luar menu menutupnya */}
+                    <div onClick={() => setDateMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+                    <div
+                      role="dialog"
+                      aria-label="Pilih tanggal"
+                      onKeyDown={(e) => { if (e.key === 'Escape') setDateMenuOpen(false); }}
+                      style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 21, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}
+                    >
+                      <button
+                        type="button"
+                        autoFocus
+                        aria-pressed={searchDate === ALL_DATES}
+                        onClick={() => pickDate(ALL_DATES)}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', textAlign: 'left', padding: '10px 12px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', color: searchDate === ALL_DATES ? '#0284c7' : '#0f172a', backgroundColor: searchDate === ALL_DATES ? '#e0f2fe' : '#f8fafc' }}
+                      >
+                        <span>
+                          {ALL_DATES}
+                          <span style={{ display: 'block', fontSize: '11.5px', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>Lihat paket tanpa menentukan tanggal</span>
+                        </span>
+                        {searchDate === ALL_DATES && <Check size={16} />}
+                      </button>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '6px 12px 4px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>
+                        Tanggal tertentu
+                        <input
+                          type="date"
+                          min={todayStr}
+                          defaultValue={searchDate === ALL_DATES ? '' : searchDate}
+                          // Tahun yang sedang diketik (mis. 0002) diabaikan sampai menjadi tanggal valid.
+                          onChange={(e) => { if (e.target.value >= todayStr) pickDate(e.target.value); }}
+                          style={{ padding: '9px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', fontFamily: 'inherit', color: '#0f172a' }}
+                        />
+                      </label>
+                    </div>
+                  </>
+                )}
               </div>
               {dateError && (
                 <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: '700', display: 'block', marginTop: '4px' }}>
@@ -419,8 +442,20 @@ export const CustomerLandingPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '22px' }}>
-            <button 
+          <div className="search-submit-row" style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '22px' }}>
+            <div style={{ position: 'relative', flex: '1 1 auto', maxWidth: '420px' }}>
+              <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+              <input
+                type="search"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }}
+                placeholder="Cari destinasi atau nama trip, mis. Dieng"
+                aria-label="Cari destinasi atau nama trip"
+                style={{ width: '100%', height: '100%', padding: '12px 14px 12px 38px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '14px', color: '#1e293b', backgroundColor: '#ffffff', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              />
+            </div>
+            <button
               onClick={handleSearchSubmit}
               style={{
                 backgroundColor: '#0284c7',
@@ -527,7 +562,7 @@ export const CustomerLandingPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setSearchParams({ destination: '', date: '', type: 'Semua Tipe', category: '' });
+                  setSearchParams({ destination: '', date: '', type: 'Semua Tipe', category: '', keyword: '' });
                   navigateTo('cari-trip');
                 }}
                 style={{ background: 'none', border: 'none', padding: 0, fontSize: '13px', color: '#007bff', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
@@ -537,7 +572,7 @@ export const CustomerLandingPage: React.FC = () => {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))', gap: '20px' }}>
-              {processedPackages.slice(0, visibleCount).map((pkg) => {
+              {processedPackages.map((pkg) => {
                 const isFavorite = wishlistIds.includes(Number(pkg.id));
                 const highlights = getHighlightsForPackage(pkg).slice(0, 3);
                 const typeStyle = TRIP_TYPE_STYLES[pkg.tripType] || TRIP_TYPE_STYLES['Open Trip'];
@@ -703,18 +738,6 @@ export const CustomerLandingPage: React.FC = () => {
                 );
               })}
             </div>
-
-            {processedPackages.length > visibleCount && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
-                <button
-                  type="button"
-                  onClick={() => setVisibleCount((count) => count + PACKAGES_PER_PAGE)}
-                  style={{ backgroundColor: '#ffffff', color: '#0284c7', border: '1.5px solid #0284c7', padding: '10px 26px', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}
-                >
-                  Tampilkan lebih banyak ({processedPackages.length - visibleCount} lagi)
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -784,6 +807,15 @@ export const CustomerLandingPage: React.FC = () => {
           .search-widget-card {
             padding: 18px 16px !important;
             margin-top: -30px !important;
+          }
+          .search-submit-row {
+            flex-direction: column;
+          }
+          .search-submit-row > div {
+            max-width: none !important;
+          }
+          .search-submit-row > button {
+            justify-content: center;
           }
           .planner-cta {
             padding: 18px 16px !important;

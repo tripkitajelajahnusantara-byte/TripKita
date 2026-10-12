@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { ProviderHintTour } from './ProviderHintTour';
 import { NotificationCenter } from './NotificationCenter';
+import { ProviderAvatar } from './ProviderAvatar';
 import {
   LayoutDashboard,
   Package,
@@ -59,7 +60,9 @@ export const Sidebar: React.FC = () => {
         </button>
 
         <div className="provider-profile-card">
-          <div className="profile-avatar">{providerName.substring(0, 2).toUpperCase()}</div>
+          <ProviderAvatar className="profile-avatar" photo={providerProfile?.profilePhoto} style={{ flexShrink: 0 }}>
+            {providerName.substring(0, 2).toUpperCase()}
+          </ProviderAvatar>
           <div className="profile-info" style={{ minWidth: 0, flex: 1 }}>
             <h4 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={providerName}>
               {providerName}

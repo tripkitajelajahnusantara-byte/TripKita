@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:customer_mobile/theme/app_theme.dart';
+import 'package:customer_mobile/widgets/common.dart';
 
 /// Splash pembuka. Frame pertamanya sama persis dengan splash native Android
 /// (simbol "7" berukuran 54dp di tengah layar putih), lalu berganti halus ke
@@ -26,7 +27,6 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
   late final Animation<double> _markScale = _interval(0.0, 0.50, from: 1, to: 1.18, curve: Curves.easeOutCubic);
   late final Animation<double> _logoOpacity = _interval(0.32, 0.70);
   late final Animation<double> _logoLift = _interval(0.32, 0.75, from: 10, to: 0, curve: Curves.easeOutCubic);
-  late final Animation<double> _taglineOpacity = _interval(0.55, 0.90);
   bool _finished = false;
 
   Animation<double> _interval(double begin, double end,
@@ -56,8 +56,9 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    precacheImage(const AssetImage('assets/images/tementrip_official_logo.png'), context);
-    precacheImage(const AssetImage('assets/images/hero.jpg'), context);
+    precacheImage(const AssetImage('assets/images/splash_logo.png'), context);
+    precacheImage(const AssetImage('assets/images/hero_gradient.png'), context);
+    precacheImage(const AssetImage('assets/images/logo_white.png'), context);
   }
 
   @override
@@ -96,27 +97,24 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                 ),
               ),
             ),
-            Center(
-              child: Opacity(
-                opacity: _logoOpacity.value,
-                child: Transform.translate(
-                  offset: Offset(0, _logoLift.value),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Image.asset('assets/images/tementrip_official_logo.png', width: 200),
-                    const SizedBox(height: 14),
-                    Opacity(
-                      opacity: _taglineOpacity.value,
-                      child: const Text(
-                        'Cari Open Trip Indonesia dengan Mudah',
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textMuted,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
+            // Desain Figma: logo 250 lebar, 28 di atas titik tengah layar.
+            Padding(
+              padding: const EdgeInsets.only(bottom: 56),
+              child: Center(
+                child: Opacity(
+                  opacity: _logoOpacity.value,
+                  child: Transform.translate(
+                    offset: Offset(0, _logoLift.value),
+                    child: const CroppedAsset(
+                      'assets/images/splash_logo.png',
+                      width: 250,
+                      height: 78.467,
+                      left: -0.1611,
+                      top: -1.5369,
+                      widthFactor: 1.3139,
+                      heightFactor: 4.2039,
                     ),
-                  ]),
+                  ),
                 ),
               ),
             ),
@@ -128,33 +126,25 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 28),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    // Garis progres hanya muncul bila pemeriksaan sesi lebih
-                    // lama dari animasi, misalnya saat jaringan lambat.
-                    AnimatedOpacity(
-                      opacity: waiting ? 1 : 0,
-                      duration: const Duration(milliseconds: 250),
+                  // Garis progres hanya muncul bila pemeriksaan sesi lebih
+                  // lama dari animasi, misalnya saat jaringan lambat.
+                  child: AnimatedOpacity(
+                    opacity: waiting ? 1 : 0,
+                    duration: const Duration(milliseconds: 250),
+                    child: Center(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(2),
                         child: const SizedBox(
                           width: 96,
                           height: 3,
                           child: LinearProgressIndicator(
-                            backgroundColor: AppColors.accentLight,
-                            color: AppColors.primary,
+                            backgroundColor: AppColors.brandSoft,
+                            color: AppColors.brand,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Opacity(
-                      opacity: _taglineOpacity.value,
-                      child: const Text(
-                        'PT TripKita Jelajah Nusantara',
-                        style: TextStyle(fontSize: 11.5, color: AppColors.textLight, letterSpacing: 0.4),
-                      ),
-                    ),
-                  ]),
+                  ),
                 ),
               ),
             ),

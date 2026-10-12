@@ -109,6 +109,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			authProfile.PUT("/profile", authCtrl.UpdateProfile)
 			authProfile.POST("/upload", middleware.ProviderAccountRequired(), middleware.RateLimit(10, time.Hour), uploadCtrl.UploadDocument)
 			authProfile.GET("/documents", middleware.ProviderAccountRequired(), uploadCtrl.GetProviderDocument)
+			authProfile.POST("/profile/photo", middleware.ProviderAccountRequired(), middleware.RateLimit(20, time.Hour), uploadCtrl.UploadProfilePhoto)
+			authProfile.DELETE("/profile/photo", middleware.ProviderAccountRequired(), uploadCtrl.DeleteProfilePhoto)
 
 			// Notification Center endpoints
 			authProfile.GET("/notifications", notifCtrl.GetUserNotifications)

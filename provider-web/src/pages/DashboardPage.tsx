@@ -17,6 +17,7 @@ import { request } from '../utils/api';
 import { SkeletonTableRows } from '../components/Skeleton';
 import { TripDepartureAlert } from '../components/TripDepartureAlert';
 import { TripImage } from '../components/TripImage';
+import { ProviderAvatar } from '../components/ProviderAvatar';
 import { getTripImage } from '../utils/tripImages';
 
 interface DashboardStats {
@@ -138,7 +139,9 @@ export const DashboardPage: React.FC = () => {
               />
             </div>
             
-            <div className="user-profile-circle">{providerName.substring(0, 2).toUpperCase()}</div>
+            <ProviderAvatar className="user-profile-circle" photo={providerProfile?.profilePhoto}>
+              {providerName.substring(0, 2).toUpperCase()}
+            </ProviderAvatar>
           </div>
         </header>
 
