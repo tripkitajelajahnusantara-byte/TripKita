@@ -17,17 +17,6 @@ const officialCategories = [
 
 const officialTripTypes = ['Open Trip', 'Private Trip', 'Honeymoon', 'Family', 'Corporate'];
 
-const indonesiaProvinces = [
-  'Aceh', 'Sumatera Utara', 'Sumatera Barat', 'Riau', 'Kepulauan Riau',
-  'Jambi', 'Sumatera Selatan', 'Bangka Belitung', 'Bengkulu', 'Lampung',
-  'DKI Jakarta', 'Jawa Barat', 'Banten', 'Jawa Tengah', 'DI Yogyakarta', 'Jawa Timur',
-  'Bali', 'Nusa Tenggara Barat (NTB)', 'Nusa Tenggara Timur (NTT)',
-  'Kalimantan Barat', 'Kalimantan Tengah', 'Kalimantan Selatan', 'Kalimantan Timur', 'Kalimantan Utara',
-  'Sulawesi Utara', 'Gorontalo', 'Sulawesi Tengah', 'Sulawesi Barat', 'Sulawesi Selatan', 'Sulawesi Tenggara',
-  'Maluku', 'Maluku Utara',
-  'Papua', 'Papua Barat', 'Papua Barat Daya', 'Papua Tengah', 'Papua Pegunungan', 'Papua Selatan',
-];
-
 const allTripTypesLabel = 'Semua Tipe';
 const allCategoriesLabel = 'Semua Kategori';
 
@@ -53,6 +42,19 @@ List<String> highlightsFor(TripPackage pkg) {
 String coverImageFor(TripPackage pkg) {
   final photos = pkg.photos;
   return photos.isEmpty ? '' : photos.first;
+}
+
+/// Label tanggal pada kartu Cari Trip: jadwal keberangkatan Open Trip, atau
+/// rentang tanggal yang dibuka mitra untuk paket lain. Null bila tidak ada.
+String? tripDateLabel(TripPackage pkg) {
+  if (pkg.isOpenTrip) {
+    final dep = openTripDeparture(pkg);
+    return dep == null ? null : formatDateRange(parseIsoDate(dep.dateIso)!, parseIsoDate(dep.endIso)!);
+  }
+  final today = dateOnly(DateTime.now());
+  final dates = pkg.availableDates.map(parseIsoDate).whereType<DateTime>().where((d) => !d.isBefore(today)).toList()
+    ..sort();
+  return dates.isEmpty ? null : formatDateRange(dates.first, dates.last);
 }
 
 /// Tanggal paling awal untuk paket non-Open Trip (wajib H-7).

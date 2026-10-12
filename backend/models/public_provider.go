@@ -11,6 +11,7 @@ type PublicProviderProfile struct {
 	OperationalProvince string    `json:"operationalProvince"`
 	OperationalCity     string    `json:"operationalCity"`
 	Description         string    `json:"description"`
+	ProfilePhoto        string    `json:"profilePhoto"`
 	IsVerified          bool      `json:"isVerified"`
 	Rating              float64   `json:"rating"`
 	TotalTravelers      int64     `json:"totalTravelers"`

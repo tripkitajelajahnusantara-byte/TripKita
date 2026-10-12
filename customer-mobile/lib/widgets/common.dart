@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:customer_mobile/models/booking.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
@@ -640,15 +641,216 @@ void showSnack(BuildContext context, String message, {bool isError = false}) {
     ));
 }
 
-/// Logo resmi TemenTrip, sama dengan header web.
-class BrandLogo extends StatelessWidget {
-  final double height;
+/// Gaya teks dasar desain Figma: tanpa tracking dan tinggi baris "auto"
+/// Roboto, menggantikan bawaan Material 3 (tracking 0.25, tinggi 1.43).
+const figmaTextStyle = TextStyle(letterSpacing: 0, height: 1.17);
 
-  const BrandLogo({super.key, this.height = 34});
+/// Ikon SVG dari desain Figma (`assets/icons/<name>.svg`). Tanpa [color],
+/// warna bawaan SVG yang dipakai.
+class AppIcon extends StatelessWidget {
+  final String name;
+  final double size;
+  final Color? color;
+
+  const AppIcon(this.name, {super.key, this.size = 24, this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset('assets/images/tementrip_official_logo.png',
-        height: height, fit: BoxFit.contain);
+    return SvgPicture.asset(
+      'assets/icons/$name.svg',
+      width: size,
+      height: size,
+      colorFilter: color == null ? null : ColorFilter.mode(color!, BlendMode.srcIn),
+    );
   }
+}
+
+/// Potongan gambar seperti layer Figma yang di-crop: gambar selebar
+/// `width * widthFactor` digeser `left`/`top` (pecahan ukuran bingkai).
+class CroppedAsset extends StatelessWidget {
+  final String asset;
+  final double width;
+  final double height;
+  final double left;
+  final double top;
+  final double widthFactor;
+  final double heightFactor;
+
+  const CroppedAsset(
+    this.asset, {
+    super.key,
+    required this.width,
+    required this.height,
+    required this.left,
+    required this.top,
+    required this.widthFactor,
+    required this.heightFactor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(clipBehavior: Clip.hardEdge, children: [
+        Positioned(
+          left: left * width,
+          top: top * height,
+          width: widthFactor * width,
+          height: heightFactor * height,
+          child: Image.asset(asset, fit: BoxFit.fill),
+        ),
+      ]),
+    );
+  }
+}
+
+/// Tombol utama berbentuk pil setinggi 44 (komponen "Buttons" Figma).
+class BrandButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+
+  const BrandButton({super.key, required this.label, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      decoration: const ShapeDecoration(
+        color: AppColors.brand,
+        shape: StadiumBorder(side: BorderSide(color: Color(0x1FFFFFFF), width: 2)),
+        shadows: [BoxShadow(color: Color(0x0D0A0D12), offset: Offset(0, 1), blurRadius: 2)],
+      ),
+      foregroundDecoration: const ShapeDecoration(
+        shape: StadiumBorder(side: BorderSide(color: Color(0x2E0A0D12))),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: Center(
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 16, height: 1.5, fontWeight: FontWeight.w600, color: Colors.white)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Chip filter setinggi 28 (komponen "Badge" Figma).
+class BadgeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget? leading;
+  final Widget? trailing;
+
+  const BadgeChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.leading,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final shape = StadiumBorder(
+        side: BorderSide(color: selected ? AppColors.brand : AppColors.border, width: 0.875));
+    return DecoratedBox(
+      decoration: const ShapeDecoration(
+        shape: StadiumBorder(),
+        shadows: [BoxShadow(color: Color(0x0D0A0D12), offset: Offset(0, 0.875), blurRadius: 0.875)],
+      ),
+      child: Material(
+        color: selected ? AppColors.brandSoft : Colors.white,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (leading != null) ...[leading!, const SizedBox(width: 4)],
+              Text(label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    fontWeight: FontWeight.w500,
+                    color: selected ? AppColors.brand : AppColors.textMedium,
+                  )),
+              if (trailing != null) ...[const SizedBox(width: 4), trailing!],
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Lembar bawah bergaya Figma: pegangan, tombol tutup (X), dan judul.
+Future<T?> showDesignSheet<T>(
+  BuildContext context, {
+  required String title,
+  required WidgetBuilder builder,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    barrierColor: const Color(0xB3000000),
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
+      child: DefaultTextStyle.merge(
+        style: figmaTextStyle,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 8),
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 4,
+                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 56,
+                child: Row(children: [
+                  const SizedBox(width: 16),
+                  IconButton(
+                    tooltip: 'Tutup',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const AppIcon('x', color: AppColors.textLight),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textMedium)),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 4),
+              builder(sheetContext),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

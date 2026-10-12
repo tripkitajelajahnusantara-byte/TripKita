@@ -58,7 +58,7 @@ func (r *providerRepository) FindPublicByID(id uint) (*models.PublicProviderProf
 	var profile models.PublicProviderProfile
 	err := r.db.Table("providers AS p").
 		Select(`p.id, p.business_name, p.business_category, p.operational_province,
-			p.operational_city, p.description, p.is_verified, p.created_at,
+			p.operational_city, p.description, p.profile_photo, p.is_verified, p.created_at,
 			COALESCE((
 				SELECT AVG(r.rating) FROM reviews r
 				JOIN packages pkg ON pkg.id = r.package_id
@@ -79,9 +79,10 @@ func (r *providerRepository) FindPublicByID(id uint) (*models.PublicProviderProf
 // Update menyimpan data profil. Status akun, verifikasi, dan potongan platform
 // hanya boleh diubah admin melalui update terarah, jadi kolom tersebut tidak
 // ikut disimpan: salinan lama yang dibaca sebelum admin menyetujui tidak boleh
-// mengembalikan akun ke PENDING.
+// mengembalikan akun ke PENDING. Foto profil juga hanya diubah lewat endpoint
+// fotonya sendiri agar simpan profil tidak mengembalikan foto lama.
 func (r *providerRepository) Update(provider *models.Provider) error {
-	return r.db.Omit("status", "is_verified", "verification_notes", "platform_fee_percent", "deleted_at").Save(provider).Error
+	return r.db.Omit("status", "is_verified", "verification_notes", "platform_fee_percent", "deleted_at", "profile_photo").Save(provider).Error
 }
 
 func (r *providerRepository) FindAllProviders() ([]models.Provider, error) {

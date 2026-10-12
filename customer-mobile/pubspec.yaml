@@ -19,6 +19,7 @@ dependencies:
   shared_preferences: ^2.3.3
   flutter_secure_storage: ^9.2.2
   file_picker: ^8.1.7
+  flutter_svg: ^2.2.2
 
 dev_dependencies:
   flutter_test:
@@ -29,3 +30,16 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/icons/
+  # Roboto statis dipaketkan karena google_fonts tidak punya bobot 600
+  # (SemiBold) yang dipakai desain Figma.
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700

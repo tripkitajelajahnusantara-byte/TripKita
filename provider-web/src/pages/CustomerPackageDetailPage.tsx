@@ -6,6 +6,7 @@ import { request } from '../utils/api';
 import { addDays, formatTripRange, jakartaToday, rangeAvailable, threeMonthLimit, tripEndDate, validDate } from '../utils/tripDates';
 import { TravelokaCalendarModal } from '../components/TravelokaCalendarModal';
 import { TripImage, PhotoPlaceholder } from '../components/TripImage';
+import { ProviderAvatar } from '../components/ProviderAvatar';
 import { getTripImages } from '../utils/tripImages';
 import { Skeleton } from '../components/Skeleton';
 import {
@@ -42,6 +43,7 @@ interface PublicProviderProfile {
   businessName: string;
   operationalCity: string;
   rating: number;
+  profilePhoto?: string;
 }
 
 export const CustomerPackageDetailPage: React.FC = () => {
@@ -908,7 +910,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                     {/* Logo Avatar */}
-                    <div 
+                    <ProviderAvatar
+                      photo={publicProvider?.profilePhoto}
                       onClick={() => {
                         if (pId && setSelectedProviderId) setSelectedProviderId(pId);
                         navigateTo('provider-public-profile');
@@ -929,7 +932,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                       }}
                     >
                       {currentProviderName.charAt(0)}
-                    </div>
+                    </ProviderAvatar>
 
                     {/* Info */}
                     <div style={{ flex: '1 1 200px' }}>

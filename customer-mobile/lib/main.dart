@@ -6,6 +6,7 @@ import 'package:customer_mobile/screens/booking_list_screen.dart';
 import 'package:customer_mobile/screens/home_screen.dart';
 import 'package:customer_mobile/screens/profile_screen.dart';
 import 'package:customer_mobile/screens/trip_list_screen.dart';
+import 'package:customer_mobile/screens/trip_planner_screen.dart';
 import 'package:customer_mobile/services/auth_session.dart';
 import 'package:customer_mobile/services/checkout_config.dart';
 import 'package:customer_mobile/services/wishlist_store.dart';
@@ -86,6 +87,7 @@ class AppShellState extends State<AppShell> {
   TripSearchParams _searchParams = const TripSearchParams();
   int _searchVersion = 0;
   int _bookingsVersion = 0;
+  bool _plannerOpened = false;
   int? _termsCheckedFor;
 
   @override
@@ -101,9 +103,13 @@ class AppShellState extends State<AppShell> {
     super.dispose();
   }
 
-  void selectTab(AppTab tab) {
+  Future<void> selectTab(AppTab tab) async {
+    // Rencana Trip tersimpan di akun, jadi customer perlu masuk lebih dulu.
+    if (tab == AppTab.rencanaTrip && !await ensureLoggedIn(context)) return;
+    if (!mounted) return;
     setState(() {
       if (tab == AppTab.booking) _bookingsVersion++;
+      if (tab == AppTab.rencanaTrip) _plannerOpened = true;
       _tab = tab;
     });
   }
@@ -167,6 +173,8 @@ class AppShellState extends State<AppShell> {
               isActive: _tab == AppTab.booking,
               onBrowseTrips: () => selectTab(AppTab.beranda),
             ),
+            // Dibangun saat tab pertama kali dibuka agar tidak memuat data sebelum masuk.
+            _plannerOpened ? const TripPlannerScreen() : const SizedBox.shrink(),
             ProfileScreen(onBrowseTrips: () => selectTab(AppTab.cariTrip)),
           ],
         ),
