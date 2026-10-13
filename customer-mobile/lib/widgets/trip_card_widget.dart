@@ -390,23 +390,36 @@ class _FavoriteHeart extends StatelessWidget {
 class _TripSummary extends StatelessWidget {
   final TripPackage pkg;
 
-  /// Tinggi tetap judul (3 baris) agar kartu sejajar di daftar mendatar.
-  final bool fixedTitleHeight;
+  /// Tinggi tetap judul & fasilitas (masing-masing 2 baris) agar kartu sejajar
+  /// di daftar mendatar.
+  final bool fixedHeight;
 
-  const _TripSummary(this.pkg, {required this.fixedTitleHeight});
+  const _TripSummary(this.pkg, {required this.fixedHeight});
 
   @override
   Widget build(BuildContext context) {
     final facilities = pkg.includedFacilities.take(3).toList();
     final title = Text(pkg.name,
-        maxLines: 3,
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontSize: 18, height: 26 / 18, fontWeight: FontWeight.w600, color: AppColors.heading));
+    final facilityText = Text.rich(
+      TextSpan(children: [
+        for (var i = 0; i < facilities.length; i++) ...[
+          if (i > 0)
+            const TextSpan(text: ' • ', style: TextStyle(fontSize: 14, height: 18 / 14, color: AppColors.borderStrong)),
+          TextSpan(text: facilities[i]),
+        ],
+      ]),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 12, height: 18 / 12, color: AppColors.textLight),
+    );
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${pkg.durationDays} hari',
           style: const TextStyle(fontSize: 12, height: 18 / 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
       const SizedBox(height: 2),
-      fixedTitleHeight ? SizedBox(height: 78, child: title) : title,
+      fixedHeight ? SizedBox(height: 52, child: title) : title,
       Row(children: [
         const AppIcon('map_pin', size: 14),
         const SizedBox(width: 4),
@@ -417,34 +430,18 @@ class _TripSummary extends StatelessWidget {
               style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMedium)),
         ),
       ]),
-      if (facilities.isNotEmpty) ...[
+      if (fixedHeight) ...[
         const SizedBox(height: 8),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 40),
-          child: Wrap(
-            clipBehavior: Clip.hardEdge,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              for (var i = 0; i < facilities.length; i++) ...[
-                if (i > 0)
-                  const SizedBox(
-                    width: 12,
-                    child: Text('•',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, height: 18 / 14, color: AppColors.borderStrong)),
-                  ),
-                Text(facilities[i],
-                    style: const TextStyle(fontSize: 12, height: 18 / 12, color: AppColors.textLight)),
-              ],
-            ],
-          ),
-        ),
+        SizedBox(height: 36, child: facilityText),
+      ] else if (facilities.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        facilityText,
       ],
     ]);
   }
 }
 
-/// Harga per pax rata kanan.
+/// Harga "mulai dari ... / orang" rata kanan.
 class _PriceTag extends StatelessWidget {
   final TripPackage pkg;
 
@@ -453,12 +450,19 @@ class _PriceTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-      Text(formatPrice(pkg.price),
+      const Text('mulai dari',
           textAlign: TextAlign.right,
-          style: const TextStyle(fontSize: 20, height: 24 / 20, fontWeight: FontWeight.w700, color: AppColors.brand)),
-      const Text('per pax',
-          textAlign: TextAlign.right,
-          style: TextStyle(fontSize: 14, height: 16 / 14, color: AppColors.textLight)),
+          style: TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textLight)),
+      Text.rich(
+        TextSpan(children: [
+          TextSpan(
+              text: formatPrice(pkg.price),
+              style: const TextStyle(fontSize: 20, height: 24 / 20, fontWeight: FontWeight.w700, color: AppColors.brand)),
+          const TextSpan(
+              text: ' / orang', style: TextStyle(fontSize: 14, height: 24 / 14, color: AppColors.textLight)),
+        ]),
+        textAlign: TextAlign.right,
+      ),
     ]);
   }
 }
@@ -489,7 +493,7 @@ class TripPopularCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              _TripSummary(pkg, fixedTitleHeight: true),
+              _TripSummary(pkg, fixedHeight: true),
               const SizedBox(height: 8),
               _PriceTag(pkg),
             ]),
@@ -522,7 +526,7 @@ class TripListCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _TripSummary(pkg, fixedTitleHeight: false),
+            _TripSummary(pkg, fixedHeight: false),
             if (dateLabel != null) ...[
               const SizedBox(height: 10),
               Container(
@@ -543,7 +547,10 @@ class TripListCard extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 2),
                         child: Text('$seats kuota tersisa',
                             style: const TextStyle(
-                                fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.errorStrong)),
+                                fontSize: 14,
+                                height: 20 / 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.errorStrong)),
                       )
                     : const SizedBox.shrink(),
               ),

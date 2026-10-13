@@ -29,6 +29,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<TripPackage>> _packages = PackageCatalog.load();
   final _scroll = ScrollController();
+  final _headerSearch = TextEditingController();
   bool _scrolled = false;
   String _popularType = officialTripTypes.first;
 
@@ -45,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _scroll.dispose();
+    _headerSearch.dispose();
     super.dispose();
   }
 
@@ -99,36 +101,76 @@ class _HomeScreenState extends State<HomeScreen> {
       height: top + 56,
       color: _scrolled ? AppColors.brand : Colors.transparent,
       padding: EdgeInsets.fromLTRB(16, top + 4, 16, 4),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const CroppedAsset(
-          'assets/images/logo_white.png',
-          width: 120.11,
-          height: 32,
-          left: -0.1606,
-          top: -0.0959,
-          widthFactor: 1.3139,
-          heightFactor: 1.2877,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        // Saat digulir, logo & lonceng diganti kolom pencarian sesuai desain Figma.
+        child: _scrolled ? _buildHeaderSearch() : _buildBrandRow(),
+      ),
+    );
+  }
+
+  Widget _buildHeaderSearch() {
+    const border = OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(9999)),
+      borderSide: BorderSide(color: Color(0x80FFFFFF)),
+    );
+    return Center(
+      child: TextField(
+        controller: _headerSearch,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (q) => widget.onSearch(TripSearchParams(destination: q.trim())),
+        cursorColor: Colors.white,
+        style: figmaTextStyle.copyWith(fontSize: 16, color: Colors.white),
+        decoration: InputDecoration(
+          isDense: true,
+          filled: true,
+          fillColor: const Color(0x1AFFFFFF),
+          contentPadding: const EdgeInsets.fromLTRB(0, 11, 16, 11),
+          prefixIcon: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: AppIcon('magnifying_glass', size: 20, color: Colors.white),
+          ),
+          prefixIconConstraints: const BoxConstraints(minWidth: 44),
+          hintText: 'Cari destinasi, nama trip (mis. Dieng)',
+          hintStyle: figmaTextStyle.copyWith(fontSize: 16, color: const Color(0xD9FFFFFF)),
+          border: border,
+          enabledBorder: border,
+          focusedBorder: border.copyWith(borderSide: const BorderSide(color: Colors.white)),
         ),
-        Semantics(
-          button: true,
-          label: 'Notifikasi',
-          child: ClipOval(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: Material(
-                color: const Color(0x80FFFFFF),
-                shape: const CircleBorder(side: BorderSide(color: Color(0x4DFFFFFF))),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: _openNotifications,
-                  child: const Padding(padding: EdgeInsets.all(10), child: AppIcon('bell', size: 20)),
-                ),
+      ),
+    );
+  }
+
+  Widget _buildBrandRow() {
+    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      const CroppedAsset(
+        'assets/images/logo_white.png',
+        width: 120.11,
+        height: 32,
+        left: -0.1606,
+        top: -0.0959,
+        widthFactor: 1.3139,
+        heightFactor: 1.2877,
+      ),
+      Semantics(
+        button: true,
+        label: 'Notifikasi',
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Material(
+              color: const Color(0x80FFFFFF),
+              shape: const CircleBorder(side: BorderSide(color: Color(0x4DFFFFFF))),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _openNotifications,
+                child: const Padding(padding: EdgeInsets.all(10), child: AppIcon('bell', size: 20)),
               ),
             ),
           ),
         ),
-      ]),
-    );
+      ),
+    ]);
   }
 
   Widget _buildHero(double top) {
