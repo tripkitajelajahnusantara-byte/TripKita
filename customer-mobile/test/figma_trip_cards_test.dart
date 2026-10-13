@@ -44,8 +44,32 @@ void main() {
     ));
     await tester.pump();
     expect(tester.takeException(), isNull);
-    expect(find.text('Rp775.000'), findsNWidgets(2));
+    expect(find.text('Rp775.000 / orang'), findsNWidgets(2));
+    expect(find.text('mulai dari'), findsNWidgets(2));
     expect(find.text('5 kuota tersisa'), findsOneWidget);
     expect(find.text('Open Trip • 3 hari'), findsNWidgets(2));
+  });
+
+  testWidgets('kartu Trip Populer sama tinggi walau judul & fasilitas beda panjang', (tester) async {
+    final short = TripPackage.fromJson({'id': 1, 'name': 'Trip Baturaden', 'price': 250000, 'duration': 2});
+    final long = TripPackage.fromJson({
+      'id': 2,
+      'name': 'Trip Wisata Kepulauan Banggai Laut dan Pantai Pasir Putih Edisi Liburan Panjang',
+      'price': 1250000,
+      'duration': 4,
+      'includedFacilities': 'Transportasi pulang pergi dari Luwuk\nPenginapan 3 malam\nMakan 3x sehari\nDokumentasi',
+    });
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TripPopularCard(key: const Key('short'), pkg: short, onTap: () {}),
+          TripPopularCard(key: const Key('long'), pkg: long, onTap: () {}),
+        ]),
+      ),
+    ));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.byKey(const Key('short'))).height,
+        tester.getSize(find.byKey(const Key('long'))).height);
   });
 }

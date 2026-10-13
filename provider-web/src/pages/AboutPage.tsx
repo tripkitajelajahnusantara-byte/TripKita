@@ -1,16 +1,18 @@
 import React from 'react';
 import { useCancellationRefundDays } from '../utils/checkoutConfig';
-import { 
-  Heart, 
-  Lightbulb, 
-  Smile, 
-  Award, 
-  ChevronUp, 
+import { useNavigation } from '../context/NavigationContext';
+import {
+  Heart,
+  Lightbulb,
+  Smile,
+  Award,
+  CheckCircle2,
   Compass
 } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
   const refundDays = useCancellationRefundDays();
+  const { navigateTo } = useNavigation();
   const values = [
     { icon: <Heart size={20} color="#ef4444" />, title: 'Keterbukaan', desc: 'Harga, jadwal, dan aturan refund ditampilkan sebelum Anda membayar. Ulasan hanya bisa ditulis oleh peserta yang sudah menyelesaikan trip.' },
     { icon: <Lightbulb size={20} color="#0284c7" />, title: 'Kemudahan', desc: 'Mitra mengelola paket, kuota, dan jadwal dari satu dasbor, sehingga tidak perlu mencatat pesanan secara manual.' },
@@ -19,24 +21,24 @@ export const AboutPage: React.FC = () => {
   ];
 
   const milestones = [
-    { year: '2026', title: 'TemenTrip diluncurkan', desc: 'TemenTrip mulai beroperasi dari Jakarta sebagai tempat memesan open trip dan paket wisata lainnya.' },
-    { year: '2026', title: 'Pembayaran penuh, dana mitra bertahap', desc: 'Pembayaran penuh di muka melalui transfer yang diverifikasi admin; buku besar TemenTrip menyediakan separuh hak mitra setelah pembayaran dan separuh sisanya setelah trip selesai.' },
-    { year: '2026', title: 'Membangun jaringan mitra', desc: 'Mengajak mitra lokal di berbagai daerah untuk mendaftar dan menerbitkan paket setelah diverifikasi admin.' },
+    { title: 'TemenTrip diluncurkan', desc: 'TemenTrip mulai beroperasi dari Jakarta sebagai tempat memesan open trip dan paket wisata lainnya.' },
+    { title: 'Pembayaran penuh, dana mitra bertahap', desc: 'Pembayaran penuh di muka melalui transfer yang diverifikasi admin; buku besar TemenTrip menyediakan separuh hak mitra setelah pembayaran dan separuh sisanya setelah trip selesai.' },
+    { title: 'Membangun jaringan mitra', desc: 'Mengajak mitra lokal di berbagai daerah untuk mendaftar dan menerbitkan paket setelah diverifikasi admin.' },
   ];
 
   const teamMembers = [
-    { name: 'Evan', role: 'Co-Founder & Product/Project Lead', initial: 'EV', dept: 'Co-Founder & Product' },
-    { name: 'Garry', role: 'Co-Founder & Tech Strategy Lead', initial: 'GA', dept: 'Co-Founder & Tech' },
-    { name: 'Liviani', role: 'Finance & Investor Relations Lead', initial: 'LI', dept: 'Finance & Investor Relations' },
-    { name: 'Kris', role: 'Provider & Partnership Lead', initial: 'KR', dept: 'Partnership' },
-    { name: 'Bakri', role: 'Legal & Compliance Lead', initial: 'BA', dept: 'Legal' },
-    { name: 'Cindy', role: 'Business Analyst Lead', initial: 'CI', dept: 'Analytics' },
-    { name: 'Farza', role: 'FSD & Documentation Lead', initial: 'FA', dept: 'Engineering' },
-    { name: 'Heaven', role: 'Marketing Lead', initial: 'HE', dept: 'Marketing' },
-    { name: 'Ilham', role: 'Customer Relations Lead', initial: 'IL', dept: 'Relations' },
-    { name: 'Kevin', role: 'QA Lead', initial: 'KE', dept: 'Quality Assurance' },
-    { name: 'Ando', role: 'Business Development Associate', initial: 'AN', dept: 'Business Dev' },
-    { name: 'Aan', role: 'Support Lead', initial: 'AA', dept: 'Customer Support' },
+    { name: 'Evan', role: 'Co-Founder & Product/Project Lead', initial: 'EV' },
+    { name: 'Gerry', role: 'Co-Founder & Tech Strategy Lead', initial: 'GE' },
+    { name: 'Liviani', role: 'Finance & Investor Relations Lead', initial: 'LI' },
+    { name: 'Kris', role: 'Provider & Partnership Lead', initial: 'KR' },
+    { name: 'Bakri', role: 'Legal & Compliance Lead', initial: 'BA' },
+    { name: 'Cindy', role: 'Business Analyst Lead', initial: 'CI' },
+    { name: 'Farza', role: 'FSD & Documentation Lead', initial: 'FA' },
+    { name: 'Heaven', role: 'Marketing Lead', initial: 'HE' },
+    { name: 'Ilham', role: 'Customer Relations Lead', initial: 'IL' },
+    { name: 'Kevin', role: 'QA Lead', initial: 'KE' },
+    { name: 'Ando', role: 'Business Development Associate', initial: 'AN' },
+    { name: 'Aan', role: 'Support Lead', initial: 'AA' },
   ];
 
   return (
@@ -65,6 +67,10 @@ export const AboutPage: React.FC = () => {
               <div className="intro-stat-item">
                 <h3>2026</h3>
                 <p>Tahun Peluncuran</p>
+              </div>
+              <div className="intro-stat-item">
+                <h3>Jakarta</h3>
+                <p>Basis Operasional</p>
               </div>
             </div>
           </div>
@@ -95,10 +101,17 @@ export const AboutPage: React.FC = () => {
             </div>
             <h3>Misi</h3>
             <ul>
-              <li>Menyediakan alat sederhana bagi mitra untuk mengelola paket, kuota, dan jadwal.</li>
-              <li>Memverifikasi setiap mitra sebelum paketnya bisa dipesan.</li>
-              <li>Menerapkan aturan refund yang sama untuk semua pesanan: pembatalan {refundDays ? `paling lambat ${refundDays} hari sebelum trip` : 'sebelum batas waktu kebijakan refund'} atau pembatalan oleh mitra, dana kembali penuh.</li>
-              <li>Mendorong lebih banyak orang berwisata di dalam negeri.</li>
+              {[
+                'Menyediakan alat sederhana bagi mitra untuk mengelola paket, kuota, dan jadwal.',
+                'Memverifikasi setiap mitra sebelum paketnya bisa dipesan.',
+                `Menerapkan aturan refund yang sama untuk semua pesanan: pembatalan ${refundDays ? `paling lambat ${refundDays} hari sebelum trip` : 'sebelum batas waktu kebijakan refund'} atau pembatalan oleh mitra, dana kembali penuh.`,
+                'Mendorong lebih banyak orang berwisata di dalam negeri.',
+              ].map((item) => (
+                <li key={item}>
+                  <CheckCircle2 size={18} color="#00c9a7" aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
@@ -132,20 +145,17 @@ export const AboutPage: React.FC = () => {
             <h2 className="section-title">Langkah awal di 2026</h2>
           </div>
 
-          <div className="timeline-list">
+          <ol className="timeline-list">
             {milestones.map((m, i) => (
-              <div key={i} className="timeline-item">
-                <div className="timeline-year">
-                  <span>{m.year}</span>
-                  <ChevronUp size={16} color="#00c9a7" />
-                </div>
+              <li key={i} className="timeline-item">
+                <div className="about-step" aria-hidden="true">{i + 1}</div>
                 <div className="timeline-content">
                   <h3>{m.title}</h3>
                   <p>{m.desc}</p>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 
@@ -161,16 +171,26 @@ export const AboutPage: React.FC = () => {
           <div className="unified-team-grid">
             {teamMembers.map((t, i) => (
               <div key={i} className="team-member-card">
-                <div className="member-avatar-circle">
+                <div className="member-avatar-circle" aria-hidden="true">
                   {t.initial}
                 </div>
                 <div className="member-info">
                   <h3>{t.name}</h3>
                   <p className="member-role">{t.role}</p>
-                  <span className="member-dept-badge">{t.dept}</span>
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="about-cta">
+        <div className="container about-cta-container">
+          <h2>Siap jalan bareng TemenTrip?</h2>
+          <p>Cari trip yang cocok, atau daftarkan usaha wisata Anda sebagai mitra.</p>
+          <div className="about-cta-actions">
+            <button type="button" className="btn btn-primary" onClick={() => navigateTo('cari-trip')}>Cari Trip</button>
+            <button type="button" className="btn btn-outline" onClick={() => navigateTo('partner-landing')}>Jadi Mitra</button>
           </div>
         </div>
       </section>
@@ -328,10 +348,18 @@ export const AboutPage: React.FC = () => {
         }
 
         .mission-card li {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
           font-size: 14px;
           color: #475569;
           margin-bottom: 12px;
           line-height: 1.5;
+        }
+
+        .mission-card li svg {
+          flex-shrink: 0;
+          margin-top: 1px;
         }
 
         /* Values */
@@ -369,13 +397,6 @@ export const AboutPage: React.FC = () => {
           border: 1px solid #e2e8f0;
           border-radius: 16px;
           padding: 28px 24px;
-          transition: all 0.2s ease;
-        }
-
-        .value-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.08);
-          border-color: #0284c7;
         }
 
         .value-icon-wrapper {
@@ -411,27 +432,42 @@ export const AboutPage: React.FC = () => {
         .timeline-list {
           max-width: 768px;
           margin: 32px auto 0 auto;
+          padding: 0;
+          list-style: none;
           display: flex;
           flex-direction: column;
           gap: 24px;
         }
 
         .timeline-item {
+          position: relative;
           display: flex;
-          gap: 24px;
+          gap: 20px;
         }
 
-        .timeline-year {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          min-width: 80px;
+        /* Garis penghubung antar langkah */
+        .timeline-item:not(:last-child)::before {
+          content: '';
+          position: absolute;
+          left: 17px;
+          top: 36px;
+          bottom: -24px;
+          width: 2px;
+          background: #bae6fd;
         }
 
-        .timeline-year span {
-          font-size: 18px;
+        .about-step {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: #0284c7;
+          color: #ffffff;
+          font-size: 15px;
           font-weight: 800;
-          color: #0284c7;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
         }
 
         .timeline-content {
@@ -452,6 +488,7 @@ export const AboutPage: React.FC = () => {
         .timeline-content p {
           font-size: 13px;
           color: #64748b;
+          line-height: 1.6;
           margin: 0;
         }
 
@@ -478,13 +515,6 @@ export const AboutPage: React.FC = () => {
           align-items: center;
           gap: 16px;
           box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .team-member-card:hover {
-          border-color: #00c9a7;
-          transform: translateY(-3px);
-          box-shadow: 0 12px 24px -6px rgba(0, 201, 167, 0.15);
         }
 
         .member-avatar-circle {
@@ -520,19 +550,39 @@ export const AboutPage: React.FC = () => {
           font-size: 12.5px;
           font-weight: 600;
           color: #475569;
-          margin: 0 0 6px 0;
+          margin: 0;
           line-height: 1.35;
         }
 
-        .member-dept-badge {
-          display: inline-block;
-          font-size: 10.5px;
-          font-weight: 700;
-          color: #0284c7;
-          background-color: #f0f9ff;
-          border: 1px solid #bae6fd;
-          padding: 2px 9px;
-          border-radius: 12px;
+        /* CTA */
+        .about-cta {
+          padding: 64px 0 80px;
+          background: #f8fafc;
+          text-align: center;
+        }
+
+        .about-cta-container {
+          max-width: 640px;
+        }
+
+        .about-cta h2 {
+          font-size: 28px;
+          font-weight: 800;
+          color: #0f172a;
+          margin-bottom: 8px;
+        }
+
+        .about-cta p {
+          font-size: 15px;
+          color: #64748b;
+          margin-bottom: 24px;
+        }
+
+        .about-cta-actions {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 12px;
         }
 
         @media (max-width: 900px) {
@@ -551,9 +601,47 @@ export const AboutPage: React.FC = () => {
         }
 
         @media (max-width: 600px) {
-          .unified-team-grid,
           .values-grid {
             grid-template-columns: 1fr;
+          }
+          .unified-team-grid {
+            gap: 12px;
+          }
+          .team-member-card {
+            flex-direction: column;
+            text-align: center;
+            padding: 16px 12px;
+            gap: 10px;
+          }
+          .member-info h3 {
+            white-space: normal;
+          }
+          .about-hero,
+          .about-intro,
+          .vision-mission-section,
+          .values-section,
+          .timeline-section,
+          .team-section {
+            padding: 48px 0;
+          }
+          .about-hero h1 {
+            font-size: 30px;
+          }
+          .intro-content h2,
+          .section-title {
+            font-size: 26px;
+          }
+          .section-header {
+            margin-bottom: 28px;
+          }
+          .vision-card, .mission-card {
+            padding: 24px;
+          }
+          .media-wrapper img {
+            height: 240px;
+          }
+          .about-cta-actions .btn {
+            flex: 1 1 140px;
           }
         }
       `}</style>
