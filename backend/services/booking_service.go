@@ -1309,6 +1309,17 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 				"/admin/bookings",
 			)
 		}
+		if newS == models.StatusPaymentReview && s.emailService != nil && database.DB != nil {
+			var adminEmails []string
+			if err := database.DB.Model(&models.Provider{}).
+				Where("role = ? AND status = ?", "ADMIN", "APPROVED").
+				Pluck("email", &adminEmails).Error; err != nil {
+				log.Printf("[Email] Gagal memuat email admin untuk booking %s: %v", b.BookingCode, err)
+			}
+			for _, to := range adminEmails {
+				sendEmail(s.emailService.SendAdminPaymentReviewEmail(to, &b, packageName))
+			}
+		}
 	}(*booking, oldStatus, newStatus)
 }
 

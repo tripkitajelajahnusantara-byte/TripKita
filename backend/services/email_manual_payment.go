@@ -80,6 +80,34 @@ func (s *EmailService) SendPaymentProofReceivedEmail(b *models.Booking) error {
 	return s.sendMailWithAttachment(b.CustomerEmail, subject, body, nil, "")
 }
 
+// SendAdminPaymentReviewEmail memberi tahu admin lewat email bahwa ada bukti
+// transfer yang menunggu verifikasi, agar tidak hanya bergantung pada lonceng.
+func (s *EmailService) SendAdminPaymentReviewEmail(to string, b *models.Booking, packageName string) error {
+	if strings.TrimSpace(to) == "" {
+		return nil
+	}
+	reviewBy := "1×24 jam"
+	if b.PaymentReviewDeadline != nil {
+		reviewBy = formatJakartaTime(*b.PaymentReviewDeadline)
+	}
+	subject := fmt.Sprintf("Verifikasi Pembayaran - Pesanan #%s TemenTrip", b.BookingCode)
+	details := fmt.Sprintf(`<table style="width:100%%;font-size:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px">
+<tr><td style="color:#64748b">Kode booking</td><td><strong>%s</strong></td></tr>
+<tr><td style="color:#64748b">Paket</td><td>%s</td></tr>
+<tr><td style="color:#64748b">Pelanggan</td><td>%s (%s)</td></tr>
+<tr><td style="color:#64748b">Total transfer</td><td><strong style="color:#0284c7">Rp %s</strong></td></tr>
+<tr><td style="color:#64748b">Batas verifikasi</td><td><strong style="color:#c2410c">%s</strong></td></tr>
+</table>`,
+		html.EscapeString(b.BookingCode), html.EscapeString(packageName),
+		html.EscapeString(b.CustomerName), html.EscapeString(b.CustomerEmail),
+		formatIDRNumber(b.TotalPrice), reviewBy)
+	body := manualPaymentEmailLayout("#2563eb", "Bukti transfer menunggu verifikasi",
+		fmt.Sprintf("Pelanggan telah mengunggah bukti transfer untuk pesanan <strong>#%s</strong>. Periksa mutasi rekening lalu setujui atau tolak pembayaran di panel admin.", html.EscapeString(b.BookingCode)),
+		details, strings.TrimRight(s.cfg.FrontendURL, "/")+"/#/admin/dashboard", "Buka Panel Admin",
+		"Email ini dikirim otomatis ke seluruh akun admin aktif.")
+	return s.sendMailWithAttachment(to, subject, body, nil, "")
+}
+
 // SendPaymentProofRejectedEmail dikirim saat admin menolak bukti transfer.
 func (s *EmailService) SendPaymentProofRejectedEmail(b *models.Booking, deadline time.Time) error {
 	if strings.TrimSpace(b.CustomerEmail) == "" {
