@@ -1310,10 +1310,13 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 			)
 		}
 		if newS == models.StatusPaymentReview && s.emailService != nil && database.DB != nil {
+			// Email login (users.email) adalah kotak masuk asli admin; providers.email
+			// akun admin bawaan masih alamat seed admin@tementrip.id.
 			var adminEmails []string
-			if err := database.DB.Model(&models.Provider{}).
-				Where("role = ? AND status = ?", "ADMIN", "APPROVED").
-				Pluck("email", &adminEmails).Error; err != nil {
+			if err := database.DB.Model(&models.User{}).
+				Joins("JOIN providers ON providers.id = users.provider_id").
+				Where("providers.role = ? AND providers.status = ? AND providers.deleted_at IS NULL", "ADMIN", "APPROVED").
+				Pluck("users.email", &adminEmails).Error; err != nil {
 				log.Printf("[Email] Gagal memuat email admin untuk booking %s: %v", b.BookingCode, err)
 			}
 			for _, to := range adminEmails {
