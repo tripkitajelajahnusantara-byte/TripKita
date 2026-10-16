@@ -390,8 +390,8 @@ class _FavoriteHeart extends StatelessWidget {
 class _TripSummary extends StatelessWidget {
   final TripPackage pkg;
 
-  /// Tinggi tetap judul & fasilitas (masing-masing 2 baris) agar kartu sejajar
-  /// di daftar mendatar.
+  /// Tinggi tetap judul (3 baris) & fasilitas (2 baris) agar kartu sejajar di
+  /// daftar mendatar.
   final bool fixedHeight;
 
   const _TripSummary(this.pkg, {required this.fixedHeight});
@@ -400,7 +400,7 @@ class _TripSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final facilities = pkg.includedFacilities.take(3).toList();
     final title = Text(pkg.name,
-        maxLines: 2,
+        maxLines: 3,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontSize: 18, height: 26 / 18, fontWeight: FontWeight.w600, color: AppColors.heading));
     final facilityText = Text.rich(
@@ -419,7 +419,7 @@ class _TripSummary extends StatelessWidget {
       Text('${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${pkg.durationDays} hari',
           style: const TextStyle(fontSize: 12, height: 18 / 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
       const SizedBox(height: 2),
-      fixedHeight ? SizedBox(height: 52, child: title) : title,
+      fixedHeight ? SizedBox(height: 78, child: title) : title,
       Row(children: [
         const AppIcon('map_pin', size: 14),
         const SizedBox(width: 4),

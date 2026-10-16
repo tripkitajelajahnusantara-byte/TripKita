@@ -36,3 +36,28 @@ func TestManualPaymentInstructionEmailContainsTransferDetails(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminPaymentReviewEmailContainsBookingAndPanelLink(t *testing.T) {
+	var sent string
+	var recipients []string
+	email := NewEmailService(&config.Config{
+		SMTPHost: "smtp.example.test", SMTPPort: "587", SMTPUser: "user", SMTPPass: "pass", SMTPFrom: "no-reply@example.test",
+		FrontendURL: "https://app.example.com/",
+	}, nil)
+	email.mailSender = func(addr string, auth smtp.Auth, from string, to []string, message []byte) error {
+		sent, recipients = string(message), to
+		return nil
+	}
+	booking := &models.Booking{BookingCode: "TK-1", CustomerName: "Budi", CustomerEmail: "budi@example.com", TotalPrice: 500000}
+	if err := email.SendAdminPaymentReviewEmail("admin@example.com", booking, "Bromo"); err != nil {
+		t.Fatal(err)
+	}
+	if len(recipients) != 1 || recipients[0] != "admin@example.com" {
+		t.Fatalf("penerima salah: %v", recipients)
+	}
+	for _, want := range []string{"TK-1", "Bromo", "budi@example.com", "https://app.example.com/#/admin/dashboard"} {
+		if !strings.Contains(sent, want) {
+			t.Errorf("email tidak memuat %q", want)
+		}
+	}
+}
