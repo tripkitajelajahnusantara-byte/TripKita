@@ -7,6 +7,7 @@ import { Calendar, Clock, CheckCircle2, XCircle, AlertCircle, MessageSquare, Sta
 import { Skeleton } from '../components/Skeleton';
 import { RescheduleOfferCard } from '../components/RescheduleOfferCard';
 import { BookingPickupSummary } from '../components/TripPickup';
+import { bookingAddOns } from '../utils/pricing';
 
 interface BookingItem {
   pickupMode?: string;
@@ -28,6 +29,9 @@ interface BookingItem {
   tripDate: string;
   guests: number;
   totalPrice: number;
+  unitCount?: number;
+  unitName?: string;
+  addOns?: unknown;
   paymentMethod: string;
   status: string;
   createdAt: string;
@@ -45,6 +49,20 @@ interface BookingItem {
   // atau keadaan kahar beserta penjelasan penyelenggara.
   cancellationReason?: string;
 }
+
+// Unit (mis. 2 Jeep) dan fasilitas tambahan yang tersimpan pada booking.
+const BookingExtras: React.FC<{ booking: BookingItem; formatIDR: (n: number) => string }> = ({ booking, formatIDR }) => {
+  const addOns = bookingAddOns(booking);
+  if (!booking.unitCount && addOns.length === 0) return null;
+  return (
+    <div style={{ marginTop: '6px', fontSize: '12.5px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      {!!booking.unitCount && <span>Unit: {booking.unitCount} {booking.unitName || 'Unit'}</span>}
+      {addOns.map((a) => (
+        <span key={a.id || a.name}>+ {a.name}{a.perPerson ? ` (×${booking.guests} orang)` : ''} · {formatIDR(a.subtotal)}</span>
+      ))}
+    </div>
+  );
+};
 
 const getWhatsAppURL = (phone?: string): string | null => {
   if (!phone) return null;
@@ -552,6 +570,7 @@ export const CustomerHistoryPage: React.FC = () => {
                     <span>Tanggal: {new Date(trackedBooking.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                     <span>Peserta: {trackedBooking.guests} orang</span>
                   </div>
+                  <BookingExtras booking={trackedBooking} formatIDR={formatIDR} />
                 </div>
 
                 {trackedBooking.status === 'RESCHEDULE_OFFERED' && (
@@ -742,6 +761,7 @@ export const CustomerHistoryPage: React.FC = () => {
                       <span>Tanggal: {formattedTripDate}</span>
                       <span>Peserta: {booking.guests} orang</span>
                     </div>
+                    <BookingExtras booking={booking} formatIDR={formatIDR} />
                   </div>
 
                   {booking.pickupMode === 'FLEXIBLE' && <details style={{ margin: '12px 0' }}>

@@ -553,6 +553,23 @@ class _BookingCard extends StatelessWidget {
         const SizedBox(height: 4),
         Text('Tanggal: $tripDate   Peserta: ${b.guests} orang',
             style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+        if (b.unitCount > 0) ...[
+          const SizedBox(height: 2),
+          Text(
+              'Kebutuhan unit: ${b.unitCount} ${b.unitName.isEmpty ? 'Unit' : b.unitName}',
+              style:
+                  const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+        ],
+        if (b.addOns.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          const Text('Layanan Tambahan',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textMedium)),
+          for (final a in b.addOns)
+            PriceRow(a.name, '+${formatIDR(a.subtotal)}'),
+        ],
         if (b.status == BookingStatus.rescheduleOffered &&
             b.rescheduleDate != null) ...[
           const SizedBox(height: 14),

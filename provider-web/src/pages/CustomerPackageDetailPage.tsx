@@ -17,6 +17,7 @@ import {
 import { isCustomerVisiblePackage, isPackageExpired } from '../utils/publicPackages';
 import { upcomingDepartures } from '../utils/departures';
 import { FlexiblePickupDetails } from '../components/TripPickup';
+import { addOnSubtotal, basePrice, isPerUnit, packageAddOns, selectAddOns, unitName, unitsFor } from '../utils/pricing';
 
 // Ambil bagian tanggal (YYYY-MM-DD) dari string tanggal paket, '' bila tidak valid
 const normalizeIsoDate = (value: unknown) => {
@@ -24,12 +25,6 @@ const normalizeIsoDate = (value: unknown) => {
   const iso = value.trim().slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : '';
 };
-
-interface AddOn {
-  id: string;
-  name: string;
-  price: number;
-}
 
 interface PackageReview {
   id: number;
@@ -233,8 +228,8 @@ export const CustomerPackageDetailPage: React.FC = () => {
   // URL di-resolve ke origin backend (dan host lokal lama diarahkan ulang).
   const photos = getGalleryImages();
 
-  // Add-on dinonaktifkan sampai katalog dan harga dikelola dari database.
-  const addOnsList: AddOn[] = [];
+  // Katalog add-on diatur mitra; harga final dihitung ulang backend saat checkout.
+  const addOnsList = packageAddOns(pkg);
 
   const departureOptions = isOpenTrip ? upcomingDepartures(pkg, todayIso) : [];
   const selectedDeparture = departureOptions.find(d => d.date === customStartDate)
@@ -304,10 +299,18 @@ export const CustomerPackageDetailPage: React.FC = () => {
     );
   };
 
-  const totalAddOnsCost = selectedAddOnIds.reduce((sum, id) => {
-    const item = addOnsList.find(a => a.id === id);
-    return sum + (item ? item.price : 0);
-  }, 0);
+  const selectedAddOns = selectAddOns(pkg, selectedAddOnIds, guestsCount);
+  const totalAddOnsCost = selectedAddOns.reduce((sum, a) => sum + a.subtotal, 0);
+  // Harga per unit (mis. per jeep): satu unit dibayar penuh berapa pun pesertanya.
+  const perUnit = isPerUnit(pkg);
+  const pkgUnitName = unitName(pkg);
+  const unitCapacity = Number(pkg.unitCapacity) || 0;
+  const unitCount = unitsFor(pkg, guestsCount);
+  const tripBasePrice = basePrice(pkg, guestsCount);
+  const estimatedTotal = tripBasePrice + totalAddOnsCost;
+  const perPersonShare = Math.round(tripBasePrice / Math.max(1, guestsCount));
+  // Kursi kosong di unit terakhir yang masih bisa diisi tanpa menambah unit.
+  const freeSeatsInUnit = perUnit ? Math.max(0, Math.min(unitCount * unitCapacity, availableSeats) - guestsCount) : 0;
 
   const getDynamicItinerary = () => {
     if (pkg.itinerary) {
@@ -429,13 +432,12 @@ export const CustomerPackageDetailPage: React.FC = () => {
       showAlert({ type: 'warning', title: 'Pilih Tanggal Keberangkatan', message: 'Silakan pilih tanggal keberangkatan terlebih dahulu.' });
       return;
     }
-    const selectedAddOnObjects = addOnsList.filter(a => selectedAddOnIds.includes(a.id));
     const updatedPkg = {
       ...pkg,
       bookingGuests: guestsCount,
       bookingDate: finalBookingDate,
       ...(!isOpenTrip ? { bookingEndDate: customEndDate } : {}),
-      selectedAddOns: selectedAddOnObjects
+      selectedAddOns
     };
     setSelectedPackageForDetail(updatedPkg);
     navigateTo('customer-checkout');
@@ -806,12 +808,13 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 <PlusCircle size={18} color="#007bff" /> Layanan Tambahan (Add-On Opsional)
               </h2>
               <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
-                Pilih fasilitas ekstra untuk melengkapi petualangan Anda (opsional).
+                Pilih fasilitas ekstra untuk melengkapi petualangan Anda (opsional). Harganya otomatis ditambahkan ke total.
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {addOnsList.map((addon) => {
                   const isChecked = selectedAddOnIds.includes(addon.id);
+                  const subtotal = addOnSubtotal(addon, guestsCount);
                   return (
                     <label 
                       key={addon.id} 
@@ -836,13 +839,21 @@ export const CustomerPackageDetailPage: React.FC = () => {
                           onChange={() => toggleAddOn(addon.id)}
                           style={{ width: '16px', height: '16px', accentColor: '#007bff', cursor: 'pointer', flexShrink: 0 }}
                         />
-                        <span style={{ fontSize: '13.5px', fontWeight: '600', color: '#0f172a', wordBreak: 'break-word' }}>
-                          {addon.name}
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: '13.5px', fontWeight: '600', color: '#0f172a', wordBreak: 'break-word' }}>
+                            {addon.name}
+                          </span>
+                          <span style={{ display: 'block', fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                            {formatIDR(addon.price)} {addon.perPerson ? '/ orang' : '/ pesanan'}
+                          </span>
                         </span>
                       </div>
-                      <strong style={{ fontSize: '13.5px', color: '#007bff', flexShrink: 0, marginLeft: 'auto' }}>
-                        +{formatIDR(addon.price)}
-                      </strong>
+                      <span style={{ flexShrink: 0, marginLeft: 'auto', textAlign: 'right' }}>
+                        <strong style={{ display: 'block', fontSize: '13.5px', color: '#007bff' }}>+{formatIDR(subtotal)}</strong>
+                        {addon.perPerson && (
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>untuk {guestsCount} orang</span>
+                        )}
+                      </span>
                     </label>
                   );
                 })}
@@ -1140,10 +1151,15 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Price Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
               <div>
-                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', display: 'block' }}>Harga per orang</span>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', display: 'block' }}>{perUnit ? `Harga per ${pkgUnitName}` : 'Harga per orang'}</span>
                 <div style={{ fontSize: '24px', fontWeight: '800', color: '#007bff' }}>
                   {formatIDR(pkg.price)}
                 </div>
+                {perUnit && (
+                  <span style={{ fontSize: '11.5px', color: '#64748b', display: 'block', marginTop: '2px', lineHeight: 1.5 }}>
+                    Maks. {unitCapacity} orang per {pkgUnitName} · ≈ {formatIDR(perPersonShare)}/orang untuk {guestsCount} peserta
+                  </span>
+                )}
               </div>
               <span style={{ backgroundColor: '#e0f2fe', color: '#0284c7', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>
                 {pkg.tripType || 'Open Trip'} • Min. {minRequiredGuests} Pax
@@ -1343,21 +1359,36 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
             {/* Total Summary */}
             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: '#64748b', marginBottom: '4px' }}>
-                <span>Paket ({guestsCount}x)</span>
-                <span>{formatIDR(pkg.price * guestsCount)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12.5px', color: '#64748b', marginBottom: '4px' }}>
+                <span>{perUnit ? `${unitCount} ${pkgUnitName} × ${formatIDR(pkg.price)}` : `${formatIDR(pkg.price)} × ${guestsCount} orang`}</span>
+                <span>{formatIDR(tripBasePrice)}</span>
               </div>
-              
-              {totalAddOnsCost > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: '#007bff', marginBottom: '4px' }}>
-                  <span>Add-On Tambahan</span>
-                  <span>+{formatIDR(totalAddOnsCost)}</span>
+              {perUnit && (
+                <div style={{ fontSize: '11.5px', color: '#64748b', marginBottom: '6px', lineHeight: 1.5 }}>
+                  <span style={{ display: 'block' }}>{guestsCount} peserta · ≈ {formatIDR(perPersonShare)} / orang</span>
+                  {unitCount > 1 && (
+                    <span style={{ display: 'block', color: '#b45309', fontWeight: '600' }}>
+                      {guestsCount} peserta melebihi kapasitas 1 {pkgUnitName} ({unitCapacity} orang), jadi dibutuhkan {unitCount} {pkgUnitName}.
+                    </span>
+                  )}
+                  {freeSeatsInUnit > 0 && (
+                    <span style={{ display: 'block', color: '#059669', fontWeight: '600' }}>
+                      Masih muat {freeSeatsInUnit} orang lagi tanpa biaya tambahan.
+                    </span>
+                  )}
                 </div>
               )}
 
+              {selectedAddOns.map((addon) => (
+                <div key={addon.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12.5px', color: '#007bff', marginBottom: '4px' }}>
+                  <span>{addon.name}{addon.perPerson ? ` (${guestsCount}x)` : ''}</span>
+                  <span>+{formatIDR(addon.subtotal)}</span>
+                </div>
+              ))}
+
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '800', color: '#0f172a', borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '4px' }}>
                 <span>Total Estimasi</span>
-                <span style={{ color: '#007bff' }}>{formatIDR(pkg.price * guestsCount + totalAddOnsCost)}</span>
+                <span style={{ color: '#007bff' }}>{formatIDR(estimatedTotal)}</span>
               </div>
             </div>
             </>)}
@@ -1413,9 +1444,11 @@ export const CustomerPackageDetailPage: React.FC = () => {
         className="mobile-only-bottom-bar"
       >
         <div>
-          <span style={{ fontSize: '11px', color: '#64748b', display: 'block', fontWeight: '600' }}>Total ({guestsCount}x)</span>
+          <span style={{ fontSize: '11px', color: '#64748b', display: 'block', fontWeight: '600' }}>
+            Total ({guestsCount} orang{perUnit ? ` · ${unitCount} ${pkgUnitName}` : ''})
+          </span>
           <span style={{ fontSize: '17px', fontWeight: '800', color: '#007bff' }}>
-            {formatIDR(pkg.price * guestsCount + totalAddOnsCost)}
+            {formatIDR(estimatedTotal)}
           </span>
         </div>
 

@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Clock3, Copy, FileText, FileUp, LoaderCirc
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { fetchCheckoutConfig, type CheckoutConfig } from '../utils/checkoutConfig';
+import { bookingAddOns } from '../utils/pricing';
 
 const formatIDR = (value: number) => new Intl.NumberFormat('id-ID', {
   style: 'currency', currency: 'IDR', minimumFractionDigits: 0,
@@ -286,7 +287,10 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
             <div style={{ minWidth: 0 }}>
               <span style={{ fontSize: 12, color: '#64748b' }}>KODE BOOKING</span>
               <h1 style={{ margin: '4px 0', fontSize: 22, wordBreak: 'break-all' }}>{bookingCode}</h1>
-              <p style={{ margin: 0, color: '#64748b' }}>{booking.packageName || booking.packageDetails?.name || 'Paket Wisata'} · {booking.guests} peserta</p>
+              <p style={{ margin: 0, color: '#64748b' }}>{booking.packageName || booking.packageDetails?.name || 'Paket Wisata'} · {booking.guests} peserta{Number(booking.unitCount) > 0 ? ` · ${booking.unitCount} ${booking.unitName || 'Unit'}` : ''}</p>
+              {bookingAddOns(booking).map((a) => (
+                <p key={a.id || a.name} style={{ margin: '2px 0 0', fontSize: 13, color: '#475569' }}>+ {a.name}{a.perPerson ? ` (×${booking.guests} orang)` : ''} · {formatIDR(a.subtotal)}</p>
+              ))}
             </div>
             <div>
               <span style={{ fontSize: 12, color: '#64748b' }}>TOTAL YANG HARUS DITRANSFER</span>

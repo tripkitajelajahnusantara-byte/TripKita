@@ -12,6 +12,7 @@ import {
 } from '../components/MeetingPointMap';
 import { fetchCheckoutConfig } from '../utils/checkoutConfig';
 import { FlexiblePickupDetails, ParticipantPickupInput } from '../components/TripPickup';
+import { addOnSubtotal, basePrice, isPerUnit, unitName, unitsFor, type PackageAddOn } from '../utils/pricing';
 
 // Tanggal hari ini (zona waktu lokal) dalam format YYYY-MM-DD untuk validasi tanggal lahir
 const getTodayIso = () => {
@@ -208,9 +209,13 @@ export const CustomerBookingPage: React.FC = () => {
   const packageMaxAge = Number(pkg.maxAge) > 0 ? Number(pkg.maxAge) : 0;
   const meetingPointCoordinates = getMeetingPointCoordinates(pkg);
   const meetingPointAddress = getMeetingPointAddress(pkg);
-  const selectedAddOns = pkg.selectedAddOns || [];
-  const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
-  const totalCost = (pkg.price * guestsCount) + addOnsTotal + (serviceFee || 0);
+  // Subtotal add-on per orang dihitung ulang dari jumlah peserta saat ini.
+  const selectedAddOns = ((pkg.selectedAddOns || []) as PackageAddOn[]).map((a) => ({ ...a, subtotal: addOnSubtotal(a, guestsCount) }));
+  const addOnsTotal = selectedAddOns.reduce((sum, a) => sum + a.subtotal, 0);
+  const perUnit = isPerUnit(pkg);
+  const unitCount = unitsFor(pkg, guestsCount);
+  const baseCost = basePrice(pkg, guestsCount);
+  const totalCost = baseCost + addOnsTotal + (serviceFee || 0);
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -763,15 +768,20 @@ export const CustomerBookingPage: React.FC = () => {
             )}
 
             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b' }}>
-                <span>Harga ({guestsCount}x)</span>
-                <span>{formatIDR(pkg.price * guestsCount)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '13px', color: '#64748b' }}>
+                <span>{perUnit ? `${unitCount} ${unitName(pkg)} × ${formatIDR(pkg.price)}` : `${formatIDR(pkg.price)} × ${guestsCount} orang`}</span>
+                <span>{formatIDR(baseCost)}</span>
               </div>
+              {perUnit && (
+                <span style={{ fontSize: '11.5px', color: '#64748b', marginTop: '-4px' }}>
+                  ≈ {formatIDR(Math.round(baseCost / Math.max(1, guestsCount)))} / orang untuk {guestsCount} peserta
+                </span>
+              )}
 
-              {selectedAddOns.map((addon: any, idx: number) => (
-                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#007bff' }}>
-                  <span>Add-On: {addon.name}</span>
-                  <span style={{ fontWeight: '600' }}>+{formatIDR(addon.price)}</span>
+              {selectedAddOns.map((addon) => (
+                <div key={addon.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '13px', color: '#007bff' }}>
+                  <span>Add-On: {addon.name}{addon.perPerson ? ` (${guestsCount}x)` : ''}</span>
+                  <span style={{ fontWeight: '600' }}>+{formatIDR(addon.subtotal)}</span>
                 </div>
               ))}
 

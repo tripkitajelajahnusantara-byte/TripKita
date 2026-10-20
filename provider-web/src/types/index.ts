@@ -1,3 +1,5 @@
+import type { BookingAddOn } from '../utils/pricing';
+
 export type Route = 
   | 'beranda' 
   | 'tentang-kami' 
@@ -83,6 +85,10 @@ export interface Booking {
   tripDate: string;
   guests: number;
   totalPrice: string;
+  /** Jumlah unit (mis. jeep) yang dipesan; 0 berarti harga per orang. */
+  unitCount?: number;
+  unitName?: string;
+  addOns?: BookingAddOn[];
   paymentMethod?: string;
   createdAt?: string;
   paidAt?: string;

@@ -17,7 +17,9 @@ import {
   CheckCircle,
   XCircle,
   UploadCloud,
-  LoaderCircle
+  LoaderCircle,
+  Users,
+  Car
 } from 'lucide-react';
 
 import { request } from '../utils/api';
@@ -32,6 +34,7 @@ import { getMeetingPointCoordinates, type MeetingPointCoordinates } from '../com
 import { MeetingPointPicker } from '../components/MeetingPointPicker';
 import { PickupModeEditor } from '../components/TripPickup';
 import { OpenTripScheduleEditor } from '../components/OpenTripScheduleEditor';
+import { basePrice, packageAddOns, unitsFor } from '../utils/pricing';
 
 /** Open Trip berangkat bersama pada jadwal tetap; tipe lain eksklusif per tanggal. */
 function isOpenTripType(tripType: string): boolean {
@@ -44,6 +47,11 @@ function suggestedMinimumGuests(tripType: string): string {
   if (tripType === 'Corporate') return '10';
   return '2';
 }
+// Pilihan cepat nama unit untuk harga per unit.
+const UNIT_PRESETS = ['Jeep', 'Mobil', 'Paket', 'Kapal', 'Villa'];
+const MAX_ADD_ONS = 20;
+const formatRupiah = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value);
+
 export const CATEGORIES = OFFICIAL_CATEGORIES;
 export const TRIP_TYPES = OFFICIAL_TRIP_TYPES;
 
@@ -120,6 +128,12 @@ export const AddPackagePage: React.FC = () => {
   const [price, setPrice] = useState('');
   const [quotaMin, setQuotaMin] = useState('');
   const [quotaMax, setQuotaMax] = useState('');
+  // Skema harga: per orang, atau per unit (jeep/mobil/paket) untuk paket selain Open Trip.
+  const [pricingMode, setPricingMode] = useState<'PER_PERSON' | 'PER_UNIT'>('PER_PERSON');
+  const [unitNameInput, setUnitNameInput] = useState('');
+  const [unitCapacity, setUnitCapacity] = useState('');
+  // Fasilitas tambahan berbayar yang dapat dipilih customer saat checkout.
+  const [addOns, setAddOns] = useState<{ id: string; name: string; price: string; perPerson: boolean }[]>([]);
   // Backend menyimpan opsi minimum melalui minGuests; nilai 1 berarti tanpa batas khusus.
   const hasCustomBookingLimits = useMinimumBooking && Number(minGuests) !== 1;
   const effectiveMaxGuests = hasCustomBookingLimits ? maxGuests : quotaMax;
@@ -129,6 +143,19 @@ export const AddPackagePage: React.FC = () => {
   const [availabilityDates, setAvailabilityDates] = useState<string[]>([]);
   const [schedule, setSchedule] = useState('');
   const requiresMinimumQuota = isOpenTripType(tripType);
+  const isUnitPricing = pricingMode === 'PER_UNIT' && !requiresMinimumQuota;
+  const unitLabel = unitNameInput.trim() || 'Unit';
+  const updateAddOn = (idx: number, patch: Partial<(typeof addOns)[number]>) =>
+    setAddOns(prev => prev.map((addOn, i) => (i === idx ? { ...addOn, ...patch } : addOn)));
+  // Simulasi harga per unit: minimum peserta, satu unit penuh, unit berikutnya, dan maksimum per booking.
+  const unitPreviewPackage = { price: Number(price), pricingMode: 'PER_UNIT', unitCapacity: Number(unitCapacity) };
+  const previewMinGuests = Math.max(1, useMinimumBooking ? Number(minGuests) || 1 : 1);
+  const previewMaxGuests = Number(effectiveMaxGuests) || 0;
+  const unitPreviewGuests = isUnitPricing && Number(price) > 0 && Number(unitCapacity) > 0
+    ? [...new Set([previewMinGuests, Number(unitCapacity), Number(unitCapacity) + 1, previewMaxGuests])]
+        .filter(guests => guests >= previewMinGuests && (!previewMaxGuests || guests <= previewMaxGuests))
+        .sort((a, b) => a - b)
+    : [];
   // Unggah foto dan simpan paket berbagi satu kunci: paket tidak boleh disimpan
   // selagi foto masih diunggah (foto baru belum masuk payload), dan sebaliknya.
   const { pending, isBusy, run } = useActionLock();
@@ -227,6 +254,10 @@ export const AddPackagePage: React.FC = () => {
             setMapPosition(savedCoordinates);
           }
           setPrice(pkg.price ? String(pkg.price) : '');
+          setPricingMode(pkg.pricingMode === 'PER_UNIT' ? 'PER_UNIT' : 'PER_PERSON');
+          setUnitNameInput(pkg.unitName || '');
+          setUnitCapacity(pkg.unitCapacity ? String(pkg.unitCapacity) : '');
+          setAddOns(packageAddOns(pkg).map(addOn => ({ ...addOn, price: String(addOn.price) })));
           const loadedTripType = pkg.tripType || TRIP_TYPES[0] || '';
           setQuotaMin(isOpenTripType(loadedTripType) && pkg.quotaMin ? String(pkg.quotaMin) : '');
           setQuotaMax(pkg.quotaMax ? String(pkg.quotaMax) : '');
@@ -535,6 +566,20 @@ export const AddPackagePage: React.FC = () => {
 	  showValidation('Harga atau kuota paket melebihi batas yang diizinkan.', 'pricing');
 	  return;
 	}
+	// Backend memvalidasi skema harga dan fasilitas tambahan juga untuk draf.
+	const capacityValue = Number(unitCapacity);
+	if (isUnitPricing && (unitCapacity === '' || !Number.isInteger(capacityValue) || capacityValue < 1 || capacityValue > 10_000)) {
+	  showValidation(`Isi kapasitas per ${unitLabel} minimal 1 orang, misalnya 6 orang per jeep.`, 'pricing');
+	  return;
+	}
+	const addOnList = addOns.map(addOn => ({ id: addOn.id, name: addOn.name.trim().replace(/\s+/g, ' '), price: Number(addOn.price), perPerson: addOn.perPerson }));
+	const invalidAddOnIdx = addOnList.findIndex(addOn =>
+	  Array.from(addOn.name).length < 2 || Array.from(addOn.name).length > 100 ||
+	  !Number.isInteger(addOn.price) || addOn.price <= 0 || addOn.price > 1_000_000_000);
+	if (invalidAddOnIdx >= 0) {
+	  showValidation(`Lengkapi fasilitas tambahan ke-${invalidAddOnIdx + 1}: nama minimal 2 karakter dan harga lebih dari 0, atau hapus baris tersebut.`, 'pricing');
+	  return;
+	}
 	if (startDate && endDate && endDate < startDate) {
 	  showValidation('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.', 'pricing');
 	  return;
@@ -600,7 +645,7 @@ export const AddPackagePage: React.FC = () => {
 		return;
 	  }
       if (!price || priceValue <= 0) {
-		showValidation('Harga per orang harus berupa angka lebih dari 0.', 'pricing');
+		showValidation(`Harga ${isUnitPricing ? `per ${unitLabel}` : 'per orang'} harus berupa angka lebih dari 0.`, 'pricing');
         return;
       }
       if (!duration || durationValue < 1) {
@@ -693,6 +738,10 @@ export const AddPackagePage: React.FC = () => {
           category: category,
           tripType: tripType,
 		  price: Number.isFinite(priceValue) ? priceValue : 0,
+          pricingMode: isUnitPricing ? 'PER_UNIT' : 'PER_PERSON',
+          unitName: isUnitPricing ? unitNameInput.trim() : '',
+          unitCapacity: isUnitPricing ? capacityValue : 0,
+          addOns: addOnList,
           // Kuota minimum adalah ambang keberangkatan bersama dan hanya berlaku
           // untuk Open Trip. Tipe lain memakai minimum peserta per booking.
           quotaMin: requiresMinimumQuota && Number.isFinite(qMin) ? qMin : 0,
@@ -733,6 +782,8 @@ export const AddPackagePage: React.FC = () => {
 		// mengharuskan hasil tersimpan sama dengan payload yang dinyatakan sukses.
 		if (!savedPackage?.id || savedPackage.status !== dbStatus || savedPackage.name !== payload.name ||
 		    savedPackage.category !== payload.category || savedPackage.tripType !== payload.tripType ||
+		    savedPackage.pricingMode !== payload.pricingMode ||
+		    (savedPackage.addOns || []).length !== payload.addOns.length ||
 		    Number(savedPackage.quotaMin) !== payload.quotaMin ||
 		    Number(savedPackage.minGuests) !== payload.minGuests ||
 		    Number(savedPackage.maxGuests) !== payload.maxGuests ||
@@ -886,6 +937,8 @@ export const AddPackagePage: React.FC = () => {
                           setAvailabilityDates([]);
                         }
                         setTripType(val);
+                        // Kursi Open Trip dibagi beberapa pemesan, sehingga selalu dihitung per orang.
+                        if (isOpenTripType(val)) setPricingMode('PER_PERSON');
                         setQuotaMin(isOpenTripType(val) ? (quotaMin || '1') : '');
                         setMinGuests(useMinimumBooking ? suggestedMinimumGuests(val) : '1');
                       }}
@@ -1195,17 +1248,69 @@ export const AddPackagePage: React.FC = () => {
               <div className="form-section-body animate-fade-in">
                 <h3>Jadwal & Harga</h3>
                 <p className="section-subtitle">Lengkapi detail harga, kapasitas, jadwal keberangkatan, dan batas peserta</p>
-                
+
+                {!requiresMinimumQuota && (
+                  <div className="input-group">
+                    <label>Skema Harga *</label>
+                    <div className="trip-option-choices" role="group" aria-label="Skema harga" style={{ marginBottom: 0 }}>
+                      {([
+                        { value: 'PER_PERSON', title: 'Per Orang', text: 'Total harga = harga × jumlah peserta.', icon: Users },
+                        { value: 'PER_UNIT', title: 'Per Unit / Paket', text: 'Harga per jeep, mobil, atau paket. 1 orang tetap bayar 1 unit; biaya per orang otomatis terbagi sesuai jumlah peserta.', icon: Car },
+                      ] as const).map(option => (
+                        <button key={option.value} type="button" aria-pressed={pricingMode === option.value} className={pricingMode === option.value ? 'selected' : ''} onClick={() => setPricingMode(option.value)}>
+                          <option.icon size={20} aria-hidden="true" /><strong>{option.title}</strong><span>{option.text}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {isUnitPricing && (
+                  <div className="input-row-2">
+                    <div className="input-group">
+                      <label htmlFor="unit-name-input">Nama Unit *</label>
+                      <input
+                        id="unit-name-input"
+                        type="text"
+                        maxLength={50}
+                        value={unitNameInput}
+                        onChange={(e) => setUnitNameInput(e.target.value)}
+                        placeholder="Contoh: Jeep"
+                      />
+                      <div className="trip-option-chips" role="group" aria-label="Pilihan cepat nama unit">
+                        {UNIT_PRESETS.map(name => (
+                          <button key={name} type="button" aria-pressed={unitNameInput.trim() === name} onClick={() => setUnitNameInput(name)}>{name}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label htmlFor="unit-capacity-input">Kapasitas per {unitLabel} (orang) *</label>
+                      <input
+                        id="unit-capacity-input"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={unitCapacity}
+                        onChange={(e) => handleDigitsOnlyInput(e.target.value, setUnitCapacity, 'Kapasitas per unit', 'pricing')}
+                        placeholder="Contoh: 6"
+                      />
+                      <span style={{ color: '#64748b', fontSize: '12px' }}>
+                        Peserta yang melebihi kapasitas otomatis dihitung {unitLabel} berikutnya.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="input-row-3">
                   <div className="input-group">
-                    <label>Harga per Orang *</label>
-                    <input 
+                    <label>{isUnitPricing ? `Harga per ${unitLabel} *` : 'Harga per Orang *'}</label>
+                    <input
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      value={price} 
-                      onChange={(e) => handleDigitsOnlyInput(e.target.value, setPrice, 'Harga per orang', 'pricing')}
-                      placeholder="Contoh: 1200000"
+                      value={price}
+                      onChange={(e) => handleDigitsOnlyInput(e.target.value, setPrice, isUnitPricing ? `Harga per ${unitLabel}` : 'Harga per orang', 'pricing')}
+                      placeholder={isUnitPricing ? 'Contoh: 1000000' : 'Contoh: 1200000'}
                     />
                   </div>
                   {requiresMinimumQuota && (
@@ -1245,6 +1350,24 @@ export const AddPackagePage: React.FC = () => {
                     ) : null}
                   </div>
                 </div>
+
+                {unitPreviewGuests.length > 0 && (
+                  <section className="trip-option-panel" aria-live="polite" style={{ marginTop: 0 }}>
+                    <h4><Car size={18} aria-hidden="true" /> Simulasi harga yang dilihat customer</h4>
+                    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                      {unitPreviewGuests.map(guests => {
+                        const total = basePrice(unitPreviewPackage, guests);
+                        return (
+                          <li key={guests} style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '4px 12px', padding: '8px 0', borderBottom: '1px solid #dbeafe', fontSize: '13px' }}>
+                            <span>{guests} orang · {unitsFor(unitPreviewPackage, guests)} {unitLabel}</span>
+                            <span><strong>{formatRupiah(total)}</strong> <span style={{ color: '#52657a' }}>(≈ {formatRupiah(Math.round(total / guests))}/orang)</span></span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className="trip-option-hint">Customer membayar per {unitLabel}, bukan per orang. Semakin banyak peserta dalam satu {unitLabel}, semakin ringan biaya per orang.</p>
+                  </section>
+                )}
 
                 {isOpenTripType(tripType) ? (<>
                   <div className="input-group">
@@ -1367,6 +1490,59 @@ export const AddPackagePage: React.FC = () => {
 					  Umur maksimal tidak boleh lebih kecil dari umur minimal.
 					</span>
 				  )}
+                </div>
+
+                <div className="input-group">
+                  <label>Fasilitas Tambahan (Opsional)</label>
+                  <span className="field-hint">
+                    Tawarkan fasilitas berbayar di luar paket, misalnya dokumentasi drone atau sewa alat. Customer dapat memilihnya saat memesan dan harganya otomatis ditambahkan ke total.
+                  </span>
+                  {addOns.map((addOn, idx) => (
+                    <div key={idx} className="addon-row">
+                      <input
+                        type="text"
+                        maxLength={100}
+                        aria-label={`Nama fasilitas tambahan ${idx + 1}`}
+                        value={addOn.name}
+                        onChange={(e) => updateAddOn(idx, { name: e.target.value })}
+                        placeholder="Contoh: Dokumentasi drone"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        aria-label={`Harga fasilitas tambahan ${idx + 1}`}
+                        value={addOn.price}
+                        onChange={(e) => {
+                          if (/^\d*$/.test(e.target.value)) updateAddOn(idx, { price: e.target.value });
+                          else showValidation('Harga fasilitas tambahan hanya boleh diisi angka bulat tanpa huruf, tanda minus, atau desimal.', 'pricing');
+                        }}
+                        placeholder="Harga, contoh: 150000"
+                      />
+                      <select
+                        aria-label={`Cara hitung fasilitas tambahan ${idx + 1}`}
+                        value={addOn.perPerson ? 'person' : 'order'}
+                        onChange={(e) => updateAddOn(idx, { perPerson: e.target.value === 'person' })}
+                      >
+                        <option value="order">per pesanan</option>
+                        <option value="person">per orang</option>
+                      </select>
+                      <div className="destination-actions">
+                        <button type="button" className="destination-remove-btn" aria-label={`Hapus fasilitas tambahan ${idx + 1}`} title="Hapus" onClick={() => setAddOns(prev => prev.filter((_, i) => i !== idx))}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="destination-add-btn"
+                    style={{ padding: '10px 16px', width: 'fit-content' }}
+                    disabled={addOns.length >= MAX_ADD_ONS}
+                    onClick={() => setAddOns(prev => [...prev, { id: '', name: '', price: '', perPerson: false }])}
+                  >
+                    <Plus size={14} /> {addOns.length >= MAX_ADD_ONS ? `Maksimal ${MAX_ADD_ONS} fasilitas` : 'Tambah fasilitas'}
+                  </button>
                 </div>
               </div>
             )}
@@ -2176,6 +2352,28 @@ export const AddPackagePage: React.FC = () => {
         .destination-add-row {
           display: flex;
           gap: 8px;
+        }
+
+        .addon-row {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          padding: 10px;
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-md);
+          background: #f8fafc;
+        }
+
+        .input-group .addon-row input, .input-group .addon-row select {
+          flex: 1 1 140px;
+          min-width: 0;
+          width: auto;
+          padding: 9px 12px;
+        }
+
+        .input-group .addon-row input:first-child {
+          flex: 2 1 200px;
         }
 
         .destination-add-row input {

@@ -154,7 +154,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     return 'Pesan Sekarang';
   }
 
-  int get _total => _pkg.price * _guests;
+  int get _total => _pkg.basePrice(_guests);
 
   Future<void> _warn(String title, String message) =>
       showNoticeDialog(context, title: title, message: message, isError: true);
@@ -405,10 +405,13 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Harga per orang',
-                  style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+              Text(_pkg.isPerUnit ? 'Harga per ${_pkg.unitLabel}' : 'Harga per orang',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
               Text(formatIDR(_pkg.price),
                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.accent)),
+              if (_pkg.isPerUnit)
+                Text('Maks. ${_pkg.unitCapacity} orang per ${_pkg.unitLabel}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
             ]),
           ),
           Container(
@@ -423,7 +426,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         const SizedBox(height: 16),
         _buildGuestCounter(),
         const Divider(height: 26),
-        PriceRow('Paket (${_guests}x)', formatIDR(_total)),
+        TripPriceRows(package: _pkg, guests: _guests),
         const Divider(height: 14),
         PriceRow('Total Estimasi', formatIDR(_total), valueColor: AppColors.accent, emphasize: true),
       ]),
@@ -748,6 +751,28 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         list('Fasilitas Termasuk', Icons.check_circle_outline, AppColors.success, _pkg.includedFacilities, AppColors.textBody),
         const SizedBox(height: 14),
         list('Fasilitas Tidak Termasuk', Icons.cancel_outlined, AppColors.danger, _pkg.excludedFacilities, AppColors.textMuted),
+        if (_pkg.addOns.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          const Row(children: [
+            Icon(Icons.add_circle_outline, size: 16, color: AppColors.accent),
+            SizedBox(width: 6),
+            Text('Layanan Tambahan (Opsional)',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.accent)),
+          ]),
+          const SizedBox(height: 4),
+          const Text('Dapat dipilih saat mengisi data pemesanan.',
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+          const SizedBox(height: 10),
+          for (final a in _pkg.addOns)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                Expanded(child: Text(a.name, style: const TextStyle(fontSize: 13, color: AppColors.textBody))),
+                Text('+${formatIDR(a.price)} ${a.priceSuffix}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+              ]),
+            ),
+        ],
       ]),
     );
   }
@@ -964,7 +989,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
           child: Row(children: [
             Expanded(
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Total (${_guests}x)',
+                Text(_pkg.isPerUnit ? 'Total ($_guests peserta)' : 'Total (${_guests}x)',
                     style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
                 Text(formatIDR(_total), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.accent)),
               ]),

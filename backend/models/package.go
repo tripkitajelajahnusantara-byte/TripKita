@@ -24,6 +24,10 @@ type Package struct {
 	Category           string             `gorm:"size:100;default:''" json:"category"`
 	TripType           string             `gorm:"size:100;default:''" json:"tripType"`
 	Price              int64              `gorm:"not null" json:"price"`
+	PricingMode        string             `gorm:"size:20;not null;default:'PER_PERSON'" json:"pricingMode"`
+	UnitName           string             `gorm:"size:50;not null;default:''" json:"unitName"`
+	UnitCapacity       int                `gorm:"not null;default:0" json:"unitCapacity"`
+	AddOns             []PackageAddOn     `gorm:"serializer:json;type:text" json:"addOns"`
 	QuotaMin           int                `gorm:"default:0" json:"quotaMin"`
 	QuotaUsed          int                `gorm:"default:0" json:"quotaUsed"`
 	QuotaMax           int                `gorm:"not null" json:"quotaMax"`
@@ -70,71 +74,79 @@ func (p *Package) NormalizeBookingLimits() {
 }
 
 type CreatePackageRequest struct {
-	PickupMode         string   `json:"pickupMode" binding:"omitempty,oneof=MEETING_POINT FLEXIBLE"`
-	PickupArea         string   `json:"pickupArea" binding:"max=500"`
-	PickupNotes        string   `json:"pickupNotes" binding:"max=1000"`
-	PickupPoints       []string `json:"pickupPoints" binding:"max=30,dive,max=255"`
-	DepartureDates     []string `json:"departureDates" binding:"max=100,dive,datetime=2006-01-02"`
-	AvailableDates     []string `json:"availableDates" binding:"omitempty,max=100,dive,datetime=2006-01-02"`
-	Name               string   `json:"name" binding:"required,max=255"`
-	Destination        string   `json:"destination" binding:"required,max=255"`
-	Destinations       []string `json:"destinations" binding:"max=30,dive,max=100"`
-	MeetingPoint       string   `json:"meetingPoint" binding:"max=255"`
-	MeetingPointLat    *float64 `json:"meetingPointLatitude"`
-	MeetingPointLng    *float64 `json:"meetingPointLongitude"`
-	Category           string   `json:"category" binding:"required,max=100"`
-	TripType           string   `json:"tripType" binding:"required,max=100"`
-	Price              int64    `json:"price" binding:"required,gt=0,lte=1000000000000"`
-	QuotaMin           int      `json:"quotaMin" binding:"gte=0"`
-	QuotaMax           int      `json:"quotaMax" binding:"required,gt=0,lte=10000"`
-	StartDate          string   `json:"startDate" binding:"required,datetime=2006-01-02"`
-	EndDate            string   `json:"endDate" binding:"required,datetime=2006-01-02"`
-	Schedule           string   `json:"schedule" binding:"required,max=255"`
-	Duration           int      `json:"duration"`
-	MinGuests          int      `json:"minGuests"`
-	MaxGuests          int      `json:"maxGuests"`
-	MinAge             int      `json:"minAge"`
-	MaxAge             int      `json:"maxAge"`
-	Status             string   `json:"status" binding:"required,oneof=Aktif Draft Nonaktif"`
-	Description        string   `json:"description" binding:"required,max=5000"`
-	IncludedFacilities string   `json:"includedFacilities"`
-	ExcludedFacilities string   `json:"excludedFacilities"`
-	Itinerary          string   `json:"itinerary"`
-	Image              string   `json:"image"`
-	Images             string   `json:"images"`
+	PickupMode         string         `json:"pickupMode" binding:"omitempty,oneof=MEETING_POINT FLEXIBLE"`
+	PickupArea         string         `json:"pickupArea" binding:"max=500"`
+	PickupNotes        string         `json:"pickupNotes" binding:"max=1000"`
+	PickupPoints       []string       `json:"pickupPoints" binding:"max=30,dive,max=255"`
+	DepartureDates     []string       `json:"departureDates" binding:"max=100,dive,datetime=2006-01-02"`
+	AvailableDates     []string       `json:"availableDates" binding:"omitempty,max=100,dive,datetime=2006-01-02"`
+	Name               string         `json:"name" binding:"required,max=255"`
+	Destination        string         `json:"destination" binding:"required,max=255"`
+	Destinations       []string       `json:"destinations" binding:"max=30,dive,max=100"`
+	MeetingPoint       string         `json:"meetingPoint" binding:"max=255"`
+	MeetingPointLat    *float64       `json:"meetingPointLatitude"`
+	MeetingPointLng    *float64       `json:"meetingPointLongitude"`
+	Category           string         `json:"category" binding:"required,max=100"`
+	TripType           string         `json:"tripType" binding:"required,max=100"`
+	Price              int64          `json:"price" binding:"required,gt=0,lte=1000000000000"`
+	PricingMode        string         `json:"pricingMode" binding:"omitempty,oneof=PER_PERSON PER_UNIT"`
+	UnitName           string         `json:"unitName" binding:"max=50"`
+	UnitCapacity       int            `json:"unitCapacity" binding:"gte=0,lte=10000"`
+	AddOns             []PackageAddOn `json:"addOns" binding:"max=20"`
+	QuotaMin           int            `json:"quotaMin" binding:"gte=0"`
+	QuotaMax           int            `json:"quotaMax" binding:"required,gt=0,lte=10000"`
+	StartDate          string         `json:"startDate" binding:"required,datetime=2006-01-02"`
+	EndDate            string         `json:"endDate" binding:"required,datetime=2006-01-02"`
+	Schedule           string         `json:"schedule" binding:"required,max=255"`
+	Duration           int            `json:"duration"`
+	MinGuests          int            `json:"minGuests"`
+	MaxGuests          int            `json:"maxGuests"`
+	MinAge             int            `json:"minAge"`
+	MaxAge             int            `json:"maxAge"`
+	Status             string         `json:"status" binding:"required,oneof=Aktif Draft Nonaktif"`
+	Description        string         `json:"description" binding:"required,max=5000"`
+	IncludedFacilities string         `json:"includedFacilities"`
+	ExcludedFacilities string         `json:"excludedFacilities"`
+	Itinerary          string         `json:"itinerary"`
+	Image              string         `json:"image"`
+	Images             string         `json:"images"`
 }
 
 type UpdatePackageRequest struct {
-	PickupMode         *string   `json:"pickupMode" binding:"omitempty,oneof=MEETING_POINT FLEXIBLE"`
-	PickupArea         *string   `json:"pickupArea" binding:"omitempty,max=500"`
-	PickupNotes        *string   `json:"pickupNotes" binding:"omitempty,max=1000"`
-	PickupPoints       *[]string `json:"pickupPoints" binding:"omitempty,max=30,dive,max=255"`
-	DepartureDates     *[]string `json:"departureDates" binding:"omitempty,max=100,dive,datetime=2006-01-02"`
-	AvailableDates     *[]string `json:"availableDates" binding:"omitempty,max=100,dive,datetime=2006-01-02"`
-	Name               *string   `json:"name"`
-	Destination        *string   `json:"destination"`
-	Destinations       *[]string `json:"destinations" binding:"omitempty,max=30,dive,max=100"`
-	MeetingPoint       *string   `json:"meetingPoint"`
-	MeetingPointLat    *float64  `json:"meetingPointLatitude"`
-	MeetingPointLng    *float64  `json:"meetingPointLongitude"`
-	Category           *string   `json:"category"`
-	TripType           *string   `json:"tripType"`
-	Price              *int64    `json:"price"`
-	QuotaMin           *int      `json:"quotaMin"`
-	QuotaMax           *int      `json:"quotaMax"`
-	StartDate          *string   `json:"startDate"`
-	EndDate            *string   `json:"endDate"`
-	Schedule           *string   `json:"schedule"`
-	Duration           *int      `json:"duration"`
-	MinGuests          *int      `json:"minGuests"`
-	MaxGuests          *int      `json:"maxGuests"`
-	MinAge             *int      `json:"minAge"`
-	MaxAge             *int      `json:"maxAge"`
-	Status             *string   `json:"status"` // Convert to Aktif, Draft, Nonaktif
-	Description        *string   `json:"description"`
-	IncludedFacilities string    `json:"includedFacilities"`
-	ExcludedFacilities string    `json:"excludedFacilities"`
-	Itinerary          string    `json:"itinerary"`
-	Image              string    `json:"image"`
-	Images             string    `json:"images"`
+	PickupMode         *string         `json:"pickupMode" binding:"omitempty,oneof=MEETING_POINT FLEXIBLE"`
+	PickupArea         *string         `json:"pickupArea" binding:"omitempty,max=500"`
+	PickupNotes        *string         `json:"pickupNotes" binding:"omitempty,max=1000"`
+	PickupPoints       *[]string       `json:"pickupPoints" binding:"omitempty,max=30,dive,max=255"`
+	DepartureDates     *[]string       `json:"departureDates" binding:"omitempty,max=100,dive,datetime=2006-01-02"`
+	AvailableDates     *[]string       `json:"availableDates" binding:"omitempty,max=100,dive,datetime=2006-01-02"`
+	Name               *string         `json:"name"`
+	Destination        *string         `json:"destination"`
+	Destinations       *[]string       `json:"destinations" binding:"omitempty,max=30,dive,max=100"`
+	MeetingPoint       *string         `json:"meetingPoint"`
+	MeetingPointLat    *float64        `json:"meetingPointLatitude"`
+	MeetingPointLng    *float64        `json:"meetingPointLongitude"`
+	Category           *string         `json:"category"`
+	TripType           *string         `json:"tripType"`
+	Price              *int64          `json:"price"`
+	PricingMode        *string         `json:"pricingMode" binding:"omitempty,oneof=PER_PERSON PER_UNIT"`
+	UnitName           *string         `json:"unitName" binding:"omitempty,max=50"`
+	UnitCapacity       *int            `json:"unitCapacity" binding:"omitempty,gte=0,lte=10000"`
+	AddOns             *[]PackageAddOn `json:"addOns" binding:"omitempty,max=20"`
+	QuotaMin           *int            `json:"quotaMin"`
+	QuotaMax           *int            `json:"quotaMax"`
+	StartDate          *string         `json:"startDate"`
+	EndDate            *string         `json:"endDate"`
+	Schedule           *string         `json:"schedule"`
+	Duration           *int            `json:"duration"`
+	MinGuests          *int            `json:"minGuests"`
+	MaxGuests          *int            `json:"maxGuests"`
+	MinAge             *int            `json:"minAge"`
+	MaxAge             *int            `json:"maxAge"`
+	Status             *string         `json:"status"` // Convert to Aktif, Draft, Nonaktif
+	Description        *string         `json:"description"`
+	IncludedFacilities string          `json:"includedFacilities"`
+	ExcludedFacilities string          `json:"excludedFacilities"`
+	Itinerary          string          `json:"itinerary"`
+	Image              string          `json:"image"`
+	Images             string          `json:"images"`
 }

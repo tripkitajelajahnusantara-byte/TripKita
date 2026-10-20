@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:customer_mobile/models/booking.dart';
+import 'package:customer_mobile/models/package.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
+import 'package:customer_mobile/utils/formatters.dart';
 
 /// Kartu putih ber-border yang menjadi blok dasar halaman web customer.
 class SectionCard extends StatelessWidget {
@@ -330,6 +332,40 @@ class InfoBanner extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Baris rincian harga trip: harga dasar (per orang atau per unit) diikuti
+/// layanan tambahan terpilih. Dipakai detail paket, form, dan konfirmasi.
+class TripPriceRows extends StatelessWidget {
+  final TripPackage package;
+  final int guests;
+  final List<AddOn> addOns;
+
+  const TripPriceRows(
+      {super.key,
+      required this.package,
+      required this.guests,
+      this.addOns = const []});
+
+  @override
+  Widget build(BuildContext context) {
+    final units = package.unitsFor(guests);
+    final base = package.basePrice(guests);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      PriceRow(
+          units > 0
+              ? '$units ${package.unitLabel} × ${formatIDR(package.price)}'
+              : 'Harga (${guests}x)',
+          formatIDR(base)),
+      if (units > 0 && guests > 0)
+        Text('≈ ${formatIDR((base / guests).round())}/orang untuk $guests peserta',
+            style: const TextStyle(fontSize: 12, color: AppColors.textLight)),
+      for (final a in addOns)
+        PriceRow(
+            a.perPerson ? '${a.name} (${guests}x)' : a.name,
+            '+${formatIDR(a.subtotalFor(guests))}'),
+    ]);
   }
 }
 

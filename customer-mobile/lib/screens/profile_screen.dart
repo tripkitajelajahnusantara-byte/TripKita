@@ -477,7 +477,7 @@ class _FavoriteTile extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.textMuted)),
               const SizedBox(height: 4),
-              Text(formatIDR(pkg.price),
+              Text('${formatIDR(pkg.price)}${pkg.isPerUnit ? ' ${pkg.priceUnitLabel}' : ''}',
                   style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,

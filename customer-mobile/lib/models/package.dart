@@ -12,6 +12,50 @@ class ItineraryItem {
       {required this.day, required this.title, required this.description});
 }
 
+/// Fasilitas tambahan opsional yang ditawarkan mitra (lihat
+/// `backend/models/package_pricing.go`). Booking menyimpan snapshot-nya
+/// beserta [subtotal].
+class AddOn {
+  final String id;
+  final String name;
+  final int price;
+  final bool perPerson;
+  final int subtotal;
+
+  const AddOn({
+    required this.id,
+    required this.name,
+    required this.price,
+    this.perPerson = false,
+    this.subtotal = 0,
+  });
+
+  factory AddOn.fromJson(Map<String, dynamic> json) => AddOn(
+        id: '${json['id'] ?? ''}',
+        name: '${json['name'] ?? ''}'.trim(),
+        price: json['price'] is num ? (json['price'] as num).toInt() : 0,
+        perPerson: json['perPerson'] == true,
+        subtotal:
+            json['subtotal'] is num ? (json['subtotal'] as num).toInt() : 0,
+      );
+
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'name': name, 'price': price, 'perPerson': perPerson};
+
+  /// Subtotal untuk sejumlah peserta, sama dengan perhitungan backend.
+  int subtotalFor(int guests) => perPerson ? price * guests : price;
+
+  String get priceSuffix => perPerson ? '/orang' : '/pesanan';
+
+  static List<AddOn> listFrom(Object? raw) => raw is List
+      ? raw
+          .whereType<Map>()
+          .map((e) => AddOn.fromJson(Map<String, dynamic>.from(e)))
+          .where((a) => a.name.isNotEmpty)
+          .toList()
+      : const [];
+}
+
 /// Paket wisata sesuai respons `GET /public/packages` (lihat
 /// `backend/models/package.go`).
 class TripPackage {
@@ -23,6 +67,13 @@ class TripPackage {
   final String category;
   final String tripType;
   final int price;
+
+  /// `PER_PERSON` (harga x peserta) atau `PER_UNIT` (harga per unit seperti
+  /// jeep berkapasitas [unitCapacity] orang; satu orang tetap bayar 1 unit).
+  final String pricingMode;
+  final String unitName;
+  final int unitCapacity;
+  final List<AddOn> addOns;
   final int quotaMin;
   final int quotaUsed;
   final int quotaMax;
@@ -58,6 +109,10 @@ class TripPackage {
     this.category = '',
     this.tripType = '',
     required this.price,
+    this.pricingMode = 'PER_PERSON',
+    this.unitName = '',
+    this.unitCapacity = 0,
+    this.addOns = const [],
     this.quotaMin = 0,
     this.quotaUsed = 0,
     this.quotaMax = 0,
@@ -102,6 +157,12 @@ class TripPackage {
       category: asString(json['category']),
       tripType: asString(json['tripType']),
       price: asInt(json['price']),
+      pricingMode: asString(json['pricingMode']),
+      unitName: asString(json['unitName']).trim(),
+      unitCapacity: asInt(json['unitCapacity']),
+      addOns: AddOn.listFrom(json['addOns'])
+          .where((a) => a.id.isNotEmpty && a.price > 0)
+          .toList(),
       quotaMin: asInt(json['quotaMin']),
       quotaUsed: asInt(json['quotaUsed']),
       quotaMax: asInt(json['quotaMax']),
@@ -135,6 +196,10 @@ class TripPackage {
         'category': category,
         'tripType': tripType,
         'price': price,
+        'pricingMode': pricingMode,
+        'unitName': unitName,
+        'unitCapacity': unitCapacity,
+        'addOns': addOns.map((a) => a.toJson()).toList(),
         'quotaMin': quotaMin,
         'quotaUsed': quotaUsed,
         'quotaMax': quotaMax,
@@ -159,6 +224,22 @@ class TripPackage {
       };
 
   bool get isOpenTrip => tripType.isEmpty || tripType == 'Open Trip';
+
+  bool get isPerUnit => pricingMode == 'PER_UNIT' && unitCapacity > 0;
+  String get unitLabel => unitName.isEmpty ? 'Unit' : unitName;
+
+  /// Satuan harga untuk label, mis. `/ orang` atau `/ Jeep` (sama dengan web).
+  String get priceUnitLabel => isPerUnit ? '/ $unitLabel' : '/ orang';
+
+  /// Jumlah unit yang dibutuhkan; 0 untuk harga per orang.
+  int unitsFor(int guests) =>
+      isPerUnit && guests > 0 ? (guests + unitCapacity - 1) ~/ unitCapacity : 0;
+
+  /// Harga trip sebelum add-on dan biaya layanan (mirror backend BasePrice).
+  int basePrice(int guests) {
+    final units = unitsFor(guests);
+    return units > 0 ? units * price : (guests < 0 ? 0 : guests) * price;
+  }
   bool get isCorporate => tripType == 'Corporate' || category == 'Corporate';
   int get durationDays => duration < 1 ? 1 : duration;
   int get minRequiredGuests => minGuests < 1 ? 1 : minGuests;

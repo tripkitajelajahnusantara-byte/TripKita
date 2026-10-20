@@ -23,6 +23,10 @@ import { TripImage } from '../components/TripImage';
 import { useActionLock } from '../utils/useActionLock';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { formatTripRange } from '../utils/tripDates';
+import { priceUnitLabel } from '../utils/pricing';
+
+// Satuan harga ("/ orang" atau "/ Jeep") ikut dibawa dari data paket mentah.
+type ListedPackage = PackageItem & { priceUnit: string };
 
 // Pilihan status di menu aksi. Status yang sedang berlaku disembunyikan agar
 // provider tidak mengirim perubahan yang tidak mengubah apa pun.
@@ -39,10 +43,10 @@ export const KelolaPaketPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Semua' | 'Aktif' | 'Draft' | 'Nonaktif'>('Semua');
 
-  const [packages, setPackages] = useState<PackageItem[]>([]);
+  const [packages, setPackages] = useState<ListedPackage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<ListedPackage | null>(null);
   // Kunci aksi berformat `aksi:idPaket` sehingga baris yang sedang diproses
   // bisa menampilkan indikator sendiri, sementara aksi lain tetap terkunci.
   const { pending, isBusy, run } = useActionLock();
@@ -75,6 +79,7 @@ export const KelolaPaketPage: React.FC = () => {
           destination: pkg.destination,
           destinations: Array.isArray(pkg.destinations) ? pkg.destinations : [],
           price: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price || 0),
+          priceUnit: priceUnitLabel(pkg),
           quota: pkg.departureDates?.length > 1 ? `${pkg.quotaMax || 0} / keberangkatan` : `${pkg.departures?.[0]?.quotaUsed ?? pkg.quotaUsed ?? 0}/${pkg.quotaMax || 0}`,
           schedule: pkg.departures?.length ? `${pkg.departures.length} jadwal · mulai ${formatTripRange(pkg.departures[0].date)}` : pkg.schedule,
           status: pkg.status,
@@ -291,7 +296,7 @@ export const KelolaPaketPage: React.FC = () => {
                       </td>
                       <td>
                         <span className="price-text">{pkg.price}</span>
-                        <span className="price-sub">/orang</span>
+                        <span className="price-sub">{pkg.priceUnit}</span>
                       </td>
                       <td>
                         <div className="quota-bar-wrapper">
@@ -481,7 +486,7 @@ export const KelolaPaketPage: React.FC = () => {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Harga</span>
-                  <span className="detail-value text-teal">{selectedPackage.price}/orang</span>
+                  <span className="detail-value text-teal">{selectedPackage.price} {selectedPackage.priceUnit}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Kuota</span>

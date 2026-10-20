@@ -200,7 +200,7 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 		CustomerInitial string    `json:"customerInitial"`
 		Guests          int       `json:"guests" binding:"required,gt=0"`
 		TripDate        time.Time `json:"tripDate" binding:"required"`
-		AddOnIDs        []string  `json:"addOnIds" binding:"max=10,dive,max=50"`
+		AddOnIDs        []string  `json:"addOnIds" binding:"max=20,dive,max=50"`
 		// Participants bersifat opsional agar klien lama tetap dapat checkout;
 		// bila dikirim, jumlahnya divalidasi terhadap jumlah tamu di service.
 		Participants []models.BookingParticipantInput `json:"participants" binding:"max=100,dive"`

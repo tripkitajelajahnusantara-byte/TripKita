@@ -117,6 +117,10 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 		Category:           req.Category,
 		TripType:           req.TripType,
 		Price:              req.Price,
+		PricingMode:        req.PricingMode,
+		UnitName:           req.UnitName,
+		UnitCapacity:       req.UnitCapacity,
+		AddOns:             req.AddOns,
 		QuotaMin:           req.QuotaMin,
 		QuotaUsed:          0,
 		QuotaMax:           req.QuotaMax,
@@ -138,6 +142,9 @@ func (s *packageService) CreatePackage(providerID uint, req *models.CreatePackag
 		Images:             req.Images,
 	}
 	if err := validatePackagePickup(pkg); err != nil {
+		return nil, err
+	}
+	if err := normalizePackagePricing(pkg); err != nil {
 		return nil, err
 	}
 	// Draft Open Trip boleh disimpan tanpa jadwal agar provider dapat
@@ -416,6 +423,25 @@ func (s *packageService) UpdatePackage(id uint, providerID uint, req *models.Upd
 	}
 	if req.Price != nil {
 		pkg.Price = *req.Price
+	}
+	if req.PricingMode != nil {
+		pkg.PricingMode = *req.PricingMode
+	}
+	if req.UnitName != nil {
+		pkg.UnitName = *req.UnitName
+	}
+	if req.UnitCapacity != nil {
+		pkg.UnitCapacity = *req.UnitCapacity
+	}
+	if req.AddOns != nil {
+		pkg.AddOns = *req.AddOns
+	}
+	// Paket yang diubah menjadi Open Trip otomatis kembali ke harga per orang.
+	if models.IsOpenTrip(pkg.TripType) {
+		pkg.PricingMode = models.PricingPerPerson
+	}
+	if err := normalizePackagePricing(pkg); err != nil {
+		return nil, err
 	}
 	if req.QuotaMin != nil && models.IsOpenTrip(pkg.TripType) {
 		pkg.QuotaMin = *req.QuotaMin
