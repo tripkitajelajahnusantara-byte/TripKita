@@ -121,6 +121,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         guests: draft.guests,
         tripDateIso: draft.startDate,
         participants: widget.participants,
+        addOnIds: [for (final a in draft.addOns) a.id],
       );
       if (booking.bookingCode.isEmpty) {
         throw const ApiException('Backend tidak mengembalikan kode booking', 0);
@@ -216,7 +217,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   const SizedBox(height: 4),
                   _iconLine(Icons.groups_outlined, '${d.guests} Peserta'),
                   const Divider(height: 26),
-                  PriceRow('Harga (${d.guests}x)', formatIDR(d.packageTotal)),
+                  TripPriceRows(
+                      package: d.package, guests: d.guests, addOns: d.addOns),
                   PriceRow(
                       'Biaya Admin',
                       _config == null

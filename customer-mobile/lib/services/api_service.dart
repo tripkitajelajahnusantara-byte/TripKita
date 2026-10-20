@@ -259,6 +259,7 @@ class ApiService {
     required int guests,
     required String tripDateIso,
     required List<Participant> participants,
+    List<String> addOnIds = const [],
   }) async {
     final data = await _request('POST', '/public/bookings', body: {
       'packageId': packageId,
@@ -270,7 +271,7 @@ class ApiService {
           (booker.name.isNotEmpty ? booker.name[0] : 'P').toUpperCase(),
       'guests': guests,
       'tripDate': '${tripDateIso}T00:00:00.000Z',
-      'addOnIds': <String>[],
+      'addOnIds': addOnIds,
       'participants': [for (final p in participants) p.toApiJson()],
     });
     return Booking.fromJson(_asMap(data));

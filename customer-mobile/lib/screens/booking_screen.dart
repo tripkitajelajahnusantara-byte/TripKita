@@ -45,6 +45,12 @@ class _BookingScreenState extends State<BookingScreen> {
   late final List<TextEditingController> _phoneCtrls;
   late final List<TextEditingController> _medicalCtrls;
   Map<String, String> _errors = {};
+  final Set<String> _addOnIds = {};
+
+  /// Draft dengan layanan tambahan yang sedang dicentang.
+  BookingDraft get _draft => widget.draft.withAddOns(widget.draft.package.addOns
+      .where((a) => _addOnIds.contains(a.id))
+      .toList());
 
   @override
   void initState() {
@@ -203,7 +209,7 @@ class _BookingScreenState extends State<BookingScreen> {
     if (!mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => PaymentScreen(
-        draft: widget.draft,
+        draft: _draft,
         booker: BookerContact(
           name: _bookerName.text.trim(),
           email: _bookerEmail.text.trim(),
@@ -224,6 +230,10 @@ class _BookingScreenState extends State<BookingScreen> {
         children: [
           _buildSummaryCard(),
           const SizedBox(height: 16),
+          if (widget.draft.package.addOns.isNotEmpty) ...[
+            _buildAddOnsCard(),
+            const SizedBox(height: 16),
+          ],
           SectionCard(
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -397,8 +407,65 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  Widget _buildAddOnsCard() {
+    final guests = widget.draft.guests;
+    return SectionCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Layanan Tambahan (Opsional)',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark)),
+        const SizedBox(height: 6),
+        const Text(
+            'Pilih fasilitas tambahan dari penyelenggara. Harga otomatis ditambahkan ke total.',
+            style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+        const SizedBox(height: 12),
+        for (final a in widget.draft.package.addOns) ...[
+          Material(
+            color: _addOnIds.contains(a.id)
+                ? AppColors.accentLight
+                : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(
+                  color: _addOnIds.contains(a.id)
+                      ? AppColors.accent
+                      : AppColors.borderStrong),
+            ),
+            child: CheckboxListTile(
+              dense: true,
+              value: _addOnIds.contains(a.id),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: const EdgeInsets.only(right: 12),
+              title: Text(a.name,
+                  style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark)),
+              subtitle: Text(
+                  a.perPerson
+                      ? '${formatIDR(a.price)} /orang × $guests = ${formatIDR(a.subtotalFor(guests))}'
+                      : '${formatIDR(a.price)} /pesanan',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textMuted)),
+              secondary: Text('+${formatIDR(a.subtotalFor(guests))}',
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.accent)),
+              onChanged: (v) => setState(() =>
+                  v == true ? _addOnIds.add(a.id) : _addOnIds.remove(a.id)),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ]),
+    );
+  }
+
   Widget _buildSummaryCard() {
-    final d = widget.draft;
+    final d = _draft;
     return SectionCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Rincian Pemesanan',
@@ -423,7 +490,7 @@ class _BookingScreenState extends State<BookingScreen> {
         const SizedBox(height: 4),
         _iconLine(Icons.groups_outlined, '${d.guests} Peserta'),
         const Divider(height: 22),
-        PriceRow('Harga (${d.guests}x)', formatIDR(d.packageTotal)),
+        TripPriceRows(package: d.package, guests: d.guests, addOns: d.addOns),
         const Divider(height: 14),
         PriceRow('Total Pembayaran', formatIDR(d.packageTotal),
             emphasize: true),

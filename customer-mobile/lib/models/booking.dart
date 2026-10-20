@@ -79,15 +79,32 @@ class BookingDraft {
   /// Label jadwal yang ditampilkan ke pengguna.
   final String scheduleLabel;
 
+  /// Layanan tambahan yang dipilih customer di form pemesanan.
+  final List<AddOn> addOns;
+
   const BookingDraft({
     required this.package,
     required this.guests,
     required this.startDate,
     required this.endDate,
     required this.scheduleLabel,
+    this.addOns = const [],
   });
 
-  int get packageTotal => package.price * guests;
+  BookingDraft withAddOns(List<AddOn> selected) => BookingDraft(
+        package: package,
+        guests: guests,
+        startDate: startDate,
+        endDate: endDate,
+        scheduleLabel: scheduleLabel,
+        addOns: selected,
+      );
+
+  int get addOnTotal =>
+      addOns.fold(0, (sum, a) => sum + a.subtotalFor(guests));
+
+  /// Harga trip + layanan tambahan, sebelum biaya layanan.
+  int get packageTotal => package.basePrice(guests) + addOnTotal;
 
   /// Total tagihan dengan biaya layanan dari `CheckoutConfig` backend.
   int totalWithFee(int serviceFee) => packageTotal + serviceFee;
@@ -103,6 +120,11 @@ class Booking {
   final DateTime? tripDate;
   final int guests;
   final int totalPrice;
+
+  /// Snapshot harga per unit (mis. 2 Jeep); 0 berarti harga per orang.
+  final int unitCount;
+  final String unitName;
+  final List<AddOn> addOns;
   final String status;
   final String paymentUrl;
   final String paymentProof;
@@ -128,6 +150,9 @@ class Booking {
     this.tripDate,
     this.guests = 0,
     this.totalPrice = 0,
+    this.unitCount = 0,
+    this.unitName = '',
+    this.addOns = const [],
     this.status = BookingStatus.pendingPayment,
     this.paymentUrl = '',
     this.paymentProof = '',
@@ -166,6 +191,9 @@ class Booking {
       tripDate: asDate(json['tripDate']),
       guests: asInt(json['guests']),
       totalPrice: asInt(json['totalPrice']),
+      unitCount: asInt(json['unitCount']),
+      unitName: asString(json['unitName']),
+      addOns: AddOn.listFrom(json['addOns']),
       status: asString(json['status']).isEmpty
           ? BookingStatus.pendingPayment
           : asString(json['status']),

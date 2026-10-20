@@ -4,6 +4,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { fetchCheckoutConfig } from '../utils/checkoutConfig';
 import { FlexiblePickupDetails } from '../components/TripPickup';
+import { addOnSubtotal, basePrice, isPerUnit, unitName, unitsFor, type PackageAddOn } from '../utils/pricing';
 import { useActionLock } from '../utils/useActionLock';
 import { ArrowLeft, Calendar, Users, AlertCircle, HelpCircle, ShieldCheck, LoaderCircle } from 'lucide-react';
 import { LegalModalContainer, GeneralTermsContent, CustomerRegistrationTermsContent } from '../components/LegalModals';
@@ -100,9 +101,13 @@ export const CustomerConfirmationPage: React.FC = () => {
   const meetingPointAddress = getMeetingPointAddress(pkg);
   const { pemesan, peserta } = bookingFormData;
   const guestsCount = peserta.length;
-  const selectedAddOns = pkg.selectedAddOns || bookingFormData?.selectedAddOns || [];
-  const addOnsTotal = selectedAddOns.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
-  const baseCost = pkg.price * guestsCount;
+  // Rumus sama dengan backend: harga dasar + subtotal add-on + biaya layanan.
+  const selectedAddOns = ((pkg.selectedAddOns || bookingFormData?.selectedAddOns || []) as PackageAddOn[])
+    .map((a) => ({ ...a, subtotal: addOnSubtotal(a, guestsCount) }));
+  const addOnsTotal = selectedAddOns.reduce((sum, a) => sum + a.subtotal, 0);
+  const perUnit = isPerUnit(pkg);
+  const unitCount = unitsFor(pkg, guestsCount);
+  const baseCost = basePrice(pkg, guestsCount);
   const checkoutConfigLoading = (serviceFee === null || cancellationRefundDays === null) && !checkoutConfigError;
   const checkoutReady = serviceFee !== null && cancellationRefundDays !== null;
   const totalCost = baseCost + addOnsTotal + (serviceFee ?? 0);
@@ -165,7 +170,7 @@ export const CustomerConfirmationPage: React.FC = () => {
         customerInitial: (pemesan.nama || 'P').charAt(0).toUpperCase(),
         guests: guestsCount || 1,
         tripDate: tripTimestamp,
-        addOnIds: selectedAddOns.map((item: any) => item.id),
+        addOnIds: selectedAddOns.map((item) => item.id),
         participants: peserta.map((p) => {
           const medical = String(p.riwayatPenyakit || '').trim();
           return {
@@ -347,15 +352,20 @@ export const CustomerConfirmationPage: React.FC = () => {
 
             {/* Price breakdown */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', fontSize: '13.5px', color: '#64748b' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Harga ({guestsCount}x)</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                <span>{perUnit ? `${unitCount} ${unitName(pkg)} × ${formatIDR(pkg.price)}` : `${formatIDR(pkg.price)} × ${guestsCount} orang`}</span>
                 <span style={{ color: '#0f172a', fontWeight: '600' }}>{formatIDR(baseCost)}</span>
               </div>
+              {perUnit && (
+                <span style={{ fontSize: '12px', marginTop: '-6px' }}>
+                  ≈ {formatIDR(Math.round(baseCost / Math.max(1, guestsCount)))} / orang untuk {guestsCount} peserta
+                </span>
+              )}
 
-              {selectedAddOns.map((addon: any, idx: number) => (
-                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#0284c7' }}>
-                  <span>Add-On: {addon.name}</span>
-                  <span style={{ fontWeight: '600' }}>+{formatIDR(addon.price)}</span>
+              {selectedAddOns.map((addon) => (
+                <div key={addon.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '13px', color: '#0284c7' }}>
+                  <span>Add-On: {addon.name}{addon.perPerson ? ` (${guestsCount}x)` : ''}</span>
+                  <span style={{ fontWeight: '600' }}>+{formatIDR(addon.subtotal)}</span>
                 </div>
               ))}
 

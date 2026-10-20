@@ -513,16 +513,21 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		if err := ensureExclusiveDateTx(tx, &pkg, booking.TripDate, calculatePackageTripEnd(&pkg, booking.TripDate), 0); err != nil {
 			return err
 		}
-		addOnTotal, err := calculateAddOnTotal(pkg.Name, booking.SelectedAddOnIDs)
+		addOns, addOnTotal, err := pkg.SelectAddOns(booking.SelectedAddOnIDs, booking.Guests)
 		if err != nil {
 			return &BookingInputError{Message: err.Error()}
+		}
+		booking.AddOns = addOns
+		booking.UnitCount = pkg.UnitsFor(booking.Guests)
+		if booking.UnitCount > 0 {
+			booking.UnitName = pkg.UnitName
 		}
 
 		booking.ProviderID = pkg.ProviderID
 		booking.PlatformFeePercent = models.NormalizePlatformFeePercent(activeProvider.PlatformFeePercent)
 		booking.TripEndDate = calculatePackageTripEnd(&pkg, booking.TripDate)
 		serviceFee := models.BookingServiceFee
-		booking.TotalPrice = int64(booking.Guests)*pkg.Price + addOnTotal + serviceFee
+		booking.TotalPrice = pkg.BasePrice(booking.Guests) + addOnTotal + serviceFee
 		booking.Status = models.StatusPendingPayment
 		booking.PaymentMethod = "Transfer Bank Manual"
 		booking.PaymentURL = ""
@@ -865,14 +870,6 @@ func generateBookingCode() (string, error) {
 		suffix[i] = charset[value.Int64()]
 	}
 	return fmt.Sprintf("TK-%s-%s", time.Now().Format("20060102"), string(suffix)), nil
-}
-
-func calculateAddOnTotal(packageName string, selected []string) (int64, error) {
-	_ = packageName
-	if len(selected) > 0 {
-		return 0, fmt.Errorf("layanan tambahan belum tersedia")
-	}
-	return 0, nil
 }
 
 func (s *bookingService) GetRefunds() ([]models.Booking, error) {

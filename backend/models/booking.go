@@ -21,6 +21,11 @@ type Booking struct {
 	PickupMode         string    `gorm:"size:20;not null;default:'MEETING_POINT'" json:"pickupMode"`
 	PickupInstructions string    `gorm:"type:text" json:"pickupInstructions"`
 	TotalPrice         int64     `gorm:"not null" json:"totalPrice"`
+	// UnitCount/UnitName adalah snapshot harga per unit (mis. 2 Jeep); 0 berarti
+	// harga per orang. AddOns menyimpan fasilitas tambahan yang dipilih customer.
+	UnitCount int            `gorm:"not null;default:0" json:"unitCount"`
+	UnitName  string         `gorm:"size:50;not null;default:''" json:"unitName"`
+	AddOns    []BookingAddOn `gorm:"serializer:json;type:text" json:"addOns"`
 	// PlatformFeePercent adalah snapshot tarif provider saat booking dibuat.
 	// Nilai ini tidak ikut berubah saat admin mengganti tarif provider di kemudian hari.
 	PlatformFeePercent      int64      `gorm:"not null;default:15" json:"platformFeePercent"`

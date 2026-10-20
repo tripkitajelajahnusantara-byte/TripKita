@@ -21,6 +21,7 @@ import { TripChangeModal } from '../components/TripChangeModal';
 import { useCustomAlert } from '../components/CustomAlertModal';
 import { jakartaToday } from '../utils/tripDates';
 import { useActionLock } from '../utils/useActionLock';
+import { bookingAddOns } from '../utils/pricing';
 
 // Format tanggal lahir peserta (YYYY-MM-DD) beserta umur saat ini
 const formatParticipantBirth = (birthDate?: string) => {
@@ -128,6 +129,9 @@ export const ManageBookingPage: React.FC = () => {
           tripDate: b.tripDate ? new Date(b.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
           guests: b.guests || 1,
           totalPrice: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.totalPrice || 0),
+          unitCount: Number(b.unitCount) || 0,
+          unitName: b.unitName || '',
+          addOns: bookingAddOns(b),
           paymentMethod: b.paymentMethod || 'Transfer Bank Manual',
           createdAt: b.createdAt || '',
           paidAt: b.paidAt || '',
@@ -522,12 +526,23 @@ export const ManageBookingPage: React.FC = () => {
                     <span style={{ fontSize: '11px', color: '#64748b' }}>
                       Peserta: {selectedBooking.guests} Orang
                     </span>
+                    {!!selectedBooking.unitCount && (
+                      <span style={{ fontSize: '11px', color: '#0f766e', fontWeight: 700 }}>
+                        Kebutuhan unit: {selectedBooking.unitCount} {selectedBooking.unitName || 'Unit'}
+                      </span>
+                    )}
                   </div>
 
                   {/* Payment Info */}
                   <div className="detail-item">
                     <span className="detail-label">Rincian Pembayaran</span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                      {selectedBooking.addOns?.map((a) => (
+                        <div key={a.id || a.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12px' }}>
+                          <span style={{ color: '#64748b' }}>+ {a.name}{a.perPerson ? ` (×${selectedBooking.guests} orang)` : ''}</span>
+                          <span style={{ fontWeight: 500, color: '#1e293b', whiteSpace: 'nowrap' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(a.subtotal)}</span>
+                        </div>
+                      ))}
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                         <span style={{ color: '#64748b' }}>Total Harga:</span>
                         <span style={{ fontWeight: 600, color: '#0f172a' }}>{selectedBooking.totalPrice}</span>

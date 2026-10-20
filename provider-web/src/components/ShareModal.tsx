@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Copy, Check, MessageCircle, Share2, Camera } from 'lucide-react';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from './TripImage';
+import { priceUnitLabel } from '../utils/pricing';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
   };
 
   const handleWhatsAppShare = () => {
-    const text = `Halo! Cek paket wisata "${pkg.name}" di TemenTrip!\n\n📍 Destinasi: ${pkg.destination || 'Indonesia'}\n💰 Harga: Rp ${(pkg.price || 0).toLocaleString('id-ID')} / orang\n\nLihat detail paket selengkapnya di sini:\n${shareUrl}`;
+    const text = `Halo! Cek paket wisata "${pkg.name}" di TemenTrip!\n\n📍 Destinasi: ${pkg.destination || 'Indonesia'}\n💰 Harga: Rp ${(pkg.price || 0).toLocaleString('id-ID')} ${priceUnitLabel(pkg)}\n\nLihat detail paket selengkapnya di sini:\n${shareUrl}`;
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
   };
@@ -116,7 +117,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
               📍 {pkg.destination || 'Indonesia'}
             </span>
             <strong style={{ fontSize: '13.5px', color: '#007bff' }}>
-              Rp {(pkg.price || 0).toLocaleString('id-ID')} <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>/ orang</span>
+              Rp {(pkg.price || 0).toLocaleString('id-ID')} <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>{priceUnitLabel(pkg)}</span>
             </strong>
           </div>
         </div>

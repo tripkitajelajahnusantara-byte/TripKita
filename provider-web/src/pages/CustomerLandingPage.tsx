@@ -12,6 +12,7 @@ import heroImage from '../assets/hero.jpg';
 
 import { useCancellationRefundDays } from '../utils/checkoutConfig';
 import { filterCustomerVisiblePackages, isPackageExpired, sortBookableFirst } from '../utils/publicPackages';
+import { priceUnitLabel } from '../utils/pricing';
 interface TripPackage {
   id: number;
   providerId: number;
@@ -729,7 +730,7 @@ export const CustomerLandingPage: React.FC = () => {
                           <span style={{ fontSize: '11.5px', fontWeight: '700', color: '#94a3b8' }}>Tidak bisa dipesan</span>
                         ) : (
                           <span style={{ fontSize: '13px', fontWeight: '800', color: '#007bff' }}>
-                            {formatIDR(pkg.price)}
+                            {formatIDR(pkg.price)} <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 'normal' }}>{priceUnitLabel(pkg)}</span>
                           </span>
                         )}
                       </div>

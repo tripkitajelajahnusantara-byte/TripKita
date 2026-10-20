@@ -104,7 +104,7 @@ Future<void> showSharePackageSheet(BuildContext context, TripPackage pkg) {
   final link = AppConfig.webBaseUrl.isEmpty ? '' : '${AppConfig.webBaseUrl}/#/paket-detail?id=${pkg.id}';
   final message = 'Halo! Cek paket wisata "${pkg.name}" di TripKita!\n\n'
       '📍 Destinasi: ${pkg.destination.isEmpty ? 'Indonesia' : pkg.destination}\n'
-      '💰 Harga: ${formatIDR(pkg.price)} / orang'
+      '💰 Harga: ${formatIDR(pkg.price)} ${pkg.priceUnitLabel}'
       '${link.isEmpty ? '' : '\n\nLihat detail paket selengkapnya di sini:\n$link'}';
 
   return showModalBottomSheet<void>(
@@ -258,7 +258,7 @@ class TripGridCard extends StatelessWidget {
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
-                          child: Text(formatIDR(pkg.price),
+                          child: Text('${formatIDR(pkg.price)}${pkg.isPerUnit ? ' ${pkg.priceUnitLabel}' : ''}',
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
                         ),
                       ),
@@ -458,8 +458,8 @@ class _PriceTag extends StatelessWidget {
           TextSpan(
               text: formatPrice(pkg.price),
               style: const TextStyle(fontSize: 20, height: 24 / 20, fontWeight: FontWeight.w700, color: AppColors.brand)),
-          const TextSpan(
-              text: ' / orang', style: TextStyle(fontSize: 14, height: 24 / 14, color: AppColors.textLight)),
+          TextSpan(
+              text: ' ${pkg.priceUnitLabel}', style: const TextStyle(fontSize: 14, height: 24 / 14, color: AppColors.textLight)),
         ]),
         textAlign: TextAlign.right,
       ),

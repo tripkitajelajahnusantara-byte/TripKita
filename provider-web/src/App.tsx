@@ -1,4 +1,5 @@
 import React from 'react';
+import { Analytics, type BeforeSendEvent } from '@vercel/analytics/react';
 import { NavigationProvider, isReturnableHash, useNavigation } from './context/NavigationContext';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -352,6 +353,20 @@ import { CustomAlertProvider } from './components/CustomAlertModal';
 // transisi (NavigationContext) sehingga halaman lama tetap tampil.
 const PageLoadingFallback: React.FC = () => <PageSkeleton fullScreen />;
 
+// Aplikasi memakai hash routing (#/cari-trip), sedangkan Vercel Analytics
+// hanya membaca pathname. URL ditulis ulang menjadi /cari-trip dan query
+// dibuang supaya id paket atau kode login tidak ikut tercatat.
+function analyticsUrl(event: BeforeSendEvent): BeforeSendEvent {
+  const url = new URL(event.url);
+  const path = url.hash.replace(/^#\/?/, '/').split('?')[0];
+  return { ...event, url: `${url.origin}${path === '/' || !path ? '/' : path}` };
+}
+
+const RouteAnalytics: React.FC = () => {
+  const { route } = useNavigation();
+  return <Analytics route={`/${route}`} path={`/${route}`} beforeSend={analyticsUrl} />;
+};
+
 function App() {
   return (
     <ErrorBoundary>
@@ -360,6 +375,7 @@ function App() {
           <React.Suspense fallback={<PageLoadingFallback />}>
             <AppContent />
           </React.Suspense>
+          <RouteAnalytics />
         </NavigationProvider>
       </CustomAlertProvider>
     </ErrorBoundary>

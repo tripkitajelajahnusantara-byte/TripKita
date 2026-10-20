@@ -10,6 +10,7 @@ import { Skeleton } from '../components/Skeleton';
 import { filterCustomerVisiblePackages, isPackageExpired } from '../utils/publicPackages';
 import { bookableDates, nearestDate, upcomingDepartures, type Departure } from '../utils/departures';
 import { formatTripRange } from '../utils/tripDates';
+import { priceUnitLabel } from '../utils/pricing';
 
 interface TripPackage {
   availableDates?: string[];
@@ -419,7 +420,7 @@ export const CustomerSearchPage: React.FC = () => {
                         <div style={{ textAlign: 'right' }}>
                           <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Mulai dari</span>
                           <span style={{ fontSize: '19px', fontWeight: '800', color: '#007bff' }}>
-                            {formatIDR(pkg.price)} <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>/ orang</span>
+                            {formatIDR(pkg.price)} <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>{priceUnitLabel(pkg)}</span>
                           </span>
                         </div>
                       </div>
