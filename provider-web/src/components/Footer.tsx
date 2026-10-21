@@ -23,7 +23,7 @@ export const Footer: React.FC = () => {
             </p>
             <div className="security-badge">
               <ShieldCheck size={16} color="#00c9a7" />
-              <span>Pembayaran transfer diverifikasi admin TemenTrip</span>
+              <span>Pembayaran aman &amp; terverifikasi TemenTrip</span>
             </div>
           </div>
 

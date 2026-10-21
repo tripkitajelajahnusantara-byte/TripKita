@@ -9,11 +9,13 @@ import 'package:customer_mobile/models/booking.dart';
 import 'package:customer_mobile/services/api_service.dart';
 import 'package:customer_mobile/services/checkout_config.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
+import 'package:customer_mobile/utils/external_links.dart';
 import 'package:customer_mobile/utils/formatters.dart';
 import 'package:customer_mobile/widgets/common.dart';
 
-/// Pembayaran transfer manual. Kuota booking ditahan selama 24 jam; booking
-/// baru terlihat oleh provider setelah bukti transfer disetujui admin.
+/// Pembayaran booking: online lewat Midtrans, atau transfer manual yang baru
+/// terlihat oleh provider setelah bukti transfer disetujui admin. Kuota
+/// booking ditahan selama 24 jam.
 class PaymentVerificationScreen extends StatefulWidget {
   final Booking booking;
   final String packageName;
@@ -29,11 +31,14 @@ class PaymentVerificationScreen extends StatefulWidget {
       _PaymentVerificationScreenState();
 }
 
-class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> {
+class _PaymentVerificationScreenState extends State<PaymentVerificationScreen>
+    with WidgetsBindingObserver {
   late Booking _booking = widget.booking;
   CheckoutConfig? _config;
   PlatformFile? _proof;
   bool _loading = false;
+  bool _checking = false;
+  bool _gatewayOpened = false;
   String? _error;
   String? _message;
   Timer? _ticker;
@@ -42,17 +47,29 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadConfig();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
     _statusTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (_booking.status == BookingStatus.paymentReview) _checkStatus();
+      if (_booking.status == BookingStatus.paymentReview ||
+          (_booking.usesMidtrans &&
+              _booking.status == BookingStatus.pendingPayment)) {
+        _checkStatus();
+      }
     });
+  }
+
+  /// Customer kembali dari browser Midtrans: status langsung diperbarui.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkStatus();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     _statusTimer?.cancel();
     super.dispose();
@@ -63,10 +80,11 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> {
       final value = await CheckoutConfig.load();
       if (mounted) setState(() => _config = value);
     } catch (e) {
-      if (mounted)
+      // Booking Midtrans tidak memakai rekening dari konfigurasi ini.
+      if (mounted && !_booking.usesMidtrans)
         setState(() => _error = e is ApiException
             ? e.message
-            : 'Rekening pembayaran belum dapat dimuat.');
+            : 'Informasi pembayaran belum dapat dimuat.');
     }
   }
 
@@ -74,9 +92,72 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> {
     if (_loading || _booking.bookingCode.isEmpty) return;
     try {
       final latest = await ApiService.trackBooking(_booking.bookingCode);
-      if (mounted) setState(() => _booking = latest);
+      if (!mounted) return;
+      if (!_booking.isPaidOrActive && latest.isPaidOrActive) {
+        _notify('Pembayaran berhasil dikonfirmasi.');
+      }
+      setState(() => _booking = latest);
     } catch (_) {
       // Pengguna dapat mencoba ulang melalui menu Booking.
+    }
+  }
+
+  void _notify(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
+  /// Endpoint pembayaran juga mencocokkan ulang status ke Midtrans, sehingga
+  /// pembayaran yang notifikasinya terlambat langsung tercatat.
+  Future<void> _checkOnlinePayment() async {
+    if (_loading || _checking) return;
+    setState(() {
+      _checking = true;
+      _error = null;
+      _message = null;
+    });
+    try {
+      await ApiService.startMidtransPayment(_booking.bookingCode);
+      final latest = await ApiService.trackBooking(_booking.bookingCode);
+      if (!mounted) return;
+      if (latest.isPaidOrActive) {
+        _notify('Pembayaran berhasil dikonfirmasi.');
+      } else if (latest.status == BookingStatus.pendingPayment) {
+        _notify(
+            'Pembayaran belum kami terima. Bila sudah membayar, tunggu sebentar lalu cek lagi.');
+      }
+      setState(() => _booking = latest);
+    } catch (e) {
+      if (mounted)
+        setState(() => _error = e is ApiException
+            ? e.message
+            : 'Status pembayaran belum dapat diperiksa.');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  Future<void> _payOnline() async {
+    if (_loading) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _message = null;
+    });
+    try {
+      final url = await ApiService.startMidtransPayment(_booking.bookingCode);
+      if (url.isEmpty) {
+        await _checkStatus();
+      } else if (await openExternal(Uri.parse(url))) {
+        if (mounted) setState(() => _gatewayOpened = true);
+      } else if (mounted) {
+        setState(() => _error = 'Halaman pembayaran tidak dapat dibuka.');
+      }
+    } catch (e) {
+      if (mounted)
+        setState(() => _error = e is ApiException
+            ? e.message
+            : 'Halaman pembayaran belum dapat dibuka.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -132,8 +213,35 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> {
     final review = _booking.status == BookingStatus.paymentReview;
     final pending = _booking.status == BookingStatus.pendingPayment &&
         !_booking.isPaymentExpired;
-    final style = bookingStatusStyle(
-        _booking.isPaymentExpired ? BookingStatus.expired : _booking.status);
+    final online = _booking.usesMidtrans;
+    final expired = _booking.isPaymentExpired;
+    final closed = !paid && !review && !pending;
+    final style =
+        bookingStatusStyle(expired ? BookingStatus.expired : _booking.status);
+    final String title;
+    final String subtitle;
+    if (paid) {
+      title = 'Pembayaran Dikonfirmasi';
+      subtitle =
+          'Pesanan sudah diteruskan ke mitra. E-tiket dapat dilihat di menu Booking.';
+    } else if (review) {
+      title = 'Menunggu Konfirmasi Admin';
+      subtitle =
+          'Booking belum diteruskan ke provider. Admin wajib memeriksa bukti maksimal 1×24 jam.';
+    } else if (closed) {
+      title = expired ? 'Waktu Pembayaran Habis' : style.label;
+      subtitle = expired
+          ? 'Kuota sudah dilepas. Silakan buat pesanan baru bila masih ingin berangkat.'
+          : 'Lihat detail pesanan di menu Booking.';
+    } else if (online) {
+      title = 'Pembayaran Online';
+      subtitle =
+          'Selesaikan pembayaran sebelum countdown berakhir. Status pesanan diperbarui otomatis.';
+    } else {
+      title = 'Transfer Manual';
+      subtitle =
+          'Simpan Booking ID dan selesaikan transfer sebelum countdown berakhir.';
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -155,26 +263,26 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> {
                       ? Icons.check_circle_outline
                       : review
                           ? Icons.verified_user_outlined
-                          : Icons.account_balance_outlined,
+                          : closed
+                              ? Icons.error_outline
+                              : online
+                                  ? Icons.payments_outlined
+                                  : Icons.account_balance_outlined,
                   size: 52,
-                  color: paid ? AppColors.success : AppColors.primary)),
+                  color: paid
+                      ? AppColors.success
+                      : closed
+                          ? AppColors.danger
+                          : AppColors.primary)),
           const SizedBox(height: 14),
-          Text(
-              paid
-                  ? 'Pembayaran Dikonfirmasi'
-                  : review
-                      ? 'Menunggu Konfirmasi Admin'
-                      : 'Transfer Manual',
+          Text(title,
               textAlign: TextAlign.center,
               style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textDark)),
           const SizedBox(height: 8),
-          Text(
-              review
-                  ? 'Booking belum diteruskan ke provider. Admin wajib memeriksa bukti maksimal 1×24 jam.'
-                  : 'Simpan Booking ID dan selesaikan transfer sebelum countdown berakhir.',
+          Text(subtitle,
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.textMuted, height: 1.5)),
           const SizedBox(height: 20),
@@ -182,18 +290,24 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                Row(children: [
-                  Expanded(
-                      child: Text(_booking.bookingCode,
-                          style: const TextStyle(fontWeight: FontWeight.w800))),
-                  StatusBadge(style)
-                ]),
+                // Wrap: label status yang panjang turun ke baris berikutnya
+                // alih-alih memecah kode booking per karakter.
+                Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(_booking.bookingCode,
+                          style: const TextStyle(fontWeight: FontWeight.w800)),
+                      StatusBadge(style)
+                    ]),
                 const SizedBox(height: 10),
                 Text(widget.packageName,
                     style: const TextStyle(fontWeight: FontWeight.w700)),
                 const Divider(height: 24),
-                const Text('TOTAL TRANSFER',
-                    style: TextStyle(fontSize: 11, color: AppColors.textLight)),
+                Text(online ? 'TOTAL PEMBAYARAN' : 'TOTAL TRANSFER',
+                    style: const TextStyle(
+                        fontSize: 11, color: AppColors.textLight)),
                 Text(formatIDR(_booking.totalPrice),
                     style: const TextStyle(
                         fontSize: 20,
@@ -201,7 +315,9 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> {
                         color: AppColors.priceTeal)),
                 if (pending && _booking.paymentDeadline != null) ...[
                   const SizedBox(height: 12),
-                  PaymentCountdown(deadline: _booking.paymentDeadline!)
+                  PaymentCountdown(
+                      deadline: _booking.paymentDeadline!,
+                      label: online ? 'Batas Pembayaran' : 'Batas Transfer')
                 ],
                 if (review && _booking.paymentReviewDeadline != null) ...[
                   const SizedBox(height: 12),
@@ -210,7 +326,65 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> {
                       label: 'Batas Konfirmasi Admin')
                 ],
               ])),
-          if (pending) ...[
+          if (pending && online) ...[
+            const SizedBox(height: 16),
+            SectionCard(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  const Row(children: [
+                    Icon(Icons.credit_card, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Text('Bayar Online',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w800)),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(
+                      _gatewayOpened
+                          ? 'Selesaikan pembayaran sesuai instruksi di halaman Midtrans, misalnya transfer ke nomor virtual account atau scan QRIS. Menutup aplikasi tidak membatalkan pesanan.'
+                          : 'Pilih virtual account, QRIS, atau e-wallet di halaman Midtrans. Pesanan terkonfirmasi otomatis setelah bayar, tanpa unggah bukti.',
+                      style: const TextStyle(
+                          color: AppColors.textMuted, height: 1.5)),
+                  const SizedBox(height: 14),
+                  PrimaryButton(
+                      label: _loading
+                          ? 'Membuka...'
+                          : _gatewayOpened
+                              ? 'Lanjutkan Pembayaran'
+                              : 'Bayar Sekarang',
+                      loading: _loading,
+                      color: AppColors.primary,
+                      onPressed: _checking ? null : _payOnline),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                      onPressed:
+                          _loading || _checking ? null : _checkOnlinePayment,
+                      icon: _checking
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.refresh, size: 18),
+                      label: Text(_checking
+                          ? 'Memeriksa...'
+                          : 'Sudah bayar? Cek status')),
+                  const SizedBox(height: 10),
+                  const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_outline,
+                            size: 14, color: AppColors.textLight),
+                        SizedBox(width: 4),
+                        Flexible(
+                          child: Text('Pembayaran aman diproses Midtrans',
+                              style: TextStyle(
+                                  fontSize: 12, color: AppColors.textLight)),
+                        ),
+                      ]),
+                ])),
+          ],
+          if (pending && !online) ...[
             const SizedBox(height: 16),
             SectionCard(
                 child: Column(

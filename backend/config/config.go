@@ -36,6 +36,8 @@ type Config struct {
 	IPaymuCallbackURL          string
 	IPaymuReturnURL            string
 	IPaymuCancelURL            string
+	MidtransServerKey          string // kosong: checkout tetap transfer bank manual
+	MidtransIsProduction       bool
 	ManualPaymentBankName      string
 	ManualPaymentAccountNumber string
 	ManualPaymentAccountHolder string
@@ -105,6 +107,8 @@ func LoadConfig() (*Config, error) {
 		IPaymuCallbackURL:          getEnv("IPAYMU_CALLBACK_URL", ""),
 		IPaymuReturnURL:            getEnv("IPAYMU_RETURN_URL", ""),
 		IPaymuCancelURL:            getEnv("IPAYMU_CANCEL_URL", ""),
+		MidtransServerKey:          getEnv("MIDTRANS_SERVER_KEY", ""),
+		MidtransIsProduction:       getBoolEnv("MIDTRANS_IS_PRODUCTION", false),
 		ManualPaymentBankName:      getEnv("MANUAL_PAYMENT_BANK_NAME", ""),
 		ManualPaymentAccountNumber: getEnv("MANUAL_PAYMENT_ACCOUNT_NUMBER", ""),
 		ManualPaymentAccountHolder: getEnv("MANUAL_PAYMENT_ACCOUNT_HOLDER", ""),
@@ -169,6 +173,9 @@ func LoadConfig() (*Config, error) {
 }
 
 func (c *Config) IsProduction() bool { return c.AppEnv == "production" }
+
+// UsesMidtrans bernilai true bila booking baru dibayar lewat Midtrans Snap.
+func (c *Config) UsesMidtrans() bool { return c.MidtransServerKey != "" }
 
 // UsesEmailAPI bernilai true bila email dikirim lewat API HTTPS (Brevo/Resend).
 func (c *Config) UsesEmailAPI() bool { return c.EmailAPIProvider != "" }
@@ -265,15 +272,18 @@ func (c *Config) Validate() error {
 	}
 
 	required := map[string]string{
-		"MANUAL_PAYMENT_BANK_NAME":      c.ManualPaymentBankName,
-		"MANUAL_PAYMENT_ACCOUNT_NUMBER": c.ManualPaymentAccountNumber,
-		"MANUAL_PAYMENT_ACCOUNT_HOLDER": c.ManualPaymentAccountHolder,
-		"GOOGLE_CLIENT_ID":              c.GoogleClientID,
-		"GOOGLE_CLIENT_SECRET":          c.GoogleClientSecret,
-		"GOOGLE_REDIRECT_URI":           c.GoogleRedirectURI,
-		"FRONTEND_URL":                  c.FrontendURL,
-		"BACKEND_URL":                   c.BackendURL,
-		"SMTP_FROM":                     c.SMTPFrom,
+		"GOOGLE_CLIENT_ID":     c.GoogleClientID,
+		"GOOGLE_CLIENT_SECRET": c.GoogleClientSecret,
+		"GOOGLE_REDIRECT_URI":  c.GoogleRedirectURI,
+		"FRONTEND_URL":         c.FrontendURL,
+		"BACKEND_URL":          c.BackendURL,
+		"SMTP_FROM":            c.SMTPFrom,
+	}
+	// Rekening manual hanya wajib bila checkout belum memakai Midtrans.
+	if !c.UsesMidtrans() {
+		required["MANUAL_PAYMENT_BANK_NAME"] = c.ManualPaymentBankName
+		required["MANUAL_PAYMENT_ACCOUNT_NUMBER"] = c.ManualPaymentAccountNumber
+		required["MANUAL_PAYMENT_ACCOUNT_HOLDER"] = c.ManualPaymentAccountHolder
 	}
 	if !c.UsesEmailAPI() {
 		required["SMTP_HOST"] = c.SMTPHost

@@ -342,6 +342,14 @@ class ApiService {
     return Booking.fromJson(_asMap(data));
   }
 
+  /// URL halaman Snap Midtrans; kosong bila booking tidak lagi menunggu
+  /// pembayaran (mis. baru saja lunas).
+  static Future<String> startMidtransPayment(String bookingCode) async {
+    final data = _asMap(await _request('POST',
+        '/public/bookings/${Uri.encodeComponent(bookingCode)}/midtrans'));
+    return '${data['paymentUrl'] ?? ''}';
+  }
+
   static Future<Booking> submitPaymentProof(
       String bookingCode, List<int> bytes, String fileName) async {
     if (bytes.isEmpty || bytes.length > 5 * 1024 * 1024) {

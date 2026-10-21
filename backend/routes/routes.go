@@ -81,6 +81,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			public.POST("/bookings", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.CreateBooking)
 			public.GET("/bookings/status/:code", middleware.RateLimit(30, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.GetPublicStatus)
 			public.POST("/bookings/:code/payment-proof", middleware.RateLimit(10, time.Hour), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.SubmitPaymentProof)
+			public.POST("/bookings/:code/midtrans", middleware.RateLimit(20, time.Minute), middleware.OptionalAuthMiddleware(db, cfg), bookingCtrl.StartMidtransPayment)
+			// Tanpa auth: keaslian dibuktikan signature_key dan cek ulang ke API status Midtrans.
+			public.POST("/webhooks/midtrans", bookingCtrl.MidtransWebhook)
 
 			// Auth routes
 			auth := public.Group("/auth")

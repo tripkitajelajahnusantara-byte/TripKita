@@ -80,6 +80,8 @@ const CANCELLED_WITH_REASON = ['REFUND_REQUIRED', 'REFUNDED', 'CANCELLED_BY_PROV
 // konstanta ini hanya dipakai selama konfigurasi belum termuat.
 const DEFAULT_PAYMENT_WINDOW_SECONDS = 24 * 60 * 60;
 
+const isOnlinePayment = (booking: { paymentMethod?: string }) => String(booking.paymentMethod || '').startsWith('Midtrans');
+
 const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; deadlineAt?: string; label?: string; onExpire?: () => void }> = ({ createdAt, windowSeconds, deadlineAt, label = 'Batas Transfer', onExpire }) => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const onExpireRef = useRef(onExpire);
@@ -841,7 +843,7 @@ export const CustomerHistoryPage: React.FC = () => {
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                           <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Menunggu Pembayaran</strong>
-                          <CountdownTimer createdAt={booking.createdAt} deadlineAt={(booking as any).paymentDeadline} windowSeconds={paymentWindowSeconds} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
+                          <CountdownTimer createdAt={booking.createdAt} deadlineAt={(booking as any).paymentDeadline} windowSeconds={paymentWindowSeconds} label={isOnlinePayment(booking) ? 'Batas Pembayaran' : undefined} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
                         </div>
 
                         {booking.paymentReviewNotes && (
@@ -851,7 +853,11 @@ export const CustomerHistoryPage: React.FC = () => {
                         )}
                         
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
-                          Silakan transfer sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> lalu unggah bukti pembayaran sebelum countdown berakhir.
+                          {isOnlinePayment(booking) ? (
+                            <>Bayar online sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> lewat virtual account, QRIS, atau e-wallet sebelum countdown berakhir. Pesanan terkonfirmasi otomatis.</>
+                          ) : (
+                            <>Silakan transfer sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> lalu unggah bukti pembayaran sebelum countdown berakhir.</>
+                          )}
                         </span>
                         
                         <div style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>

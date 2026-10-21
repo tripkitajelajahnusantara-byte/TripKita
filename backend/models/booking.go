@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 )
 
@@ -82,6 +83,14 @@ const (
 )
 
 const AdminPaymentReviewWindow = 24 * time.Hour
+
+// PaymentMethodMidtrans menandai booking yang dibayar online lewat Midtrans
+// Snap; setelah lunas nilainya menjadi "Midtrans <payment_type>".
+const PaymentMethodMidtrans = "Midtrans"
+
+func (b *Booking) UsesMidtrans() bool {
+	return strings.HasPrefix(b.PaymentMethod, PaymentMethodMidtrans)
+}
 
 type ReviewManualPaymentRequest struct {
 	Decision string `json:"decision" binding:"required,oneof=APPROVED REJECTED"`

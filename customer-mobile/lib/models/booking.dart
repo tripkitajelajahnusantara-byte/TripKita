@@ -126,6 +126,7 @@ class Booking {
   final String unitName;
   final List<AddOn> addOns;
   final String status;
+  final String paymentMethod;
   final String paymentUrl;
   final String paymentProof;
   final DateTime? paymentProofSubmittedAt;
@@ -154,6 +155,7 @@ class Booking {
     this.unitName = '',
     this.addOns = const [],
     this.status = BookingStatus.pendingPayment,
+    this.paymentMethod = '',
     this.paymentUrl = '',
     this.paymentProof = '',
     this.paymentProofSubmittedAt,
@@ -197,6 +199,7 @@ class Booking {
       status: asString(json['status']).isEmpty
           ? BookingStatus.pendingPayment
           : asString(json['status']),
+      paymentMethod: asString(json['paymentMethod']),
       paymentUrl: asString(json['paymentUrl']).isNotEmpty
           ? asString(json['paymentUrl'])
           : asString(json['payment_url']),
@@ -232,6 +235,9 @@ class Booking {
         deadline != null &&
         DateTime.now().isAfter(deadline);
   }
+
+  /// Booking dibayar online lewat Midtrans; tidak memakai bukti transfer.
+  bool get usesMidtrans => paymentMethod.startsWith('Midtrans');
 
   bool get isPaidOrActive =>
       status == BookingStatus.paid ||

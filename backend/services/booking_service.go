@@ -37,6 +37,8 @@ type BookingService interface {
 	GetBookingByCode(code string) (*models.Booking, error)
 	AdminGetAllBookings() ([]models.Booking, error)
 	ExpirePendingBooking(id uint, cutoff time.Time) error
+	StartMidtransPayment(bookingID uint) (*models.Booking, error)
+	HandleMidtransNotification(n *MidtransNotification) error
 }
 
 // ExpirePendingBooking digunakan job rekonsiliasi agar perubahan status yang
@@ -71,6 +73,7 @@ type bookingService struct {
 	repo          repositories.BookingRepository
 	packageRepo   repositories.PackageRepository
 	ipaymuService IPaymuService
+	midtrans      MidtransService
 	emailService  *EmailService
 	notifService  *NotificationService
 }
@@ -87,11 +90,12 @@ type BookingEmailError struct{ Message string }
 
 func (e *BookingEmailError) Error() string { return e.Message }
 
-func NewBookingService(repo repositories.BookingRepository, packageRepo repositories.PackageRepository, ipaymuService IPaymuService, emailService *EmailService, notifService *NotificationService) BookingService {
+func NewBookingService(repo repositories.BookingRepository, packageRepo repositories.PackageRepository, ipaymuService IPaymuService, midtrans MidtransService, emailService *EmailService, notifService *NotificationService) BookingService {
 	return &bookingService{
 		repo:          repo,
 		packageRepo:   packageRepo,
 		ipaymuService: ipaymuService,
+		midtrans:      midtrans,
 		emailService:  emailService,
 		notifService:  notifService,
 	}
@@ -530,6 +534,9 @@ func (s *bookingService) CreateBooking(booking *models.Booking) error {
 		booking.TotalPrice = pkg.BasePrice(booking.Guests) + addOnTotal + serviceFee
 		booking.Status = models.StatusPendingPayment
 		booking.PaymentMethod = "Transfer Bank Manual"
+		if s.midtrans != nil {
+			booking.PaymentMethod = models.PaymentMethodMidtrans
+		}
 		booking.PaymentURL = ""
 		booking.BookingCode = ""
 
@@ -577,6 +584,9 @@ func (s *bookingService) SubmitPaymentProof(bookingID uint, proofPath string) (*
 		}
 		if booking.Status != models.StatusPendingPayment {
 			return &BookingInputError{Message: "bukti transfer hanya dapat dikirim untuk booking yang menunggu pembayaran"}
+		}
+		if booking.UsesMidtrans() {
+			return &BookingInputError{Message: "pesanan ini dibayar online melalui Midtrans; bukti transfer tidak diperlukan"}
 		}
 		now := time.Now()
 		if !now.Before(paymentAcceptanceEnd(&booking)) {
@@ -1045,7 +1055,7 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID stri
 		return recalculatePackageQuotaTx(tx, booking.PackageID)
 	})
 	if err != nil {
-		log.Printf("[iPaymu Webhook] gagal memproses event: %v", err)
+		log.Printf("[Payment Webhook] gagal memproses event: %v", err)
 		return err
 	}
 	if changed {
@@ -1201,6 +1211,9 @@ func (s *bookingService) sendNotificationsAndEmails(booking *models.Booking, old
 			} else if oldS == "" {
 				title = "Pesanan Dibuat, Menunggu Pembayaran"
 				msgCustomer = fmt.Sprintf("Pesanan #%s (%s) dibuat. Transfer sesuai tagihan dan unggah bukti sebelum batas waktu.", b.BookingCode, packageName)
+				if b.UsesMidtrans() {
+					msgCustomer = fmt.Sprintf("Pesanan #%s (%s) dibuat. Selesaikan pembayaran online sebelum batas waktu.", b.BookingCode, packageName)
+				}
 				if s.emailService != nil {
 					sendEmail(s.emailService.SendManualPaymentInstructionEmail(&b, packageName, models.PaymentDeadline(&b)))
 				}
