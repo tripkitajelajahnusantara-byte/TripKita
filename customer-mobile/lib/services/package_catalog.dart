@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:customer_mobile/models/package.dart';
 import 'package:customer_mobile/services/api_service.dart';
 
@@ -8,6 +10,13 @@ class PackageCatalog {
   static List<TripPackage>? _cache;
   static DateTime? _fetchedAt;
   static const _maxAge = Duration(minutes: 2);
+
+  /// Katalog tetap untuk tes widget, tanpa memanggil backend.
+  @visibleForTesting
+  static set debugCache(List<TripPackage>? packages) {
+    _cache = packages;
+    _fetchedAt = packages == null ? null : DateTime.now();
+  }
 
   static Future<List<TripPackage>> load({bool force = false}) {
     final fresh = _fetchedAt != null && DateTime.now().difference(_fetchedAt!) < _maxAge;

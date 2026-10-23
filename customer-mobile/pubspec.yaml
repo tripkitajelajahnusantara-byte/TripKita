@@ -10,9 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
 
   cupertino_icons: ^1.0.8
-  google_fonts: ^6.2.1
   http: ^1.2.2
   intl: ^0.19.0
   url_launcher: ^6.3.1
@@ -20,6 +21,9 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   file_picker: ^8.1.7
   flutter_svg: ^2.2.2
+  share_plus: ^10.1.4
+  geolocator: ^13.0.4
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:
@@ -27,12 +31,14 @@ dev_dependencies:
   flutter_lints: ^2.0.0
 
 flutter:
+  # Dipakai bila `--flavor` tidak diberikan; production hanya lewat `--flavor production`.
+  default-flavor: staging
   uses-material-design: true
   assets:
     - assets/images/
     - assets/icons/
-  # Roboto statis dipaketkan karena google_fonts tidak punya bobot 600
-  # (SemiBold) yang dipakai desain Figma.
+  # Roboto statis dipaketkan karena desain Figma memakai bobot 600
+  # (SemiBold) dan aplikasi tidak bergantung pada unduhan font.
   fonts:
     - family: Roboto
       fonts:

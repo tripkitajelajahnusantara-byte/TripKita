@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:customer_mobile/config/app_config.dart';
 import 'package:customer_mobile/models/package.dart';
 import 'package:customer_mobile/services/auth_session.dart';
 import 'package:customer_mobile/services/wishlist_store.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
-import 'package:customer_mobile/utils/external_links.dart';
 import 'package:customer_mobile/utils/formatters.dart';
 import 'package:customer_mobile/utils/trip_utils.dart';
 import 'package:customer_mobile/widgets/common.dart';
+import 'package:customer_mobile/widgets/share_package_sheet.dart';
 
 /// Warna badge & highlight per bagian beranda, sama dengan web.
 class TripCardTone {
@@ -97,55 +96,6 @@ class ShareButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return _RoundIconButton(icon: Icons.share_outlined, color: AppColors.textBody, onTap: () => showSharePackageSheet(context, pkg));
   }
-}
-
-/// Lembar "Bagikan Paket", padanan `ShareModal` web.
-Future<void> showSharePackageSheet(BuildContext context, TripPackage pkg) {
-  final link = AppConfig.webBaseUrl.isEmpty ? '' : '${AppConfig.webBaseUrl}/#/paket-detail?id=${pkg.id}';
-  final message = 'Halo! Cek paket wisata "${pkg.name}" di TripKita!\n\n'
-      '📍 Destinasi: ${pkg.destination.isEmpty ? 'Indonesia' : pkg.destination}\n'
-      '💰 Harga: ${formatIDR(pkg.price)} ${pkg.priceUnitLabel}'
-      '${link.isEmpty ? '' : '\n\nLihat detail paket selengkapnya di sini:\n$link'}';
-
-  return showModalBottomSheet<void>(
-    context: context,
-    builder: (sheetContext) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Bagikan Paket', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
-            Text(pkg.name, style: const TextStyle(color: AppColors.textMuted)),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.whatsapp),
-              onPressed: () {
-                Navigator.pop(sheetContext);
-                openExternal(Uri.parse('https://wa.me/?text=${Uri.encodeComponent(message)}'));
-              },
-              icon: const Icon(Icons.chat_outlined),
-              label: const Text('Bagikan ke WhatsApp'),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: message));
-                if (sheetContext.mounted) {
-                  Navigator.pop(sheetContext);
-                  showSnack(context, 'Info paket berhasil disalin.');
-                }
-              },
-              icon: const Icon(Icons.copy_outlined),
-              label: const Text('Salin Info Paket'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }
 
 class _HighlightPill extends StatelessWidget {
@@ -394,7 +344,10 @@ class _TripSummary extends StatelessWidget {
   /// daftar mendatar.
   final bool fixedHeight;
 
-  const _TripSummary(this.pkg, {required this.fixedHeight});
+  /// Gaya kartu Cari Trip: meta huruf besar dan rating di kanan.
+  final bool listStyle;
+
+  const _TripSummary(this.pkg, {required this.fixedHeight, this.listStyle = false});
 
   @override
   Widget build(BuildContext context) {
@@ -402,7 +355,7 @@ class _TripSummary extends StatelessWidget {
     final title = Text(pkg.name,
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 18, height: 26 / 18, fontWeight: FontWeight.w600, color: AppColors.heading));
+        style: const TextStyle(fontSize: 18, height: 26 / 18, fontWeight: FontWeight.w600, color: AppColors.textStrong));
     final facilityText = Text.rich(
       TextSpan(children: [
         for (var i = 0; i < facilities.length; i++) ...[
@@ -413,11 +366,25 @@ class _TripSummary extends StatelessWidget {
       ]),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontSize: 12, height: 18 / 12, color: AppColors.textLight),
+      style: TextStyle(fontSize: 12, height: 18 / 12, color: listStyle ? AppColors.textMuted : AppColors.textLight),
     );
+    final meta = '${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${pkg.durationDays} hari';
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${pkg.durationDays} hari',
-          style: const TextStyle(fontSize: 12, height: 18 / 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
+      Row(children: [
+        Expanded(
+          child: Text(listStyle ? meta.toUpperCase() : meta,
+              style: TextStyle(
+                  fontSize: 12,
+                  height: 18 / 12,
+                  fontWeight: FontWeight.w500,
+                  color: listStyle ? AppColors.textMedium : AppColors.textMuted)),
+        ),
+        if (listStyle && pkg.rating > 0) ...[
+          const Icon(Icons.star_rounded, size: 16, color: AppColors.star),
+          const SizedBox(width: 2),
+          Text(ratingLabel(pkg), style: const TextStyle(fontSize: 12, height: 18 / 12, color: AppColors.textMedium)),
+        ],
+      ]),
       const SizedBox(height: 2),
       fixedHeight ? SizedBox(height: 78, child: title) : title,
       Row(children: [
@@ -450,16 +417,17 @@ class _PriceTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-      const Text('mulai dari',
+      const Text('Mulai dari',
           textAlign: TextAlign.right,
-          style: TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textLight)),
+          style: TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMuted)),
       Text.rich(
         TextSpan(children: [
           TextSpan(
               text: formatPrice(pkg.price),
-              style: const TextStyle(fontSize: 20, height: 24 / 20, fontWeight: FontWeight.w700, color: AppColors.brand)),
+              style: const TextStyle(fontSize: 20, height: 24 / 20, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
           TextSpan(
-              text: ' ${pkg.priceUnitLabel}', style: const TextStyle(fontSize: 14, height: 24 / 14, color: AppColors.textLight)),
+              text: pkg.isPerUnit ? ' /${pkg.unitLabel}' : ' /orang',
+              style: const TextStyle(fontSize: 14, height: 24 / 14, color: AppColors.textMedium)),
         ]),
         textAlign: TextAlign.right,
       ),
@@ -526,7 +494,7 @@ class TripListCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _TripSummary(pkg, fixedHeight: false),
+            _TripSummary(pkg, fixedHeight: false, listStyle: true),
             if (dateLabel != null) ...[
               const SizedBox(height: 10),
               Container(
@@ -591,7 +559,7 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
           : NetworkPhoto(coverImageFor(pkg)),
       if (pkg.category.isNotEmpty) Positioned(left: 0, top: 12, child: _CategoryLabel(pkg.category)),
       Positioned(right: 12, top: 12, child: _FavoriteHeart(pkg, size: 24)),
-      Positioned(left: 12, bottom: 12, child: _RatingBadge(pkg, large: true)),
+      if (pkg.rating <= 0) Positioned(left: 12, bottom: 12, child: _RatingBadge(pkg, large: true)),
       if (photos.length > 1)
         Positioned(
           left: 0,

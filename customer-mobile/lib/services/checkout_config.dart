@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:customer_mobile/services/api_service.dart';
 
 /// Angka checkout dari `GET /public/checkout-config`, satu sumber dengan
@@ -21,6 +23,10 @@ class CheckoutConfig {
 
   static CheckoutConfig? _cached;
   static Future<CheckoutConfig>? _pending;
+
+  /// Konfigurasi tetap untuk tes widget, tanpa memanggil backend.
+  @visibleForTesting
+  static set debugCached(CheckoutConfig? config) => _cached = config;
 
   /// Masa berlaku transfer untuk hitung mundur. Sebelum konfigurasi termuat
   /// dipakai 24 jam, nilai yang sama dengan `models.PaymentWindow` backend;

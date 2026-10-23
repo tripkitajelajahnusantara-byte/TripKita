@@ -98,6 +98,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 				auth.GET("/google", oauthCtrl.RedirectToGoogle)
 				auth.GET("/google/callback", oauthCtrl.GoogleCallback)
 				auth.POST("/google/exchange", oauthCtrl.ExchangeLoginCode)
+				auth.POST("/google/mobile", middleware.RateLimit(10, time.Minute), oauthCtrl.GoogleMobileLogin)
 
 				auth.POST("/provider/forgot-password", middleware.RateLimit(5, time.Hour), authCtrl.ProviderForgotPassword)
 				auth.POST("/provider/reset-password", middleware.RateLimit(10, time.Hour), authCtrl.ProviderResetPassword)

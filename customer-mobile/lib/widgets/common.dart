@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:customer_mobile/models/booking.dart';
@@ -159,11 +160,7 @@ class PrimaryButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          shadowColor: color.withValues(alpha: 0.35),
-          elevation: onPressed == null || loading ? 0 : 3,
-        ),
+        style: ElevatedButton.styleFrom(backgroundColor: color),
         onPressed: loading ? null : onPressed,
         child: loading
             ? const SizedBox(
@@ -320,11 +317,7 @@ class InfoBanner extends StatelessWidget {
                   ),
                 if (message != null)
                   Text(message!,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: textColor,
-                          height: 1.5,
-                          fontWeight: FontWeight.w600)),
+                      style: TextStyle(fontSize: 12, color: textColor, height: 1.45)),
                 if (child != null) child!,
               ],
             ),
@@ -355,16 +348,16 @@ class TripPriceRows extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       PriceRow(
           units > 0
-              ? '$units ${package.unitLabel} × ${formatIDR(package.price)}'
-              : 'Harga (${guests}x)',
-          formatIDR(base)),
+              ? '$units ${package.unitLabel} × ${formatPrice(package.price)}'
+              : 'Harga (Paket ${guests}x)',
+          formatPrice(base)),
       if (units > 0 && guests > 0)
-        Text('≈ ${formatIDR((base / guests).round())}/orang untuk $guests peserta',
+        Text('≈ ${formatPrice((base / guests).round())}/orang untuk $guests peserta',
             style: const TextStyle(fontSize: 12, color: AppColors.textLight)),
       for (final a in addOns)
         PriceRow(
             a.perPerson ? '${a.name} (${guests}x)' : a.name,
-            '+${formatIDR(a.subtotalFor(guests))}'),
+            '+${formatPrice(a.subtotalFor(guests))}'),
     ]);
   }
 }
@@ -380,14 +373,15 @@ class PriceRow extends StatelessWidget {
     this.label,
     this.value, {
     super.key,
-    this.labelColor = AppColors.textMuted,
+    this.labelColor = AppColors.textMedium,
     this.valueColor = AppColors.textDark,
     this.emphasize = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final size = emphasize ? 16.0 : 13.5;
+    final size = emphasize ? 16.0 : 14.0;
+    final weight = emphasize ? FontWeight.w600 : FontWeight.w400;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -398,15 +392,15 @@ class PriceRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: size,
                   color: emphasize ? AppColors.textDark : labelColor,
-                  fontWeight: emphasize ? FontWeight.w800 : FontWeight.w500,
+                  fontWeight: weight,
                 )),
           ),
           const SizedBox(width: 12),
           Text(value,
               style: TextStyle(
-                fontSize: emphasize ? 18 : size,
+                fontSize: size,
                 color: valueColor,
-                fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+                fontWeight: emphasize ? FontWeight.w600 : FontWeight.w500,
               )),
         ],
       ),
@@ -830,63 +824,305 @@ class BadgeChip extends StatelessWidget {
   }
 }
 
-/// Lembar bawah bergaya Figma: pegangan, tombol tutup (X), dan judul.
+/// Lembar bawah bergaya Figma: pegangan, judul (dengan tombol tutup X
+/// opsional), isi yang dapat digulir, dan [footer] tetap di bawah.
 Future<T?> showDesignSheet<T>(
   BuildContext context, {
   required String title,
   required WidgetBuilder builder,
+  String? subtitle,
+  bool showClose = true,
+  WidgetBuilder? footer,
+  bool expand = false,
 }) {
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: Colors.white,
     barrierColor: const Color(0xB3000000),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
-      child: DefaultTextStyle.merge(
-        style: figmaTextStyle,
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 8),
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 4,
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 56,
-                child: Row(children: [
-                  const SizedBox(width: 16),
-                  IconButton(
-                    tooltip: 'Tutup',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-                    onPressed: () => Navigator.pop(sheetContext),
-                    icon: const AppIcon('x', color: AppColors.textLight),
+    builder: (sheetContext) {
+      final maxHeight = MediaQuery.sizeOf(sheetContext).height * 0.92;
+      final body = builder(sheetContext);
+      return Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
+        child: DefaultTextStyle.merge(
+          style: figmaTextStyle,
+          child: SafeArea(
+            top: false,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: Column(
+                mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 4,
+                      decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                    ),
                   ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textMedium)),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 48,
+                    child: Row(children: [
+                      SizedBox(width: showClose ? 8 : 16),
+                      if (showClose) ...[
+                        IconButton(
+                          tooltip: 'Tutup',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+                          onPressed: () => Navigator.pop(sheetContext),
+                          icon: const AppIcon('x', color: AppColors.textLight),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Expanded(
+                        child: Text(title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                      ),
+                      const SizedBox(width: 16),
+                    ]),
                   ),
-                ]),
+                  if (subtitle != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                      child: Text(subtitle, style: const TextStyle(fontSize: 14, color: AppColors.textMuted, height: 1.4)),
+                    ),
+                  const SizedBox(height: 8),
+                  if (expand) Expanded(child: body) else Flexible(child: body),
+                  if (footer != null) footer(sheetContext),
+                ],
               ),
-              const SizedBox(height: 4),
-              builder(sheetContext),
-            ],
+            ),
           ),
         ),
+      );
+    },
+  );
+}
+
+/// Bilah aksi bawah berlatar putih dengan garis atas, dipakai CTA halaman
+/// dan footer lembar bawah.
+class BottomActionBar extends StatelessWidget {
+  final Widget child;
+
+  const BottomActionBar({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 12), child: child),
+      ),
+    );
+  }
+}
+
+/// Footer form lembar bawah: "Batal" (garis) dan "Simpan" (isi).
+class SheetFormFooter extends StatelessWidget {
+  final VoidCallback onSave;
+  final String saveLabel;
+
+  const SheetFormFooter({super.key, required this.onSave, this.saveLabel = 'Simpan'});
+
+  @override
+  Widget build(BuildContext context) {
+    return BottomActionBar(
+      child: Row(children: [
+        Expanded(
+          child: OutlinedButton(onPressed: () => Navigator.maybePop(context), child: const Text('Batal')),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: ElevatedButton(onPressed: onSave, child: Text(saveLabel))),
+      ]),
+    );
+  }
+}
+
+/// Indikator dua langkah checkout: "Data Peserta" lalu "Pembayaran".
+class CheckoutSteps extends StatelessWidget {
+  final int current;
+
+  const CheckoutSteps({super.key, required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget step(String label, int index) {
+      final done = index <= current;
+      return Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            height: 3,
+            decoration: BoxDecoration(
+              color: done ? AppColors.accent : AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: index == current ? FontWeight.w500 : FontWeight.w400,
+                color: index == current ? AppColors.primaryDark : (done ? AppColors.textMedium : AppColors.textLight),
+              )),
+        ]),
+      );
+    }
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Row(children: [step('Data Peserta', 0), const SizedBox(width: 6), step('Pembayaran', 1)]),
+    );
+  }
+}
+
+/// Judul bagian halaman (18, SemiBold).
+class SectionTitle extends StatelessWidget {
+  final String text;
+  final Widget? trailing;
+
+  const SectionTitle(this.text, {super.key, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Expanded(
+        child: Text(text,
+            style: const TextStyle(fontSize: 18, height: 1.3, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+      ),
+      if (trailing != null) trailing!,
+    ]);
+  }
+}
+
+/// Kartu bergaya tiket: bagian atas dan bawah dipisah garis putus-putus
+/// dengan takik setengah lingkaran di kedua sisi.
+class TicketCard extends StatelessWidget {
+  final Widget top;
+  final Widget bottom;
+
+  const TicketCard({super.key, required this.top, required this.bottom});
+
+  @override
+  Widget build(BuildContext context) {
+    final notchColor = Theme.of(context).scaffoldBackgroundColor;
+    Widget notch(bool left) => Positioned(
+          left: left ? -7 : null,
+          right: left ? null : -7,
+          top: -7,
+          child: Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              color: notchColor,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.border),
+            ),
+          ),
+        );
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(padding: const EdgeInsets.all(16), child: top),
+        Stack(clipBehavior: Clip.none, children: [
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: DashedLine()),
+          notch(true),
+          notch(false),
+        ]),
+        Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), child: bottom),
+      ]),
+    );
+  }
+}
+
+class DashedLine extends StatelessWidget {
+  final Color color;
+
+  const DashedLine({super.key, this.color = AppColors.borderStrong});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final count = (constraints.maxWidth / 7).floor();
+      return Row(children: [
+        for (var i = 0; i < count; i++)
+          Expanded(child: Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 1.5), color: color)),
+      ]);
+    });
+  }
+}
+
+/// Tombol pil kecil "Salin" yang menyalin [text] ke clipboard.
+class CopyChip extends StatelessWidget {
+  final String text;
+  final String message;
+
+  const CopyChip(this.text, {super.key, this.message = 'Disalin.'});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 30),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: const TextStyle(fontFamily: 'Roboto', fontSize: 13, fontWeight: FontWeight.w500),
+      ),
+      onPressed: () async {
+        await Clipboard.setData(ClipboardData(text: text));
+        if (context.mounted) showSnack(context, message);
+      },
+      icon: const Icon(Icons.copy_rounded, size: 16),
+      label: const Text('Salin'),
+    );
+  }
+}
+
+/// Dialog konfirmasi bergaya Figma: judul, pesan, lalu tombol utama dan
+/// tombol garis bertumpuk. Mengembalikan true bila dikonfirmasi.
+Future<bool> showActionDialog(
+  BuildContext context, {
+  required String title,
+  required Widget message,
+  required String confirmLabel,
+  required String cancelLabel,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+          const SizedBox(height: 8),
+          DefaultTextStyle.merge(
+            style: const TextStyle(fontSize: 14, height: 1.45, color: AppColors.textMedium),
+            child: message,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text(confirmLabel)),
+          const SizedBox(height: 8),
+          OutlinedButton(onPressed: () => Navigator.pop(context, false), child: Text(cancelLabel)),
+        ]),
       ),
     ),
   );
+  return result ?? false;
 }

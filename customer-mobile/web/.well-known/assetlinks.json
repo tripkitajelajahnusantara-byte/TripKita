@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.tementrip.mobileapp",
+      "sha256_cert_fingerprints": [
+        "1D:26:1D:0A:16:FC:D9:46:74:D4:B8:03:1C:4A:7D:9A:3E:89:97:45:94:EF:06:FF:72:15:21:A9:B7:C3:11:AD"
+      ]
+    }
+  }
+]

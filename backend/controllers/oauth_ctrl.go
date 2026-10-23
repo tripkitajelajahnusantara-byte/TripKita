@@ -211,6 +211,85 @@ func fetchGoogleProfile(client *http.Client, accessToken string) (googleIdentity
 	return profile, nil
 }
 
+// googleTokenInfoURL berupa variabel agar tes dapat mengarahkannya ke server lokal.
+var googleTokenInfoURL = "https://oauth2.googleapis.com/tokeninfo"
+
+var errInvalidGoogleIDToken = errors.New("invalid Google ID token")
+
+// GoogleMobileLogin menerima ID token dari Google Sign-In native di aplikasi
+// customer. Audiens token wajib GOOGLE_CLIENT_ID, sehingga token yang
+// diterbitkan untuk aplikasi lain tidak dapat dipakai login di sini.
+func (ctrl *OAuthController) GoogleMobileLogin(c *gin.Context) {
+	var req struct {
+		IDToken string `json:"id_token" binding:"required,max=4096"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token Google tidak valid"})
+		return
+	}
+	if ctrl.cfg.GoogleClientID == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Google OAuth belum dikonfigurasi"})
+		return
+	}
+	profile, err := verifyGoogleIDToken(&http.Client{Timeout: 10 * time.Second}, req.IDToken, ctrl.cfg.GoogleClientID)
+	if errors.Is(err, errInvalidGoogleIDToken) {
+		log.Printf("[OAuth] mobile ID token rejected: %v", err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Login Google tidak valid. Silakan coba lagi."})
+		return
+	}
+	if err != nil {
+		log.Printf("[OAuth] tokeninfo request failed: %v", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Google authentication sedang tidak tersedia"})
+		return
+	}
+	user, provider, err := ctrl.findOrCreateOAuthUser("customer", profile)
+	if err != nil {
+		log.Printf("[OAuth] account processing failed: %v", err)
+		c.JSON(http.StatusForbidden, gin.H{"error": "Akun Google tidak dapat digunakan untuk login ini"})
+		return
+	}
+	token, err := authn.IssueSession(c.Request.Context(), ctrl.db, user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat sesi login"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"token": token, "provider": provider})
+}
+
+// shortcut: tokeninfo menambah satu panggilan HTTP ke Google per login; ganti
+// ke verifikasi JWKS lokal (google.golang.org/api/idtoken) bila volume login besar.
+func verifyGoogleIDToken(client *http.Client, idToken, audience string) (googleIdentity, error) {
+	resp, err := client.Get(googleTokenInfoURL + "?id_token=" + url.QueryEscape(idToken))
+	if err != nil {
+		return googleIdentity{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return googleIdentity{}, fmt.Errorf("%w: tokeninfo status %d", errInvalidGoogleIDToken, resp.StatusCode)
+	}
+	// tokeninfo sudah memeriksa tanda tangan dan masa berlaku; audiens dan
+	// penerbit tetap wajib dicek. email_verified dikirim sebagai string "true".
+	var claims struct {
+		Audience      string `json:"aud"`
+		Issuer        string `json:"iss"`
+		Subject       string `json:"sub"`
+		Email         string `json:"email"`
+		Name          string `json:"name"`
+		EmailVerified any    `json:"email_verified"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&claims); err != nil {
+		return googleIdentity{}, fmt.Errorf("%w: %v", errInvalidGoogleIDToken, err)
+	}
+	if claims.Audience != audience || (claims.Issuer != "accounts.google.com" && claims.Issuer != "https://accounts.google.com") {
+		return googleIdentity{}, fmt.Errorf("%w: unexpected aud/iss", errInvalidGoogleIDToken)
+	}
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
+	if claims.Subject == "" || email == "" || fmt.Sprint(claims.EmailVerified) != "true" {
+		return googleIdentity{}, fmt.Errorf("%w: missing verified identity", errInvalidGoogleIDToken)
+	}
+	return googleIdentity{Subject: claims.Subject, Email: email, Name: claims.Name, EmailVerified: true}, nil
+}
+
 func (ctrl *OAuthController) findOrCreateOAuthUser(authType string, profile googleIdentity) (models.User, models.Provider, error) {
 	var user models.User
 	var provider models.Provider

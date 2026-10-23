@@ -1,0 +1,2 @@
+C:/Users/gerry/Documents/TripKita/customer-mobile/android/app/.cxx/Debug/y696p5e6/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/gerry/Documents/TripKita/customer-mobile/android/app/.cxx/Debug/y696p5e6/arm64-v8a/CMakeFiles/rebuild_cache.dir

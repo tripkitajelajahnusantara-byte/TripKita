@@ -6,9 +6,22 @@ class AppConfig {
     defaultValue: 'https://tripkita-production.up.railway.app/api/v1',
   );
 
-  /// URL web customer untuk tautan "Bagikan Paket". Kosong berarti pesan yang
-  /// dibagikan tidak menyertakan tautan.
-  static const String webBaseUrl = String.fromEnvironment('WEB_BASE_URL', defaultValue: '');
+  /// Host web (Flutter web di Firebase Hosting) untuk tautan "Bagikan Paket"
+  /// `<webBaseUrl>/paket/<id>`. Di Android, tautan ini dibuka langsung oleh
+  /// aplikasi (App Links, lihat `web/.well-known/assetlinks.json` dan
+  /// `AndroidManifest.xml`); tanpa aplikasi, tautan membuka web.
+  static const String webBaseUrl = String.fromEnvironment('WEB_BASE_URL', defaultValue: 'https://tementrip-app.web.app');
+
+  /// `staging` menandai build uji: halaman pembayaran menampilkan petunjuk
+  /// Midtrans Sandbox.
+  static const String environment = String.fromEnvironment('APP_ENV', defaultValue: 'production');
+
+  static bool get isStaging => environment == 'staging';
+
+  /// Client ID OAuth tipe "Web application", sama dengan `GOOGLE_CLIENT_ID`
+  /// backend. Google menerbitkan ID token untuk audiens ini. Kosong berarti
+  /// tombol "Lanjutkan dengan Google" disembunyikan.
+  static const String googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
 
   /// Origin backend tanpa `/api/v1`, dipakai untuk melengkapi path gambar
   /// relatif seperti `/uploads/paket.jpg`.

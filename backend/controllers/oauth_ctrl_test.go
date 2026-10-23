@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -102,6 +104,54 @@ func TestGoogleRedirectSetsBoundStateAndPKCECookies(t *testing.T) {
 	for _, cookie := range cookies {
 		if cookie.Path != oauthCookiePath || !cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteLaxMode {
 			t.Fatalf("atribut cookie OAuth tidak aman: %+v", cookie)
+		}
+	}
+}
+
+func TestVerifyGoogleIDTokenChecksAudienceAndVerifiedEmail(t *testing.T) {
+	claims := map[string]string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("id_token") == "expired" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(claims)
+	}))
+	defer server.Close()
+	previous := googleTokenInfoURL
+	googleTokenInfoURL = server.URL
+	defer func() { googleTokenInfoURL = previous }()
+
+	valid := map[string]string{"aud": "web.apps.googleusercontent.com", "iss": "https://accounts.google.com", "sub": "123", "email": " User@Gmail.com ", "email_verified": "true", "name": "User"}
+	cases := []struct {
+		name     string
+		override map[string]string
+		token    string
+		wantErr  bool
+	}{
+		{"valid", nil, "ok", false},
+		{"audiens aplikasi lain", map[string]string{"aud": "other.apps.googleusercontent.com"}, "ok", true},
+		{"penerbit palsu", map[string]string{"iss": "evil.example.com"}, "ok", true},
+		{"email belum terverifikasi", map[string]string{"email_verified": "false"}, "ok", true},
+		{"token ditolak Google", nil, "expired", true},
+	}
+	for _, tc := range cases {
+		claims = map[string]string{}
+		for k, v := range valid {
+			claims[k] = v
+		}
+		for k, v := range tc.override {
+			claims[k] = v
+		}
+		profile, err := verifyGoogleIDToken(server.Client(), tc.token, "web.apps.googleusercontent.com")
+		if tc.wantErr {
+			if !errors.Is(err, errInvalidGoogleIDToken) {
+				t.Fatalf("%s: diharapkan errInvalidGoogleIDToken, got %v", tc.name, err)
+			}
+			continue
+		}
+		if err != nil || profile.Subject != "123" || profile.Email != "user@gmail.com" {
+			t.Fatalf("%s: token valid ditolak: profile=%+v err=%v", tc.name, profile, err)
 		}
 	}
 }

@@ -190,12 +190,27 @@ class ApiService {
   // ----------------------------------------------------------------- Auth
 
   static Future<AuthResult> login(String email, String password) async {
-    final data = _asMap(await _request(
+    return _loginResult(await _request(
       'POST',
       '/public/auth/login',
       body: {'email': email, 'password': password},
       withAuth: false,
     ));
+  }
+
+  /// Tukar ID token Google Sign-In dengan sesi TemenTrip. Akun baru otomatis
+  /// didaftarkan sebagai customer oleh backend.
+  static Future<AuthResult> loginWithGoogle(String idToken) async {
+    return _loginResult(await _request(
+      'POST',
+      '/public/auth/google/mobile',
+      body: {'id_token': idToken},
+      withAuth: false,
+    ));
+  }
+
+  static AuthResult _loginResult(dynamic response) {
+    final data = _asMap(response);
     final token = data['token'];
     final provider = data['provider'];
     if (token is! String ||

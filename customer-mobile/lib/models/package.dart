@@ -2,14 +2,33 @@ import 'dart:convert';
 
 import 'package:customer_mobile/config/app_config.dart';
 
+/// URL media dari backend. Path relatif dilengkapi dengan origin backend,
+/// teks lain yang bukan URL dibuang (mengikuti web); kosong bila tidak valid.
+String resolveMediaUrl(String raw) {
+  final url = raw.trim();
+  if (url.isEmpty) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  final looksLikePath = url.startsWith('/') ||
+      url.startsWith('uploads/') ||
+      url.startsWith('storage/') ||
+      RegExp(r'\.(jpg|jpeg|png|webp|gif)$', caseSensitive: false).hasMatch(url);
+  if (!looksLikePath) return '';
+  final origin = AppConfig.backendOrigin;
+  return url.startsWith('/') ? '$origin$url' : '$origin/$url';
+}
+
 /// Satu kegiatan pada itinerary paket.
 class ItineraryItem {
   final String day;
-  final String title;
+  final String time;
+  final String activity;
   final String description;
 
   const ItineraryItem(
-      {required this.day, required this.title, required this.description});
+      {required this.day, this.time = '', required this.activity, required this.description});
+
+  /// Jam dan kegiatan dalam satu baris, mis. `08:00 — Jemput`.
+  String get title => time.isNotEmpty ? '$time — $activity' : activity;
 }
 
 /// Fasilitas tambahan opsional yang ditawarkan mitra (lihat
@@ -56,6 +75,39 @@ class AddOn {
       : const [];
 }
 
+/// Satu keberangkatan Open Trip dari backend (`models.PackageDeparture`):
+/// kuota dihitung per tanggal, bukan per paket.
+class Departure {
+  final String date;
+  final String endDate;
+  final int quotaUsed;
+  final int seatsLeft;
+  final bool closed;
+
+  const Departure({
+    required this.date,
+    required this.endDate,
+    this.quotaUsed = 0,
+    this.seatsLeft = 0,
+    this.closed = false,
+  });
+
+  factory Departure.fromJson(Map<String, dynamic> json) => Departure(
+        date: '${json['date'] ?? ''}',
+        endDate: '${json['endDate'] ?? ''}',
+        quotaUsed: json['quotaUsed'] is num ? (json['quotaUsed'] as num).toInt() : 0,
+        seatsLeft: json['seatsLeft'] is num ? (json['seatsLeft'] as num).toInt() : 0,
+        closed: json['closed'] == true,
+      );
+
+  Map<String, dynamic> toJson() =>
+      {'date': date, 'endDate': endDate, 'quotaUsed': quotaUsed, 'seatsLeft': seatsLeft, 'closed': closed};
+
+  static List<Departure>? listFrom(Object? raw) => raw is List
+      ? raw.whereType<Map>().map((e) => Departure.fromJson(Map<String, dynamic>.from(e))).toList()
+      : null;
+}
+
 /// Paket wisata sesuai respons `GET /public/packages` (lihat
 /// `backend/models/package.go`).
 class TripPackage {
@@ -64,6 +116,17 @@ class TripPackage {
   final String name;
   final String destination;
   final String meetingPoint;
+
+  /// Koordinat titik kumpul dari peta mitra; null bila belum dipilih.
+  final double? meetingPointLatitude;
+  final double? meetingPointLongitude;
+
+  /// `MEETING_POINT` (satu titik kumpul) atau `FLEXIBLE` (tiap peserta
+  /// memilih/mengusulkan titik jemput di sepanjang rute).
+  final String pickupMode;
+  final String pickupArea;
+  final String pickupNotes;
+  final List<String> pickupPoints;
   final String category;
   final String tripType;
   final int price;
@@ -100,12 +163,22 @@ class TripPackage {
   /// Tanggal yang sudah terkunci oleh pesanan lain (YYYY-MM-DD).
   final List<String> bookedDates;
 
+  /// Keberangkatan Open Trip beserta sisa kursinya; null bila backend lama
+  /// tidak mengirimkannya.
+  final List<Departure>? departures;
+
   const TripPackage({
     required this.id,
     required this.providerId,
     required this.name,
     required this.destination,
     this.meetingPoint = '',
+    this.meetingPointLatitude,
+    this.meetingPointLongitude,
+    this.pickupMode = 'MEETING_POINT',
+    this.pickupArea = '',
+    this.pickupNotes = '',
+    this.pickupPoints = const [],
     this.category = '',
     this.tripType = '',
     required this.price,
@@ -134,12 +207,14 @@ class TripPackage {
     this.imagesRaw = '',
     this.availableDates = const [],
     this.bookedDates = const [],
+    this.departures,
   });
 
   factory TripPackage.fromJson(Map<String, dynamic> json) {
     int asInt(Object? v, [int fallback = 0]) =>
         v is num ? v.toInt() : int.tryParse('$v') ?? fallback;
     String asString(Object? v) => v is String ? v : (v == null ? '' : '$v');
+    double? asCoordinate(Object? v) => v is num && v != 0 ? v.toDouble() : null;
     List<String> asStringList(Object? v) =>
         v is List ? v.map((e) => '$e').toList() : const [];
 
@@ -154,6 +229,12 @@ class TripPackage {
       name: asString(json['name']),
       destination: asString(json['destination']),
       meetingPoint: asString(json['meetingPoint']),
+      meetingPointLatitude: asCoordinate(json['meetingPointLatitude']),
+      meetingPointLongitude: asCoordinate(json['meetingPointLongitude']),
+      pickupMode: asString(json['pickupMode']).isEmpty ? 'MEETING_POINT' : asString(json['pickupMode']),
+      pickupArea: asString(json['pickupArea']),
+      pickupNotes: asString(json['pickupNotes']),
+      pickupPoints: asStringList(json['pickupPoints']).map((p) => p.trim()).where((p) => p.isNotEmpty).toList(),
       category: asString(json['category']),
       tripType: asString(json['tripType']),
       price: asInt(json['price']),
@@ -184,6 +265,7 @@ class TripPackage {
       imagesRaw: images is List ? images.join(',') : asString(images),
       availableDates: asStringList(json['availableDates']),
       bookedDates: asStringList(json['bookedDates']),
+      departures: Departure.listFrom(json['departures']),
     );
   }
 
@@ -193,6 +275,12 @@ class TripPackage {
         'name': name,
         'destination': destination,
         'meetingPoint': meetingPoint,
+        'meetingPointLatitude': meetingPointLatitude,
+        'meetingPointLongitude': meetingPointLongitude,
+        'pickupMode': pickupMode,
+        'pickupArea': pickupArea,
+        'pickupNotes': pickupNotes,
+        'pickupPoints': pickupPoints,
         'category': category,
         'tripType': tripType,
         'price': price,
@@ -221,9 +309,12 @@ class TripPackage {
         'images': imagesRaw,
         'availableDates': availableDates,
         'bookedDates': bookedDates,
+        if (departures != null) 'departures': departures!.map((d) => d.toJson()).toList(),
       };
 
   bool get isOpenTrip => tripType.isEmpty || tripType == 'Open Trip';
+
+  bool get isFlexiblePickup => pickupMode == 'FLEXIBLE';
 
   bool get isPerUnit => pricingMode == 'PER_UNIT' && unitCapacity > 0;
   String get unitLabel => unitName.isEmpty ? 'Unit' : unitName;
@@ -253,27 +344,12 @@ class TripPackage {
       status == 'Aktif' ||
       status.toLowerCase() == 'published';
 
-  /// Daftar foto paket yang valid. Path relatif dilengkapi dengan origin
-  /// backend, teks lain yang bukan URL dibuang (mengikuti web).
+  /// Daftar foto paket yang valid (lihat [resolveMediaUrl]).
   List<String> get photos {
-    String normalize(String raw) {
-      final url = raw.trim();
-      if (url.isEmpty) return '';
-      if (url.startsWith('http://') || url.startsWith('https://')) return url;
-      final looksLikePath = url.startsWith('/') ||
-          url.startsWith('uploads/') ||
-          url.startsWith('storage/') ||
-          RegExp(r'\.(jpg|jpeg|png|webp|gif)$', caseSensitive: false)
-              .hasMatch(url);
-      if (!looksLikePath) return '';
-      final origin = AppConfig.backendOrigin;
-      return url.startsWith('/') ? '$origin$url' : '$origin/$url';
-    }
-
     final fromImages =
-        imagesRaw.split(',').map(normalize).where((u) => u.isNotEmpty).toList();
+        imagesRaw.split(',').map(resolveMediaUrl).where((u) => u.isNotEmpty).toList();
     if (fromImages.isNotEmpty) return fromImages;
-    final single = normalize(image);
+    final single = resolveMediaUrl(image);
     return single.isEmpty ? const [] : [single];
   }
 
@@ -300,7 +376,8 @@ class TripPackage {
           final title = '${act['title'] ?? ''}'.trim();
           items.add(ItineraryItem(
             day: 'Hari ${day['day']}',
-            title: time.isNotEmpty ? '$time — $title' : title,
+            time: time,
+            activity: title,
             description: '${act['description'] ?? ''}',
           ));
         }

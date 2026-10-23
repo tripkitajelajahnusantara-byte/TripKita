@@ -1,3 +1,5 @@
+import 'package:customer_mobile/models/package.dart';
+
 /// Ulasan terverifikasi dari `GET /public/reviews/package/:id`.
 class PackageReview {
   final int id;
@@ -26,6 +28,9 @@ class PublicProvider {
   final String operationalProvince;
   final String operationalCity;
   final String description;
+
+  /// Foto profil mitra (URL lengkap), kosong bila belum diunggah.
+  final String profilePhoto;
   final bool isVerified;
   final double rating;
   final int totalTravelers;
@@ -38,6 +43,7 @@ class PublicProvider {
     this.operationalProvince = '',
     this.operationalCity = '',
     this.description = '',
+    this.profilePhoto = '',
     this.isVerified = false,
     this.rating = 0,
     this.totalTravelers = 0,
@@ -53,6 +59,7 @@ class PublicProvider {
       operationalProvince: json['operationalProvince'] as String? ?? '',
       operationalCity: json['operationalCity'] as String? ?? '',
       description: json['description'] as String? ?? '',
+      profilePhoto: resolveMediaUrl(json['profilePhoto'] as String? ?? ''),
       isVerified: json['isVerified'] as bool? ?? false,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
       totalTravelers: (json['totalTravelers'] as num?)?.toInt() ?? 0,

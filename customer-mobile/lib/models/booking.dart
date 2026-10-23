@@ -25,13 +25,27 @@ class Participant {
   String birthDate;
   String medicalHistory;
 
+  /// Titik jemput peserta (paket `FLEXIBLE`); kosong untuk titik kumpul.
+  String pickupPoint;
+
   Participant({
     this.name = '',
     this.phone = '',
     this.gender = '',
     this.birthDate = '',
     this.medicalHistory = '',
+    this.pickupPoint = '',
   });
+
+  /// Peserta pada respons booking (`models.BookingParticipant`).
+  factory Participant.fromJson(Map<String, dynamic> json) => Participant(
+        name: '${json['name'] ?? ''}',
+        phone: '${json['phone'] ?? ''}',
+        gender: '${json['gender'] ?? ''}',
+        birthDate: '${json['birthDate'] ?? ''}',
+        medicalHistory: '${json['medicalNotes'] ?? ''}',
+        pickupPoint: '${json['pickupPoint'] ?? ''}',
+      );
 
   /// Format `participants` pada `POST /public/bookings`.
   Map<String, dynamic> toApiJson() {
@@ -43,6 +57,7 @@ class Participant {
       'birthDate': birthDate,
       'medicalNotes':
           notes == '-' || notes.toLowerCase() == 'tidak ada' ? '' : notes,
+      'pickupPoint': pickupPoint.trim(),
     };
   }
 
@@ -52,6 +67,7 @@ class Participant {
         gender: gender,
         birthDate: birthDate,
         medicalHistory: medicalHistory,
+        pickupPoint: pickupPoint,
       );
 }
 
@@ -117,7 +133,10 @@ class Booking {
   final TripPackage? packageDetails;
   final String packageNameFallback;
   final String customerName;
+  final String customerEmail;
+  final String customerPhone;
   final DateTime? tripDate;
+  final DateTime? tripEndDate;
   final int guests;
   final int totalPrice;
 
@@ -140,6 +159,7 @@ class Booking {
   final String providerName;
   final DateTime? rescheduleDate;
   final String cancellationReason;
+  final List<Participant> participants;
 
   const Booking({
     required this.id,
@@ -148,7 +168,10 @@ class Booking {
     this.packageDetails,
     this.packageNameFallback = '',
     this.customerName = '',
+    this.customerEmail = '',
+    this.customerPhone = '',
     this.tripDate,
+    this.tripEndDate,
     this.guests = 0,
     this.totalPrice = 0,
     this.unitCount = 0,
@@ -167,6 +190,7 @@ class Booking {
     this.providerName = '',
     this.rescheduleDate,
     this.cancellationReason = '',
+    this.participants = const [],
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -190,7 +214,10 @@ class Booking {
           ? asString(details['name'])
           : asString(json['packageName']),
       customerName: asString(json['customerName']),
+      customerEmail: asString(json['customerEmail']),
+      customerPhone: asString(json['customerPhone']),
       tripDate: asDate(json['tripDate']),
+      tripEndDate: asDate(json['tripEndDate']),
       guests: asInt(json['guests']),
       totalPrice: asInt(json['totalPrice']),
       unitCount: asInt(json['unitCount']),
@@ -213,6 +240,12 @@ class Booking {
       providerName: asString(json['providerName']),
       rescheduleDate: asDate(json['rescheduleDate']),
       cancellationReason: asString(json['cancellationReason']),
+      participants: json['participants'] is List
+          ? [
+              for (final p in (json['participants'] as List).whereType<Map>())
+                Participant.fromJson(Map<String, dynamic>.from(p))
+            ]
+          : const [],
     );
   }
 

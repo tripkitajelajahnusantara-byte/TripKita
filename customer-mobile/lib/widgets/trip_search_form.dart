@@ -110,7 +110,7 @@ class _TripSearchFormState extends State<TripSearchForm> {
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 hintText: 'Pilih destinasi Anda',
-                hintStyle: figmaTextStyle.copyWith(fontSize: 16, color: AppColors.textLight),
+                hintStyle: figmaTextStyle.copyWith(fontSize: 16, color: AppColors.textMuted),
               ),
             ),
           ),
@@ -219,13 +219,13 @@ class _InputShell extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: focused ? AppColors.brand : AppColors.borderStrong, width: border),
           boxShadow: focused
-              ? const [BoxShadow(color: Color(0x4D0084C7), spreadRadius: 4)]
+              ? const [BoxShadow(color: Color(0x4D039CA2), spreadRadius: 4)]
               : const [BoxShadow(color: Color(0x0D101828), offset: Offset(0, 1), blurRadius: 1)],
         ),
         child: SizedBox(
           height: 42,
           child: Row(children: [
-            if (leading != null) ...[AppIcon(leading!), const SizedBox(width: 8)],
+            if (leading != null) ...[AppIcon(leading!, color: AppColors.textLight), const SizedBox(width: 8)],
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(label, style: TextStyle(fontSize: 12, color: focused ? AppColors.brand : AppColors.textMuted)),
@@ -233,7 +233,7 @@ class _InputShell extends StatelessWidget {
                 child,
               ]),
             ),
-            if (trailing != null) ...[const SizedBox(width: 8), AppIcon(trailing!)],
+            if (trailing != null) ...[const SizedBox(width: 8), AppIcon(trailing!, color: AppColors.textMedium)],
           ]),
         ),
       ),
@@ -252,7 +252,7 @@ class _FieldValue extends StatelessWidget {
     return Text(value ?? placeholder,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: 16, color: value == null ? AppColors.textLight : AppColors.textDark));
+        style: TextStyle(fontSize: 16, color: value == null ? AppColors.textMuted : AppColors.textDark));
   }
 }
 

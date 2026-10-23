@@ -11,7 +11,7 @@ const _tabs = {
   AppTab.beranda: ('Beranda', 'house', 'house_fill'),
   AppTab.cariTrip: ('Cari Trip', 'nav_search', 'magnifying_glass_fill'),
   AppTab.booking: ('Booking', 'ticket', 'ticket_fill'),
-  AppTab.rencanaTrip: ('Rencana Trip', 'calendar_heart', 'calendar_heart_fill'),
+  AppTab.rencanaTrip: ('Plan Trip', 'calendar_heart', 'calendar_heart_fill'),
   AppTab.akun: ('Profil', 'user', 'user_fill'),
 };
 
@@ -47,7 +47,7 @@ class TripKitaBottomNavigation extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Column(mainAxisSize: MainAxisSize.min, children: [
                           AppIcon(tab == current ? activeIcon : icon,
-                              color: tab == current ? AppColors.brand : AppColors.textLight),
+                              color: tab == current ? AppColors.primaryDark : AppColors.textMuted),
                           const SizedBox(height: 4),
                           Text(label,
                               maxLines: 1,
@@ -58,7 +58,7 @@ class TripKitaBottomNavigation extends StatelessWidget {
                                 height: 20 / 12,
                                 letterSpacing: 0,
                                 fontWeight: tab == current ? FontWeight.w600 : FontWeight.w400,
-                                color: tab == current ? AppColors.brand : AppColors.textLight,
+                                color: tab == current ? AppColors.primaryDark : AppColors.textMuted,
                               )),
                         ]),
                       ),
