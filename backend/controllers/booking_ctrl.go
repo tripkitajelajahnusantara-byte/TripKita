@@ -371,7 +371,7 @@ func (ctrl *BookingController) StartMidtransPayment(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki akses untuk membayar booking ini"})
 		return
 	}
-	updated, err := ctrl.service.StartMidtransPayment(booking.ID)
+	updated, err := ctrl.service.StartMidtransPayment(booking.ID, c.Query("changeMethod") == "true")
 	if err != nil {
 		var inputErr *services.BookingInputError
 		var gatewayErr *services.BookingGatewayError

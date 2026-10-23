@@ -131,10 +131,34 @@ func TestMidtransStatusNotFoundAndAuth(t *testing.T) {
 	}
 }
 
+func TestMidtransExpireTransaction(t *testing.T) {
+	var gotMethod, gotPath string
+	s := newTestMidtrans(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath = r.Method, r.URL.Path
+		if strings.Contains(r.URL.Path, "settled") {
+			w.WriteHeader(http.StatusPreconditionFailed)
+			return
+		}
+		_, _ = w.Write([]byte(`{"status_code":"407","transaction_status":"expire"}`))
+	})
+	if err := s.ExpireTransaction("TK-1-1"); err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/v2/TK-1-1/expire" {
+		t.Fatalf("request = %s %s", gotMethod, gotPath)
+	}
+	if err := s.ExpireTransaction("settled"); err == nil {
+		t.Fatal("HTTP 412 harus menjadi error")
+	}
+}
+
 type fakeMidtrans struct {
 	MidtransService
 	validSignature bool
 	status         *MidtransTransactionStatus
+	// afterExpire menggantikan status saat ExpireTransaction dipanggil;
+	// nil berarti Midtrans menolak expire.
+	afterExpire *MidtransTransactionStatus
 }
 
 func (f *fakeMidtrans) VerifyNotificationSignature(*MidtransNotification) bool {
@@ -142,6 +166,61 @@ func (f *fakeMidtrans) VerifyNotificationSignature(*MidtransNotification) bool {
 }
 func (f *fakeMidtrans) GetTransactionStatus(string) (*MidtransTransactionStatus, error) {
 	return f.status, nil
+}
+func (f *fakeMidtrans) ExpireTransaction(string) error {
+	if f.afterExpire == nil {
+		return errors.New("ditolak")
+	}
+	f.status = f.afterExpire
+	return nil
+}
+
+func TestExpireMidtransOrder(t *testing.T) {
+	pending := &MidtransTransactionStatus{TransactionStatus: "pending"}
+	cases := []struct {
+		name       string
+		fake       *fakeMidtrans
+		wantStatus string
+	}{
+		{"pending menjadi expire", &fakeMidtrans{status: pending, afterExpire: &MidtransTransactionStatus{TransactionStatus: "expire"}}, "expire"},
+		// Expire ditolak karena customer baru saja membayar order lama.
+		{"lunas sebelum expire", &fakeMidtrans{status: &MidtransTransactionStatus{TransactionStatus: "settlement"}}, "settlement"},
+		{"expire ditolak tetap pending", &fakeMidtrans{status: pending}, ""},
+	}
+	for _, tc := range cases {
+		st, err := (&bookingService{midtrans: tc.fake}).expireMidtransOrder("TK-1-1")
+		if tc.wantStatus == "" {
+			if err == nil {
+				t.Fatalf("%s: order yang masih pending harus menjadi error", tc.name)
+			}
+			continue
+		}
+		if err != nil || st.TransactionStatus != tc.wantStatus {
+			t.Fatalf("%s: status = %v, err = %v", tc.name, st, err)
+		}
+	}
+}
+
+// Jalur lunas memakai database (applyMidtransPayment), jadi tidak diuji di sini.
+func TestStopMidtransPaymentBeforeCancel(t *testing.T) {
+	booking := &models.Booking{PaymentMethod: models.PaymentMethodMidtrans, XenditInvoiceID: "TK-1-1", PaymentURL: "https://app.sandbox.midtrans.com/snap/x"}
+	pending := &MidtransTransactionStatus{TransactionStatus: "pending"}
+
+	expired := &fakeMidtrans{status: pending, afterExpire: &MidtransTransactionStatus{TransactionStatus: "expire"}}
+	if err := (&bookingService{midtrans: expired}).stopMidtransPayment(booking); err != nil || expired.status.TransactionStatus != "expire" {
+		t.Fatalf("pending: err = %v, status = %v", err, expired.status)
+	}
+	if err := (&bookingService{midtrans: &fakeMidtrans{}}).stopMidtransPayment(booking); err != nil {
+		t.Fatalf("belum memilih metode: err = %v", err)
+	}
+	var gatewayErr *BookingGatewayError
+	if err := (&bookingService{midtrans: &fakeMidtrans{status: pending}}).stopMidtransPayment(booking); !errors.As(err, &gatewayErr) {
+		t.Fatalf("expire ditolak: err = %v", err)
+	}
+	manual := &models.Booking{PaymentMethod: "Transfer Bank", XenditInvoiceID: "TK-1-1", PaymentURL: "x"}
+	if err := (&bookingService{midtrans: &fakeMidtrans{status: pending}}).stopMidtransPayment(manual); err != nil {
+		t.Fatalf("booking manual: err = %v", err)
+	}
 }
 
 func TestHandleMidtransNotificationIgnoresUnpaidAndForged(t *testing.T) {

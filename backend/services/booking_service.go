@@ -37,7 +37,7 @@ type BookingService interface {
 	GetBookingByCode(code string) (*models.Booking, error)
 	AdminGetAllBookings() ([]models.Booking, error)
 	ExpirePendingBooking(id uint, cutoff time.Time) error
-	StartMidtransPayment(bookingID uint) (*models.Booking, error)
+	StartMidtransPayment(bookingID uint, changeMethod bool) (*models.Booking, error)
 	HandleMidtransNotification(n *MidtransNotification) error
 }
 
@@ -416,6 +416,11 @@ func (s *bookingService) CancelBookingByCustomer(id uint, customerID uint) (*mod
 	}
 	if booking.Status != "PENDING_PAYMENT" && booking.Status != "PAID" && booking.Status != "CONFIRMED" {
 		return nil, fmt.Errorf("booking dengan status %s tidak dapat dibatalkan", booking.Status)
+	}
+	if booking.Status == models.StatusPendingPayment {
+		if err := s.stopMidtransPayment(&booking); err != nil {
+			return nil, err
+		}
 	}
 	return s.UpdateBookingStatus(booking.ID, booking.ProviderID, "CANCELLED_BY_CUSTOMER")
 }
@@ -1014,9 +1019,16 @@ func (s *bookingService) UpdateStatusByWebhook(invoiceID string, externalID stri
 				return fmt.Errorf("nominal atau mata uang callback tidak sesuai dengan booking")
 			}
 			if oldStatus == "PAID" || oldStatus == "CONFIRMED" || oldStatus == "COMPLETED" {
+				// Order lain yang ikut lunas berarti customer membayar dua kali.
+				if invoiceID != booking.XenditInvoiceID && invoiceID != booking.IPaymuTransactionID {
+					log.Printf("[Payment Webhook] PEMBAYARAN GANDA booking %s: order %s lunas padahal booking sudah dibayar lewat %s; refund manual diperlukan", booking.BookingCode, invoiceID, booking.XenditInvoiceID)
+				}
 				return nil
 			}
 			if oldStatus != "PENDING_PAYMENT" {
+				if booking.PaidAt == nil {
+					log.Printf("[Payment Webhook] booking %s berstatus %s menerima pembayaran order %s; refund manual diperlukan", booking.BookingCode, oldStatus, invoiceID)
+				}
 				return fmt.Errorf("status booking %s tidak dapat menerima pembayaran", oldStatus)
 			}
 			newStatus = "PAID"

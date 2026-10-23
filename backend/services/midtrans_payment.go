@@ -16,8 +16,9 @@ const midtransMinPaymentWindow = 5 * time.Minute
 
 // StartMidtransPayment mengembalikan booking dengan PaymentURL Snap yang dapat
 // dibayar. Order yang masih berjalan dipakai ulang agar satu booking tidak
-// pernah memiliki dua tagihan aktif sekaligus.
-func (s *bookingService) StartMidtransPayment(bookingID uint) (*models.Booking, error) {
+// pernah memiliki dua tagihan aktif sekaligus. changeMethod menghentikan order
+// pending lebih dulu karena Snap mengunci metode bayar per order_id.
+func (s *bookingService) StartMidtransPayment(bookingID uint, changeMethod bool) (*models.Booking, error) {
 	if s.midtrans == nil {
 		return nil, &BookingInputError{Message: "pembayaran online belum diaktifkan"}
 	}
@@ -45,6 +46,11 @@ func (s *bookingService) StartMidtransPayment(bookingID uint) (*models.Booking, 
 		if err != nil {
 			log.Printf("[Midtrans] cek status %s gagal: %v", previousOrderID, err)
 			return nil, &BookingGatewayError{Message: "status pembayaran belum dapat diperiksa, coba lagi"}
+		}
+		if changeMethod && st != nil && !st.IsPaid() && !st.IsFailed() {
+			if st, err = s.expireMidtransOrder(previousOrderID); err != nil {
+				return nil, &BookingGatewayError{Message: "metode pembayaran belum dapat diganti, coba lagi"}
+			}
 		}
 		switch {
 		case st != nil && st.IsPaid():
@@ -86,6 +92,49 @@ func (s *bookingService) StartMidtransPayment(bookingID uint) (*models.Booking, 
 	}
 	booking.XenditInvoiceID, booking.PaymentURL = orderID, paymentURL
 	return &booking, nil
+}
+
+// expireMidtransOrder mengembalikan status order setelah dihentikan: gagal
+// (siap diganti order baru) atau lunas bila pembayaran masuk sebelum expire.
+func (s *bookingService) expireMidtransOrder(orderID string) (*MidtransTransactionStatus, error) {
+	if err := s.midtrans.ExpireTransaction(orderID); err != nil {
+		// Tetap dibaca ulang: penolakan bisa berarti order baru saja lunas.
+		log.Printf("[Midtrans] expire %s gagal: %v", orderID, err)
+	}
+	st, err := s.midtrans.GetTransactionStatus(orderID)
+	if err == nil && (st == nil || (!st.IsPaid() && !st.IsFailed())) {
+		err = fmt.Errorf("order masih dapat dibayar (status %+v)", st)
+	}
+	if err != nil {
+		log.Printf("[Midtrans] order %s belum dapat dihentikan: %v", orderID, err)
+		return nil, err
+	}
+	return st, nil
+}
+
+// stopMidtransPayment memastikan tagihan booking tidak dapat dibayar lagi
+// sebelum booking dibatalkan. Pembayaran yang terlanjur masuk dicatat dan
+// pembatalan dihentikan, agar uang customer tidak masuk tanpa pesanan.
+func (s *bookingService) stopMidtransPayment(booking *models.Booking) error {
+	orderID := booking.XenditInvoiceID
+	if s.midtrans == nil || !booking.UsesMidtrans() || orderID == "" || booking.PaymentURL == "" {
+		return nil
+	}
+	st, err := s.midtrans.GetTransactionStatus(orderID)
+	if err == nil && st != nil && !st.IsPaid() && !st.IsFailed() {
+		st, err = s.expireMidtransOrder(orderID)
+	}
+	if err != nil {
+		log.Printf("[Midtrans] tagihan %s belum dapat dihentikan untuk pembatalan: %v", orderID, err)
+		return &BookingGatewayError{Message: "pesanan belum dapat dibatalkan karena status pembayaran belum dapat dipastikan, coba lagi"}
+	}
+	if st != nil && st.IsPaid() {
+		if err := s.applyMidtransPayment(st); err != nil {
+			return err
+		}
+		return &BookingInputError{Message: "pembayaran pesanan ini sudah kami terima, jadi pesanan belum dibatalkan; muat ulang untuk melihat status terbaru"}
+	}
+	return nil
 }
 
 // HandleMidtransNotification memproses HTTP notification Midtrans. Isinya

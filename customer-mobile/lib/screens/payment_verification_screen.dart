@@ -147,16 +147,36 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
     }
   }
 
-  Future<void> _payOnline() async {
+  Future<void> _payOnline({bool changeMethod = false}) async {
     if (_loading) return;
+    if (changeMethod) {
+      final ok = await showConfirmDialog(
+        context,
+        icon: Icons.swap_horiz_rounded,
+        iconColor: AppColors.primary,
+        iconBackground: AppColors.accentLight,
+        title: 'Ganti Metode Pembayaran?',
+        message: const Text(
+          'Kode QRIS atau nomor virtual account yang sudah dibuat akan dibatalkan, lalu Anda dapat memilih metode baru.\n\n'
+          'Sudah terlanjur membayar? Ketuk Kembali, lalu "Cek status pembayaran".',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: AppColors.textMuted, height: 1.6),
+        ),
+        cancelLabel: 'Kembali',
+        confirmLabel: 'Ya, Ganti',
+      );
+      if (!ok || !mounted) return;
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final url = await ApiService.startMidtransPayment(_booking.bookingCode);
+      final url = await ApiService.startMidtransPayment(_booking.bookingCode, changeMethod: changeMethod);
       if (url.isEmpty) {
-        await _checkStatus();
+        // Bukan _checkStatus(): fungsi itu berhenti selama _loading masih true.
+        final latest = await ApiService.trackBooking(_booking.bookingCode);
+        if (mounted) setState(() => _booking = latest);
       } else if (await openInAppBrowser(Uri.parse(url))) {
         if (mounted) setState(() => _gatewayOpened = true);
       } else if (mounted) {
@@ -239,6 +259,9 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
     );
   }
 
+  /// Halaman Midtrans sudah pernah dibuka, jadi metode mungkin sudah terkunci.
+  bool get _paymentStarted => _gatewayOpened || _booking.paymentUrl.isNotEmpty;
+
   List<String> get _steps => _booking.usesMidtrans
       ? const [
           'Ketuk "Bayar Sekarang" untuk membuka halaman pembayaran Midtrans.',
@@ -319,7 +342,7 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
                   onPressed: _loading || _checking ? null : _payOnline,
                   child: _loading
                       ? const _ButtonSpinner()
-                      : Text(_gatewayOpened ? 'Lanjutkan Pembayaran' : 'Bayar Sekarang'),
+                      : Text(_paymentStarted ? 'Lanjutkan Pembayaran' : 'Bayar Sekarang'),
                 ),
                 const SizedBox(height: 4),
                 TextButton(
@@ -395,8 +418,22 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
         Text(formatPrice(_booking.totalPrice),
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
         const Divider(height: 28),
-        const Text('Metode Pembayaran', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-        const SizedBox(height: 8),
+        Row(children: [
+          const Expanded(child: Text('Metode Pembayaran', style: TextStyle(fontSize: 13, color: AppColors.textMuted))),
+          // Snap mengunci metode setelah dipilih; tagihan lama perlu dihentikan dulu.
+          if (_paymentStarted)
+            TextButton.icon(
+              onPressed: _loading || _checking ? null : () => _payOnline(changeMethod: true),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+              label: const Text('Ganti Metode'),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+        ]),
+        SizedBox(height: _paymentStarted ? 4 : 8),
         const Wrap(spacing: 6, runSpacing: 6, children: [
           _MethodChip(icon: Icons.account_balance_outlined, label: 'Virtual Account'),
           _MethodChip(icon: Icons.qr_code_2_rounded, label: 'QRIS'),

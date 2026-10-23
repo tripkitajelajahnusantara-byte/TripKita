@@ -28,6 +28,9 @@ type MidtransService interface {
 	// GetTransactionStatus mengembalikan nil tanpa error bila order belum
 	// memiliki transaksi (customer belum memilih metode di halaman Snap).
 	GetTransactionStatus(orderID string) (*MidtransTransactionStatus, error)
+	// ExpireTransaction menghentikan transaksi pending; hasilnya dipastikan
+	// pemanggil lewat GetTransactionStatus.
+	ExpireTransaction(orderID string) error
 	VerifyNotificationSignature(n *MidtransNotification) bool
 }
 
@@ -193,6 +196,17 @@ func (s *midtransService) GetTransactionStatus(orderID string) (*MidtransTransac
 		return nil, fmt.Errorf("status Midtrans untuk order lain dikembalikan")
 	}
 	return &st, nil
+}
+
+func (s *midtransService) ExpireTransaction(orderID string) error {
+	respBody, status, err := s.do(http.MethodPost, s.apiBaseURL+"/v2/"+url.PathEscape(orderID)+"/expire", nil, "")
+	if err != nil {
+		return err
+	}
+	if status < 200 || status >= 300 {
+		return fmt.Errorf("expire Midtrans ditolak (HTTP %d): %s", status, respBody)
+	}
+	return nil
 }
 
 func (s *midtransService) VerifyNotificationSignature(n *MidtransNotification) bool {

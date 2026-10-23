@@ -358,10 +358,11 @@ class ApiService {
   }
 
   /// URL halaman Snap Midtrans; kosong bila booking tidak lagi menunggu
-  /// pembayaran (mis. baru saja lunas).
-  static Future<String> startMidtransPayment(String bookingCode) async {
+  /// pembayaran (mis. baru saja lunas). [changeMethod] membatalkan QRIS/VA
+  /// lama agar customer dapat memilih metode lain.
+  static Future<String> startMidtransPayment(String bookingCode, {bool changeMethod = false}) async {
     final data = _asMap(await _request('POST',
-        '/public/bookings/${Uri.encodeComponent(bookingCode)}/midtrans'));
+        '/public/bookings/${Uri.encodeComponent(bookingCode)}/midtrans${changeMethod ? '?changeMethod=true' : ''}'));
     return '${data['paymentUrl'] ?? ''}';
   }
 

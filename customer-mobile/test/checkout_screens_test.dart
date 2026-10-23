@@ -137,6 +137,21 @@ void main() {
     expect(find.text('Selesaikan Pembayaran'), findsOneWidget);
     expect(find.text('Bayar Sekarang'), findsOneWidget);
     expect(find.text('Unggah Bukti Transfer'), findsNothing);
+    // Metode baru dapat terkunci setelah halaman Midtrans pernah dibuka.
+    expect(find.text('Ganti Metode'), findsNothing);
+
+    final started = Booking(
+      id: 1,
+      bookingCode: 'TK-20261015-TSSJVQX5',
+      totalPrice: 2330000,
+      paymentMethod: 'Midtrans',
+      paymentUrl: 'https://app.sandbox.midtrans.com/snap/v4/redirection/x',
+      createdAt: DateTime.now(),
+      serverPaymentDeadline: DateTime.now().add(const Duration(hours: 23)),
+    );
+    await _pumpPhone(tester, PaymentVerificationScreen(key: const ValueKey('started'), booking: started, packageName: _pkg.name));
+    expect(find.text('Lanjutkan Pembayaran'), findsOneWidget);
+    expect(find.text('Ganti Metode'), findsOneWidget);
 
     const paid = Booking(id: 1, bookingCode: 'TK-1', totalPrice: 2330000, status: BookingStatus.paid, paymentMethod: 'Midtrans');
     await tester.pumpWidget(MaterialApp(

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, Copy, CreditCard, FileText, FileUp, LoaderCircle, Lock, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, CheckCircle2, Clock3, Copy, CreditCard, FileText, FileUp, LoaderCircle, Lock, RefreshCw, ShieldCheck, X } from 'lucide-react';
 
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
@@ -244,6 +244,8 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   const returnStatus = isOnline && canUpload ? midtransReturnStatus() : '';
   const returnCopy = MIDTRANS_RETURN_COPY[returnStatus];
   const awaitingConfirmation = MIDTRANS_PAID_RETURNS.includes(returnStatus);
+  // Setelah tagihan gagal/kedaluwarsa, tombol utama sudah membuka pilihan metode baru.
+  const canChangeMethod = returnStatus === 'pending' || (!returnCopy && !!booking.paymentUrl);
   const cardTone = CARD_TONE[returnCopy?.tone || 'default'];
   const currentStep = isOnline ? (isPaid ? 3 : awaitingConfirmation ? 2 : 1) : isPaid ? 4 : isReview ? 3 : file ? 2 : 1;
 
@@ -293,13 +295,15 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
     }
   };
 
-  const payOnline = async () => {
+  // changeMethod menghentikan QRIS/VA lama karena Midtrans mengunci metode per tagihan.
+  const payOnline = async (changeMethod = false) => {
     if (loading || !canUpload) return;
+    if (changeMethod && !window.confirm('Ganti metode pembayaran?\n\nKode QRIS atau nomor virtual account yang sudah dibuat akan dibatalkan, lalu Anda dapat memilih metode baru.\n\nSudah terlanjur membayar? Pilih Batal, lalu tekan "Sudah bayar? Cek status".')) return;
     setLoading(true);
     setError('');
     setMessage('');
     try {
-      const res = await request(`/public/bookings/${encodeURIComponent(bookingCode)}/midtrans`, { method: 'POST' });
+      const res = await request(`/public/bookings/${encodeURIComponent(bookingCode)}/midtrans${changeMethod ? '?changeMethod=true' : ''}`, { method: 'POST' });
       if (res?.paymentUrl) {
         window.location.assign(res.paymentUrl);
         return;
@@ -423,11 +427,16 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
                   <p style={{ color: '#475569', fontSize: 13, margin: 0, lineHeight: 1.5 }}>{returnCopy?.body || 'Pilih virtual account, QRIS, atau e-wallet di halaman Midtrans. Pesanan terkonfirmasi otomatis setelah bayar, tanpa unggah bukti.'}</p>
                 </div>
               </div>
-              <button type="button" disabled={loading || checking} onClick={payOnline} style={{ marginTop: 16, width: '100%', border: 0, borderRadius: 10, padding: 14, fontSize: 15, background: '#0284c7', color: '#fff', fontWeight: 800, cursor: loading || checking ? 'not-allowed' : 'pointer', opacity: loading || checking ? .55 : 1 }}>
+              <button type="button" disabled={loading || checking} onClick={() => payOnline()} style={{ marginTop: 16, width: '100%', border: 0, borderRadius: 10, padding: 14, fontSize: 15, background: '#0284c7', color: '#fff', fontWeight: 800, cursor: loading || checking ? 'not-allowed' : 'pointer', opacity: loading || checking ? .55 : 1 }}>
                 {loading
                   ? <><LoaderCircle size={16} className="btn-spinner" style={{ verticalAlign: 'middle', marginRight: 8 }} />Membuka halaman pembayaran...</>
-                  : returnCopy ? returnCopy.action : `Bayar Sekarang · ${formatIDR(totalPrice)}`}
+                  : returnCopy ? returnCopy.action : booking.paymentUrl ? 'Lanjutkan Pembayaran' : `Bayar Sekarang · ${formatIDR(totalPrice)}`}
               </button>
+              {canChangeMethod && (
+                <button type="button" disabled={loading || checking} onClick={() => payOnline(true)} style={{ marginTop: 10, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: '1px solid #bae6fd', borderRadius: 10, padding: 12, fontSize: 14, background: '#fff', color: '#0369a1', fontWeight: 800, cursor: loading || checking ? 'not-allowed' : 'pointer', opacity: loading || checking ? .55 : 1 }}>
+                  <ArrowLeftRight size={16} /> Ganti Metode Pembayaran
+                </button>
+              )}
               <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b' }}>
                   <Lock size={13} /> Pembayaran aman diproses Midtrans
