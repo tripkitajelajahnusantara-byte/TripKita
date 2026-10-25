@@ -5,6 +5,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { fetchCheckoutConfig, type CheckoutConfig } from '../utils/checkoutConfig';
 import { bookingAddOns } from '../utils/pricing';
+import { midtransReturnStatus } from '../utils/midtransReturn';
 
 const formatIDR = (value: number) => new Intl.NumberFormat('id-ID', {
   style: 'currency', currency: 'IDR', minimumFractionDigits: 0,
@@ -31,11 +32,8 @@ const CARD_TONE = {
   error: { bg: '#fef2f2', border: '#fecaca', iconBg: '#fee2e2', icon: '#dc2626' },
 };
 
-function midtransReturnStatus(): string {
-  // Snap dapat menaruh parameter di query string maupun setelah hash.
-  const params = `${window.location.search}&${window.location.hash}`;
-  return (params.match(/[?&]transaction_status=([a-z_]+)/i)?.[1] || '').toLowerCase();
-}
+const currentMidtransReturn = (bookingCode: string) =>
+  midtransReturnStatus(bookingCode, window.location.search, window.location.hash);
 
 // Status akhir/lain yang tidak lagi menerima bukti transfer beserta penjelasannya.
 const CLOSED_STATUS_COPY: Record<string, { title: string; body: string }> = {
@@ -175,7 +173,7 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
     if (!bookingCode || (status !== 'PAYMENT_REVIEW' && status !== 'PENDING_PAYMENT')) return;
     // Pembayaran Midtrans dikonfirmasi otomatis lewat webhook, jadi dipantau lebih sering.
     const online = String(booking?.paymentMethod || '').startsWith('Midtrans');
-    const justPaid = online && MIDTRANS_PAID_RETURNS.includes(midtransReturnStatus());
+    const justPaid = online && MIDTRANS_PAID_RETURNS.includes(currentMidtransReturn(bookingCode));
     const timer = window.setInterval(refreshStatus, justPaid ? 5000 : status === 'PAYMENT_REVIEW' || online ? 15000 : 30000);
     return () => window.clearInterval(timer);
   }, [bookingCode, booking?.status, booking?.paymentMethod, refreshStatus]);
@@ -241,7 +239,7 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   const bank = config?.manualPayment;
   const bankReady = !!bank?.accountNumber;
   const totalPrice = Number(booking.totalPrice) || 0;
-  const returnStatus = isOnline && canUpload ? midtransReturnStatus() : '';
+  const returnStatus = isOnline && canUpload ? currentMidtransReturn(bookingCode) : '';
   const returnCopy = MIDTRANS_RETURN_COPY[returnStatus];
   const awaitingConfirmation = MIDTRANS_PAID_RETURNS.includes(returnStatus);
   // Setelah tagihan gagal/kedaluwarsa, tombol utama sudah membuka pilihan metode baru.
