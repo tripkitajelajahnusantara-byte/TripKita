@@ -5,12 +5,19 @@ on:
     branches:
       - main
       - staging
+    # Push yang hanya mengubah backend/web tidak perlu mengirim APK baru ke tester.
+    paths:
+      - 'customer-mobile/**'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
+    env:
+      # main -> production; branch lain (staging, workflow_dispatch) -> staging.
+      FLAVOR: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
 
     steps:
       - name: Checkout Code
@@ -25,7 +32,7 @@ jobs:
       - name: Set up Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
+          flutter-version: '3.29.2'
           channel: 'stable'
           cache: true
 
@@ -43,10 +50,27 @@ jobs:
         run: |
           cd customer-mobile
           chmod +x android/gradlew 2>/dev/null || true
-          flutter build apk --release --target-platform android-arm,android-arm64,android-x64 --no-tree-shake-icons
+          flutter build apk --release --flavor "$FLAVOR" --target-platform android-arm,android-arm64,android-x64 --no-tree-shake-icons \
+            --dart-define-from-file=env/$FLAVOR.json \
+            --build-number=${{ github.run_number }}
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: TemenTrip-Customer-App
+          name: TemenTrip-Customer-App-${{ env.FLAVOR }}
           path: customer-mobile/build/app/outputs/flutter-apk/*.apk
+
+      - name: Distribute to Firebase App Distribution
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_APP_ID: ${{ github.ref_name == 'main' && secrets.FIREBASE_APP_ID_PRODUCTION || secrets.FIREBASE_APP_ID_STAGING }}
+          # Lewat env, bukan ekspresi langsung di script, agar isi pesan commit tidak dieksekusi shell.
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"
+          npx --yes firebase-tools@14 appdistribution:distribute \
+            customer-mobile/build/app/outputs/flutter-apk/app-$FLAVOR-release.apk \
+            --app "$FIREBASE_APP_ID" \
+            --groups "testers" \
+            --release-notes "[$GITHUB_REF_NAME ${GITHUB_SHA::7}] $COMMIT_MESSAGE"

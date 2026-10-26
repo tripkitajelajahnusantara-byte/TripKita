@@ -44,6 +44,22 @@ func (s *EmailService) SendManualPaymentInstructionEmail(b *models.Booking, pack
 		return nil
 	}
 	subject := fmt.Sprintf("Instruksi Pembayaran - Pesanan #%s TemenTrip", b.BookingCode)
+	// Booking Midtrans tidak memakai rekening manual: tombol email membuka
+	// halaman pembayaran yang meneruskan ke Snap.
+	if b.UsesMidtrans() {
+		details := fmt.Sprintf(`<table style="width:100%%;font-size:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px">
+<tr><td style="color:#64748b">Kode booking</td><td><strong>%s</strong></td></tr>
+<tr><td style="color:#64748b">Paket</td><td>%s</td></tr>
+<tr><td style="color:#64748b">Total pembayaran</td><td><strong style="color:#0284c7">Rp %s</strong></td></tr>
+<tr><td style="color:#64748b">Batas bayar</td><td><strong style="color:#c2410c">%s</strong></td></tr>
+</table>`,
+			html.EscapeString(b.BookingCode), html.EscapeString(packageName), formatIDRNumber(b.TotalPrice), formatJakartaTime(deadline))
+		body := manualPaymentEmailLayout("#0f172a", "Selesaikan pembayaran Anda",
+			fmt.Sprintf("Halo <strong>%s</strong>, kuota Anda sedang kami tahan. Bayar online melalui tombol di bawah dengan virtual account, QRIS, e-wallet, atau metode lain yang tersedia.", html.EscapeString(b.CustomerName)),
+			details, s.paymentPageURL(b.BookingCode), "Bayar Sekarang",
+			"Simpan email ini: kode booking diperlukan untuk memantau pesanan di menu Cek Booking. Jika tidak dibayar sebelum batas waktu, pesanan dibatalkan otomatis.")
+		return s.sendMailWithAttachment(b.CustomerEmail, subject, body, nil, "")
+	}
 	details := fmt.Sprintf(`<table style="width:100%%;font-size:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px">
 <tr><td style="color:#64748b">Kode booking</td><td><strong>%s</strong></td></tr>
 <tr><td style="color:#64748b">Paket</td><td>%s</td></tr>

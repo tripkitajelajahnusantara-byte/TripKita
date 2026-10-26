@@ -216,7 +216,7 @@ func (ctrl *BookingController) CreateBooking(c *gin.Context) {
 	}
 	// Tanpa rekening tujuan customer tidak dapat membayar, sehingga booking
 	// hanya akan menahan kuota selama 24 jam tanpa guna.
-	if strings.TrimSpace(ctrl.cfg.ManualPaymentAccountNumber) == "" {
+	if !ctrl.cfg.UsesMidtrans() && strings.TrimSpace(ctrl.cfg.ManualPaymentAccountNumber) == "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Pembayaran sedang tidak tersedia. Silakan hubungi admin TemenTrip."})
 		return
 	}
@@ -294,13 +294,9 @@ func (ctrl *BookingController) SubmitPaymentProof(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Booking tidak ditemukan"})
 		return
 	}
-	if booking.CustomerID != nil && *booking.CustomerID > 0 {
-		callerID, hasID := c.Get("provider_id")
-		callerRole, _ := c.Get("role")
-		if !hasID || callerRole != "CUSTOMER" || callerID.(uint) != *booking.CustomerID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki akses untuk mengirim bukti pembayaran booking ini"})
-			return
-		}
+	if !callerMayPay(c, booking) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki akses untuk mengirim bukti pembayaran booking ini"})
+		return
 	}
 
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxDocumentSize+1024*1024)
@@ -350,6 +346,72 @@ func (ctrl *BookingController) SubmitPaymentProof(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, withPaymentDeadline(updated))
+}
+
+// callerMayPay: booking akun hanya dapat dibayar pemiliknya; booking tamu
+// cukup dengan kode booking.
+func callerMayPay(c *gin.Context, booking *models.Booking) bool {
+	if booking.CustomerID == nil || *booking.CustomerID == 0 {
+		return true
+	}
+	callerID, hasID := c.Get("provider_id")
+	callerRole, _ := c.Get("role")
+	return hasID && callerRole == "CUSTOMER" && callerID.(uint) == *booking.CustomerID
+}
+
+// StartMidtransPayment membuat atau memakai ulang sesi Snap. paymentUrl kosong
+// berarti booking tidak lagi menunggu pembayaran (mis. baru saja lunas).
+func (ctrl *BookingController) StartMidtransPayment(c *gin.Context) {
+	booking, err := ctrl.service.GetBookingByCode(c.Param("code"))
+	if err != nil || booking == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Booking tidak ditemukan"})
+		return
+	}
+	if !callerMayPay(c, booking) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki akses untuk membayar booking ini"})
+		return
+	}
+	updated, err := ctrl.service.StartMidtransPayment(booking.ID, c.Query("changeMethod") == "true")
+	if err != nil {
+		var inputErr *services.BookingInputError
+		var gatewayErr *services.BookingGatewayError
+		switch {
+		case errors.As(err, &inputErr):
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+		case errors.As(err, &gatewayErr):
+			c.JSON(http.StatusBadGateway, gin.H{"error": gatewayErr.Message})
+		default:
+			respondInternalError(c, "membuat pembayaran Midtrans", err)
+		}
+		return
+	}
+	paymentURL := ""
+	if updated.Status == models.StatusPendingPayment {
+		paymentURL = updated.PaymentURL
+	}
+	c.JSON(http.StatusOK, gin.H{"status": updated.Status, "paymentUrl": paymentURL})
+}
+
+// MidtransWebhook menerima HTTP notification Midtrans. Selain 2xx membuat
+// Midtrans mengirim ulang, jadi hanya gangguan sementara yang dijawab 5xx.
+func (ctrl *BookingController) MidtransWebhook(c *gin.Context) {
+	var notification services.MidtransNotification
+	if err := c.ShouldBindJSON(&notification); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Payload notifikasi tidak valid"})
+		return
+	}
+	if err := ctrl.service.HandleMidtransNotification(&notification); err != nil {
+		var inputErr *services.BookingInputError
+		if errors.As(err, &inputErr) {
+			log.Printf("[Midtrans Webhook] order %s ditolak: %s", notification.OrderID, inputErr.Message)
+			c.JSON(http.StatusBadRequest, gin.H{"error": inputErr.Message})
+			return
+		}
+		log.Printf("[Midtrans Webhook] order %s gagal: %v", notification.OrderID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Notifikasi belum dapat diproses"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (ctrl *BookingController) ReviewManualPayment(c *gin.Context) {

@@ -850,14 +850,20 @@ class _BookingCard extends StatelessWidget {
         border: Border.all(color: AppColors.primary, width: 1.5),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('Informasi Transfer Manual:',
-            style: TextStyle(
+        Text(
+            b.usesMidtrans
+                ? 'Pembayaran Online:'
+                : 'Informasi Transfer Manual:',
+            style: const TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w800,
                 color: AppColors.primaryDark)),
         if (b.paymentDeadline != null) ...[
           const SizedBox(height: 8),
-          PaymentCountdown(deadline: b.paymentDeadline!, onExpire: onExpire),
+          PaymentCountdown(
+              deadline: b.paymentDeadline!,
+              label: b.usesMidtrans ? 'Batas Pembayaran' : 'Batas Transfer',
+              onExpire: onExpire),
         ],
         const SizedBox(height: 10),
         Text.rich(
@@ -869,8 +875,10 @@ class _BookingCard extends StatelessWidget {
                   fontSize: 15,
                   fontWeight: FontWeight.w800),
             ),
-            const TextSpan(
-                text: ' ke rekening TemenTrip lalu upload bukti transfer.'),
+            TextSpan(
+                text: b.usesMidtrans
+                    ? ' secara online lewat virtual account, QRIS, atau e-wallet. Pesanan terkonfirmasi otomatis.'
+                    : ' ke rekening TemenTrip lalu upload bukti transfer.'),
           ]),
           style: const TextStyle(fontSize: 13, color: AppColors.textDark),
         ),

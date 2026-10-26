@@ -2,7 +2,7 @@
   "hosting": {
     "site": "tementrip-app",
     "public": "build/web",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": ["firebase.json", "**/.last_build_id", "**/node_modules/**"],
     "rewrites": [{ "source": "**", "destination": "/index.html" }],
     "headers": [
       {

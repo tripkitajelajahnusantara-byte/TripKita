@@ -6,6 +6,7 @@ const monthsFull = [
 ];
 const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const weekdaysShort = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+const weekdaysFull = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 final _idr = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
@@ -61,4 +62,11 @@ String ageLabel(String birthIso) {
   var age = now.year - birth.year;
   if (now.month < birth.month || (now.month == birth.month && now.day < birth.day)) age--;
   return age > 0 ? '$age Tahun' : '0 Tahun';
+}
+
+/// Waktu dalam WIB terlepas dari zona perangkat: `Rabu, 16 Okt 2026, 14:56 WIB`.
+String formatDateTimeWib(DateTime time) {
+  final t = time.toUtc().add(const Duration(hours: 7));
+  return '${weekdaysFull[t.weekday - 1]}, ${t.day} ${monthsShort[t.month - 1]} ${t.year}, '
+      '${twoDigits(t.hour)}:${twoDigits(t.minute)} WIB';
 }

@@ -190,12 +190,27 @@ class ApiService {
   // ----------------------------------------------------------------- Auth
 
   static Future<AuthResult> login(String email, String password) async {
-    final data = _asMap(await _request(
+    return _loginResult(await _request(
       'POST',
       '/public/auth/login',
       body: {'email': email, 'password': password},
       withAuth: false,
     ));
+  }
+
+  /// Tukar ID token Google Sign-In dengan sesi TemenTrip. Akun baru otomatis
+  /// didaftarkan sebagai customer oleh backend.
+  static Future<AuthResult> loginWithGoogle(String idToken) async {
+    return _loginResult(await _request(
+      'POST',
+      '/public/auth/google/mobile',
+      body: {'id_token': idToken},
+      withAuth: false,
+    ));
+  }
+
+  static AuthResult _loginResult(dynamic response) {
+    final data = _asMap(response);
     final token = data['token'];
     final provider = data['provider'];
     if (token is! String ||
@@ -340,6 +355,15 @@ class ApiService {
     final data = await _request(
         'GET', '/public/bookings/status/${Uri.encodeComponent(bookingCode)}');
     return Booking.fromJson(_asMap(data));
+  }
+
+  /// URL halaman Snap Midtrans; kosong bila booking tidak lagi menunggu
+  /// pembayaran (mis. baru saja lunas). [changeMethod] membatalkan QRIS/VA
+  /// lama agar customer dapat memilih metode lain.
+  static Future<String> startMidtransPayment(String bookingCode, {bool changeMethod = false}) async {
+    final data = _asMap(await _request('POST',
+        '/public/bookings/${Uri.encodeComponent(bookingCode)}/midtrans${changeMethod ? '?changeMethod=true' : ''}'));
+    return '${data['paymentUrl'] ?? ''}';
   }
 
   static Future<Booking> submitPaymentProof(

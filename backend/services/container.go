@@ -56,7 +56,7 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 	weatherService := NewWeatherService(cfg)
 	geocodingService := NewGeocodingService(cfg)
 
-	bookingService := NewBookingService(bookingRepo, packageRepo, ipaymuService, emailService, notifService)
+	bookingService := NewBookingService(bookingRepo, packageRepo, ipaymuService, NewMidtransService(cfg), emailService, notifService)
 
 	return &Container{
 		ProviderRepo:    providerRepo,

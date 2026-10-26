@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import 'package:customer_mobile/config/app_config.dart';
 import 'package:customer_mobile/services/api_service.dart';
 import 'package:customer_mobile/services/auth_session.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
@@ -94,6 +96,29 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() {
         _loading = false;
         _generalError = e is ApiException ? e.message : 'Proses gagal. Silakan periksa kembali data Anda.';
+      });
+    }
+  }
+
+  Future<void> _googleLogin() async {
+    setState(() {
+      _generalError = null;
+      _loading = true;
+    });
+    try {
+      final signedIn = await AuthSession.instance.loginWithGoogle();
+      if (!mounted) return;
+      if (!signedIn) {
+        setState(() => _loading = false);
+        return;
+      }
+      showSnack(context, 'Berhasil masuk dengan Google!');
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _generalError = e is ApiException ? e.message : 'Login Google gagal. Silakan coba lagi.';
       });
     }
   }
@@ -254,6 +279,16 @@ class _AuthScreenState extends State<AuthScreen> {
                 icon: Icons.arrow_forward,
                 onPressed: _submit,
               ),
+              // google_sign_in di web butuh tombol GIS khusus; versi web
+              // customer sudah punya login Google sendiri.
+              if (!kIsWeb && AppConfig.googleServerClientId.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _loading ? null : _googleLogin,
+                  icon: const Icon(Icons.g_mobiledata, size: 28),
+                  label: const Text('Lanjutkan dengan Google'),
+                ),
+              ],
               const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 14),

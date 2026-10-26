@@ -44,10 +44,11 @@ void main() {
     ));
     await tester.pump();
     expect(tester.takeException(), isNull);
-    expect(find.text('Rp775.000 / orang'), findsNWidgets(2));
-    expect(find.text('mulai dari'), findsNWidgets(2));
+    expect(find.text('Rp775.000 /orang'), findsNWidgets(2));
+    expect(find.text('Mulai dari'), findsNWidgets(2));
     expect(find.text('5 kuota tersisa'), findsOneWidget);
-    expect(find.text('Open Trip • 3 hari'), findsNWidgets(2));
+    expect(find.text('Open Trip • 3 hari'), findsOneWidget, reason: 'kartu Trip Populer');
+    expect(find.text('OPEN TRIP • 3 HARI'), findsOneWidget, reason: 'kartu Cari Trip memakai huruf besar');
   });
 
   testWidgets('kartu Trip Populer sama tinggi walau judul & fasilitas beda panjang', (tester) async {

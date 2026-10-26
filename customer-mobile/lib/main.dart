@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'package:customer_mobile/screens/auth_screen.dart';
 import 'package:customer_mobile/screens/booking_list_screen.dart';
 import 'package:customer_mobile/screens/home_screen.dart';
 import 'package:customer_mobile/screens/profile_screen.dart';
+import 'package:customer_mobile/screens/trip_detail_screen.dart';
 import 'package:customer_mobile/screens/trip_list_screen.dart';
 import 'package:customer_mobile/screens/trip_planner_screen.dart';
 import 'package:customer_mobile/services/auth_session.dart';
 import 'package:customer_mobile/services/checkout_config.dart';
 import 'package:customer_mobile/services/wishlist_store.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
+import 'package:customer_mobile/utils/deep_links.dart';
 import 'package:customer_mobile/widgets/bottom_navigation.dart';
 import 'package:customer_mobile/widgets/common.dart';
 import 'package:customer_mobile/widgets/legal_content.dart';
@@ -21,6 +24,8 @@ final appShellKey = GlobalKey<AppShellState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Web: tautan bagikan `/paket/<id>` dibaca dari path URL, bukan hash.
+  usePathUrlStrategy();
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
   await WishlistStore.instance.load();
   runApp(const TemenTripApp());
@@ -38,8 +43,45 @@ class TemenTripApp extends StatefulWidget {
   State<TemenTripApp> createState() => _TemenTripAppState();
 }
 
-class _TemenTripAppState extends State<TemenTripApp> {
+class _TemenTripAppState extends State<TemenTripApp> with WidgetsBindingObserver {
   bool _splashDone = false;
+
+  /// Paket dari tautan yang membuka aplikasi; dibuka setelah splash selesai.
+  int? _pendingPackageId =
+      packageIdFromUri(Uri.parse(WidgetsBinding.instance.platformDispatcher.defaultRouteName));
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Tautan paket yang diketuk saat aplikasi sudah berjalan (Android App Links).
+  @override
+  Future<bool> didPushRouteInformation(RouteInformation routeInformation) async {
+    final id = packageIdFromUri(routeInformation.uri);
+    if (id == null) return false;
+    if (_splashDone) {
+      openPackageLink(id);
+    } else {
+      _pendingPackageId = id;
+    }
+    return true;
+  }
+
+  void _finishSplash() {
+    setState(() => _splashDone = true);
+    final id = _pendingPackageId;
+    if (id == null) return;
+    _pendingPackageId = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) => openPackageLink(id));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +89,8 @@ class _TemenTripAppState extends State<TemenTripApp> {
       title: 'TemenTrip',
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
+      // Rute awal dari tautan ditangani sendiri lewat [_pendingPackageId].
+      initialRoute: '/',
       theme: AppTheme.light(),
       home: ListenableBuilder(
         listenable: AuthSession.instance,
@@ -57,12 +101,17 @@ class _TemenTripAppState extends State<TemenTripApp> {
               ? AppShell(key: appShellKey)
               : SplashView(
                   ready: !AuthSession.instance.initializing,
-                  onFinished: () => setState(() => _splashDone = true),
+                  onFinished: _finishSplash,
                 ),
         ),
       ),
     );
   }
+}
+
+/// Membuka detail paket dari tautan bagikan `/paket/<id>`.
+void openPackageLink(int packageId) {
+  navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => PackageLinkScreen(packageId: packageId)));
 }
 
 /// Memastikan customer sudah masuk sebelum melanjutkan, padanan
@@ -108,6 +157,11 @@ class AppShellState extends State<AppShell> {
     if (tab == AppTab.rencanaTrip && !await ensureLoggedIn(context)) return;
     if (!mounted) return;
     setState(() {
+      // Masuk Cari Trip dari navigasi bawah: tampilkan trip terdekat (GPS).
+      if (tab == AppTab.cariTrip && _tab != AppTab.cariTrip) {
+        _searchParams = const TripSearchParams(nearMe: true);
+        _searchVersion++;
+      }
       if (tab == AppTab.booking) _bookingsVersion++;
       if (tab == AppTab.rencanaTrip) _plannerOpened = true;
       _tab = tab;
@@ -165,7 +219,7 @@ class AppShellState extends State<AppShell> {
         body: IndexedStack(
           index: _tab.index,
           children: [
-            HomeScreen(onSearch: openSearch),
+            HomeScreen(onSearch: openSearch, onPlanTrip: () => selectTab(AppTab.rencanaTrip)),
             TripListScreen(key: ValueKey('search-$_searchVersion'), params: _searchParams),
             BookingListScreen(
               key: const ValueKey('bookings'),

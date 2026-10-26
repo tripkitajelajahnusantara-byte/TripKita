@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:customer_mobile/config/app_config.dart';
 import 'package:customer_mobile/models/customer.dart';
 import 'package:customer_mobile/services/api_service.dart';
 import 'package:customer_mobile/services/wishlist_store.dart';
@@ -24,6 +26,14 @@ class AuthSession extends ChangeNotifier {
   CustomerProfile? get profile => _profile;
   bool get isLoggedIn => _profile != null && _token != null;
   bool get initializing => _initializing;
+
+  /// Sesi palsu untuk tes widget, tanpa penyimpanan aman.
+  @visibleForTesting
+  void debugSetSession(String? token, CustomerProfile? profile) {
+    _token = token;
+    _profile = profile;
+    notifyListeners();
+  }
 
   /// Bernilai true sekali setelah sesi dicabut server (401), agar UI dapat
   /// memberi tahu pengguna lalu mengarahkan ke halaman masuk.
@@ -66,7 +76,34 @@ class AuthSession extends ChangeNotifier {
 
   Future<void> login(String email, String password) async {
     _generation++;
-    final result = await ApiService.login(email, password);
+    await _adoptCustomer(await ApiService.login(email, password));
+  }
+
+  // initialize() hanya boleh dipanggil sekali; static final membuatnya lazy.
+  static final Future<void> _googleReady =
+      GoogleSignIn.instance.initialize(serverClientId: AppConfig.googleServerClientId);
+
+  /// Masuk lewat pemilih akun Google bawaan Android. Bernilai false bila
+  /// pengguna menutup pemilih akun.
+  Future<bool> loginWithGoogle() async {
+    final GoogleSignInAccount account;
+    try {
+      await _googleReady;
+      account = await GoogleSignIn.instance.authenticate();
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) return false;
+      throw ApiException('Login Google gagal (${e.code.name}). Silakan coba lagi.', 0);
+    }
+    final idToken = account.authentication.idToken;
+    if (idToken == null) {
+      throw const ApiException('Google tidak mengirim token login. Silakan coba lagi.', 0);
+    }
+    _generation++;
+    await _adoptCustomer(await ApiService.loginWithGoogle(idToken));
+    return true;
+  }
+
+  Future<void> _adoptCustomer(AuthResult result) async {
     if (!result.profile.isCustomer) {
       await ApiService.revokeSession(result.token);
       throw const ApiException(

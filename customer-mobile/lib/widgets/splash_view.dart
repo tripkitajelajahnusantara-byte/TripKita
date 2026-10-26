@@ -57,7 +57,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
   void didChangeDependencies() {
     super.didChangeDependencies();
     precacheImage(const AssetImage('assets/images/splash_logo.png'), context);
-    precacheImage(const AssetImage('assets/images/hero_gradient.png'), context);
+    precacheImage(const AssetImage('assets/images/home_hero.jpg'), context);
     precacheImage(const AssetImage('assets/images/logo_white.png'), context);
   }
 

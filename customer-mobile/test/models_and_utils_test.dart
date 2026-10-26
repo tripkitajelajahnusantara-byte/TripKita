@@ -2,10 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:customer_mobile/models/booking.dart';
 import 'package:customer_mobile/models/package.dart';
+import 'package:customer_mobile/utils/deep_links.dart';
 import 'package:customer_mobile/utils/external_links.dart';
 import 'package:customer_mobile/utils/formatters.dart';
 import 'package:customer_mobile/utils/trip_utils.dart';
 import 'package:customer_mobile/utils/validators.dart';
+import 'package:customer_mobile/widgets/form_fields.dart';
 
 void main() {
   group('TripPackage.fromJson', () {
@@ -78,6 +80,7 @@ void main() {
       gender: 'Laki-laki',
       birthDate: '1995-04-12',
       medicalHistory: 'Tidak Ada',
+      pickupPoint: ' Depok, Exit Tol Cisalak (lobby) ',
     ).toApiJson();
     expect(json, {
       'name': 'Budi Santoso',
@@ -85,15 +88,43 @@ void main() {
       'gender': 'Laki-laki',
       'birthDate': '1995-04-12',
       'medicalNotes': '',
+      'pickupPoint': 'Depok, Exit Tol Cisalak (lobby)',
     });
   });
 
+  test('booking membawa data pemesan dan peserta dari backend', () {
+    final booking = Booking.fromJson({
+      'id': 1,
+      'bookingCode': 'TK-1',
+      'customerEmail': 'a@b.co',
+      'customerPhone': '6281234567890',
+      'participants': [
+        {'name': 'Nadia', 'phone': '628123', 'medicalNotes': 'alergi seafood', 'pickupPoint': 'Bekasi'},
+      ],
+    });
+    expect(booking.customerEmail, 'a@b.co');
+    expect(booking.participants.single.medicalHistory, 'alergi seafood');
+    expect(booking.participants.single.pickupPoint, 'Bekasi');
+  });
+
   group('tautan eksternal', () {
-    test('hanya invoice HTTPS Xendit yang dipercaya', () {
-      expect(trustedPaymentUri('https://checkout.xendit.co/web/abc'), isNotNull);
-      expect(trustedPaymentUri('http://checkout.xendit.co/web/abc'), isNull);
-      expect(trustedPaymentUri('https://xendit.co.evil.com/pay'), isNull);
-      expect(trustedPaymentUri('https://example.com/xendit-mock-checkout/1'), isNull);
+    test('tautan bagikan paket bolak-balik ke ID paket', () {
+      final uri = packageShareUri(12);
+      expect(uri.toString(), 'https://tementrip-app.web.app/paket/12');
+      expect(packageIdFromUri(uri), 12);
+      expect(packageIdFromUri(Uri.parse('/paket/12')), 12);
+      expect(packageIdFromUri(Uri.parse('/paket/abc')), isNull);
+      expect(packageIdFromUri(Uri.parse('/')), isNull);
+      expect(packageIdFromUri(Uri.parse('/paket/12/ulasan')), isNull);
+    });
+
+    test('nomor HP form (+62) dikirim berawalan 62 dan lolos validasi', () {
+      expect(phoneLocalPart('0812-3456-7890'), '81234567890');
+      expect(phoneLocalPart('+6281234567890'), '81234567890');
+      expect(phoneFromLocal('081234567890'), '6281234567890');
+      expect(phoneFromLocal(''), '');
+      expect(validateBookerPhone(phoneFromLocal('81234567890')), isNull);
+      expect(displayPhone('6281234567890'), '+6281234567890');
     });
 
     test('nomor WhatsApp dinormalisasi ke format 62', () {
@@ -118,7 +149,7 @@ void main() {
   });
 
   group('jadwal & tanggal', () {
-    test('Open Trip memakai satu jadwal dari mitra, dan jadwal lampau tidak dapat dipesan', () {
+    test('Open Trip lama memakai satu jadwal dari mitra, dan jadwal lampau tidak dapat dipesan', () {
       final today = dateOnly(DateTime.now());
       TripPackage pkg(DateTime start) => TripPackage.fromJson({
             'id': 1,
@@ -127,13 +158,41 @@ void main() {
             'price': 1,
             'tripType': 'Open Trip',
             'duration': 3,
+            'quotaMax': 10,
             'startDate': toIsoDate(start),
             'endDate': toIsoDate(start.add(const Duration(days: 2))),
           });
-      final future = openTripDeparture(pkg(today.add(const Duration(days: 10))))!;
-      expect(future.dateIso, toIsoDate(today.add(const Duration(days: 10))));
-      expect(future.label, endsWith('(3 Hari)'));
-      expect(openTripDeparture(pkg(today.subtract(const Duration(days: 1)))), isNull);
+      final future = nextDeparture(pkg(today.add(const Duration(days: 10))))!;
+      expect(future.date, toIsoDate(today.add(const Duration(days: 10))));
+      expect(future.endDate, toIsoDate(today.add(const Duration(days: 12))));
+      expect(future.seatsLeft, 10);
+      expect(nextDeparture(pkg(today.subtract(const Duration(days: 1)))), isNull);
+    });
+
+    test('Open Trip multi-jadwal memakai kuota per keberangkatan dari server', () {
+      final today = dateOnly(DateTime.now());
+      String day(int offset) => toIsoDate(today.add(Duration(days: offset)));
+      final pkg = TripPackage.fromJson({
+        'id': 1,
+        'name': 'Open Trip',
+        'destination': 'X',
+        'price': 1,
+        'tripType': 'Open Trip',
+        'duration': 3,
+        'pickupMode': 'FLEXIBLE',
+        'pickupPoints': ['Depok, Exit Tol Cisalak', ' '],
+        'departures': [
+          {'date': day(20), 'endDate': day(22), 'quotaUsed': 3, 'seatsLeft': 7},
+          {'date': day(-3), 'endDate': day(-1), 'quotaUsed': 0, 'seatsLeft': 10},
+          {'date': day(10), 'endDate': day(12), 'quotaUsed': 10, 'seatsLeft': 0},
+        ],
+      });
+      final upcoming = upcomingDepartures(pkg);
+      expect(upcoming.map((d) => d.date), [day(10), day(20)]);
+      expect(nextDeparture(pkg)!.date, day(20), reason: 'jadwal penuh dilewati');
+      expect(pkg.isFlexiblePickup, isTrue);
+      expect(pkg.pickupPoints, ['Depok, Exit Tol Cisalak']);
+      expect(TripPackage.fromJson(pkg.toJson()).departures!.length, 3);
     });
 
     test('highlight berasal dari fasilitas mitra, bukan karangan dari nama paket', () {

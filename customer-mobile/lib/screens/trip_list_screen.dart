@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'package:customer_mobile/models/package.dart';
 import 'package:customer_mobile/screens/trip_detail_screen.dart';
+import 'package:customer_mobile/services/location_service.dart';
 import 'package:customer_mobile/services/package_catalog.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
 import 'package:customer_mobile/utils/formatters.dart';
@@ -20,11 +21,15 @@ class TripSearchParams {
   final String type;
   final String category;
 
+  /// Dibuka dari navigasi bawah: trip diurutkan dari lokasi GPS customer.
+  final bool nearMe;
+
   const TripSearchParams({
     this.destination = '',
     this.date = '',
     this.type = allTripTypesLabel,
     this.category = allCategoriesLabel,
+    this.nearMe = false,
   });
 
   TripSearchParams copyWith({String? destination, String? date, String? type, String? category}) => TripSearchParams(
@@ -32,6 +37,7 @@ class TripSearchParams {
         date: date ?? this.date,
         type: type ?? this.type,
         category: category ?? this.category,
+        nearMe: nearMe,
       );
 
   bool get hasType => type.isNotEmpty && type != allTripTypesLabel;
@@ -51,15 +57,77 @@ class TripListScreen extends StatefulWidget {
 }
 
 class _TripListScreenState extends State<TripListScreen> {
+  /// Dialog "aktifkan lokasi" cukup sekali per sesi; berikutnya cukup pesan singkat.
+  static bool _askedToEnableLocation = false;
+
   late TripSearchParams _params = widget.params;
   late Future<List<TripPackage>> _packages = PackageCatalog.load();
   final _scroll = ScrollController();
   String _sortBy = _sortOptions.first;
 
+  /// Lokasi customer (mode terdekat); null berarti semua trip tanpa urutan jarak.
+  ({double lat, double lon})? _origin;
+  bool _locating = false;
+  bool _waitingForSettings = false;
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    // Kembali dari pengaturan lokasi: coba ambil lokasi lagi.
+    _lifecycle = AppLifecycleListener(onResume: () {
+      if (_waitingForSettings) {
+        _waitingForSettings = false;
+        _locate();
+      }
+    });
+    if (_params.nearMe) _locate();
+  }
+
   @override
   void dispose() {
+    _lifecycle.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// Trip terdekat dulu. Bila lokasi tidak tersedia, daftar tetap menampilkan
+  /// semua trip; layanan lokasi yang mati ditawarkan untuk diaktifkan.
+  Future<void> _locate() async {
+    setState(() => _locating = true);
+    final result = await LocationService.current();
+    if (!mounted) return;
+    final position = result.position;
+    setState(() {
+      _locating = false;
+      _origin = position == null ? null : (lat: position.latitude, lon: position.longitude);
+    });
+    switch (result.issue) {
+      case null:
+        return;
+      case LocationIssue.serviceDisabled:
+        if (_askedToEnableLocation) {
+          showSnack(context, 'Lokasi perangkat mati. Menampilkan semua trip.');
+          return;
+        }
+        _askedToEnableLocation = true;
+        final enable = await showActionDialog(
+          context,
+          title: 'Aktifkan Lokasi',
+          message: const Text('Nyalakan layanan lokasi (GPS) agar kami bisa menampilkan trip dengan titik kumpul '
+              'terdekat dari posisi Anda.'),
+          confirmLabel: 'Aktifkan Lokasi',
+          cancelLabel: 'Lihat Semua Trip',
+        );
+        if (enable && mounted) {
+          _waitingForSettings = true;
+          await LocationService.openSettings();
+        }
+      case LocationIssue.permissionDenied:
+        showSnack(context, 'Izin lokasi tidak diberikan. Menampilkan semua trip.');
+      case LocationIssue.unavailable:
+        showSnack(context, 'Lokasi belum dapat ditemukan. Menampilkan semua trip.');
+    }
   }
 
   Future<void> _refresh() async {
@@ -88,8 +156,11 @@ class _TripListScreenState extends State<TripListScreen> {
       case 'Termurah':
         list.sort((a, b) => a.price.compareTo(b.price));
       default:
+        final origin = _origin;
         final target = parseIsoDate(_params.date);
-        if (target != null) {
+        if (origin != null && target == null) {
+          sortByDistance(list, origin.lat, origin.lon);
+        } else if (target != null) {
           int distance(TripPackage p) {
             final start = parseIsoDate(p.startDate);
             return start == null ? 1 << 30 : start.difference(target).inDays.abs();
@@ -139,6 +210,13 @@ class _TripListScreenState extends State<TripListScreen> {
     setState(() => _params = _params.copyWith(category: _params.category == category ? allCategoriesLabel : category));
   }
 
+  /// Judul kolom pencarian saat destinasi kosong.
+  String get _placeholder {
+    if (!_params.nearMe) return 'Semua Destinasi';
+    if (_origin != null) return 'Lokasi Terdekat';
+    return _locating ? 'Mencari lokasi terdekat...' : 'Semua Trip';
+  }
+
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
@@ -163,6 +241,7 @@ class _TripListScreenState extends State<TripListScreen> {
                     delegate: _SearchHeader(
                       top: top,
                       params: _params,
+                      placeholder: _placeholder,
                       onEdit: _editSearch,
                       onSort: _pickSort,
                       onCategory: _toggleCategory,
@@ -231,6 +310,7 @@ class _SearchHeader extends SliverPersistentHeaderDelegate {
 
   final double top;
   final TripSearchParams params;
+  final String placeholder;
   final VoidCallback onEdit;
   final VoidCallback onSort;
   final ValueChanged<String> onCategory;
@@ -238,6 +318,7 @@ class _SearchHeader extends SliverPersistentHeaderDelegate {
   const _SearchHeader({
     required this.top,
     required this.params,
+    required this.placeholder,
     required this.onEdit,
     required this.onSort,
     required this.onCategory,
@@ -278,7 +359,7 @@ class _SearchHeader extends SliverPersistentHeaderDelegate {
                     child: Opacity(
                       opacity: 1 - t,
                       child: const Text('Cari Trip',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white)),
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.white)),
                     ),
                   ),
                 ),
@@ -288,32 +369,44 @@ class _SearchHeader extends SliverPersistentHeaderDelegate {
           SizedBox(height: lerpDouble(8, 4, t)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _SearchPill(params: params, t: t, onTap: onEdit),
+            child: _SearchPill(params: params, placeholder: placeholder, t: t, onTap: onEdit),
           ),
           SizedBox(height: lerpDouble(16, 12, t)),
+          // "Urutkan" tetap di tempat; hanya chip kategori yang bergulir.
           SizedBox(
             height: 28,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                BadgeChip(
-                  label: 'Urutkan',
-                  selected: true,
-                  onTap: onSort,
-                  leading: const AppIcon('sort_ascending', size: 16, color: AppColors.brand),
-                  trailing: const AppIcon('caret_down', size: 16, color: AppColors.brand),
+            child: Row(children: [
+              const SizedBox(width: 16),
+              BadgeChip(
+                label: 'Urutkan',
+                selected: true,
+                onTap: onSort,
+                leading: const AppIcon('sort_ascending', size: 16, color: AppColors.primaryDark),
+                trailing: const AppIcon('caret_down', size: 16, color: AppColors.primaryDark),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 1,
+                height: 28,
+                color: Color.lerp(const Color(0x66FFFFFF), AppColors.border, t),
+              ),
+              Expanded(
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
+                  children: [
+                    for (final category in officialCategories) ...[
+                      if (category != officialCategories.first) const SizedBox(width: 6),
+                      BadgeChip(
+                        label: category,
+                        selected: params.category == category,
+                        onTap: () => onCategory(category),
+                      ),
+                    ],
+                  ],
                 ),
-                for (final category in officialCategories) ...[
-                  const SizedBox(width: 6),
-                  BadgeChip(
-                    label: category,
-                    selected: params.category == category,
-                    onTap: () => onCategory(category),
-                  ),
-                ],
-              ],
-            ),
+              ),
+            ]),
           ),
           const SizedBox(height: 16),
         ]),
@@ -322,72 +415,62 @@ class _SearchHeader extends SliverPersistentHeaderDelegate {
   }
 }
 
-/// Kolom ringkasan pencarian berbentuk pil; warnanya berpindah dari gaya
-/// di atas biru (t = 0) ke gaya di atas putih (t = 1).
+/// Kolom ringkasan pencarian berbentuk pil (terang, ikon teal, "Ubah").
+/// Tanpa tanggal/tipe hanya satu baris, mis. "Lokasi Terdekat".
 class _SearchPill extends StatelessWidget {
   final TripSearchParams params;
+  final String placeholder;
   final double t;
   final VoidCallback onTap;
 
-  const _SearchPill({required this.params, required this.t, required this.onTap});
+  const _SearchPill({required this.params, required this.placeholder, required this.t, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final date = parseIsoDate(params.date);
-    final subtitleColor = Color.lerp(AppColors.divider, AppColors.textMuted, t)!;
-    final subtitleStyle = TextStyle(fontSize: 12, height: 16 / 12, color: subtitleColor);
-    return DecoratedBox(
-      decoration: ShapeDecoration(
-        shape: const StadiumBorder(),
-        shadows: [
-          BoxShadow(color: Colors.white.withValues(alpha: 0.2 * (1 - t)), offset: const Offset(0, 2), blurRadius: 8),
-        ],
-      ),
-      child: Material(
-        color: Color.lerp(AppColors.brand, Colors.white, t),
-        shape: StadiumBorder(side: BorderSide(color: Color.lerp(AppColors.border, AppColors.borderStrong, t)!)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(children: [
-              AppIcon('magnifying_glass', color: Color.lerp(Colors.white, AppColors.textLight, t)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(params.destination.isEmpty ? 'Mau ke mana kali ini?' : params.destination,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 20 / 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color.lerp(Colors.white, AppColors.textDark, t),
-                        )),
+    final hasDetail = date != null || params.hasType;
+    const subtitleStyle = TextStyle(fontSize: 11, height: 16 / 11, color: AppColors.textMuted);
+    final title = params.destination.isEmpty ? placeholder : params.destination;
+    return Material(
+      color: AppColors.accentSoft,
+      shape: StadiumBorder(side: BorderSide(color: AppColors.border.withValues(alpha: t))),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 48,
+          padding: const EdgeInsets.only(left: 12, right: 16),
+          child: Row(children: [
+            const AppIcon('magnifying_glass', color: AppColors.accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: hasDetail
+                          ? const TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, color: AppColors.textDark)
+                          : const TextStyle(fontSize: 15, height: 20 / 15, color: AppColors.textMedium)),
+                  if (hasDetail)
                     Row(children: [
-                      Text(date == null ? 'Tanggal' : formatDateLong(date), style: subtitleStyle),
-                      SizedBox(
-                        width: 16,
-                        child: Text('•',
-                            textAlign: TextAlign.center,
-                            style: subtitleStyle.copyWith(
-                                color: Color.lerp(AppColors.divider, AppColors.borderStrong, t))),
-                      ),
-                      Flexible(
-                        child: Text(params.hasType ? params.type : 'Tipe Trip',
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: subtitleStyle),
-                      ),
+                      if (date != null) Text(formatDateLong(date), style: subtitleStyle),
+                      if (date != null && params.hasType)
+                        const SizedBox(
+                          width: 14,
+                          child: Text('•', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppColors.borderStrong)),
+                        ),
+                      if (params.hasType)
+                        Flexible(child: Text(params.type, maxLines: 1, overflow: TextOverflow.ellipsis, style: subtitleStyle)),
                     ]),
-                  ],
-                ),
+                ],
               ),
-            ]),
-          ),
+            ),
+            const SizedBox(width: 8),
+            const Text('Ubah', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent)),
+          ]),
         ),
       ),
     );

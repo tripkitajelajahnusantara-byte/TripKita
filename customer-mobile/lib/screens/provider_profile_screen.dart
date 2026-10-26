@@ -24,6 +24,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   PublicProvider? _provider;
   List<TripPackage> _packages = const [];
   bool _loading = true;
+  bool _descExpanded = false;
   String? _error;
 
   @override
@@ -62,98 +63,148 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   Widget build(BuildContext context) {
     final p = _provider;
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil Mitra')),
+      backgroundColor: Colors.white,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(backgroundColor: Colors.transparent, surfaceTintColor: Colors.transparent, scrolledUnderElevation: 0),
       body: RefreshIndicator(
         onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          children: [
-            if (p != null) _header(p),
-            if (_loading && p == null) const LoadingView('Memuat profil mitra...'),
-            if (_error != null && p == null)
-              EmptyState(
-                icon: Icons.storefront_outlined,
-                title: 'Profil Mitra Tidak Ditemukan',
-                message: _error!,
-                actions: [ElevatedButton(onPressed: _load, child: const Text('Coba Lagi'))],
-              ),
-            const SizedBox(height: 20),
-            if (!_loading || _packages.isNotEmpty) ...[
-              Text('Paket dari ${p?.businessName ?? 'Mitra'} (${_packages.length})',
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textDark)),
-              const SizedBox(height: 12),
-              if (_packages.isEmpty && !_loading)
-                const Text('Mitra ini belum memiliki paket aktif.', style: TextStyle(color: AppColors.textMuted)),
-              for (final pkg in _packages) ...[
-                TripListCard(
-                  pkg: pkg,
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripDetailScreen(package: pkg))),
+        child: DefaultTextStyle.merge(
+          style: figmaTextStyle,
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 32),
+            children: [
+              Stack(clipBehavior: Clip.none, children: [
+                Container(
+                  height: 150,
+                  color: AppColors.divider,
+                  alignment: const Alignment(0, 0.1),
+                  child: const Icon(Icons.image_outlined, size: 44, color: AppColors.borderStrong),
                 ),
-                const SizedBox(height: 14),
-              ],
+                if (p != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 110, 16, 0),
+                    child: _header(p),
+                  ),
+              ]),
+              if (_loading && p == null) const LoadingView('Memuat profil mitra...'),
+              if (_error != null && p == null)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: EmptyState(
+                    icon: Icons.storefront_outlined,
+                    title: 'Profil Mitra Tidak Ditemukan',
+                    message: _error!,
+                    actions: [ElevatedButton(onPressed: _load, child: const Text('Coba Lagi'))],
+                  ),
+                ),
+              if (!_loading || _packages.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    SectionTitle('Paket Wisata (${_packages.length})'),
+                    const SizedBox(height: 12),
+                    if (_packages.isEmpty && !_loading)
+                      const Text('Mitra ini belum memiliki paket aktif.', style: TextStyle(color: AppColors.textMuted)),
+                    for (final pkg in _packages) ...[
+                      TripListCard(
+                        pkg: pkg,
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripDetailScreen(package: pkg))),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ]),
+                ),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _header(PublicProvider p) {
-    final location = [p.operationalCity, p.operationalProvince].where((s) => s.isNotEmpty).join(', ');
-    Widget stat(String value, String label) => Expanded(
-          child: Column(children: [
-            Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textDark)),
-            const SizedBox(height: 2),
-            Text(label, style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-          ]),
+    final since = p.createdAt == null ? '' : 'Bergabung sejak ${p.createdAt!.year}';
+    final city = p.operationalCity.isNotEmpty ? p.operationalCity : p.operationalProvince;
+    Widget stat(IconData icon, Color color, String label, String value) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(8)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Icon(icon, size: 14, color: color),
+                const SizedBox(width: 4),
+                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textDark)),
+              ]),
+              const SizedBox(height: 4),
+              Text(value, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+            ]),
+          ),
         );
 
-    return SectionCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [BoxShadow(color: Color(0x14102A33), blurRadius: 12, offset: Offset(0, 4))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Container(
-            width: 60,
-            height: 60,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(16)),
-            child: Text(p.businessName.isNotEmpty ? p.businessName[0].toUpperCase() : 'M',
-                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
-          ),
-          const SizedBox(width: 14),
+          ProviderLogo(provider: p, size: 52),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Flexible(
                   child: Text(p.businessName,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textDark)),
                 ),
                 if (p.isVerified) ...[
                   const SizedBox(width: 6),
                   const Icon(Icons.verified, size: 18, color: AppColors.accent),
                 ],
               ]),
-              if (p.businessCategory.isNotEmpty)
-                Text(p.businessCategory, style: const TextStyle(fontSize: 12.5, color: AppColors.primary, fontWeight: FontWeight.w700)),
-              if (location.isNotEmpty) ...[
+              if (since.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(since, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              ],
+              if (city.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Row(children: [
-                  const Icon(Icons.location_on_outlined, size: 14, color: AppColors.accent),
+                  const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textMedium),
                   const SizedBox(width: 3),
-                  Expanded(child: Text(location, style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted))),
+                  Expanded(child: Text(city, style: const TextStyle(fontSize: 12, color: AppColors.textMedium))),
                 ]),
               ],
             ]),
           ),
         ]),
         if (p.description.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text(p.description, style: const TextStyle(fontSize: 13.5, color: AppColors.textMedium, height: 1.6)),
+          const SizedBox(height: 12),
+          Text(
+            p.description,
+            maxLines: _descExpanded ? null : 3,
+            overflow: _descExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13, height: 1.5, color: AppColors.textMuted),
+          ),
+          if (p.description.length > 140)
+            Center(
+              child: TextButton(
+                onPressed: () => setState(() => _descExpanded = !_descExpanded),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(_descExpanded ? 'Lebih sedikit' : 'Selengkapnya', style: const TextStyle(fontSize: 13)),
+                  Icon(_descExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, size: 20),
+                ]),
+              ),
+            ),
         ],
-        const Divider(height: 28),
+        const SizedBox(height: 12),
         Row(children: [
-          stat(p.rating > 0 ? p.rating.toStringAsFixed(1) : '-', 'Rating'),
-          stat('${p.totalTravelers}', 'Wisatawan'),
-          stat('${_packages.length}', 'Paket Aktif'),
+          stat(Icons.star_rounded, AppColors.star, 'Rating',
+              p.rating > 0 ? '${p.rating.toStringAsFixed(1)} / 5.0' : 'Belum ada ulasan'),
+          const SizedBox(width: 8),
+          stat(Icons.favorite_rounded, AppColors.success, 'Peserta Trip',
+              p.totalTravelers > 0 ? '${p.totalTravelers} orang' : '-'),
         ]),
       ]),
     );

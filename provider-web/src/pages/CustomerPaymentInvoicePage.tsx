@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, Copy, FileText, FileUp, LoaderCircle, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, CheckCircle2, Clock3, Copy, CreditCard, FileText, FileUp, LoaderCircle, Lock, RefreshCw, ShieldCheck, X } from 'lucide-react';
 
 import { useNavigation } from '../context/NavigationContext';
 import { request } from '../utils/api';
 import { fetchCheckoutConfig, type CheckoutConfig } from '../utils/checkoutConfig';
 import { bookingAddOns } from '../utils/pricing';
+import { midtransReturnStatus } from '../utils/midtransReturn';
 
 const formatIDR = (value: number) => new Intl.NumberFormat('id-ID', {
   style: 'currency', currency: 'IDR', minimumFractionDigits: 0,
@@ -13,6 +14,26 @@ const formatIDR = (value: number) => new Intl.NumberFormat('id-ID', {
 const MAX_PROOF_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PROOF_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
 const PAID_STATUSES = ['PAID', 'CONFIRMED', 'COMPLETED'];
+
+// Pesan saat customer kembali dari halaman Snap. transaction_status di URL
+// hanya dipakai untuk pesan; status resmi tetap dibaca dari backend.
+const MIDTRANS_RETURN_COPY: Record<string, { tone: 'warn' | 'error'; title: string; body: string; action: string }> = {
+  pending: { tone: 'warn', title: 'Selesaikan pembayaran Anda', body: 'Ikuti instruksi di halaman Midtrans, misalnya transfer ke nomor virtual account atau scan QRIS. Menutup halaman ini tidak membatalkan pesanan.', action: 'Lihat Instruksi Pembayaran' },
+  deny: { tone: 'error', title: 'Pembayaran belum berhasil', body: 'Transaksi ditolak. Silakan coba lagi, bisa dengan metode pembayaran lain.', action: 'Coba Bayar Lagi' },
+  cancel: { tone: 'error', title: 'Pembayaran dibatalkan', body: 'Kuota Anda masih ditahan. Silakan bayar lagi sebelum batas waktu.', action: 'Coba Bayar Lagi' },
+  expire: { tone: 'error', title: 'Instruksi pembayaran kedaluwarsa', body: 'Silakan buat instruksi baru selama batas waktu pesanan masih berjalan.', action: 'Coba Bayar Lagi' },
+  failure: { tone: 'error', title: 'Pembayaran belum berhasil', body: 'Terjadi kendala saat memproses pembayaran. Silakan coba lagi.', action: 'Coba Bayar Lagi' },
+};
+const MIDTRANS_PAID_RETURNS = ['settlement', 'capture'];
+
+const CARD_TONE = {
+  default: { bg: '#f0f9ff', border: '#bae6fd', iconBg: '#e0f2fe', icon: '#0284c7' },
+  warn: { bg: '#fffbeb', border: '#fde68a', iconBg: '#fef3c7', icon: '#d97706' },
+  error: { bg: '#fef2f2', border: '#fecaca', iconBg: '#fee2e2', icon: '#dc2626' },
+};
+
+const currentMidtransReturn = (bookingCode: string) =>
+  midtransReturnStatus(bookingCode, window.location.search, window.location.hash);
 
 // Status akhir/lain yang tidak lagi menerima bukti transfer beserta penjelasannya.
 const CLOSED_STATUS_COPY: Record<string, { title: string; body: string }> = {
@@ -97,6 +118,7 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [statusLoadError, setStatusLoadError] = useState('');
@@ -137,7 +159,7 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   }, [bookingCode, setSelectedBookingForInvoice]);
 
   useEffect(() => {
-    fetchCheckoutConfig().then(setConfig).catch((err) => setError(err.message || 'Informasi rekening belum dapat dimuat. Muat ulang halaman ini.'));
+    fetchCheckoutConfig().then(setConfig).catch((err) => setError(err.message || 'Informasi pembayaran belum dapat dimuat. Muat ulang halaman ini.'));
   }, []);
 
   // Data dari sessionStorage bisa sudah usang (mis. admin sudah menyetujui atau
@@ -149,9 +171,12 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   useEffect(() => {
     const status = booking?.status;
     if (!bookingCode || (status !== 'PAYMENT_REVIEW' && status !== 'PENDING_PAYMENT')) return;
-    const timer = window.setInterval(refreshStatus, status === 'PAYMENT_REVIEW' ? 15000 : 30000);
+    // Pembayaran Midtrans dikonfirmasi otomatis lewat webhook, jadi dipantau lebih sering.
+    const online = String(booking?.paymentMethod || '').startsWith('Midtrans');
+    const justPaid = online && MIDTRANS_PAID_RETURNS.includes(currentMidtransReturn(bookingCode));
+    const timer = window.setInterval(refreshStatus, justPaid ? 5000 : status === 'PAYMENT_REVIEW' || online ? 15000 : 30000);
     return () => window.clearInterval(timer);
-  }, [bookingCode, booking?.status, refreshStatus]);
+  }, [bookingCode, booking?.status, booking?.paymentMethod, refreshStatus]);
 
   useEffect(() => {
     if (!file || !file.type.startsWith('image/')) {
@@ -206,6 +231,7 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   const isPaid = PAID_STATUSES.includes(status);
   const isReview = status === 'PAYMENT_REVIEW';
   const isPending = status === 'PENDING_PAYMENT';
+  const isOnline = String(booking.paymentMethod || '').startsWith('Midtrans');
   const isLocallyExpired = isPending && paymentDeadline > 0 && Date.now() >= paymentDeadline;
   const closedCopy = CLOSED_STATUS_COPY[status] || (isLocallyExpired ? CLOSED_STATUS_COPY.EXPIRED : undefined);
   const canUpload = isPending && !isLocallyExpired;
@@ -213,7 +239,13 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
   const bank = config?.manualPayment;
   const bankReady = !!bank?.accountNumber;
   const totalPrice = Number(booking.totalPrice) || 0;
-  const currentStep = isPaid ? 4 : isReview ? 3 : file ? 2 : 1;
+  const returnStatus = isOnline && canUpload ? currentMidtransReturn(bookingCode) : '';
+  const returnCopy = MIDTRANS_RETURN_COPY[returnStatus];
+  const awaitingConfirmation = MIDTRANS_PAID_RETURNS.includes(returnStatus);
+  // Setelah tagihan gagal/kedaluwarsa, tombol utama sudah membuka pilihan metode baru.
+  const canChangeMethod = returnStatus === 'pending' || (!returnCopy && !!booking.paymentUrl);
+  const cardTone = CARD_TONE[returnCopy?.tone || 'default'];
+  const currentStep = isOnline ? (isPaid ? 3 : awaitingConfirmation ? 2 : 1) : isPaid ? 4 : isReview ? 3 : file ? 2 : 1;
 
   const selectFile = (selected: File | null) => {
     setError('');
@@ -261,6 +293,43 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
     }
   };
 
+  // changeMethod menghentikan QRIS/VA lama karena Midtrans mengunci metode per tagihan.
+  const payOnline = async (changeMethod = false) => {
+    if (loading || !canUpload) return;
+    if (changeMethod && !window.confirm('Ganti metode pembayaran?\n\nKode QRIS atau nomor virtual account yang sudah dibuat akan dibatalkan, lalu Anda dapat memilih metode baru.\n\nSudah terlanjur membayar? Pilih Batal, lalu tekan "Sudah bayar? Cek status".')) return;
+    setLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const res = await request(`/public/bookings/${encodeURIComponent(bookingCode)}/midtrans${changeMethod ? '?changeMethod=true' : ''}`, { method: 'POST' });
+      if (res?.paymentUrl) {
+        window.location.assign(res.paymentUrl);
+        return;
+      }
+      await refreshStatus();
+    } catch (err: any) {
+      setError(err?.message || 'Halaman pembayaran belum dapat dibuka. Coba lagi.');
+    }
+    setLoading(false);
+  };
+
+  // Endpoint yang sama juga mencocokkan ulang status ke Midtrans, sehingga
+  // pembayaran yang notifikasinya terlambat langsung tercatat.
+  const checkOnlinePayment = async () => {
+    if (checking || loading) return;
+    setChecking(true);
+    setError('');
+    setMessage('');
+    try {
+      const res = await request(`/public/bookings/${encodeURIComponent(bookingCode)}/midtrans`, { method: 'POST' });
+      await refreshStatus();
+      if (res?.status === 'PENDING_PAYMENT') setMessage('Pembayaran belum kami terima. Bila sudah membayar, tunggu sebentar lalu cek lagi.');
+    } catch (err: any) {
+      setError(err?.message || 'Status pembayaran belum dapat diperiksa. Coba lagi.');
+    }
+    setChecking(false);
+  };
+
   const onCopied = (what: string) => (ok: boolean) => {
     setError('');
     if (ok) setMessage(`${what} berhasil disalin.`);
@@ -269,11 +338,13 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
 
   const statusTone = isPaid ? { bg: '#ecfdf5', icon: <CheckCircle2 color="#059669" /> }
     : isReview ? { bg: '#eff6ff', icon: <ShieldCheck color="#2563eb" /> }
+    : awaitingConfirmation ? { bg: '#eff6ff', icon: <LoaderCircle color="#2563eb" className="btn-spinner" /> }
     : closedCopy ? { bg: '#fef2f2', icon: <AlertTriangle color="#dc2626" /> }
     : { bg: '#fff7ed', icon: <Clock3 color="#ea580c" /> };
 
   const statusTitle = isPaid ? 'Pembayaran dikonfirmasi'
     : isReview ? 'Bukti transfer sedang diperiksa admin'
+    : awaitingConfirmation ? 'Pembayaran diterima, sedang diverifikasi'
     : closedCopy ? closedCopy.title
     : booking.paymentReviewNotes ? 'Bukti transfer sebelumnya ditolak'
     : 'Menunggu pembayaran — kuota sedang ditahan untuk Anda';
@@ -293,19 +364,28 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
               ))}
             </div>
             <div>
-              <span style={{ fontSize: 12, color: '#64748b' }}>TOTAL YANG HARUS DITRANSFER</span>
+              <span style={{ fontSize: 12, color: '#64748b' }}>{isOnline ? 'TOTAL PEMBAYARAN' : 'TOTAL YANG HARUS DITRANSFER'}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 24, fontWeight: 800, color: '#0284c7' }}>{formatIDR(totalPrice)}</span>
-                {canUpload && totalPrice > 0 && <CopyButton value={String(Math.round(totalPrice))} label="nominal transfer" onCopied={onCopied('Nominal transfer')} />}
+                {canUpload && !isOnline && totalPrice > 0 && <CopyButton value={String(Math.round(totalPrice))} label="nominal transfer" onCopied={onCopied('Nominal transfer')} />}
               </div>
             </div>
           </div>
 
           {!closedCopy && (
             <ol style={{ listStyle: 'none', margin: '20px 0 0', padding: 0, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-              <StepItem index={1} title="Transfer" active={currentStep === 1} done={currentStep > 1} />
-              <StepItem index={2} title="Unggah bukti" active={currentStep === 2} done={currentStep > 2} />
-              <StepItem index={3} title="Verifikasi admin" active={currentStep === 3} done={currentStep > 3} />
+              {isOnline ? (
+                <>
+                  <StepItem index={1} title="Pilih metode & bayar" active={currentStep === 1} done={currentStep > 1} />
+                  <StepItem index={2} title="Konfirmasi otomatis" active={currentStep === 2} done={currentStep > 2} />
+                </>
+              ) : (
+                <>
+                  <StepItem index={1} title="Transfer" active={currentStep === 1} done={currentStep > 1} />
+                  <StepItem index={2} title="Unggah bukti" active={currentStep === 2} done={currentStep > 2} />
+                  <StepItem index={3} title="Verifikasi admin" active={currentStep === 3} done={currentStep > 3} />
+                </>
+              )}
             </ol>
           )}
 
@@ -319,14 +399,54 @@ export const CustomerPaymentInvoicePage: React.FC = () => {
                   ? <Countdown deadline={reviewDeadline} label="Batas pemeriksaan admin" />
                   : 'Admin memeriksa bukti maksimal 1×24 jam sejak dikirim.')}
                 {closedCopy && closedCopy.body}
-                {canUpload && (paymentDeadline > 0
-                  ? <Countdown deadline={paymentDeadline} label="Selesaikan dalam" onExpire={refreshStatus} />
-                  : 'Memuat batas waktu pembayaran...')}
+                {canUpload && (awaitingConfirmation
+                  ? 'Midtrans sudah menerima pembayaran Anda. Halaman ini diperbarui otomatis dalam beberapa detik.'
+                  : paymentDeadline > 0
+                    ? <Countdown deadline={paymentDeadline} label="Selesaikan dalam" onExpire={refreshStatus} />
+                    : 'Memuat batas waktu pembayaran...')}
               </div>
             </div>
           </div>
 
-          {canUpload && (
+          {awaitingConfirmation && (
+            <button type="button" disabled={checking} onClick={checkOnlinePayment} style={{ marginTop: 16, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: '1px solid #bae6fd', borderRadius: 10, padding: 12, fontSize: 14, background: '#fff', color: '#0369a1', fontWeight: 800, cursor: checking ? 'not-allowed' : 'pointer', opacity: checking ? .6 : 1 }}>
+              <RefreshCw size={16} className={checking ? 'btn-spinner' : undefined} /> {checking ? 'Memeriksa pembayaran...' : 'Cek Status Pembayaran'}
+            </button>
+          )}
+
+          {canUpload && isOnline && !awaitingConfirmation && (
+            <div role={returnCopy ? 'status' : undefined} style={{ marginTop: 20, padding: 18, border: `1px solid ${cardTone.border}`, borderRadius: 14, background: cardTone.bg }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <span style={{ width: 40, height: 40, borderRadius: 10, background: cardTone.iconBg, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  {returnCopy?.tone === 'error' ? <AlertTriangle size={20} color={cardTone.icon} /> : returnCopy ? <Clock3 size={20} color={cardTone.icon} /> : <CreditCard size={20} color={cardTone.icon} />}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <h2 style={{ margin: '0 0 4px', fontSize: 16 }}>{returnCopy?.title || 'Bayar online'}</h2>
+                  <p style={{ color: '#475569', fontSize: 13, margin: 0, lineHeight: 1.5 }}>{returnCopy?.body || 'Pilih virtual account, QRIS, atau e-wallet di halaman Midtrans. Pesanan terkonfirmasi otomatis setelah bayar, tanpa unggah bukti.'}</p>
+                </div>
+              </div>
+              <button type="button" disabled={loading || checking} onClick={() => payOnline()} style={{ marginTop: 16, width: '100%', border: 0, borderRadius: 10, padding: 14, fontSize: 15, background: '#0284c7', color: '#fff', fontWeight: 800, cursor: loading || checking ? 'not-allowed' : 'pointer', opacity: loading || checking ? .55 : 1 }}>
+                {loading
+                  ? <><LoaderCircle size={16} className="btn-spinner" style={{ verticalAlign: 'middle', marginRight: 8 }} />Membuka halaman pembayaran...</>
+                  : returnCopy ? returnCopy.action : booking.paymentUrl ? 'Lanjutkan Pembayaran' : `Bayar Sekarang · ${formatIDR(totalPrice)}`}
+              </button>
+              {canChangeMethod && (
+                <button type="button" disabled={loading || checking} onClick={() => payOnline(true)} style={{ marginTop: 10, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: '1px solid #bae6fd', borderRadius: 10, padding: 12, fontSize: 14, background: '#fff', color: '#0369a1', fontWeight: 800, cursor: loading || checking ? 'not-allowed' : 'pointer', opacity: loading || checking ? .55 : 1 }}>
+                  <ArrowLeftRight size={16} /> Ganti Metode Pembayaran
+                </button>
+              )}
+              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b' }}>
+                  <Lock size={13} /> Pembayaran aman diproses Midtrans
+                </span>
+                <button type="button" disabled={checking || loading} onClick={checkOnlinePayment} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: 0, background: 'transparent', color: '#0284c7', fontWeight: 700, fontSize: 13, cursor: checking || loading ? 'not-allowed' : 'pointer', padding: '6px 0' }}>
+                  <RefreshCw size={14} className={checking ? 'btn-spinner' : undefined} /> {checking ? 'Memeriksa...' : 'Sudah bayar? Cek status'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {canUpload && !isOnline && (
             <>
               <div style={{ marginTop: 20, padding: 18, border: '1px solid #bae6fd', borderRadius: 14, background: '#f0f9ff' }}>
                 <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>1. Transfer ke rekening TemenTrip</h2>

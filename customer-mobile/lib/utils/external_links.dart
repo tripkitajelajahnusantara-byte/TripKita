@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Tautan `wa.me` untuk nomor mitra, atau null bila nomornya tidak valid.
@@ -19,4 +20,14 @@ Future<bool> openExternal(Uri uri) async {
   } catch (_) {
     return false;
   }
+}
+
+/// Halaman pembayaran dibuka di browser dalam aplikasi (Custom Tabs) agar
+/// customer kembali ke aplikasi begitu tab ditutup; bila tidak didukung,
+/// dibuka di browser luar.
+Future<bool> openInAppBrowser(Uri uri) async {
+  try {
+    if (await launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.inAppBrowserView)) return true;
+  } catch (_) {}
+  return openExternal(uri);
 }
