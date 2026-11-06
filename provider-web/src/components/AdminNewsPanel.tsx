@@ -40,6 +40,8 @@ function NewsList({ onOpen }: { onOpen: (id: number | 'new') => void }) {
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState<Filter>('ALL');
   const [query, setQuery] = useState('');
+  // Id berita yang sedang dihapus; baris tetap tampil dengan indikator sampai server menjawab.
+  const [deleting, setDeleting] = useState<ReadonlySet<number>>(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -67,11 +69,18 @@ function NewsList({ onOpen }: { onOpen: (id: number | 'new') => void }) {
     type: 'error',
     confirmText: 'Hapus',
     onConfirm: async () => {
+      setDeleting((current) => new Set(current).add(item.id));
       try {
         await request(`/admin/news/${item.id}`, { method: 'DELETE' });
         setItems((current) => current?.filter((row) => row.id !== item.id) ?? null);
       } catch (err) {
         showAlert({ type: 'error', message: errorMessage(err, 'Berita gagal dihapus.') });
+      } finally {
+        setDeleting((current) => {
+          const next = new Set(current);
+          next.delete(item.id);
+          return next;
+        });
       }
     },
   });
@@ -114,25 +123,32 @@ function NewsList({ onOpen }: { onOpen: (id: number | 'new') => void }) {
         <ul className="nw-rows">
           {visible.map((item) => {
             const cover = resolveMediaUrl(item.coverImage);
+            const isDeleting = deleting.has(item.id);
             return (
-              <li key={item.id} className="nw-row">
-                <button type="button" className="nw-row-main" onClick={() => onOpen(item.id)}>
+              <li key={item.id} className={`nw-row${isDeleting ? ' is-deleting' : ''}`} aria-busy={isDeleting}>
+                <button type="button" className="nw-row-main" onClick={() => onOpen(item.id)} disabled={isDeleting}>
                   <span className="nw-thumb">{cover ? <img src={cover} alt="" loading="lazy" /> : <Newspaper size={18} />}</span>
                   <span className="nw-row-text">
                     <strong>{item.title}</strong>
-                    <small>
-                      {item.status === 'PUBLISHED' ? `Terbit ${formatNewsDate(item.publishedAt)}` : 'Belum diterbitkan'}
-                      {' · '}Diubah {formatNewsDate(item.updatedAt)}
-                    </small>
+                    {isDeleting ? (
+                      <small className="nw-deleting-text" role="status">Menghapus berita…</small>
+                    ) : (
+                      <small>
+                        {item.status === 'PUBLISHED' ? `Terbit ${formatNewsDate(item.publishedAt)}` : 'Belum diterbitkan'}
+                        {' · '}Diubah {formatNewsDate(item.updatedAt)}
+                      </small>
+                    )}
                   </span>
                 </button>
                 <StatusChip status={item.status} />
                 <div className="nw-row-actions">
-                  {item.status === 'PUBLISHED' && (
+                  {item.status === 'PUBLISHED' && !isDeleting && (
                     <a className="nw-icon-btn" href={newsHash(item.id)} target="_blank" rel="noreferrer" aria-label="Lihat di situs" title="Lihat di situs"><ExternalLink size={16} /></a>
                   )}
-                  <button type="button" className="nw-icon-btn" onClick={() => onOpen(item.id)} aria-label="Edit" title="Edit"><Pencil size={16} /></button>
-                  <button type="button" className="nw-icon-btn danger" onClick={() => confirmDelete(item)} aria-label="Hapus" title="Hapus"><Trash2 size={16} /></button>
+                  <button type="button" className="nw-icon-btn" onClick={() => onOpen(item.id)} disabled={isDeleting} aria-label="Edit" title="Edit"><Pencil size={16} /></button>
+                  <button type="button" className="nw-icon-btn danger" onClick={() => confirmDelete(item)} disabled={isDeleting} aria-label={isDeleting ? 'Menghapus' : 'Hapus'} title={isDeleting ? 'Menghapus…' : 'Hapus'}>
+                    {isDeleting ? <LoaderCircle size={16} className="nw-spin" /> : <Trash2 size={16} />}
+                  </button>
                 </div>
               </li>
             );
@@ -497,6 +513,12 @@ const NEWS_PANEL_CSS = `
   .nw-icon-btn { width: 34px; height: 34px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: #64748b; }
   .nw-icon-btn:hover { background: #f1f5f9; color: var(--color-text-dark); }
   .nw-icon-btn.danger:hover { background: #fef2f2; color: #b91c1c; }
+  .nw-row.is-deleting { background: #fef2f2; }
+  .nw-row.is-deleting .nw-row-main, .nw-row.is-deleting .nw-chip { opacity: 0.55; }
+  .nw-row.is-deleting button { cursor: progress; }
+  .nw-row.is-deleting .nw-icon-btn.danger { color: #b91c1c; opacity: 1; }
+  .nw-deleting-text { color: #b91c1c !important; font-weight: 600; }
+  .nw-spin { animation: spin 0.9s linear infinite; }
   .nw-no-result { padding: 40px 16px; text-align: center; color: #64748b; font-size: 14px; }
 
   .nw-empty {
