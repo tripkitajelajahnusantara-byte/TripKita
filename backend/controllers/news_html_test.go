@@ -70,4 +70,22 @@ func TestApplyNewsRequest(t *testing.T) {
 	if err := applyNewsRequest(&models.News{}, &models.SaveNewsRequest{Title: "x", CoverImage: "javascript:alert(1)", Status: models.NewsStatusDraft}, now); err == nil {
 		t.Fatal("expected invalid cover to be rejected")
 	}
+
+	// Sumber foto sampul wajib saat terbit; draf boleh belum lengkap.
+	cover := "/uploads/pkg_0123456789abcdef0123456789abcdef.jpg"
+	if err := applyNewsRequest(&models.News{}, &models.SaveNewsRequest{Title: "x", Content: "<p>a</p>", CoverImage: cover, Status: models.NewsStatusPublished}, now); err == nil {
+		t.Fatal("expected missing cover source to block publishing")
+	}
+	draft := &models.News{}
+	if err := applyNewsRequest(draft, &models.SaveNewsRequest{Title: "x", CoverImage: cover, CoverCaption: "  Pantai   Pink ", Status: models.NewsStatusDraft}, now); err != nil {
+		t.Fatalf("draft without source should be allowed: %v", err)
+	}
+	if draft.CoverCaption != "Pantai Pink" {
+		t.Fatalf("caption not normalized: %q", draft.CoverCaption)
+	}
+	// Tanpa foto sampul, keterangan dan sumber ikut dikosongkan.
+	_ = applyNewsRequest(draft, &models.SaveNewsRequest{Title: "x", CoverCaption: "a", CoverSource: "b", Status: models.NewsStatusDraft}, now)
+	if draft.CoverCaption != "" || draft.CoverSource != "" {
+		t.Fatalf("caption/source should be cleared without cover: %+v", draft)
+	}
 }

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ExternalLink, ImagePlus, LoaderCircle, Newspaper, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { request } from '../utils/api';
 import { resolveMediaUrl } from '../utils/tripImages';
-import { formatNewsDate, newsHash, toDisplayHtml, toStoredHtml, type NewsItem } from '../utils/news';
+import { coverCredit, formatNewsDate, newsHash, toDisplayHtml, toStoredHtml, type NewsItem } from '../utils/news';
 import { useCustomAlert } from './CustomAlertModal';
 import { RichTextEditor } from './RichTextEditor';
 import { Skeleton, SkeletonTable } from './Skeleton';
@@ -143,7 +143,8 @@ function NewsList({ onOpen }: { onOpen: (id: number | 'new') => void }) {
   );
 }
 
-interface Draft { title: string; coverImage: string; content: string }
+interface Draft { title: string; coverImage: string; coverCaption: string; coverSource: string; content: string }
+const EMPTY_DRAFT: Draft = { title: '', coverImage: '', coverCaption: '', coverSource: '', content: '' };
 const snapshot = (draft: Draft) => JSON.stringify(draft);
 
 function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose: () => void }) {
@@ -151,8 +152,9 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
   const [id, setId] = useState(initialId);
   const [loaded, setLoaded] = useState(initialId === null);
   const [loadError, setLoadError] = useState('');
-  const [draft, setDraft] = useState<Draft>({ title: '', coverImage: '', content: '' });
-  const [baseline, setBaseline] = useState(() => snapshot({ title: '', coverImage: '', content: '' }));
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [baseline, setBaseline] = useState(() => snapshot(EMPTY_DRAFT));
+  const [sourceRequired, setSourceRequired] = useState(false);
   const [status, setStatus] = useState<NewsItem['status']>('DRAFT');
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -161,6 +163,7 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
   const [notice, setNotice] = useState('');
   const [coverUploading, setCoverUploading] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const sourceInputRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const dirty = snapshot(draft) !== baseline;
 
@@ -170,7 +173,13 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
     request(`/admin/news/${initialId}`)
       .then((news: NewsItem) => {
         if (cancelled) return;
-        const next = { title: news.title, coverImage: news.coverImage, content: toDisplayHtml(news.content ?? '') };
+        const next = {
+          title: news.title,
+          coverImage: news.coverImage,
+          coverCaption: news.coverCaption ?? '',
+          coverSource: news.coverSource ?? '',
+          content: toDisplayHtml(news.content ?? ''),
+        };
         setDraft(next);
         setBaseline(snapshot(next));
         setStatus(news.status);
@@ -203,12 +212,19 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
       titleRef.current?.focus();
       return;
     }
+    // Standar jurnalistik: foto sampul yang tayang wajib mencantumkan sumbernya.
+    if (nextStatus === 'PUBLISHED' && draft.coverImage && !draft.coverSource.trim()) {
+      setSourceRequired(true);
+      setError('Isi sumber foto sampul sebelum menerbitkan, contoh: Dok. Istimewa.');
+      sourceInputRef.current?.focus();
+      return;
+    }
     setSaving(true);
     setError('');
     setNotice('');
     const sent = draft;
     try {
-      const payload = JSON.stringify({ title: sent.title, coverImage: sent.coverImage, content: toStoredHtml(sent.content), status: nextStatus });
+      const payload = JSON.stringify({ ...sent, content: toStoredHtml(sent.content), status: nextStatus });
       const saved: NewsItem = id === null
         ? await request('/admin/news', { method: 'POST', body: payload })
         : await request(`/admin/news/${id}`, { method: 'PUT', body: payload });
@@ -352,11 +368,14 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
               {coverUrl ? (
                 <div className="nw-cover">
                   <img src={coverUrl} alt="Pratinjau foto sampul" />
+                  {coverCredit(draft.coverCaption, draft.coverSource) && (
+                    <p className="nw-cover-credit">{coverCredit(draft.coverCaption, draft.coverSource)}</p>
+                  )}
                   <div className="nw-cover-actions">
                     <button type="button" className="nw-btn nw-btn-sm" disabled={coverUploading} onClick={() => coverInputRef.current?.click()}>
                       {coverUploading ? 'Mengunggah…' : 'Ganti'}
                     </button>
-                    <button type="button" className="nw-btn nw-btn-sm nw-btn-danger" onClick={() => setDraft((current) => ({ ...current, coverImage: '' }))}>Hapus</button>
+                    <button type="button" className="nw-btn nw-btn-sm nw-btn-danger" onClick={() => setDraft((current) => ({ ...current, coverImage: '', coverCaption: '', coverSource: '' }))}>Hapus</button>
                   </div>
                 </div>
               ) : (
@@ -377,7 +396,35 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
                   if (file) void uploadCover(file);
                 }}
               />
-              <p className="nw-help">Tampil di daftar berita dan di atas artikel.</p>
+              {coverUrl ? (
+                <>
+                  <label className="nw-field">
+                    <span>Keterangan foto</span>
+                    <textarea
+                      rows={2}
+                      maxLength={300}
+                      placeholder="Contoh: Wisatawan menikmati senja di Pantai Pink, Lombok Timur."
+                      value={draft.coverCaption}
+                      onChange={(event) => setDraft((current) => ({ ...current, coverCaption: event.target.value.replace(/\n/g, ' ') }))}
+                    />
+                  </label>
+                  <label className="nw-field">
+                    <span>Sumber foto <em>wajib</em></span>
+                    <input
+                      ref={sourceInputRef}
+                      type="text"
+                      maxLength={150}
+                      placeholder="Contoh: Dok. Istimewa"
+                      aria-invalid={sourceRequired && !draft.coverSource.trim()}
+                      value={draft.coverSource}
+                      onChange={(event) => setDraft((current) => ({ ...current, coverSource: event.target.value }))}
+                    />
+                  </label>
+                  <p className="nw-help">Tampil di bawah foto: keterangan lalu "(Foto: sumber)".</p>
+                </>
+              ) : (
+                <p className="nw-help">Tampil di daftar berita dan di atas artikel.</p>
+              )}
             </section>
 
             <section className="nw-card nw-side-card">
@@ -482,6 +529,16 @@ const NEWS_PANEL_CSS = `
   .nw-side-card h4 { font-family: var(--font-primary); font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 12px; }
   .nw-cover img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; display: block; }
   .nw-cover-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .nw-cover-credit { margin-top: 6px; font-size: 11.5px; line-height: 1.45; color: #64748b; }
+  .nw-field { display: flex; flex-direction: column; gap: 5px; margin-top: 14px; font-size: 13px; }
+  .nw-field span { font-weight: 600; color: #334155; }
+  .nw-field em { font-style: normal; font-weight: 500; color: #94a3b8; margin-left: 4px; }
+  .nw-field input, .nw-field textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px;
+    font-size: 13.5px; line-height: 1.45; color: var(--color-text-dark); resize: vertical;
+  }
+  .nw-field input:focus, .nw-field textarea:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(0, 123, 255, .12); }
+  .nw-field [aria-invalid="true"] { border-color: #dc2626; }
   .nw-cover-drop {
     width: 100%; aspect-ratio: 16 / 9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
     border: 1.5px dashed #cbd5e1; border-radius: 8px; background: #f8fafc; color: #475569; font-size: 14px; font-weight: 600;

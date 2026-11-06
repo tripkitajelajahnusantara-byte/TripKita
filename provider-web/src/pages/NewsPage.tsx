@@ -1,31 +1,37 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Newspaper } from 'lucide-react';
 import { ApiError, request } from '../utils/api';
 import { resolveMediaUrl } from '../utils/tripImages';
 import {
-  countWords, formatNewsDate, htmlToText, newsHash, readingMinutes, toDisplayHtml,
+  countWords, coverCredit, formatNewsDate, htmlToText, newsHash, readingMinutes, splitNewsPages, toDisplayHtml,
   type NewsItem, type NewsPage as NewsPageData,
 } from '../utils/news';
 import { Skeleton, SkeletonCards } from '../components/Skeleton';
 
-// Artikel dibuka lewat #/berita?id=12 sehingga tautannya dapat dibagikan.
-function readNewsId(): number | null {
-  const id = Number(new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('id'));
-  return Number.isInteger(id) && id > 0 ? id : null;
+// Artikel dibuka lewat #/berita?id=12 (halaman berikutnya &hal=2) sehingga
+// tautannya dapat dibagikan dan tombol kembali browser berfungsi.
+function readNewsLocation() {
+  const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+  const id = Number(params.get('id'));
+  const page = Number(params.get('hal'));
+  return {
+    id: Number.isInteger(id) && id > 0 ? id : null,
+    page: Number.isInteger(page) && page > 1 ? page : 1,
+  };
 }
 
 export function NewsPage() {
-  const [id, setId] = useState(readNewsId);
+  const [location, setLocation] = useState(readNewsLocation);
   useEffect(() => {
-    const onHashChange = () => setId(readNewsId());
+    const onHashChange = () => setLocation(readNewsLocation());
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
-  useEffect(() => { window.scrollTo({ top: 0 }); }, [id]);
+  useEffect(() => { window.scrollTo({ top: 0 }); }, [location.id, location.page]);
 
   return (
     <div className="news-page animate-fade-in">
-      {id ? <NewsArticle key={id} id={id} /> : <NewsIndex />}
+      {location.id ? <NewsArticle key={location.id} id={location.id} page={location.page} /> : <NewsIndex />}
       <style>{NEWS_PAGE_CSS}</style>
     </div>
   );
@@ -138,7 +144,27 @@ function NewsIndex() {
   );
 }
 
-function NewsArticle({ id }: { id: number }) {
+function ArticlePager({ id, page, total }: { id: number; page: number; total: number }) {
+  return (
+    <nav className="news-pager" aria-label="Halaman artikel">
+      {page > 1
+        ? <a className="news-pager-step" href={newsHash(id, page - 1)}><ArrowLeft size={16} /> Sebelumnya</a>
+        : <span className="news-pager-step is-disabled" aria-hidden="true"><ArrowLeft size={16} /> Sebelumnya</span>}
+      <ol>
+        {Array.from({ length: total }, (_, index) => index + 1).map((number) => (
+          <li key={number}>
+            <a href={newsHash(id, number)} aria-label={`Halaman ${number}`} aria-current={number === page ? 'page' : undefined}>{number}</a>
+          </li>
+        ))}
+      </ol>
+      {page < total
+        ? <a className="news-pager-step" href={newsHash(id, page + 1)}>Selanjutnya <ArrowRight size={16} /></a>
+        : <span className="news-pager-step is-disabled" aria-hidden="true">Selanjutnya <ArrowRight size={16} /></span>}
+    </nav>
+  );
+}
+
+function NewsArticle({ id, page }: { id: number; page: number }) {
   const [article, setArticle] = useState<NewsItem | null>(null);
   const [related, setRelated] = useState<NewsItem[]>([]);
   const [error, setError] = useState<{ notFound: boolean; message: string } | null>(null);
@@ -161,6 +187,7 @@ function NewsArticle({ id }: { id: number }) {
     return () => { cancelled = true; };
   }, [id]);
 
+  const pages = useMemo(() => splitNewsPages(toDisplayHtml(article?.content ?? '')), [article]);
   const backLink = <a className="news-back" href={newsHash()}><ArrowLeft size={16} /> Semua berita</a>;
 
   if (error) {
@@ -187,9 +214,11 @@ function NewsArticle({ id }: { id: number }) {
     );
   }
 
-  const content = article.content ?? '';
-  const minutes = readingMinutes(countWords(htmlToText(content)));
+  const minutes = readingMinutes(countWords(htmlToText(article.content ?? '')));
   const cover = resolveMediaUrl(article.coverImage);
+  const credit = coverCredit(article.coverCaption ?? '', article.coverSource ?? '');
+  const current = Math.min(page, pages.length);
+  const isLastPage = current === pages.length;
 
   return (
     <>
@@ -198,15 +227,22 @@ function NewsArticle({ id }: { id: number }) {
         <header className="news-article-head">
           <p className="news-date">
             <time dateTime={article.publishedAt ?? undefined}>{formatNewsDate(article.publishedAt)}</time> · {minutes} menit baca
+            {pages.length > 1 && ` · Halaman ${current} dari ${pages.length}`}
           </p>
           <h1>{article.title}</h1>
         </header>
-        {cover && <img className="news-article-cover" src={cover} alt="" />}
+        {cover && current === 1 && (
+          <figure className="news-article-figure">
+            <img className="news-article-cover" src={cover} alt={article.coverCaption || ''} />
+            {credit && <figcaption>{credit}</figcaption>}
+          </figure>
+        )}
         {/* Isi sudah disaring backend (controllers/news_html.go) sebelum disimpan. */}
-        <div className="news-prose" dangerouslySetInnerHTML={{ __html: toDisplayHtml(content) }} />
+        <div className="news-prose" dangerouslySetInnerHTML={{ __html: pages[current - 1] }} />
+        {pages.length > 1 && <ArticlePager id={id} page={current} total={pages.length} />}
       </article>
 
-      {related.length > 0 && (
+      {isLastPage && related.length > 0 && (
         <section className="news-container news-related" aria-labelledby="news-related-title">
           <h2 id="news-related-title">Berita lainnya</h2>
           <div className="news-grid">
@@ -270,8 +306,24 @@ const NEWS_PAGE_CSS = `
   .news-back { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 28px; }
   .news-back:hover { color: var(--color-accent); }
   .news-article-head h1 { font-size: 40px; line-height: 1.18; letter-spacing: -0.02em; margin-top: 10px; }
-  .news-article-cover { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 14px; margin: 32px 0 36px; }
+  .news-article-figure { margin: 32px 0 36px; }
+  .news-article-cover { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 14px; }
+  .news-article-figure figcaption { margin-top: 8px; font-size: 13px; line-height: 1.5; color: #64748b; }
   .news-article-head + .news-prose { margin-top: 32px; }
+  .news-pager {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--color-border);
+  }
+  .news-pager ol { display: flex; gap: 6px; list-style: none; flex-wrap: wrap; justify-content: center; }
+  .news-pager ol a {
+    min-width: 38px; height: 38px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--color-border);
+    display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #475569;
+  }
+  .news-pager ol a:hover { border-color: var(--color-text-dark); color: var(--color-text-dark); }
+  .news-pager ol a[aria-current="page"] { background: var(--color-text-dark); border-color: var(--color-text-dark); color: #fff; }
+  .news-pager-step { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--color-accent); }
+  .news-pager-step:hover { text-decoration: underline; }
+  .news-pager-step.is-disabled { color: #cbd5e1; pointer-events: none; }
   .news-related { margin-top: 72px; padding-top: 40px; border-top: 1px solid var(--color-border); }
   .news-related h2 { font-size: 22px; margin-bottom: 24px; }
 
@@ -284,6 +336,11 @@ const NEWS_PAGE_CSS = `
     .news-container, .news-article { padding: 0 16px; }
     .news-head h1 { font-size: 28px; }
     .news-article-head h1 { font-size: 28px; }
-    .news-article-cover { margin: 24px 0 28px; border-radius: 10px; }
+    .news-article-figure { margin: 24px 0 28px; }
+    .news-article-cover { border-radius: 10px; }
+    .news-pager { justify-content: center; }
+    .news-pager-step { flex: 1 1 40%; }
+    .news-pager-step:last-child { justify-content: flex-end; }
+    .news-pager ol { order: 3; flex-basis: 100%; }
   }
 `;

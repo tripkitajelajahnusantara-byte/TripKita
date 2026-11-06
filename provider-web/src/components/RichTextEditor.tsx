@@ -3,7 +3,8 @@ import {
   Bold, Italic, Underline, Strikethrough, Heading2, Heading3, List, ListOrdered, Quote,
   Link2, Unlink, ImagePlus, Minus, Undo2, Redo2, RemoveFormatting, LoaderCircle, Trash2,
 } from 'lucide-react';
-import { countWords, readingMinutes } from '../utils/news';
+import { countWords, readingMinutes, splitNewsPages } from '../utils/news';
+import { NEWS_PAGE_CHARS } from '../utils/newsPages';
 
 interface RichTextEditorProps {
   /** HTML awal. Editor tidak dikontrol; beri `key` baru untuk memuat artikel lain. */
@@ -114,6 +115,7 @@ export function RichTextEditor({ initialHtml, onChange, onUploadImage, placehold
   const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(null);
   const [imageAlt, setImageAlt] = useState('');
   const [words, setWords] = useState(0);
+  const [pages, setPages] = useState(1);
   const [empty, setEmpty] = useState(true);
 
   const refreshStats = useCallback(() => {
@@ -122,6 +124,7 @@ export function RichTextEditor({ initialHtml, onChange, onUploadImage, placehold
     const text = el.innerText;
     setWords(countWords(text));
     setEmpty(!text.trim() && !el.querySelector('img, hr'));
+    setPages(splitNewsPages(el.innerHTML).length);
   }, []);
 
   const emit = () => {
@@ -380,7 +383,9 @@ export function RichTextEditor({ initialHtml, onChange, onUploadImage, placehold
       />
 
       <div className="rte-footer">
-        <span>{words} kata · ±{readingMinutes(words)} menit baca</span>
+        <span title={`Artikel otomatis dipotong per ±${NEWS_PAGE_CHARS.toLocaleString('id-ID')} karakter di akhir paragraf`}>
+          {words} kata · ±{readingMinutes(words)} menit baca · {pages} halaman
+        </span>
         <span className="rte-hint">Klik foto untuk menambah keterangan atau menghapusnya.</span>
       </div>
 

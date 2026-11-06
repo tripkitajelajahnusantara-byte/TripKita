@@ -183,15 +183,21 @@ func applyNewsRequest(news *models.News, req *models.SaveNewsRequest, now time.T
 		return errors.New("Isi berita masih kosong. Tulis isinya sebelum menerbitkan.")
 	}
 	cover := strings.TrimSpace(req.CoverImage)
-	if cover != "" {
-		if _, ok := safeNewsURL(cover, true); !ok {
-			return errors.New("Foto sampul tidak valid")
-		}
+	caption := strings.Join(strings.Fields(req.CoverCaption), " ")
+	source := strings.Join(strings.Fields(req.CoverSource), " ")
+	if cover == "" {
+		caption, source = "", ""
+	} else if _, ok := safeNewsURL(cover, true); !ok {
+		return errors.New("Foto sampul tidak valid")
+	} else if req.Status == models.NewsStatusPublished && source == "" {
+		return errors.New("Sumber foto sampul wajib diisi sebelum menerbitkan, contoh: Dok. Istimewa.")
 	}
 	news.Title = title
 	news.Content = content
 	news.Excerpt = newsExcerpt(text, newsExcerptLength)
 	news.CoverImage = cover
+	news.CoverCaption = caption
+	news.CoverSource = source
 	news.Status = req.Status
 	// Tanggal terbit pertama dipertahankan walau berita sempat ditarik ke draf.
 	if req.Status == models.NewsStatusPublished && news.PublishedAt == nil {

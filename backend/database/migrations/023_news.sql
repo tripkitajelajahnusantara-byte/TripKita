@@ -13,3 +13,9 @@ CREATE TABLE IF NOT EXISTS news (
     updated_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_news_status_published ON news (status, published_at);
+
+-- Keterangan dan sumber foto sampul (standar jurnalistik). ADD COLUMN IF NOT
+-- EXISTS agar file ini aman dijalankan ulang pada tabel yang sudah dibuat.
+ALTER TABLE news
+    ADD COLUMN IF NOT EXISTS cover_caption VARCHAR(300) NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS cover_source VARCHAR(150) NOT NULL DEFAULT '';
