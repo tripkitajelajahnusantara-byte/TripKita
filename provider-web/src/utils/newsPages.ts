@@ -2,7 +2,7 @@
 // tidak bergantung pada DOM/API dan dapat diuji langsung dengan node --test.
 
 /** Batas teks per halaman artikel (karakter, tanpa tag HTML). */
-export const NEWS_PAGE_CHARS = 3000;
+export const NEWS_PAGE_CHARS = 1000;
 /** Satu foto dihitung setara teks sepanjang ini agar halaman bergambar tidak terlalu panjang. */
 export const NEWS_IMAGE_CHARS = 400;
 /** Halaman terakhir yang lebih pendek dari porsi ini digabung ke halaman sebelumnya. */
