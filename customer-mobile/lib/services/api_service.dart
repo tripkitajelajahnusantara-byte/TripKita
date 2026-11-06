@@ -372,6 +372,29 @@ class ApiService {
       throw const ApiException(
           'Ukuran bukti transfer harus antara 1 byte dan 5 MB.', 400);
     }
+    final data = await _uploadFile(
+      '/public/bookings/${Uri.encodeComponent(bookingCode)}/payment-proof',
+      bytes,
+      fileName,
+      failure: 'Bukti transfer belum dapat dikirim.',
+      offline: 'Tidak dapat mengirim bukti transfer.',
+    );
+    return Booking.fromJson(_asMap(data));
+  }
+
+  /// Foto profil customer (JPG/PNG maks. 5 MB); mengembalikan path fotonya.
+  static Future<String> uploadProfilePhoto(List<int> bytes, String fileName) async {
+    if (bytes.isEmpty || bytes.length > 5 * 1024 * 1024) {
+      throw const ApiException('Ukuran foto harus antara 1 byte dan 5 MB.', 400);
+    }
+    final data = await _uploadFile('/provider/profile/photo', bytes, fileName,
+        failure: 'Foto profil belum dapat disimpan.', offline: 'Tidak dapat mengunggah foto profil.');
+    return '${_asMap(data)['profilePhoto'] ?? ''}';
+  }
+
+  /// Unggahan multipart satu berkas pada field `file`.
+  static Future<dynamic> _uploadFile(String endpoint, List<int> bytes, String fileName,
+      {required String failure, required String offline}) async {
     final extension = fileName.toLowerCase().split('.').last;
     final contentType = extension == 'pdf'
         ? 'application/pdf'
@@ -387,10 +410,7 @@ class ApiService {
     final token = tokenProvider();
     final client = http.Client();
     try {
-      final request = http.Request(
-          'POST',
-          Uri.parse(
-              '${AppConfig.apiBaseUrl}/public/bookings/${Uri.encodeComponent(bookingCode)}/payment-proof'));
+      final request = http.Request('POST', Uri.parse('${AppConfig.apiBaseUrl}$endpoint'));
       request.headers['Accept'] = 'application/json';
       request.headers['Content-Type'] =
           'multipart/form-data; boundary=$boundary';
@@ -404,19 +424,17 @@ class ApiService {
       final text = utf8.decode(response.bodyBytes, allowMalformed: true);
       final data = text.isEmpty ? null : jsonDecode(text);
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final message = data is Map && data['error'] is String
-            ? data['error'] as String
-            : 'Bukti transfer belum dapat dikirim.';
+        final message = data is Map && data['error'] is String ? data['error'] as String : failure;
         throw ApiException(message, response.statusCode);
       }
-      return Booking.fromJson(_asMap(data));
+      return data;
     } on ApiException {
       rethrow;
     } on TimeoutException {
       throw const ApiException(
           'Permintaan terlalu lama. Silakan coba lagi.', 0);
     } catch (_) {
-      throw const ApiException('Tidak dapat mengirim bukti transfer.', 0);
+      throw ApiException(offline, 0);
     } finally {
       client.close();
     }

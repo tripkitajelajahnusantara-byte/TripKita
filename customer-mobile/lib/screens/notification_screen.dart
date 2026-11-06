@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:customer_mobile/main.dart';
 import 'package:customer_mobile/models/notification.dart';
-import 'package:customer_mobile/screens/trip_planner_screen.dart';
+import 'package:customer_mobile/widgets/bottom_navigation.dart';
 import 'package:customer_mobile/services/api_service.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
 import 'package:customer_mobile/utils/formatters.dart';
@@ -68,8 +68,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
     if (!mounted) return;
     if (item.type == 'TRIP_PLAN') {
-      Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => const TripPlannerScreen()));
+      // Plan Trip adalah tab; kembali ke shell lalu buka tabnya.
+      navigatorKey.currentState?.popUntil((route) => route.isFirst);
+      appShellKey.currentState?.selectTab(AppTab.rencanaTrip);
     } else {
       appShellKey.currentState?.showBookings();
     }

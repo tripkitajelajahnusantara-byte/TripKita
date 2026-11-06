@@ -16,12 +16,22 @@ class AppConfig {
   /// Midtrans Sandbox.
   static const String environment = String.fromEnvironment('APP_ENV', defaultValue: 'production');
 
-  static bool get isStaging => environment == 'staging';
+  static bool get isStaging => isStagingBuild;
+  static const bool isStagingBuild = environment == 'staging';
 
   /// Client ID OAuth tipe "Web application", sama dengan `GOOGLE_CLIENT_ID`
   /// backend. Google menerbitkan ID token untuk audiens ini. Kosong berarti
   /// tombol "Lanjutkan dengan Google" disembunyikan.
   static const String googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+
+  /// Situs web TemenTrip (mis. `https://tementrip.id`) untuk menu "Jadi Mitra
+  /// Provider" dan "Kenali TemenTrip"; kosong berarti menu tersebut memberi
+  /// petunjuk alih-alih membuka situs.
+  static const String siteUrl = String.fromEnvironment('SITE_URL');
+
+  /// Kontak layanan pelanggan, sama dengan footer web.
+  static const String supportWhatsApp = '628132008875';
+  static const String supportEmail = 'tripkitajelajahnusantara@gmail.com';
 
   /// Origin backend tanpa `/api/v1`, dipakai untuk melengkapi path gambar
   /// relatif seperti `/uploads/paket.jpg`.

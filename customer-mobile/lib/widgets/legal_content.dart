@@ -200,6 +200,28 @@ Future<void> _showLegalSheet(
   );
 }
 
+const _privacyPolicy = _LegalDocument(
+  'KEBIJAKAN PRIVASI TEMENTRIP',
+  'Komitmen Kami dalam menjaga keamanan dan kerahasiaan Data Pribadi Anda sesuai UU No. 27 Tahun 2022.',
+  [
+    _LegalSection('INFORMASI YANG DIKUMPULKAN', [
+      '• Data Identitas: Nama lengkap, alamat email, nomor WhatsApp/telepon.',
+      '• Data Transaksi: Riwayat booking, bukti pembayaran, dan tanggal keberangkatan.',
+      '• Data Teknis: Alamat IP, jenis peramban, dan log aktivitas platform.',
+    ]),
+    _LegalSection('PENGGUNAAN & KERAHASIAAN DATA', [
+      '• Data digunakan khusus untuk memproses pendaftaran, pemesanan tiket, dan komunikasi trip.',
+      '• Kami TIDAK PERNAH menjual atau menyewakan data pribadi Anda kepada pihak mana pun.',
+    ]),
+    _LegalSection('KEAMANAN TEKNIS', [
+      'Seluruh kata sandi dienkripsi menggunakan algoritma standar industri (bcrypt), dan komunikasi data dilindungi oleh enkripsi SSL/TLS.',
+    ]),
+  ],
+);
+
+Future<void> showPrivacyPolicy(BuildContext context) =>
+    _showLegalSheet(context, 'Kebijakan Privasi TemenTrip', _privacyPolicy);
+
 Future<void> showGeneralTerms(BuildContext context) => _showLegalSheet(
     context, 'Syarat & Ketentuan Customer TemenTrip', _generalTerms);
 

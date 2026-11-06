@@ -20,7 +20,8 @@ import {
   DollarSign,
   Wallet,
   LoaderCircle,
-  TrendingUp
+  TrendingUp,
+  Newspaper
 } from 'lucide-react';
 import { getProtectedDocumentURL, openProtectedDocument, request } from '../utils/api';
 import { NotificationCenter, type NotificationItem } from '../components/NotificationCenter';
@@ -29,6 +30,7 @@ import { useActionLock } from '../utils/useActionLock';
 import { Skeleton, SkeletonTable } from '../components/Skeleton';
 import { AdminRevenuePanel } from '../components/AdminRevenuePanel';
 import { AdminBookingMonitor } from '../components/AdminBookingMonitor';
+import { AdminNewsPanel } from '../components/AdminNewsPanel';
 
 
 interface ProviderAdminData {
@@ -159,7 +161,7 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 export const AdminDashboardPage: React.FC = () => {
   const { providerProfile, logout, navigateTo } = useNavigation();
   const [providers, setProviders] = useState<ProviderAdminData[]>([]);
-  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider' | 'penghasilan-platform' | 'monitoring-booking'>('kelola-provider');
+  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider' | 'penghasilan-platform' | 'monitoring-booking' | 'berita'>('kelola-provider');
   const [monitorProviderId, setMonitorProviderId] = useState<number | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Semua Kategori');
@@ -1032,6 +1034,12 @@ export const AdminDashboardPage: React.FC = () => {
             >
               <TrendingUp size={18} /> Penghasilan TemenTrip
             </button>
+            <button
+              className={`menu-btn ${activeView === 'berita' ? 'active' : ''}`}
+              onClick={() => { setActiveView('berita'); setSelectedProvider(null); }}
+            >
+              <Newspaper size={18} /> Berita
+            </button>
           </nav>
         </div>
 
@@ -1084,6 +1092,8 @@ export const AdminDashboardPage: React.FC = () => {
                   ? 'Pengajuan Pencairan Dana Provider (Payouts)'
                   : activeView === 'penghasilan-platform'
                   ? 'Penghasilan TemenTrip'
+                  : activeView === 'berita'
+                  ? 'Berita'
                   : 'Pusat Verifikasi Mitra'}
               </h1>
               <p>
@@ -1097,6 +1107,8 @@ export const AdminDashboardPage: React.FC = () => {
                   ? 'Kelola pengajuan pencairan saldo DP 50% & pelunasan dari mitra provider.'
                   : activeView === 'penghasilan-platform'
                   ? 'Biaya layanan dan komisi TemenTrip dari setiap booking berbayar. Booking yang direfund penuh tidak dihitung.'
+                  : activeView === 'berita'
+                  ? 'Tulis dan kelola berita yang tampil di menu Berita pada situs customer.'
                   : 'Kelola dan verifikasi semua mitra yang terdaftar di TemenTrip.'}
               </p>
             </div>
@@ -1471,6 +1483,8 @@ export const AdminDashboardPage: React.FC = () => {
                   )}
                 </div>
               </div>
+            ) : activeView === 'berita' ? (
+              <AdminNewsPanel />
             ) : activeView === 'penghasilan-platform' ? (
               /* View 6: Penghasilan TemenTrip */
               <AdminRevenuePanel />

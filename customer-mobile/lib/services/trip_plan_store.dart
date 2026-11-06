@@ -16,6 +16,7 @@ class TripPlanStore extends ChangeNotifier {
   static const maxPlans = 10;
 
   List<TripPlan> _plans = [];
+  final Map<String, Uint8List> _covers = {};
   bool _loading = false;
   String? _error;
 
@@ -26,6 +27,23 @@ class TripPlanStore extends ChangeNotifier {
   String get _key {
     final profile = AuthSession.instance.profile;
     return profile == null ? '' : 'tementrip_plans_cust_${profile.id}';
+  }
+
+  // shortcut: sampul plan hanya disimpan di perangkat ini (base64 di
+  // SharedPreferences) karena backend belum punya kolomnya; pindahkan ke
+  // unggahan backend bila sampul perlu tampil di web atau perangkat lain.
+  static const _coverPrefix = 'tementrip_plan_cover_';
+
+  /// Foto sampul plan dari perangkat ini; null berarti sampul bawaan.
+  Uint8List? cover(String planId) => _covers[planId];
+
+  Future<void> setCover(String planId, Uint8List bytes) async {
+    _covers[planId] = bytes;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('$_coverPrefix$planId', base64Encode(bytes));
+    } catch (_) {}
   }
 
   TripPlan? byId(String id) {
@@ -52,6 +70,13 @@ class TripPlanStore extends ChangeNotifier {
 
       // Migrasikan data lokal lama hanya bila akun belum mempunyai data server.
       final prefs = await SharedPreferences.getInstance();
+      for (final plan in _plans) {
+        final raw = prefs.getString('$_coverPrefix${plan.id}');
+        if (raw == null) continue;
+        try {
+          _covers[plan.id] = base64Decode(raw);
+        } catch (_) {}
+      }
       final raw = prefs.getString(key);
       if (_plans.isEmpty && raw != null) {
         try {
@@ -105,6 +130,11 @@ class TripPlanStore extends ChangeNotifier {
   Future<void> remove(String id) async {
     if (RegExp(r'^\d+$').hasMatch(id)) await ApiService.deleteTripPlan(id);
     _plans = _plans.where((p) => p.id != id).toList();
+    _covers.remove(id);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('$_coverPrefix$id');
+    } catch (_) {}
     await _persist();
   }
 

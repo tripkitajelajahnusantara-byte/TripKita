@@ -26,7 +26,8 @@ export type Route =
   | 'provider-public-profile'
   | 'admin-login'
   | 'pengaturan'
-  | 'rencana-trip';
+  | 'rencana-trip'
+  | 'berita';
 
 export interface TripChecklistItem {
   id: string;

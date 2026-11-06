@@ -36,6 +36,7 @@ const pageLoaders = {
   ProviderPublicProfilePage: () => import('./pages/ProviderPublicProfilePage').then((m) => ({ default: m.ProviderPublicProfilePage })),
   CustomerSettingsPage: () => import('./pages/CustomerSettingsPage').then((m) => ({ default: m.CustomerSettingsPage })),
   CustomerTripPlannerPage: () => import('./pages/CustomerTripPlannerPage').then((m) => ({ default: m.CustomerTripPlannerPage })),
+  NewsPage: () => import('./pages/NewsPage').then((m) => ({ default: m.NewsPage })),
 } satisfies Record<string, () => Promise<{ default: React.ComponentType }>>;
 
 type PageName = keyof typeof pageLoaders;
@@ -88,6 +89,7 @@ const ProviderFinancePage = React.lazy(pageLoaders.ProviderFinancePage);
 const ProviderPublicProfilePage = React.lazy(pageLoaders.ProviderPublicProfilePage);
 const CustomerSettingsPage = React.lazy(pageLoaders.CustomerSettingsPage);
 const CustomerTripPlannerPage = React.lazy(pageLoaders.CustomerTripPlannerPage);
+const NewsPage = React.lazy(pageLoaders.NewsPage);
 
 const AppContent: React.FC = () => {
   const { route, loadingProfile, providerProfile, customerProfile, navigateTo } = useNavigation();
@@ -340,6 +342,7 @@ const AppContent: React.FC = () => {
         {route === 'bantuan' && <CustomerHelpPage />}
         {route === 'pengaturan' && <CustomerSettingsPage />}
         {route === 'rencana-trip' && <CustomerTripPlannerPage />}
+        {route === 'berita' && <NewsPage />}
       </main>
       <Footer />
       {renderGlobalTermsModal()}

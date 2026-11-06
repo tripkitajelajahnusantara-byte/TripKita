@@ -58,13 +58,19 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
     super.didChangeDependencies();
     precacheImage(const AssetImage('assets/images/splash_logo.png'), context);
     precacheImage(const AssetImage('assets/images/home_hero.jpg'), context);
-    precacheImage(const AssetImage('assets/images/logo_white.png'), context);
+    precacheImage(const AssetImage('assets/images/logo_color.png'), context);
   }
 
   @override
   void didUpdateWidget(covariant SplashView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.ready && !oldWidget.ready) _maybeFinish();
+    // Ditunda ke akhir frame: onFinished memanggil setState induk, yang
+    // dilarang selama build (splash macet bila init selesai setelah animasi).
+    if (widget.ready && !oldWidget.ready) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _maybeFinish();
+      });
+    }
   }
 
   void _maybeFinish() {

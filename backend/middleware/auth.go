@@ -97,6 +97,21 @@ func CustomerRequired() gin.HandlerFunc {
 	return requireRole("CUSTOMER", true, false)
 }
 
+// ProfileOwnerRequired mengizinkan mitra (aturan ProviderAccountRequired)
+// atau customer aktif mengelola foto profilnya sendiri; akun customer juga
+// tersimpan di tabel providers sehingga memakai provider_id yang sama.
+func ProfileOwnerRequired() gin.HandlerFunc {
+	provider := ProviderAccountRequired()
+	customer := CustomerRequired()
+	return func(c *gin.Context) {
+		if role, _ := c.Get("role"); role == "CUSTOMER" {
+			customer(c)
+			return
+		}
+		provider(c)
+	}
+}
+
 func requireRole(requiredRole string, approved, verified bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, roleOK := c.Get("role")

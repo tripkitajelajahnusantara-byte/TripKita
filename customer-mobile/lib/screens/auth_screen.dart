@@ -1,16 +1,26 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import 'package:customer_mobile/config/app_config.dart';
 import 'package:customer_mobile/services/api_service.dart';
 import 'package:customer_mobile/services/auth_session.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
+import 'package:customer_mobile/utils/external_links.dart';
 import 'package:customer_mobile/utils/validators.dart';
 import 'package:customer_mobile/widgets/common.dart';
+import 'package:customer_mobile/widgets/form_fields.dart';
+import 'package:customer_mobile/widgets/google_button/google_web_button.dart'
+    if (dart.library.js_interop) 'package:customer_mobile/widgets/google_button/google_web_button_web.dart';
 import 'package:customer_mobile/widgets/legal_content.dart';
 
-/// Masuk / daftar customer, padanan `CustomerLoginPage` di web. Setelah
+enum _Mode { login, registerEmail, registerForm }
+
+/// Masuk / daftar customer, padanan `CustomerLoginPage` di web. Daftar dibuat
+/// dua langkah: email dulu, lalu nama, WhatsApp, dan kata sandi. Setelah
 /// berhasil, layar ditutup dengan hasil `true` sehingga alur sebelumnya
 /// (mis. "Pesan Sekarang") dapat dilanjutkan.
 class AuthScreen extends StatefulWidget {
@@ -23,7 +33,7 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  late bool _register = widget.startInRegisterMode;
+  late _Mode _mode = widget.startInRegisterMode ? _Mode.registerEmail : _Mode.login;
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _whatsapp = TextEditingController();
@@ -31,12 +41,33 @@ class _AuthScreenState extends State<AuthScreen> {
   final _confirm = TextEditingController();
   bool _showPassword = false;
   bool _showConfirm = false;
-  bool _agreeTerms = false;
   bool _loading = false;
-  String? _generalError;
   Map<String, String> _errors = {};
 
   late final TapGestureRecognizer _termsTap = TapGestureRecognizer()..onTap = () => showRegistrationTerms(context);
+
+  bool get _googleAvailable => AppConfig.googleServerClientId.isNotEmpty;
+
+  /// Web: hasil login dari tombol resmi Google datang lewat event ini.
+  StreamSubscription<GoogleSignInAuthenticationEvent>? _googleEvents;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb && _googleAvailable) {
+      AuthSession.googleReady.then((_) {
+        if (!mounted) return;
+        _googleEvents = GoogleSignIn.instance.authenticationEvents.listen(
+          (event) {
+            if (event is GoogleSignInAuthenticationEventSignIn) _completeGoogle(event.user);
+          },
+          onError: (Object e) {
+            if (mounted) _showGoogleError(e);
+          },
+        );
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -44,29 +75,38 @@ class _AuthScreenState extends State<AuthScreen> {
       c.dispose();
     }
     _termsTap.dispose();
+    _googleEvents?.cancel();
     super.dispose();
+  }
+
+  /// Nomor WhatsApp seperti diketik di web (`08…`) dari isian berawalan +62.
+  String get _whatsappNumber {
+    final local = phoneLocalPart(_whatsapp.text);
+    return local.isEmpty ? '' : '0$local';
   }
 
   bool _validate() {
     final errors = <String, String>{};
-    if (_register) {
-      if (!_agreeTerms) errors['agreeTerms'] = 'Anda wajib menyetujui Syarat dan Ketentuan Pendaftaran Customer TemenTrip.';
+    if (_mode != _Mode.registerForm) {
+      final email = validateEmail(_email.text);
+      if (email != null) errors['email'] = email;
+    }
+    if (_mode == _Mode.login && _password.text.isEmpty) errors['password'] = 'Kata sandi wajib diisi.';
+    if (_mode == _Mode.registerForm) {
       final name = validateRegisterName(_name.text);
       if (name != null) errors['name'] = name;
-      final wa = validateRegisterPhone(_whatsapp.text);
+      final wa = validateRegisterPhone(_whatsappNumber);
       if (wa != null) errors['whatsapp'] = wa;
+      if (_password.text.isEmpty) {
+        errors['password'] = 'Kata sandi wajib diisi.';
+      } else if (_password.text.length < 12) {
+        errors['password'] = 'Kata sandi minimal 12 karakter.';
+      }
       if (_confirm.text.isEmpty) {
         errors['confirm'] = 'Konfirmasi kata sandi wajib diisi.';
       } else if (_password.text != _confirm.text) {
         errors['confirm'] = 'Konfirmasi kata sandi tidak cocok dengan kata sandi di atas.';
       }
-    }
-    final email = validateEmail(_email.text);
-    if (email != null) errors['email'] = email;
-    if (_password.text.isEmpty) {
-      errors['password'] = 'Kata sandi wajib diisi.';
-    } else if (_register && _password.text.length < 12) {
-      errors['password'] = 'Kata sandi minimal 12 karakter.';
     }
     setState(() => _errors = errors);
     return errors.isEmpty;
@@ -74,37 +114,36 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    setState(() => _generalError = null);
-    if (!_validate()) return;
+    if (_loading || !_validate()) return;
+    if (_mode == _Mode.registerEmail) {
+      setState(() => _mode = _Mode.registerForm);
+      return;
+    }
+    final register = _mode == _Mode.registerForm;
     setState(() => _loading = true);
     try {
-      if (_register) {
+      if (register) {
         await AuthSession.instance.register(
           name: _name.text.trim(),
           email: _email.text.trim(),
           password: _password.text,
-          whatsapp: _whatsapp.text.trim(),
+          whatsapp: _whatsappNumber,
         );
       } else {
         await AuthSession.instance.login(_email.text.trim(), _password.text);
       }
       if (!mounted) return;
-      showSnack(context, _register ? 'Pendaftaran berhasil! Akun Anda telah aktif.' : 'Berhasil masuk! Selamat datang kembali.');
+      showTopToast(context, register ? 'Pendaftaran berhasil! Akun Anda telah aktif.' : 'Berhasil masuk! Selamat datang kembali.');
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _generalError = e is ApiException ? e.message : 'Proses gagal. Silakan periksa kembali data Anda.';
-      });
+      setState(() => _loading = false);
+      showTopToast(context, e is ApiException ? e.message : 'Proses gagal. Silakan periksa kembali data Anda.');
     }
   }
 
   Future<void> _googleLogin() async {
-    setState(() {
-      _generalError = null;
-      _loading = true;
-    });
+    setState(() => _loading = true);
     try {
       final signedIn = await AuthSession.instance.loginWithGoogle();
       if (!mounted) return;
@@ -112,213 +151,308 @@ class _AuthScreenState extends State<AuthScreen> {
         setState(() => _loading = false);
         return;
       }
-      showSnack(context, 'Berhasil masuk dengan Google!');
+      showTopToast(context, 'Berhasil masuk dengan Google!');
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _generalError = e is ApiException ? e.message : 'Login Google gagal. Silakan coba lagi.';
-      });
+      setState(() => _loading = false);
+      _showGoogleError(e);
     }
   }
 
-  void _toggleMode() {
+  Future<void> _completeGoogle(GoogleSignInAccount account) async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      await AuthSession.instance.loginWithGoogleAccount(account);
+      if (!mounted) return;
+      showTopToast(context, 'Berhasil masuk dengan Google!');
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _showGoogleError(e);
+    }
+  }
+
+  void _showGoogleError(Object e) {
+    showNoticeDialog(
+      context,
+      title: 'Login Google Gagal',
+      message: e is ApiException ? e.message : 'Login Google gagal: $e',
+      isError: true,
+    );
+  }
+
+  // shortcut: backend belum punya reset kata sandi customer, jadi diarahkan
+  // ke WhatsApp CS; ganti ke alur email bila endpoint-nya tersedia.
+  void _forgotPassword() {
+    final email = _email.text.trim();
+    final text = 'Halo TemenTrip, saya lupa kata sandi akun${email.isEmpty ? '' : ' $email'}.';
+    openExternal(Uri.parse('https://wa.me/${AppConfig.supportWhatsApp}?text=${Uri.encodeComponent(text)}'));
+  }
+
+  void _switchMode() {
     setState(() {
-      _register = !_register;
-      _generalError = null;
+      _mode = _mode == _Mode.login ? _Mode.registerEmail : _Mode.login;
       _errors = {};
     });
   }
 
-  InputDecoration _decoration(String hint, IconData icon, String key, {Widget? suffix}) => InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, size: 18, color: _errors[key] != null ? AppColors.danger : AppColors.textLight),
-        suffixIcon: suffix,
-        errorText: _errors[key],
+  Widget _eye(bool shown, VoidCallback onTap) => Padding(
+        padding: const EdgeInsets.only(right: 12),
+        child: Semantics(
+          button: true,
+          label: shown ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi',
+          child: InkResponse(onTap: onTap, radius: 20, child: const AppIcon('eye', color: AppColors.icon)),
+        ),
       );
+
+  Widget _passwordField(TextEditingController controller, String key, String hint, bool shown, VoidCallback toggle,
+      {Iterable<String>? autofill, ValueChanged<String>? onSubmitted}) {
+    return TextField(
+      controller: controller,
+      obscureText: !shown,
+      autofillHints: autofill,
+      onSubmitted: onSubmitted,
+      style: fieldTextStyle,
+      decoration: markError(
+        InputDecoration(
+          hintText: hint,
+          suffixIcon: _eye(shown, toggle),
+          suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 24),
+        ),
+        _errors[key],
+      ),
+    );
+  }
+
+  Widget _emailField() {
+    return LabeledField(
+      label: 'Alamat Email',
+      error: _errors['email'],
+      child: TextField(
+        controller: _email,
+        keyboardType: TextInputType.emailAddress,
+        autofillHints: const [AutofillHints.email],
+        style: fieldTextStyle,
+        decoration: markError(
+          InputDecoration(
+            hintText: 'Alamat email',
+            prefixIconConstraints: fieldPrefixConstraints,
+            prefixIcon: fieldPrefixIcon('envelope'),
+          ),
+          _errors['email'],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(_register ? 'Daftar' : 'Masuk')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-        children: [
-          SectionCard(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Center(
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  decoration: const BoxDecoration(color: AppColors.accentLight, shape: BoxShape.circle),
-                  child: const Icon(Icons.how_to_reg_outlined, size: 26, color: AppColors.accent),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(_register ? 'Daftar Akun Baru' : 'Selamat Datang Kembali!',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textDark)),
-              const SizedBox(height: 6),
-              Text(
-                _register
-                    ? 'Buat akun untuk simpan tiket & riwayat trip kamu dengan mudah.'
-                    : 'Masuk untuk pesan open trip dan cek tiket perjalanan kamu.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13.5, color: AppColors.textMuted, height: 1.5),
-              ),
-              const SizedBox(height: 22),
-              if (_generalError != null) ...[
-                InfoBanner(
-                  icon: Icons.error_outline,
-                  color: AppColors.dangerDark,
-                  background: AppColors.dangerSoft,
-                  border: AppColors.dangerBorder,
-                  textColor: const Color(0xFF991B1B),
-                  message: _generalError,
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (_register) ...[
-                TextField(
-                  controller: _name,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: _decoration('Nama Lengkap...', Icons.person_outline, 'name'),
-                ),
-                const SizedBox(height: 14),
-              ],
-              TextField(
-                controller: _email,
-                keyboardType: TextInputType.emailAddress,
-                autofillHints: const [AutofillHints.email],
-                decoration: _decoration('Alamat Email (contoh: nama@gmail.com)...', Icons.mail_outline, 'email'),
-              ),
-              const SizedBox(height: 14),
-              if (_register) ...[
-                TextField(
-                  controller: _whatsapp,
-                  keyboardType: TextInputType.phone,
-                  decoration: _decoration('Nomor WhatsApp (contoh: 081234567890)...', Icons.phone_outlined, 'whatsapp'),
-                ),
-                const SizedBox(height: 14),
-              ],
-              TextField(
-                controller: _password,
-                obscureText: !_showPassword,
-                autofillHints: [_register ? AutofillHints.newPassword : AutofillHints.password],
-                onSubmitted: _register ? null : (_) => _submit(),
-                decoration: _decoration(
-                  _register ? 'Kata Sandi (minimal 12 karakter)...' : 'Kata Sandi...',
-                  Icons.lock_outline,
-                  'password',
-                  suffix: IconButton(
-                    onPressed: () => setState(() => _showPassword = !_showPassword),
-                    icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+    final register = _mode != _Mode.login;
+    return PopScope(
+      // Langkah kedua daftar kembali ke langkah email.
+      canPop: _mode != _Mode.registerForm,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) setState(() => _mode = _Mode.registerEmail);
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(leadingWidth: 72),
+        body: DefaultTextStyle.merge(
+          style: figmaTextStyle,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Expanded(
+              child: AutofillGroup(
+                child: ListView(padding: const EdgeInsets.fromLTRB(16, 19.7, 16, 16), children: [
+                  Text(register ? 'Daftar Akun Baru' : 'Masuk ke TemenTrip',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                  const SizedBox(height: 5.2),
+                  Text(
+                    register
+                        ? 'Daftar akun baru untuk pesan open trip & kelola tiket Anda.'
+                        : 'Silakan masuk atau daftar akun untuk melanjutkan.',
+                    style: const TextStyle(fontSize: 14, height: 1.6, color: AppColors.textMuted),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  ...switch (_mode) {
+                    _Mode.login => _loginFields(),
+                    _Mode.registerEmail => _registerEmailFields(),
+                    _Mode.registerForm => _registerFormFields(),
+                  },
+                ]),
               ),
-              if (_register) ...[
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _confirm,
-                  obscureText: !_showConfirm,
-                  decoration: _decoration(
-                    'Konfirmasi Kata Sandi...',
-                    Icons.lock_outline,
-                    'confirm',
-                    suffix: IconButton(
-                      onPressed: () => setState(() => _showConfirm = !_showConfirm),
-                      icon: Icon(_showConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  decoration: BoxDecoration(
-                    color: _errors['agreeTerms'] != null ? AppColors.dangerSoft : AppColors.background,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _errors['agreeTerms'] != null ? AppColors.dangerBorder : AppColors.border,
-                      width: _errors['agreeTerms'] != null ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Row(children: [
-                    Checkbox(
-                      value: _agreeTerms,
-                      onChanged: (v) => setState(() {
-                        _agreeTerms = v ?? false;
-                        _errors.remove('agreeTerms');
-                      }),
-                    ),
-                    Expanded(
-                      child: Text.rich(TextSpan(
-                        text: 'Saya menyetujui ',
-                        style: const TextStyle(fontSize: 13, color: AppColors.textBody),
-                        children: [
-                          TextSpan(
-                            text: 'Syarat & Ketentuan Pendaftaran',
-                            recognizer: _termsTap,
-                            style: const TextStyle(
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.w700,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ],
-                      )),
-                    ),
-                  ]),
-                ),
-                ErrorText(_errors['agreeTerms']),
-              ],
-              const SizedBox(height: 20),
-              PrimaryButton(
-                label: _loading ? 'Memproses...' : (_register ? 'Daftar Akun Sekarang' : 'Masuk Sekarang'),
-                loading: _loading,
-                icon: Icons.arrow_forward,
-                onPressed: _submit,
-              ),
-              // google_sign_in di web butuh tombol GIS khusus; versi web
-              // customer sudah punya login Google sendiri.
-              if (!kIsWeb && AppConfig.googleServerClientId.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _loading ? null : _googleLogin,
-                  icon: const Icon(Icons.g_mobiledata, size: 28),
-                  label: const Text('Lanjutkan dengan Google'),
-                ),
-              ],
-              const SizedBox(height: 20),
-              const Divider(),
-              const SizedBox(height: 14),
-              Wrap(alignment: WrapAlignment.center, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                Text(_register ? 'Sudah punya akun? ' : 'Belum punya akun? ',
-                    style: const TextStyle(fontSize: 13.5, color: AppColors.textMuted)),
-                GestureDetector(
-                  onTap: _toggleMode,
-                  child: Text(_register ? 'Masuk sekarang' : 'Daftar gratis sekarang',
-                      style: const TextStyle(fontSize: 13.5, color: AppColors.accent, fontWeight: FontWeight.w800)),
-                ),
-              ]),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
             ),
-            child: const Text(
-              'Mitra Provider / Pemilik Tour? Kelola paket melalui Partner Hub di web TemenTrip.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5, color: AppColors.textMedium),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 17.3),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(register ? 'Sudah punya akun?' : 'Belum punya akun?',
+                      style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMuted)),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: _loading ? null : _switchMode,
+                    child: Text(register ? 'Masuk sekarang' : 'Daftar sekarang',
+                        style: const TextStyle(
+                            fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                  ),
+                ]),
+              ),
             ),
-          ),
-        ],
+          ]),
+        ),
       ),
+    );
+  }
+
+  List<Widget> _loginFields() => [
+        _emailField(),
+        const SizedBox(height: 16),
+        LabeledField(
+          label: 'Kata Sandi',
+          error: _errors['password'],
+          child: _passwordField(
+            _password,
+            'password',
+            'Kata sandi',
+            _showPassword,
+            () => setState(() => _showPassword = !_showPassword),
+            autofill: const [AutofillHints.password],
+            onSubmitted: (_) => _submit(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerRight,
+          child: InkWell(
+            onTap: _forgotPassword,
+            child: const Text('Lupa kata sandi?',
+                style: TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
+          ),
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton(onPressed: _loading ? null : _submit, child: Text(_loading ? 'Memproses...' : 'Masuk')),
+        ..._googleSection(),
+      ];
+
+  List<Widget> _registerEmailFields() => [
+        _emailField(),
+        const SizedBox(height: 20),
+        ElevatedButton(onPressed: _loading ? null : _submit, child: const Text('Lanjut')),
+        ..._googleSection(),
+        const SizedBox(height: 16.3),
+        _terms(),
+      ];
+
+  List<Widget> _registerFormFields() => [
+        LabeledField(
+          label: 'Nama Lengkap',
+          error: _errors['name'],
+          child: TextField(
+            controller: _name,
+            textCapitalization: TextCapitalization.words,
+            autofillHints: const [AutofillHints.name],
+            style: fieldTextStyle,
+            decoration: markError(const InputDecoration(hintText: 'Nama lengkap'), _errors['name']),
+          ),
+        ),
+        const SizedBox(height: 16),
+        LabeledField(
+          label: 'Nomor WhatsApp / HP',
+          required: true,
+          error: _errors['whatsapp'],
+          child: PhoneField(controller: _whatsapp, errorText: _errors['whatsapp']),
+        ),
+        const SizedBox(height: 16),
+        LabeledField(
+          label: 'Kata Sandi',
+          error: _errors['password'],
+          child: _passwordField(
+            _password,
+            'password',
+            'Minimal 12 karakter',
+            _showPassword,
+            () => setState(() => _showPassword = !_showPassword),
+            autofill: const [AutofillHints.newPassword],
+          ),
+        ),
+        const SizedBox(height: 16),
+        LabeledField(
+          label: 'Konfirmasi Kata Sandi',
+          error: _errors['confirm'],
+          child: _passwordField(
+            _confirm,
+            'confirm',
+            'Ulangi kata sandi',
+            _showConfirm,
+            () => setState(() => _showConfirm = !_showConfirm),
+            onSubmitted: (_) => _submit(),
+          ),
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton(onPressed: _loading ? null : _submit, child: Text(_loading ? 'Memproses...' : 'Daftar')),
+        const SizedBox(height: 16.3),
+        _terms(),
+      ];
+
+  /// "atau" lalu tombol Google; disembunyikan bila login Google tidak aktif.
+  List<Widget> _googleSection() {
+    if (!_googleAvailable) return const [];
+    return [
+      const SizedBox(height: 17.4),
+      const Row(children: [
+        SizedBox(width: 16),
+        Expanded(child: Divider(height: 1, color: AppColors.border)),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Text('atau',
+              style: TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
+        ),
+        Expanded(child: Divider(height: 1, color: AppColors.border)),
+        SizedBox(width: 16),
+      ]),
+      const SizedBox(height: 16.6),
+      if (kIsWeb)
+        // Web wajib memakai tombol resmi Google (GIS) agar login dapat dipicu.
+        SizedBox(
+          height: 44,
+          child: FutureBuilder<void>(
+            future: AuthSession.googleReady,
+            builder: (context, snapshot) => snapshot.connectionState != ConnectionState.done
+                ? const SizedBox.shrink()
+                : LayoutBuilder(builder: (context, c) => Center(child: googleWebButton(c.maxWidth))),
+          ),
+        )
+      else
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: AppColors.borderStrong),
+            foregroundColor: AppColors.textMedium,
+          ),
+          onPressed: _loading ? null : _googleLogin,
+          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon('google_g', size: 20),
+            SizedBox(width: 12),
+            Text('Masuk dengan Google'),
+          ]),
+        ),
+    ];
+  }
+
+  Widget _terms() {
+    return Text.rich(
+      TextSpan(text: 'Dengan mendaftar di sini, Anda menyetujui ', children: [
+        TextSpan(
+          text: 'Syarat & Ketentuan Pendaftaran',
+          recognizer: _termsTap,
+          style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+        ),
+        const TextSpan(text: ' TemenTrip'),
+      ]),
+      textAlign: TextAlign.center,
+      style: const TextStyle(fontSize: 14, height: 1.6, color: AppColors.textMuted),
     );
   }
 }

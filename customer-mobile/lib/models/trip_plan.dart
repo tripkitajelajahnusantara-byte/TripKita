@@ -70,13 +70,13 @@ class TripPlan {
 
   static List<TripChecklistItem> defaultChecklist() => const [
         TripChecklistItem(id: '1', label: 'Tentukan Destinasi & Target Budget Liburan', completed: true),
-        TripChecklistItem(id: '2', label: 'Capai 25% Tabungan Perjalanan'),
-        TripChecklistItem(id: '3', label: 'Capai 50% Tabungan Perjalanan'),
-        TripChecklistItem(id: '4', label: 'Capai 75% Tabungan Perjalanan'),
-        TripChecklistItem(id: '5', label: 'Capai 100% Target Tabungan'),
-        TripChecklistItem(id: '6', label: 'Cari & Pesan Paket Open Trip di TemenTrip'),
-        TripChecklistItem(id: '7', label: 'Siapkan Barang Bawaan & Pakaian Liburan'),
-        TripChecklistItem(id: '8', label: 'Siap Berangkat & Nikmati Liburan! 🥳'),
+        TripChecklistItem(id: '2', label: 'Capai 25% target tabungan'),
+        TripChecklistItem(id: '3', label: 'Capai 50% target tabungan'),
+        TripChecklistItem(id: '4', label: 'Capai 75% target tabungan'),
+        TripChecklistItem(id: '5', label: 'Capai 100% target tabungan'),
+        TripChecklistItem(id: '6', label: 'Cari dan pesan open trip di TemenTrip'),
+        TripChecklistItem(id: '7', label: 'Siapkan barang bawaan'),
+        TripChecklistItem(id: '8', label: 'Siap berangkat & nikmati liburan!'),
       ];
 
   int get savedAmount => savingsLogs.fold(0, (sum, log) => sum + log.amount);

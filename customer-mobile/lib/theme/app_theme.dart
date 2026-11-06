@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// Palet warna desain Figma "TemenTrip" (Final Design): teal sebagai warna
 /// utama dan abu-abu kebiruan untuk teks. Nama token lama dipertahankan agar
@@ -63,6 +64,92 @@ class AppColors {
   static const calendarWeekday = Color(0xFF666666);
   static const errorStrong = Color(0xFFB42318);
   static const favorite = Color(0xFFD92D20);
+
+  // Token desain Figma alur Booking & Payment, Booking, Profil, Plan Trip, Login.
+  static const sheetTitle = Color(0xFF0F172A);
+  static const buttonOutline = Color(0xFF82C1CE);
+  static const errorText = Color(0xFFB91C1C);
+  static const icon = Color(0xFF647780);
+  static const accentBright = Color(0xFF03B2B5);
+}
+
+/// Lapisan komponen "Buttons" Figma: bayangan 1px di luar, bayangan dalam 2px
+/// di bawah, cincin gelap 1px, dan kilau putih 2px pada tombol isi.
+class ButtonSkin extends StatelessWidget {
+  final Widget child;
+  final bool filled;
+  final bool enabled;
+
+  /// Sudut tumpul; bawaannya setengah tinggi (pil).
+  final double? radius;
+
+  /// Pengali ketebalan efek, mis. 1.375 untuk kotak ikon 44.
+  final double scale;
+
+  const ButtonSkin(
+      {super.key, required this.child, this.filled = true, this.enabled = true, this.radius, this.scale = 1});
+
+  @override
+  Widget build(BuildContext context) =>
+      CustomPaint(painter: enabled ? _ButtonSkinPainter(filled, radius, scale) : null, child: child);
+}
+
+class _ButtonSkinPainter extends CustomPainter {
+  final bool filled;
+  final double? radius;
+  final double scale;
+
+  const _ButtonSkinPainter(this.filled, this.radius, this.scale);
+
+  static const _ink = Color(0xFF0A0D12);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rrect = RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius ?? size.height / 2));
+    final s = scale;
+    final shape = Path()..addRRect(rrect);
+    canvas
+      ..save()
+      ..clipPath(Path.combine(PathOperation.difference, Path()..addRect((Offset.zero & size).inflate(6)), shape))
+      ..drawRRect(
+        rrect.shift(Offset(0, s)),
+        Paint()
+          ..color = _ink.withValues(alpha: 0.05)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, s),
+      )
+      ..restore()
+      ..save()
+      ..clipRRect(rrect)
+      ..drawPath(
+        Path.combine(PathOperation.difference, shape, Path()..addRRect(rrect.shift(Offset(0, -2 * s)))),
+        Paint()..color = _ink.withValues(alpha: 0.05),
+      );
+    if (filled) {
+      canvas.drawRRect(
+        rrect.deflate(1),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0x1FFFFFFF), Color(0x00FFFFFF)],
+          ).createShader(Offset.zero & size),
+      );
+    }
+    canvas
+      ..drawRRect(
+        rrect.deflate(0.5 * s),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = s
+          ..color = _ink.withValues(alpha: 0.18),
+      )
+      ..restore();
+  }
+
+  @override
+  bool shouldRepaint(_ButtonSkinPainter oldDelegate) => oldDelegate.filled != filled;
 }
 
 class AppTheme {
@@ -98,10 +185,30 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.background,
     );
 
-    // Seluruh teks memakai Roboto (aset lokal) mengikuti desain Figma.
-    final textTheme = base.textTheme.apply(
+    // Seluruh teks memakai Roboto (aset lokal) mengikuti desain Figma. Figma
+    // membagi ruang tinggi baris sama rata di atas dan bawah teks dan tidak
+    // memakai tracking bawaan Material 3.
+    TextStyle? even(TextStyle? s) => s?.copyWith(leadingDistribution: TextLeadingDistribution.even, letterSpacing: 0);
+    final applied = base.textTheme.apply(
       bodyColor: AppColors.textDark,
       displayColor: AppColors.textDark,
+    );
+    final textTheme = applied.copyWith(
+      displayLarge: even(applied.displayLarge),
+      displayMedium: even(applied.displayMedium),
+      displaySmall: even(applied.displaySmall),
+      headlineLarge: even(applied.headlineLarge),
+      headlineMedium: even(applied.headlineMedium),
+      headlineSmall: even(applied.headlineSmall),
+      titleLarge: even(applied.titleLarge),
+      titleMedium: even(applied.titleMedium),
+      titleSmall: even(applied.titleSmall),
+      bodyLarge: even(applied.bodyLarge),
+      bodyMedium: even(applied.bodyMedium),
+      bodySmall: even(applied.bodySmall),
+      labelLarge: even(applied.labelLarge),
+      labelMedium: even(applied.labelMedium),
+      labelSmall: even(applied.labelSmall),
     );
     OutlineInputBorder outline(Color color, [double width = 1]) => OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -121,24 +228,39 @@ class AppTheme {
         titleTextStyle: TextStyle(
           fontFamily: 'Roboto',
           color: AppColors.textDark,
-          fontSize: 22,
-          height: 1.3,
+          fontSize: 24,
+          height: 1.17,
           fontWeight: FontWeight.w600,
         ),
       ),
+      // Panah kembali Phosphor dari desain, abu-abu.
+      actionIconTheme: ActionIconThemeData(
+        backButtonIconBuilder: (_) => SvgPicture.asset(
+          'assets/icons/arrow_left.svg',
+          width: 24,
+          height: 24,
+          colorFilter: const ColorFilter.mode(AppColors.icon, BlendMode.srcIn),
+        ),
+      ),
+      // Isian Figma: tinggi 40, teks 16, galat 14 merah tua di bawahnya.
       inputDecorationTheme: InputDecorationTheme(
         isDense: true,
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        hintStyle: const TextStyle(color: AppColors.textLight, fontSize: 15),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        hintStyle: const TextStyle(color: AppColors.textLight, fontSize: 16, height: 1.5, letterSpacing: 0),
         border: outline(AppColors.borderStrong),
         enabledBorder: outline(AppColors.borderStrong),
         focusedBorder: outline(AppColors.accent, 1.5),
         errorBorder: outline(AppColors.dangerDark),
         focusedErrorBorder: outline(AppColors.dangerDark, 1.5),
         disabledBorder: outline(AppColors.border),
-        errorStyle: const TextStyle(color: AppColors.dangerDark, fontSize: 12),
+        errorStyle: const TextStyle(
+          color: AppColors.errorText,
+          fontSize: 14,
+          height: 20 / 14,
+          leadingDistribution: TextLeadingDistribution.even,
+        ),
         errorMaxLines: 3,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -149,19 +271,26 @@ class AppTheme {
           disabledForegroundColor: Colors.white,
           elevation: 0,
           minimumSize: const Size(64, 44),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           shape: pill,
           textStyle: const TextStyle(fontFamily: 'Roboto', fontSize: 16, fontWeight: FontWeight.w600),
+          backgroundBuilder: (context, states, child) =>
+              ButtonSkin(enabled: !states.contains(WidgetState.disabled), child: child!),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.accent,
-          side: const BorderSide(color: AppColors.accent),
+          backgroundColor: Colors.white,
+          side: const BorderSide(color: AppColors.buttonOutline),
           minimumSize: const Size(64, 44),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           shape: pill,
           textStyle: const TextStyle(fontFamily: 'Roboto', fontSize: 16, fontWeight: FontWeight.w600),
+          backgroundBuilder: (context, states, child) =>
+              ButtonSkin(filled: false, enabled: !states.contains(WidgetState.disabled), child: child!),
         ),
       ),
       textButtonTheme: TextButtonThemeData(

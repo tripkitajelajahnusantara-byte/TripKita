@@ -53,7 +53,7 @@ export function getHighlightsForPackage(pkg: HighlightSource, limit: number = 3)
   return highlights;
 }
 
-const BACKEND_ORIGIN = API_BASE_URL.replace(/\/api\/v1$/, '');
+export const BACKEND_ORIGIN = API_BASE_URL.replace(/\/api\/v1$/, '');
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2']);
 
 // Mengubah nilai foto dari database menjadi URL yang dapat dimuat browser.

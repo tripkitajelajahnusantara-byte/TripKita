@@ -110,6 +110,11 @@ export const Footer: React.FC = () => {
                 </button>
               </li>
               <li>
+                <button type="button" onClick={() => navigateTo('berita')} className="footer-nav-btn">
+                  <ChevronRight size={14} /> Berita TemenTrip
+                </button>
+              </li>
+              <li>
                 <button type="button" onClick={() => navigateTo('bantuan')} className="footer-nav-btn">
                   <ChevronRight size={14} /> Pusat Bantuan & FAQ
                 </button>

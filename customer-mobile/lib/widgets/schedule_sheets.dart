@@ -20,7 +20,7 @@ class ScheduleChoice {
 /// Sisa kursi ≤ 10 ditampilkan merah agar customer segera memesan.
 const _urgentSeats = 10;
 
-/// `3 hari, 2 malam • 7 kuota tersisa`
+/// `3 hari • 7 kuota tersisa` (12 Medium, titik pemisah abu-abu).
 class _QuotaLine extends StatelessWidget {
   final int days;
   final int seatsLeft;
@@ -31,23 +31,32 @@ class _QuotaLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final urgent = overrideText == null && seatsLeft <= _urgentSeats;
-    return Text.rich(
-      TextSpan(text: durationLabel(days), children: [
-        const TextSpan(text: '  •  ', style: TextStyle(color: AppColors.borderStrong)),
-        TextSpan(
-          text: overrideText ?? (urgent ? '$seatsLeft kuota tersisa' : '$seatsLeft kuota tersedia'),
-          style: TextStyle(color: urgent || overrideText != null ? AppColors.dangerDark : AppColors.textMuted),
+    const style = TextStyle(fontSize: 12, height: 20 / 12, fontWeight: FontWeight.w500, color: AppColors.textMuted);
+    return Row(children: [
+      Text('$days hari', style: style),
+      Container(
+        width: 2.8,
+        height: 2.8,
+        margin: const EdgeInsets.only(left: 6, right: 5, top: 1),
+        decoration: const BoxDecoration(color: AppColors.borderStrong, shape: BoxShape.circle),
+      ),
+      Flexible(
+        child: Text(
+          overrideText ?? (urgent ? '$seatsLeft kuota tersisa' : '$seatsLeft kuota tersedia'),
+          overflow: TextOverflow.ellipsis,
+          style: style.copyWith(color: urgent || overrideText != null ? AppColors.errorText : AppColors.textMedium),
         ),
-      ]),
-      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-    );
+      ),
+    ]);
   }
 }
 
 String _rangeArrow(String startIso, String endIso) =>
     '${formatDateShort(parseIsoDate(startIso))} → ${formatDateShort(parseIsoDate(endIso))}';
 
-/// Kotak "Tanggal Dipilih".
+const _rangeStyle = TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w500, color: AppColors.textDark);
+
+/// Kotak "Tanggal Dipilih" setinggi 92.
 class SelectedScheduleBox extends StatelessWidget {
   final ScheduleChoice choice;
   final bool highlighted;
@@ -57,34 +66,39 @@ class SelectedScheduleBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final border = highlighted ? 2.0 : 1.0;
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      height: 92,
+      padding: EdgeInsets.only(left: 16 - border, right: 16.9 - border),
       decoration: BoxDecoration(
         color: highlighted ? AppColors.accentSoft : Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: highlighted ? AppColors.accent : AppColors.borderStrong, width: highlighted ? 1.5 : 1),
+        border: Border.all(color: highlighted ? AppColors.accent : AppColors.borderStrong, width: border),
       ),
       child: Row(children: [
-        const Icon(Icons.event_available_outlined, color: AppColors.accent, size: 22),
-        const SizedBox(width: 10),
+        const AppIcon('calendar_check', color: AppColors.accent),
+        const SizedBox(width: 8),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Tanggal Dipilih', style: TextStyle(fontSize: 11, color: AppColors.primaryDark)),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Tanggal Dipilih',
+                style: TextStyle(fontSize: 10, height: 14 / 10, fontWeight: FontWeight.w500, color: AppColors.primaryDark)),
             const SizedBox(height: 4),
-            Text(_rangeArrow(choice.startIso, choice.endIso),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-            const SizedBox(height: 4),
+            Text(_rangeArrow(choice.startIso, choice.endIso), style: _rangeStyle),
             _QuotaLine(days: choice.days, seatsLeft: choice.seatsLeft),
           ]),
         ),
         if (onChange != null)
-          TextButton(onPressed: onChange, child: const Text('Ubah')),
+          GestureDetector(
+            onTap: onChange,
+            child: const Text('Ubah',
+                style: TextStyle(fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w600, color: AppColors.accent)),
+          ),
       ]),
     );
   }
 }
 
-/// Footer harga lembar jadwal: "Mulai dari Rp…/orang" + tombol.
+/// Footer harga lembar jadwal: "Mulai dari Rp…/orang" + tombol 160.
 class _PriceFooter extends StatelessWidget {
   final String caption;
   final int amount;
@@ -104,20 +118,7 @@ class _PriceFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     return BottomActionBar(
       child: Row(children: [
-        Expanded(
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(caption, style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
-            const SizedBox(height: 2),
-            Text.rich(TextSpan(
-              text: formatPrice(amount),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
-              children: [
-                if (suffix.isNotEmpty)
-                  TextSpan(text: ' $suffix', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textMuted)),
-              ],
-            )),
-          ]),
-        ),
+        Expanded(child: PriceCaption(caption: caption, amount: amount, suffix: suffix)),
         const SizedBox(width: 12),
         SizedBox(width: 160, child: ElevatedButton(onPressed: onPressed, child: Text(buttonLabel))),
       ]),
@@ -125,14 +126,50 @@ class _PriceFooter extends StatelessWidget {
   }
 }
 
+/// "Mulai dari" (14 Medium) di atas harga 20 Bold teal dan akhiran 16 abu.
+class PriceCaption extends StatelessWidget {
+  final String caption;
+  final int amount;
+  final String suffix;
+
+  const PriceCaption({super.key, required this.caption, required this.amount, this.suffix = ''});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(caption,
+          style: const TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
+      Text.rich(
+        TextSpan(
+          text: formatPrice(amount),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
+          children: [
+            if (suffix.isNotEmpty)
+              TextSpan(
+                text: ' $suffix',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: AppColors.textLight),
+              ),
+          ],
+        ),
+        style: const TextStyle(height: 26 / 20),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    ]);
+  }
+}
+
 String _priceSuffix(TripPackage pkg) => pkg.isPerUnit ? '/${pkg.unitLabel}' : '/orang';
+
+/// Subjudul lembar jadwal.
+const _scheduleSubtitle = 'Pilih tanggal keberangkatan yang tersedia.';
 
 /// Lembar "Jadwal Tersedia" untuk Open Trip: daftar keberangkatan per bulan.
 Future<ScheduleChoice?> showDepartureSheet(BuildContext context, {required TripPackage pkg, String? selectedIso}) {
   return showDesignSheet<ScheduleChoice>(
     context,
     title: 'Jadwal Tersedia',
-    subtitle: 'Pilih tanggal keberangkatan yang tersedia.',
+    subtitle: _scheduleSubtitle,
     showClose: false,
     builder: (_) => _DepartureList(pkg: pkg, selectedIso: selectedIso),
   );
@@ -164,18 +201,18 @@ class _DepartureListState extends State<_DepartureList> {
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (_months.length > 1)
         SizedBox(
-          height: 44,
+          height: 43,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 15),
             children: [
               for (final m in _months) ...[
-                BadgeChip(
+                _MonthChip(
                   label: '${monthsFull[int.parse(m.substring(5)) - 1]} ${m.substring(0, 4)}',
                   selected: m == _month,
                   onTap: () => setState(() => _month = m),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
               ],
             ],
           ),
@@ -200,7 +237,7 @@ class _DepartureListState extends State<_DepartureList> {
         caption: 'Mulai dari',
         amount: widget.pkg.price,
         suffix: _priceSuffix(widget.pkg),
-        buttonLabel: 'Lanjutkan',
+        buttonLabel: 'Pilih Jadwal',
         onPressed: chosen == null
             ? null
             : () => Navigator.pop(context, ScheduleChoice(chosen.date, chosen.endDate, chosen.seatsLeft)),
@@ -223,34 +260,87 @@ class _DepartureListState extends State<_DepartureList> {
         onTap: bookable ? () => setState(() => _selected = d.date) : null,
         child: Opacity(
           opacity: bookable ? 1 : 0.55,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-            child: Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(_rangeArrow(d.date, d.endDate),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-                  const SizedBox(height: 4),
-                  _QuotaLine(
-                    days: days,
-                    seatsLeft: d.seatsLeft,
-                    overrideText: d.closed
-                        ? 'Jadwal ditutup'
-                        : d.seatsLeft <= 0
-                            ? 'Kuota penuh'
-                            : !bookable
-                                ? 'Sisa ${d.seatsLeft}, min. ${widget.pkg.minRequiredGuests} peserta'
-                                : null,
-                  ),
-                ]),
-              ),
-              Radio<String>(
-                value: d.date,
-                groupValue: _selected,
-                onChanged: bookable ? (v) => setState(() => _selected = v) : null,
-              ),
-            ]),
+          child: SizedBox(
+            height: 72,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(children: [
+                Expanded(
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(_rangeArrow(d.date, d.endDate), style: _rangeStyle),
+                    _QuotaLine(
+                      days: days,
+                      seatsLeft: d.seatsLeft,
+                      overrideText: d.closed
+                          ? 'Jadwal ditutup'
+                          : d.seatsLeft <= 0
+                              ? 'Kuota penuh'
+                              : !bookable
+                                  ? 'Sisa ${d.seatsLeft}, min. ${widget.pkg.minRequiredGuests} peserta'
+                                  : null,
+                    ),
+                  ]),
+                ),
+                _RadioDot(selected: selected),
+              ]),
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Radio Figma 20: lingkaran bergaris, isi teal saat terpilih.
+class _RadioDot extends StatelessWidget {
+  final bool selected;
+
+  const _RadioDot({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 20,
+      height: 20,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: selected ? AppColors.accent : AppColors.borderStrong, width: selected ? 6 : 1),
+      ),
+    );
+  }
+}
+
+/// Chip bulan 28 (14 Medium): terpilih berlatar teal muda.
+class _MonthChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _MonthChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.accentSoft : Colors.white,
+      shape: StadiumBorder(
+        side: BorderSide(color: selected ? const Color(0xFFC0ECEC) : AppColors.border, width: 0.875),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 28,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          child: Text(label,
+              style: TextStyle(
+                fontSize: 14,
+                height: 20 / 14,
+                fontWeight: FontWeight.w500,
+                color: selected ? AppColors.primaryDark : AppColors.textBody,
+              )),
         ),
       ),
     );
@@ -270,7 +360,7 @@ Future<ScheduleChoice?> showDateSheet(
   return showDesignSheet<ScheduleChoice>(
     context,
     title: 'Jadwal Tersedia',
-    subtitle: 'Pilih tanggal keberangkatan yang tersedia.',
+    subtitle: _scheduleSubtitle,
     showClose: false,
     builder: (_) => _DateCalendar(pkg: pkg, minIso: minIso, maxIso: maxIso, selectedIso: selectedIso),
   );
@@ -328,45 +418,63 @@ class _DateCalendarState extends State<_DateCalendar> {
     final canPrev = _month.isAfter(_firstMonth);
     final canNext = _month.isBefore(_lastMonth);
     final start = _start;
+    Widget arrow(String icon, String tooltip, bool enabled, int delta) => IconButton(
+          tooltip: tooltip,
+          onPressed: enabled ? () => setState(() => _month = DateTime(_month.year, _month.month + delta)) : null,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 24, height: 24),
+          icon: AppIcon(icon, color: enabled ? AppColors.icon : AppColors.borderStrong),
+        );
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Flexible(
         child: ListView(
           shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           children: [
+            SizedBox(
+              height: 24,
+              child: Row(children: [
+                Expanded(
+                  child: Text('${monthsFull[_month.month - 1]} ${_month.year}',
+                      style: const TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w500, color: AppColors.textDark)),
+                ),
+                arrow('caret_left_thin', 'Bulan sebelumnya', canPrev, -1),
+                const SizedBox(width: 21.26),
+                arrow('caret_right_thin', 'Bulan berikutnya', canNext, 1),
+                const SizedBox(width: 5.37),
+              ]),
+            ),
+            const SizedBox(height: 23.25),
             Row(children: [
-              Expanded(
-                child: Text('${monthsFull[_month.month - 1]} ${_month.year}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-              ),
-              IconButton(
-                tooltip: 'Bulan sebelumnya',
-                onPressed: canPrev ? () => setState(() => _month = DateTime(_month.year, _month.month - 1)) : null,
-                icon: const Icon(Icons.chevron_left_rounded),
-              ),
-              IconButton(
-                tooltip: 'Bulan berikutnya',
-                onPressed: canNext ? () => setState(() => _month = DateTime(_month.year, _month.month + 1)) : null,
-                icon: const Icon(Icons.chevron_right_rounded),
-              ),
+              for (final w in weekdaysShort)
+                Expanded(
+                  child: Text(w,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 12, height: 16 / 12, letterSpacing: 0.96, color: AppColors.calendarWeekday)),
+                ),
             ]),
-            const SizedBox(height: 4),
-            _grid(),
-            if (start != null) ...[
-              const SizedBox(height: 16),
-              SelectedScheduleBox(
-                highlighted: true,
-                choice: ScheduleChoice(start, _endOf(start), widget.pkg.availableSeats),
-              ),
-            ],
+            const SizedBox(height: 12.75),
+            ..._weeks(),
           ],
         ),
       ),
+      const SizedBox(height: 15.5),
+      const Divider(height: 1),
+      if (start != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: SelectedScheduleBox(
+            highlighted: true,
+            choice: ScheduleChoice(start, _endOf(start), widget.pkg.availableSeats),
+          ),
+        ),
+      const SizedBox(height: 16),
       _PriceFooter(
         caption: 'Mulai dari',
         amount: widget.pkg.price,
         suffix: _priceSuffix(widget.pkg),
-        buttonLabel: 'Lanjutkan',
+        buttonLabel: 'Pilih Jadwal',
         onPressed: start == null
             ? null
             : () => Navigator.pop(context, ScheduleChoice(start, _endOf(start), widget.pkg.availableSeats)),
@@ -374,62 +482,67 @@ class _DateCalendarState extends State<_DateCalendar> {
     ]);
   }
 
-  Widget _grid() {
+  /// Baris minggu: sel 40 tinggi berjarak 8; angka 16, titik 4 di bawahnya
+  /// untuk tanggal yang dapat dipilih.
+  List<Widget> _weeks() {
     final first = DateTime(_month.year, _month.month, 1);
     final leading = (first.weekday + 6) % 7; // Senin sebagai kolom pertama.
     final rows = ((leading + DateTime(_month.year, _month.month + 1, 0).day) / 7).ceil();
-    final cells = <Widget>[
-      for (final w in weekdaysShort)
-        Center(child: Text(w, style: const TextStyle(fontSize: 12, color: AppColors.textMuted))),
+    return [
+      for (var r = 0; r < rows; r++) ...[
+        if (r > 0) const SizedBox(height: 8),
+        Row(children: [
+          for (var c = 0; c < 7; c++) Expanded(child: _day(first.add(Duration(days: r * 7 + c - leading)))),
+        ]),
+      ],
     ];
-    for (var i = 0; i < rows * 7; i++) {
-      final day = first.add(Duration(days: i - leading));
-      final inMonth = day.month == _month.month;
-      final iso = toIsoDate(day);
-      final selectable = inMonth && _selectable(iso);
-      final selected = iso == _start;
-      final inRange = _start != null && iso.compareTo(_start!) > 0 && iso.compareTo(_endOf(_start!)) <= 0;
-      final color = selected
-          ? Colors.white
-          : inRange
-              ? AppColors.primaryDark
-              : selectable
-                  ? AppColors.textDark
-                  : AppColors.borderStrong;
-      cells.add(Semantics(
-        button: selectable,
-        selected: selected,
-        label: formatDateLong(day),
-        child: Material(
-          color: selected ? AppColors.accent : (inRange && inMonth ? AppColors.accentLight : Colors.transparent),
+  }
+
+  Widget _day(DateTime day) {
+    final inMonth = day.month == _month.month;
+    final iso = toIsoDate(day);
+    final selectable = inMonth && _selectable(iso);
+    final selected = iso == _start;
+    final color = selected ? Colors.white : (selectable ? AppColors.textMedium : AppColors.textLight);
+    return Semantics(
+      button: selectable,
+      selected: selected,
+      label: formatDateLong(day),
+      child: Material(
+        color: selected ? AppColors.accent : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: selectable ? () => setState(() => _start = iso) : null,
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text('${day.day}', style: TextStyle(fontSize: 16, color: inMonth ? color : AppColors.border)),
-              const SizedBox(height: 3),
-              Container(
-                width: 4,
-                height: 4,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selectable ? (selected ? Colors.white : AppColors.accent) : Colors.transparent,
-                ),
+          onTap: selectable ? () => setState(() => _start = iso) : null,
+          child: SizedBox(
+            height: 40,
+            child: Stack(alignment: Alignment.topCenter, children: [
+              Positioned(
+                top: 10,
+                child: Text('${day.day}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.17,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                      color: color,
+                    )),
               ),
+              if (selectable)
+                Positioned(
+                  top: 30,
+                  child: Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: selected ? Colors.white : AppColors.accentBright,
+                    ),
+                  ),
+                ),
             ]),
           ),
         ),
-      ));
-    }
-    return GridView.count(
-      crossAxisCount: 7,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 4,
-      crossAxisSpacing: 4,
-      childAspectRatio: 1,
-      children: cells,
+      ),
     );
   }
 }
@@ -488,16 +601,21 @@ class _GuestPickerState extends State<_GuestPicker> {
     final pkg = widget.pkg;
     final enough = _max >= _min;
     final units = pkg.unitsFor(_guests);
-    Widget step(IconData icon, String tooltip, bool enabled, VoidCallback onTap) => Material(
+    Widget step(String icon, String tooltip, bool enabled, VoidCallback onTap) => Material(
           color: enabled ? AppColors.accentLight : AppColors.divider,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           child: InkWell(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
             onTap: enabled ? onTap : null,
             child: SizedBox(
-              width: 36,
-              height: 36,
-              child: Icon(icon, size: 20, color: enabled ? AppColors.accent : AppColors.borderStrong, semanticLabel: tooltip),
+              width: 40,
+              height: 40,
+              child: Center(
+                child: Semantics(
+                  label: tooltip,
+                  child: AppIcon(icon, size: 16, color: enabled ? AppColors.accent : AppColors.borderStrong),
+                ),
+              ),
             ),
           ),
         );
@@ -505,7 +623,7 @@ class _GuestPickerState extends State<_GuestPicker> {
       Flexible(
         child: ListView(
           shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
           children: [
             SelectedScheduleBox(
               choice: widget.schedule,
@@ -515,14 +633,15 @@ class _GuestPickerState extends State<_GuestPicker> {
             Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Jumlah Peserta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-                  const SizedBox(height: 4),
+                  const Text('Jumlah Peserta',
+                      style: TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w500, color: AppColors.textDark)),
+                  const SizedBox(height: 2),
                   Text(
                     [
                       'Min. $_min peserta',
                       if (pkg.maxGuests > 0) 'maks. ${pkg.maxGuests}',
                     ].join(', '),
-                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    style: const TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMuted),
                   ),
                 ]),
               ),
@@ -530,17 +649,17 @@ class _GuestPickerState extends State<_GuestPicker> {
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: AppColors.borderStrong),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  step(Icons.remove_rounded, 'Kurangi peserta', enough && _guests > _min, () => setState(() => _guests--)),
+                  step('minus', 'Kurangi peserta', enough && _guests > _min, () => setState(() => _guests--)),
                   SizedBox(
-                    width: 44,
+                    width: 46,
                     child: Text('$_guests',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textDark)),
+                        style: const TextStyle(fontSize: 20, height: 1.4, fontWeight: FontWeight.w600, color: AppColors.textDark)),
                   ),
-                  step(Icons.add_rounded, 'Tambah peserta', enough && _guests < _max, () => setState(() => _guests++)),
+                  step('plus', 'Tambah peserta', enough && _guests < _max, () => setState(() => _guests++)),
                 ]),
               ),
             ]),
@@ -551,23 +670,21 @@ class _GuestPickerState extends State<_GuestPicker> {
             ],
             if (!enough) ...[
               const SizedBox(height: 12),
-              InfoBanner(
-                icon: Icons.error_outline,
-                message: 'Sisa kuota tanggal ini (${widget.schedule.seatsLeft}) kurang dari minimal $_min peserta. Silakan pilih tanggal lain.',
-                color: AppColors.dangerDark,
-                textColor: AppColors.dangerDark,
-                background: AppColors.dangerSoft,
-                border: AppColors.dangerSoft,
+              NoteBox(
+                tone: NoteTone.danger,
+                text: 'Sisa kuota tanggal ini (${widget.schedule.seatsLeft}) kurang dari minimal $_min peserta. '
+                    'Silakan pilih tanggal lain.',
               ),
             ],
           ],
         ),
       ),
+      Container(height: 4, color: AppColors.divider),
       _PriceFooter(
-        caption: 'Total estimasi',
+        caption: 'Total Estimasi',
         amount: pkg.basePrice(_guests),
         suffix: '',
-        buttonLabel: 'Pesan Sekarang',
+        buttonLabel: 'Pilih Jadwal',
         onPressed: enough ? () => Navigator.pop(context, GuestChoice(_guests)) : null,
       ),
     ]);

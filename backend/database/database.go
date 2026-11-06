@@ -82,6 +82,7 @@ func ConnectDB(cfg *config.Config) {
 			&models.RefundRecord{},
 			&models.TripDeparture{},
 			&models.TripPlan{},
+			&models.News{},
 		)
 		if err != nil {
 			log.Fatalf("Migrasi database gagal: %v", err)

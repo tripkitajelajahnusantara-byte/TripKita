@@ -110,7 +110,7 @@ class _TripSearchFormState extends State<TripSearchForm> {
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 hintText: 'Pilih destinasi Anda',
-                hintStyle: figmaTextStyle.copyWith(fontSize: 16, color: AppColors.textMuted),
+                hintStyle: figmaTextStyle.copyWith(fontSize: 16, color: AppColors.textLight),
               ),
             ),
           ),
@@ -228,12 +228,12 @@ class _InputShell extends StatelessWidget {
             if (leading != null) ...[AppIcon(leading!, color: AppColors.textLight), const SizedBox(width: 8)],
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(label, style: TextStyle(fontSize: 12, color: focused ? AppColors.brand : AppColors.textMuted)),
+                Text(label, style: TextStyle(fontSize: 12, color: focused ? AppColors.brand : AppColors.textMedium)),
                 const SizedBox(height: 8),
                 child,
               ]),
             ),
-            if (trailing != null) ...[const SizedBox(width: 8), AppIcon(trailing!, color: AppColors.textMedium)],
+            if (trailing != null) ...[const SizedBox(width: 8), AppIcon(trailing!, color: AppColors.textMuted)],
           ]),
         ),
       ),
@@ -252,7 +252,7 @@ class _FieldValue extends StatelessWidget {
     return Text(value ?? placeholder,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: 16, color: value == null ? AppColors.textMuted : AppColors.textDark));
+        style: TextStyle(fontSize: 16, color: value == null ? AppColors.textLight : AppColors.textDark));
   }
 }
 
