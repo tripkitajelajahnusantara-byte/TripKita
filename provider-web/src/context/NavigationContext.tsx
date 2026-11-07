@@ -59,6 +59,18 @@ export function isReturnableHash(hash: string | null | undefined): hash is strin
   return !AUTH_HASH_PREFIXES.some((prefix) => hash.startsWith(prefix));
 }
 
+// Simpan halaman yang diminta agar setelah login pengguna kembali ke sana
+// (redirectAfterAuth membaca kunci yang sama).
+export function rememberReturnTo(hash = typeof window === 'undefined' ? '' : window.location.hash) {
+  if (isReturnableHash(hash)) {
+    try {
+      sessionStorage.setItem('tementrip_auth_return_to', hash);
+    } catch {
+      // abaikan
+    }
+  }
+}
+
 export function getHashFromRoute(r: Route): string {
   switch (r) {
     case 'dashboard': return '#/provider/dashboard';

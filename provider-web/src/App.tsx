@@ -1,6 +1,6 @@
 import React from 'react';
 import { Analytics, type BeforeSendEvent } from '@vercel/analytics/react';
-import { NavigationProvider, isReturnableHash, useNavigation } from './context/NavigationContext';
+import { NavigationProvider, rememberReturnTo, useNavigation } from './context/NavigationContext';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from './components/LegalModals';
@@ -394,19 +394,6 @@ function App() {
 }
 
 
-// Simpan halaman yang diminta agar setelah login pengguna kembali ke sana
-// (redirectAfterAuth membaca kunci yang sama).
-function rememberReturnTo() {
-  if (typeof window === 'undefined') return;
-  const hash = window.location.hash;
-  if (isReturnableHash(hash)) {
-    try {
-      sessionStorage.setItem('tementrip_auth_return_to', hash);
-    } catch {
-      // abaikan
-    }
-  }
-}
 
 export default App;
 

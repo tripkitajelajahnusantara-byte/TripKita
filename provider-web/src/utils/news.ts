@@ -2,9 +2,29 @@ import { BACKEND_ORIGIN } from './tripImages';
 import { groupNewsBlocks, NEWS_IMAGE_CHARS } from './newsPages';
 import { getLang } from '../i18n';
 
+// Slug kategori sama persis dengan models.NewsCategories di backend.
+export const NEWS_CATEGORIES = [
+  { slug: 'destinasi', id: 'Destinasi', en: 'Destinations' },
+  { slug: 'kuliner', id: 'Kuliner', en: 'Culinary' },
+  { slug: 'wisata-budaya', id: 'Wisata Budaya', en: 'Culture' },
+  { slug: 'tips-travel', id: 'Tips Travel', en: 'Travel Tips' },
+  { slug: 'mistis', id: 'Mistis', en: 'Mystical' },
+  { slug: 'lainnya', id: 'Lainnya', en: 'Others' },
+] as const;
+export type NewsCategory = typeof NEWS_CATEGORIES[number]['slug'];
+
+export const isNewsCategory = (value: unknown): value is NewsCategory =>
+  NEWS_CATEGORIES.some((category) => category.slug === value);
+
+export function newsCategoryLabel(slug: string, lang: 'id' | 'en' = 'id') {
+  const category = NEWS_CATEGORIES.find((item) => item.slug === slug);
+  return category ? category[lang] : slug;
+}
+
 export interface NewsItem {
   id: number;
   title: string;
+  category: NewsCategory;
   excerpt: string;
   coverImage: string;
   coverCaption: string;
@@ -12,6 +32,22 @@ export interface NewsItem {
   content?: string;
   status: 'DRAFT' | 'PUBLISHED';
   publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewsHighlights {
+  featured: NewsItem[];
+  editorPicks: NewsItem[];
+}
+
+export interface NewsComment {
+  id: number;
+  parentId: number | null;
+  displayName: string;
+  anonymous: boolean;
+  body: string;
+  mine: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -47,6 +83,7 @@ export function htmlToText(html: string) {
 
 export const newsHash = (id?: number, page = 1) =>
   (id ? `#/berita?id=${id}${page > 1 ? `&hal=${page}` : ''}` : '#/berita');
+export const newsCategoryHash = (slug: string) => `#/berita?kategori=${slug}`;
 
 /** Keterangan foto sampul gaya media: "Keterangan (Foto: Sumber)". */
 export function coverCredit(caption: string, source: string) {

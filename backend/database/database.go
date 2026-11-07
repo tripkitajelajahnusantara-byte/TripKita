@@ -83,6 +83,8 @@ func ConnectDB(cfg *config.Config) {
 			&models.TripDeparture{},
 			&models.TripPlan{},
 			&models.News{},
+			&models.NewsPlacement{},
+			&models.NewsComment{},
 		)
 		if err != nil {
 			log.Fatalf("Migrasi database gagal: %v", err)
@@ -124,6 +126,8 @@ func ConnectDB(cfg *config.Config) {
 		execMigration(`ALTER TABLE IF EXISTS trip_plans ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS trip_departures ENABLE ROW LEVEL SECURITY;`)
 		execMigration(`ALTER TABLE IF EXISTS package_dates ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS news_placements ENABLE ROW LEVEL SECURITY;`)
+		execMigration(`ALTER TABLE IF EXISTS news_comments ENABLE ROW LEVEL SECURITY;`)
 		if err := syncLegacyAuthUsers(); err != nil {
 			log.Fatalf("Migrasi identitas akun lama gagal: %v", err)
 		}

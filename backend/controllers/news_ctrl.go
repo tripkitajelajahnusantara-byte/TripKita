@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,7 +20,7 @@ const (
 )
 
 // Kolom daftar sengaja tanpa content agar respons daftar tetap ringan.
-var newsListColumns = []string{"id", "title", "excerpt", "cover_image", "status", "published_at", "created_at", "updated_at"}
+var newsListColumns = []string{"id", "title", "category", "excerpt", "cover_image", "status", "published_at", "created_at", "updated_at"}
 
 // NewsController melayani berita: admin menulis, customer hanya membaca yang
 // berstatus PUBLISHED.
@@ -47,13 +48,24 @@ func (ctrl *NewsController) PublicList(c *gin.Context) {
 	if err != nil || page < 1 {
 		page = 1
 	}
+	category := c.Query("category")
+	if category != "" && !models.IsNewsCategory(category) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Kategori berita tidak dikenal"})
+		return
+	}
+	scope := func() *gorm.DB {
+		if category == "" {
+			return ctrl.published()
+		}
+		return ctrl.published().Where("category = ?", category)
+	}
 	var total int64
-	if err := ctrl.published().Count(&total).Error; err != nil {
+	if err := scope().Count(&total).Error; err != nil {
 		respondInternalError(c, "menghitung berita", err)
 		return
 	}
 	items := []models.News{}
-	if err := ctrl.published().Select(newsListColumns).Order("published_at DESC, id DESC").
+	if err := scope().Select(newsListColumns).Order("published_at DESC, id DESC").
 		Limit(newsPageSize).Offset((page - 1) * newsPageSize).Find(&items).Error; err != nil {
 		respondInternalError(c, "memuat berita", err)
 		return
@@ -72,6 +84,108 @@ func (ctrl *NewsController) PublicGet(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, news)
+}
+
+// Highlights mengembalikan Berita Utama dan Pilihan Redaksi sesuai urutan
+// admin. Hanya artikel PUBLISHED yang ikut, jadi artikel yang ditarik ke draf
+// langsung hilang dari halaman customer. Admin memakai endpoint yang sama.
+func (ctrl *NewsController) Highlights(c *gin.Context) {
+	featured, err := ctrl.placed(models.NewsSlotFeatured)
+	if err != nil {
+		respondInternalError(c, "memuat berita utama", err)
+		return
+	}
+	picks, err := ctrl.placed(models.NewsSlotEditorPick)
+	if err != nil {
+		respondInternalError(c, "memuat pilihan redaksi", err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"featured": featured, "editorPicks": picks})
+}
+
+func (ctrl *NewsController) placed(slot string) ([]models.News, error) {
+	items := []models.News{}
+	err := ctrl.published().Select("news."+strings.Join(newsListColumns, ", news.")).
+		Joins("JOIN news_placements ON news_placements.news_id = news.id AND news_placements.slot = ?", slot).
+		Order("news_placements.position").Find(&items).Error
+	return items, err
+}
+
+// SavePlacements mengganti seluruh susunan Berita Utama dan Pilihan Redaksi
+// dalam satu transaksi agar halaman customer tidak pernah melihat susunan setengah jadi.
+func (ctrl *NewsController) SavePlacements(c *gin.Context) {
+	var req models.SaveNewsPlacementsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Susunan berita tidak valid"})
+		return
+	}
+	if err := validatePlacement(req.Featured, "Berita Utama"); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validatePlacement(req.EditorPicks, "Pilihan Redaksi"); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	ids := append(append([]uint{}, req.Featured...), req.EditorPicks...)
+	if len(ids) > 0 {
+		var published int64
+		if err := ctrl.published().Where("id IN ?", ids).Count(&published).Error; err != nil {
+			respondInternalError(c, "memeriksa berita pilihan", err)
+			return
+		}
+		if int(published) != countDistinct(ids) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Ada artikel yang belum terbit atau sudah dihapus. Muat ulang halaman lalu pilih lagi."})
+			return
+		}
+	}
+	rows := placementRows(models.NewsSlotFeatured, req.Featured)
+	rows = append(rows, placementRows(models.NewsSlotEditorPick, req.EditorPicks)...)
+	err := ctrl.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("1 = 1").Delete(&models.NewsPlacement{}).Error; err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return nil
+		}
+		return tx.Omit("News").Create(&rows).Error
+	})
+	if err != nil {
+		respondInternalError(c, "menyimpan susunan berita", err)
+		return
+	}
+	ctrl.Highlights(c)
+}
+
+func validatePlacement(ids []uint, label string) error {
+	if len(ids) > models.NewsSlotSize {
+		return fmt.Errorf("%s maksimal %d artikel", label, models.NewsSlotSize)
+	}
+	for _, id := range ids {
+		if id == 0 {
+			return fmt.Errorf("%s berisi artikel yang tidak valid", label)
+		}
+	}
+	if countDistinct(ids) != len(ids) {
+		return fmt.Errorf("Artikel yang sama dipilih dua kali di %s", label)
+	}
+	return nil
+}
+
+func countDistinct(ids []uint) int {
+	seen := map[uint]bool{}
+	for _, id := range ids {
+		seen[id] = true
+	}
+	return len(seen)
+}
+
+func placementRows(slot string, ids []uint) []models.NewsPlacement {
+	rows := make([]models.NewsPlacement, 0, len(ids))
+	for index, id := range ids {
+		rows = append(rows, models.NewsPlacement{Slot: slot, Position: index + 1, NewsID: id})
+	}
+	return rows
 }
 
 // shortcut: daftar admin tanpa paginasi; tambahkan bila berita sudah ratusan.
@@ -193,6 +307,7 @@ func applyNewsRequest(news *models.News, req *models.SaveNewsRequest, now time.T
 		return errors.New("Sumber foto sampul wajib diisi sebelum menerbitkan, contoh: Dok. Istimewa.")
 	}
 	news.Title = title
+	news.Category = req.Category
 	news.Content = content
 	news.Excerpt = newsExcerpt(text, newsExcerptLength)
 	news.CoverImage = cover

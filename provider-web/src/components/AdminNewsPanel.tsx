@@ -2,7 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ExternalLink, ImagePlus, LoaderCircle, Newspaper, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { request } from '../utils/api';
 import { resolveMediaUrl } from '../utils/tripImages';
-import { coverCredit, formatNewsDate, newsHash, toDisplayHtml, toStoredHtml, type NewsItem } from '../utils/news';
+import {
+  NEWS_CATEGORIES, coverCredit, formatNewsDate, newsCategoryLabel, newsHash, toDisplayHtml, toStoredHtml,
+  type NewsCategory, type NewsItem,
+} from '../utils/news';
 import { useCustomAlert } from './CustomAlertModal';
 import { RichTextEditor } from './RichTextEditor';
 import { Skeleton, SkeletonTable } from './Skeleton';
@@ -39,6 +42,7 @@ function NewsList({ onOpen }: { onOpen: (id: number | 'new') => void }) {
   const [items, setItems] = useState<NewsItem[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState<Filter>('ALL');
+  const [category, setCategory] = useState<NewsCategory | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
   // Id berita yang sedang dihapus; baris tetap tampil dengan indikator sampai server menjawab.
   const [deleting, setDeleting] = useState<ReadonlySet<number>>(() => new Set());
@@ -60,8 +64,10 @@ function NewsList({ onOpen }: { onOpen: (id: number | 'new') => void }) {
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return (items ?? []).filter((item) =>
-      (filter === 'ALL' || item.status === filter) && (!needle || item.title.toLowerCase().includes(needle)));
-  }, [items, filter, query]);
+      (filter === 'ALL' || item.status === filter)
+      && (category === 'ALL' || item.category === category)
+      && (!needle || item.title.toLowerCase().includes(needle)));
+  }, [items, filter, category, query]);
 
   const confirmDelete = (item: NewsItem) => showConfirm({
     title: 'Hapus berita?',
@@ -108,6 +114,10 @@ function NewsList({ onOpen }: { onOpen: (id: number | 'new') => void }) {
             </button>
           ))}
         </div>
+        <select className="nw-select" value={category} onChange={(event) => setCategory(event.target.value as NewsCategory | 'ALL')} aria-label="Filter kategori">
+          <option value="ALL">Semua kategori</option>
+          {NEWS_CATEGORIES.map((item) => <option key={item.slug} value={item.slug}>{item.id}</option>)}
+        </select>
         <label className="nw-search">
           <Search size={16} />
           <input type="search" placeholder="Cari judul" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Cari judul berita" />
@@ -140,6 +150,7 @@ function NewsList({ onOpen }: { onOpen: (id: number | 'new') => void }) {
                     )}
                   </span>
                 </button>
+                <span className="nw-cat">{newsCategoryLabel(item.category)}</span>
                 <StatusChip status={item.status} />
                 <div className="nw-row-actions">
                   {item.status === 'PUBLISHED' && !isDeleting && (
@@ -159,8 +170,8 @@ function NewsList({ onOpen }: { onOpen: (id: number | 'new') => void }) {
   );
 }
 
-interface Draft { title: string; coverImage: string; coverCaption: string; coverSource: string; content: string }
-const EMPTY_DRAFT: Draft = { title: '', coverImage: '', coverCaption: '', coverSource: '', content: '' };
+interface Draft { title: string; category: NewsCategory | ''; coverImage: string; coverCaption: string; coverSource: string; content: string }
+const EMPTY_DRAFT: Draft = { title: '', category: '', coverImage: '', coverCaption: '', coverSource: '', content: '' };
 const snapshot = (draft: Draft) => JSON.stringify(draft);
 
 function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose: () => void }) {
@@ -181,6 +192,7 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
   const coverInputRef = useRef<HTMLInputElement>(null);
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const categoryRef = useRef<HTMLSelectElement>(null);
   const dirty = snapshot(draft) !== baseline;
 
   useEffect(() => {
@@ -191,6 +203,7 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
         if (cancelled) return;
         const next = {
           title: news.title,
+          category: news.category,
           coverImage: news.coverImage,
           coverCaption: news.coverCaption ?? '',
           coverSource: news.coverSource ?? '',
@@ -226,6 +239,11 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
     if (!draft.title.trim()) {
       setError('Judul berita wajib diisi.');
       titleRef.current?.focus();
+      return;
+    }
+    if (!draft.category) {
+      setError('Pilih kategori berita.');
+      categoryRef.current?.focus();
       return;
     }
     // Standar jurnalistik: foto sampul yang tayang wajib mencantumkan sumbernya.
@@ -380,6 +398,22 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
 
           <aside className="nw-side">
             <section className="nw-card nw-side-card">
+              <h4>Kategori</h4>
+              <select
+                ref={categoryRef}
+                className="nw-select nw-select-block"
+                value={draft.category}
+                aria-label="Kategori berita"
+                aria-invalid={!!error && !draft.category}
+                onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value as NewsCategory }))}
+              >
+                <option value="" disabled>Pilih kategori</option>
+                {NEWS_CATEGORIES.map((item) => <option key={item.slug} value={item.slug}>{item.id}</option>)}
+              </select>
+              <p className="nw-help">Satu kategori utama. Dipakai untuk Topik Pilihan di halaman Berita.</p>
+            </section>
+
+            <section className="nw-card nw-side-card">
               <h4>Foto sampul</h4>
               {coverUrl ? (
                 <div className="nw-cover">
@@ -464,7 +498,7 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
   );
 }
 
-const NEWS_PANEL_CSS = `
+export const NEWS_PANEL_CSS = `
   .nw-card { background: #fff; border: 1px solid var(--color-border); border-radius: 12px; }
   .nw-btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -487,6 +521,14 @@ const NEWS_PANEL_CSS = `
   .nw-segment button { height: 32px; padding: 0 12px; border-radius: 7px; font-size: 13px; font-weight: 600; color: #475569; }
   .nw-segment button span { margin-left: 4px; color: #94a3b8; font-weight: 500; }
   .nw-segment button.active { background: #fff; color: var(--color-text-dark); box-shadow: 0 1px 2px rgb(15 23 42 / .08); }
+  .nw-select {
+    height: 38px; padding: 0 32px 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; background-color: #fff;
+    font-size: 14px; color: var(--color-text-dark);
+  }
+  .nw-select:focus { outline: none; border-color: var(--color-accent); }
+  .nw-select[aria-invalid="true"] { border-color: #dc2626; }
+  .nw-select-block { width: 100%; }
+  .nw-cat { flex: none; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #fff; border: 1px solid #99f6e4; color: #0f766e; }
   .nw-search {
     flex: 1 1 200px; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px;
     border: 1px solid #cbd5e1; border-radius: 8px; color: #94a3b8;
@@ -587,7 +629,7 @@ const NEWS_PANEL_CSS = `
     .nw-title-input { font-size: 24px; }
     .nw-row { flex-wrap: wrap; }
     .nw-row-main { flex-basis: 100%; }
-    .nw-chip { margin-left: 86px; }
+    .nw-cat { margin-left: 86px; }
     .nw-row-actions { margin-left: auto; }
   }
 `;
