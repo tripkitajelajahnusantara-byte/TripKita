@@ -763,8 +763,8 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShieldCheck size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Mitra diverifikasi', 'Verified partners')}</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{t('Admin TemenTrip memeriksa setiap mitra sebelum paketnya bisa dipesan', 'TemenTrip admins review every partner before their trips can be booked')}</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Mitra lokal terverifikasi', 'Verified local partners')}</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{t('Tim TemenTrip memeriksa setiap mitra sebelum paketnya tayang, jadi kamu bisa pesan dengan tenang.', 'Our team checks every partner before their trips go live, so you can book with peace of mind.')}</span>
           </div>
 
           {/* Item 2 */}
@@ -772,11 +772,11 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <RotateCcw size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Aturan refund jelas', 'Clear refund rules')}</strong>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Batal? Uang kembali penuh', 'Plans changed? Full refund')}</strong>
             <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>
               {refundDays
-                ? t(`Batal paling lambat ${refundDays} hari sebelum trip, atau trip dibatalkan mitra: dana kembali penuh`, `Full refund if you cancel at least ${refundDays} days before the trip, or if the partner cancels`)
-                : t('Batal sesuai batas kebijakan refund, atau trip dibatalkan mitra: dana kembali penuh', 'Full refund if you cancel within the refund window, or if the partner cancels')}
+                ? t(`Berlaku bila kamu batal paling lambat ${refundDays} hari sebelum berangkat, atau trip dibatalkan mitra.`, `When you cancel at least ${refundDays} days before departure, or when the partner cancels the trip.`)
+                : t('Berlaku bila kamu batal sesuai batas kebijakan refund, atau trip dibatalkan mitra.', 'When you cancel within the refund window, or when the partner cancels the trip.')}
             </span>
           </div>
 
@@ -785,8 +785,8 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CreditCard size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Bayar online, terkonfirmasi otomatis', 'Pay online, confirmed automatically')}</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{t('Virtual account, QRIS, atau e-wallet lewat Midtrans. Tanpa unggah bukti transfer.', 'Virtual account, QRIS, or e-wallet via Midtrans. No transfer receipt to upload.')}</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Bayar online tanpa ribet', 'Hassle-free online payment')}</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{t('Pilih virtual account, QRIS, atau e-wallet lewat Midtrans. Pesanan terkonfirmasi otomatis, tanpa kirim bukti transfer.', 'Pay by virtual account, QRIS, or e-wallet via Midtrans. Your booking confirms automatically, no receipt needed.')}</span>
           </div>
 
           {/* Item 4 */}
@@ -794,8 +794,8 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MessageSquare size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Ulasan dari peserta', 'Reviews from travelers')}</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{t('Ulasan hanya bisa ditulis setelah trip selesai', 'Reviews can only be written after the trip')}</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Ulasan asli dari peserta', 'Real reviews, real trips')}</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{t('Hanya peserta yang sudah ikut trip yang bisa memberi ulasan, jadi kamu tahu pengalaman sebenarnya.', 'Only travelers who joined the trip can review it, so you see what it is really like.')}</span>
           </div>
         </div>
       </div>
