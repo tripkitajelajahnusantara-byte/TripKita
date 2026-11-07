@@ -1,6 +1,7 @@
 import React from 'react';
 import { useCancellationRefundDays } from '../utils/checkoutConfig';
 import { useNavigation } from '../context/NavigationContext';
+import { useI18n } from '../i18n';
 import {
   Heart,
   Lightbulb,
@@ -11,19 +12,20 @@ import {
 } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
+  const { t } = useI18n();
   const refundDays = useCancellationRefundDays();
   const { navigateTo } = useNavigation();
   const values = [
-    { icon: <Heart size={20} color="#ef4444" />, title: 'Keterbukaan', desc: 'Harga, jadwal, dan aturan refund ditampilkan sebelum Anda membayar. Ulasan hanya bisa ditulis oleh peserta yang sudah menyelesaikan trip.' },
-    { icon: <Lightbulb size={20} color="#0284c7" />, title: 'Kemudahan', desc: 'Mitra mengelola paket, kuota, dan jadwal dari satu dasbor, sehingga tidak perlu mencatat pesanan secara manual.' },
-    { icon: <Smile size={20} color="#00c9a7" />, title: 'Inklusivitas', desc: 'Pelaku wisata lokal, termasuk usaha kecil, bisa mendaftar sebagai mitra dan menjual paketnya di TemenTrip.' },
-    { icon: <Award size={20} color="#f59e0b" />, title: 'Verifikasi mitra', desc: 'Setiap mitra diperiksa oleh admin TemenTrip sebelum bisa menerbitkan paket.' },
+    { icon: <Heart size={20} color="#ef4444" />, title: t('Keterbukaan', 'Transparency'), desc: t('Harga, jadwal, dan aturan refund ditampilkan sebelum Anda membayar. Ulasan hanya bisa ditulis oleh peserta yang sudah menyelesaikan trip.', 'Prices, schedules, and refund rules are shown before you pay. Only participants who have completed a trip can write a review.') },
+    { icon: <Lightbulb size={20} color="#0284c7" />, title: t('Kemudahan', 'Simplicity'), desc: t('Mitra mengelola paket, kuota, dan jadwal dari satu dasbor, sehingga tidak perlu mencatat pesanan secara manual.', 'Partners manage packages, quotas, and schedules from one dashboard, so there is no need to track bookings by hand.') },
+    { icon: <Smile size={20} color="#00c9a7" />, title: t('Inklusivitas', 'Inclusivity'), desc: t('Pelaku wisata lokal, termasuk usaha kecil, bisa mendaftar sebagai mitra dan menjual paketnya di TemenTrip.', 'Local tourism businesses, including small ones, can sign up as partners and sell their packages on TemenTrip.') },
+    { icon: <Award size={20} color="#f59e0b" />, title: t('Verifikasi mitra', 'Verified partners'), desc: t('Setiap mitra diperiksa oleh admin TemenTrip sebelum bisa menerbitkan paket.', 'Every partner is reviewed by the TemenTrip admin before they can publish packages.') },
   ];
 
   const milestones = [
-    { title: 'TemenTrip diluncurkan', desc: 'TemenTrip mulai beroperasi dari Jakarta sebagai tempat memesan open trip dan paket wisata lainnya.' },
-    { title: 'Pembayaran penuh, dana mitra bertahap', desc: 'Pembayaran penuh di muka melalui transfer yang diverifikasi admin; buku besar TemenTrip menyediakan separuh hak mitra setelah pembayaran dan separuh sisanya setelah trip selesai.' },
-    { title: 'Membangun jaringan mitra', desc: 'Mengajak mitra lokal di berbagai daerah untuk mendaftar dan menerbitkan paket setelah diverifikasi admin.' },
+    { title: t('TemenTrip diluncurkan', 'TemenTrip launches'), desc: t('TemenTrip mulai beroperasi dari Jakarta sebagai tempat memesan open trip dan paket wisata lainnya.', 'TemenTrip starts operating from Jakarta as a place to book open trips and other travel packages.') },
+    { title: t('Pembayaran penuh, dana mitra bertahap', 'Full payment, staged partner funds'), desc: t('Pembayaran penuh di muka secara online melalui Midtrans dan terkonfirmasi otomatis; buku besar TemenTrip menyediakan separuh hak mitra setelah pembayaran dan separuh sisanya setelah trip selesai.', "Full payment upfront online through Midtrans, confirmed automatically; the TemenTrip ledger releases half of the partner's share after payment and the other half after the trip is completed.") },
+    { title: t('Membangun jaringan mitra', 'Building a partner network'), desc: t('Mengajak mitra lokal di berbagai daerah untuk mendaftar dan menerbitkan paket setelah diverifikasi admin.', 'Inviting local partners across the country to sign up and publish packages once verified by the admin.') },
   ];
 
   const teamMembers = [
@@ -46,8 +48,8 @@ export const AboutPage: React.FC = () => {
       {/* About Hero */}
       <section className="about-hero">
         <div className="container about-hero-container">
-          <h1>Tentang TemenTrip</h1>
-          <p>TemenTrip mempertemukan traveler dengan mitra penyelenggara trip lokal di Indonesia.</p>
+          <h1>{t('Tentang TemenTrip', 'About TemenTrip')}</h1>
+          <p>{t('TemenTrip mempertemukan traveler dengan mitra penyelenggara trip lokal di Indonesia.', 'TemenTrip connects travelers with local trip organizers across Indonesia.')}</p>
         </div>
       </section>
 
@@ -55,29 +57,35 @@ export const AboutPage: React.FC = () => {
       <section className="about-intro">
         <div className="container intro-container">
           <div className="intro-content">
-            <h2>Cerita kami</h2>
+            <h2>{t('Cerita kami', 'Our story')}</h2>
             <p>
-              TemenTrip dibuat di Jakarta oleh tim yang ingin memudahkan orang menemukan dan memesan trip dari penyelenggara lokal. Traveler bisa melihat paket, memesan, dan membayar di satu tempat, sementara mitra mengelola pesanan tanpa harus mencatatnya satu per satu.
+              {t(
+                'TemenTrip dibuat di Jakarta oleh tim yang ingin memudahkan orang menemukan dan memesan trip dari penyelenggara lokal. Traveler bisa melihat paket, memesan, dan membayar di satu tempat, sementara mitra mengelola pesanan tanpa harus mencatatnya satu per satu.',
+                'TemenTrip was built in Jakarta by a team that wants to make it easy to find and book trips from local organizers. Travelers can browse packages, book, and pay in one place, while partners manage bookings without tracking each one by hand.'
+              )}
             </p>
             <p>
-              Banyak penyelenggara trip lokal masih menerima pesanan lewat chat dan transfer manual. Kami membuat proses itu lebih rapi: Booking ID unik, hold kuota otomatis, upload bukti transfer, verifikasi admin, dan aturan pembatalan yang sama untuk semua pihak.
+              {t(
+                'Banyak penyelenggara trip lokal masih menerima pesanan lewat chat dan transfer manual. Kami membuat proses itu lebih rapi: Booking ID unik, hold kuota otomatis, pembayaran online melalui Midtrans yang terkonfirmasi otomatis, dan aturan pembatalan yang sama untuk semua pihak.',
+                'Many local trip organizers still take bookings through chat and manual bank transfers. We make that process tidier: a unique Booking ID, automatic quota holds, online payment through Midtrans with automatic confirmation, and the same cancellation rules for everyone.'
+              )}
             </p>
 
             <div className="intro-stats">
               <div className="intro-stat-item">
                 <h3>2026</h3>
-                <p>Tahun Peluncuran</p>
+                <p>{t('Tahun Peluncuran', 'Launch Year')}</p>
               </div>
               <div className="intro-stat-item">
                 <h3>Jakarta</h3>
-                <p>Basis Operasional</p>
+                <p>{t('Basis Operasional', 'Home Base')}</p>
               </div>
             </div>
           </div>
 
           <div className="intro-media">
             <div className="media-wrapper">
-              <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80" alt="Wisata Indonesia" />
+              <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80" alt={t('Wisata Indonesia', 'Travel in Indonesia')} />
             </div>
           </div>
         </div>
@@ -90,22 +98,28 @@ export const AboutPage: React.FC = () => {
             <div className="card-icon-wrapper">
               <Compass size={24} color="#00c9a7" />
             </div>
-            <h3>Visi</h3>
+            <h3>{t('Visi', 'Vision')}</h3>
             <p>
-              Membantu pelaku wisata lokal di Indonesia menjual paketnya secara online, dan membantu traveler menemukan trip yang jelas harga, jadwal, dan aturannya.
+              {t(
+                'Membantu pelaku wisata lokal di Indonesia menjual paketnya secara online, dan membantu traveler menemukan trip yang jelas harga, jadwal, dan aturannya.',
+                'Help local tourism businesses in Indonesia sell their packages online, and help travelers find trips with clear prices, schedules, and rules.'
+              )}
             </p>
           </div>
           <div className="mission-card">
             <div className="card-icon-wrapper">
               <Award size={24} color="#00c9a7" />
             </div>
-            <h3>Misi</h3>
+            <h3>{t('Misi', 'Mission')}</h3>
             <ul>
               {[
-                'Menyediakan alat sederhana bagi mitra untuk mengelola paket, kuota, dan jadwal.',
-                'Memverifikasi setiap mitra sebelum paketnya bisa dipesan.',
-                `Menerapkan aturan refund yang sama untuk semua pesanan: pembatalan ${refundDays ? `paling lambat ${refundDays} hari sebelum trip` : 'sebelum batas waktu kebijakan refund'} atau pembatalan oleh mitra, dana kembali penuh.`,
-                'Mendorong lebih banyak orang berwisata di dalam negeri.',
+                t('Menyediakan alat sederhana bagi mitra untuk mengelola paket, kuota, dan jadwal.', 'Give partners simple tools to manage packages, quotas, and schedules.'),
+                t('Memverifikasi setiap mitra sebelum paketnya bisa dipesan.', 'Verify every partner before their packages can be booked.'),
+                t(
+                  `Menerapkan aturan refund yang sama untuk semua pesanan: pembatalan ${refundDays ? `paling lambat ${refundDays} hari sebelum trip` : 'sebelum batas waktu kebijakan refund'} atau pembatalan oleh mitra, dana kembali penuh.`,
+                  `Apply the same refund rules to every booking: cancellation ${refundDays ? `at least ${refundDays} days before the trip` : 'before the refund policy deadline'} or cancellation by the partner means a full refund.`
+                ),
+                t('Mendorong lebih banyak orang berwisata di dalam negeri.', 'Encourage more people to travel within Indonesia.'),
               ].map((item) => (
                 <li key={item}>
                   <CheckCircle2 size={18} color="#00c9a7" aria-hidden="true" />
@@ -121,7 +135,7 @@ export const AboutPage: React.FC = () => {
       <section className="values-section">
         <div className="container">
           <div className="section-header">
-            <h2 className="section-title">Prinsip kami</h2>
+            <h2 className="section-title">{t('Prinsip kami', 'Our principles')}</h2>
           </div>
 
           <div className="values-grid">
@@ -142,7 +156,7 @@ export const AboutPage: React.FC = () => {
       <section className="timeline-section">
         <div className="container">
           <div className="section-header">
-            <h2 className="section-title">Langkah awal di 2026</h2>
+            <h2 className="section-title">{t('Langkah awal di 2026', 'First steps in 2026')}</h2>
           </div>
 
           <ol className="timeline-list">
@@ -163,20 +177,20 @@ export const AboutPage: React.FC = () => {
       <section className="team-section">
         <div className="container">
           <div className="section-header">
-            <h2 className="section-title">Tim TemenTrip</h2>
-            <p className="section-subtitle">Orang-orang yang membangun dan menjalankan TemenTrip.</p>
+            <h2 className="section-title">{t('Tim TemenTrip', 'The TemenTrip team')}</h2>
+            <p className="section-subtitle">{t('Orang-orang yang membangun dan menjalankan TemenTrip.', 'The people who build and run TemenTrip.')}</p>
           </div>
 
           {/* Equal Grid of All Team Members */}
           <div className="unified-team-grid">
-            {teamMembers.map((t, i) => (
+            {teamMembers.map((member, i) => (
               <div key={i} className="team-member-card">
                 <div className="member-avatar-circle" aria-hidden="true">
-                  {t.initial}
+                  {member.initial}
                 </div>
                 <div className="member-info">
-                  <h3>{t.name}</h3>
-                  <p className="member-role">{t.role}</p>
+                  <h3>{member.name}</h3>
+                  <p className="member-role">{member.role}</p>
                 </div>
               </div>
             ))}
@@ -186,11 +200,11 @@ export const AboutPage: React.FC = () => {
 
       <section className="about-cta">
         <div className="container about-cta-container">
-          <h2>Siap jalan bareng TemenTrip?</h2>
-          <p>Cari trip yang cocok, atau daftarkan usaha wisata Anda sebagai mitra.</p>
+          <h2>{t('Siap jalan bareng TemenTrip?', 'Ready to travel with TemenTrip?')}</h2>
+          <p>{t('Cari trip yang cocok, atau daftarkan usaha wisata Anda sebagai mitra.', 'Find a trip that suits you, or register your travel business as a partner.')}</p>
           <div className="about-cta-actions">
-            <button type="button" className="btn btn-primary" onClick={() => navigateTo('cari-trip')}>Cari Trip</button>
-            <button type="button" className="btn btn-outline" onClick={() => navigateTo('partner-landing')}>Jadi Mitra</button>
+            <button type="button" className="btn btn-primary" onClick={() => navigateTo('cari-trip')}>{t('Cari Trip', 'Find Trips')}</button>
+            <button type="button" className="btn btn-outline" onClick={() => navigateTo('partner-landing')}>{t('Jadi Mitra', 'Become a Partner')}</button>
           </div>
         </div>
       </section>

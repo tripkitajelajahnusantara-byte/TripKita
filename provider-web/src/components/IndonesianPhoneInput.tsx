@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatIndonesianLocalPhone, normalizeIndonesianPhone } from '../utils/phone';
+import { useI18n } from '../i18n';
 
 interface IndonesianPhoneInputProps {
   value: string;
@@ -20,8 +21,9 @@ export const IndonesianPhoneInput: React.FC<IndonesianPhoneInputProps> = ({
   readOnly = false,
   disabled = false,
   compact = false,
-  ariaLabel = 'Nomor WhatsApp tanpa kode negara'
+  ariaLabel
 }) => {
+  const { t } = useI18n();
   const locked = readOnly || disabled;
   return (
     <div
@@ -67,7 +69,7 @@ export const IndonesianPhoneInput: React.FC<IndonesianPhoneInputProps> = ({
         type="tel"
         inputMode="numeric"
         autoComplete="tel-national"
-        aria-label={ariaLabel}
+        aria-label={ariaLabel ?? t('Nomor WhatsApp tanpa kode negara', 'WhatsApp number without country code')}
         aria-invalid={invalid}
         placeholder="812 3456 7890"
         value={formatIndonesianLocalPhone(value)}

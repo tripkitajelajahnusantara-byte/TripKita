@@ -4,9 +4,12 @@ import { User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { LegalModalContainer, CustomerRegistrationTermsContent } from '../components/LegalModals';
 import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
 import { isValidIndonesianMobilePhone } from '../utils/phone';
+import { useI18n } from '../i18n';
 
 export const CustomerRegisterPage: React.FC = () => {
   const { navigateTo, registerCustomer } = useNavigation();
+  const { t, lang } = useI18n();
+  const termsError = t('Anda wajib menyetujui Syarat dan Ketentuan Pendaftaran Customer TemenTrip.', 'You must agree to the TemenTrip Customer Registration Terms & Conditions.');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -23,22 +26,22 @@ export const CustomerRegisterPage: React.FC = () => {
     setError('');
 
     if (!agreeTerms) {
-      setError('Anda wajib menyetujui Syarat dan Ketentuan Pendaftaran Customer TemenTrip.');
+      setError(termsError);
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Konfirmasi kata sandi tidak cocok.');
+      setError(t('Konfirmasi kata sandi tidak cocok.', "Passwords don't match."));
       return;
     }
 
     if (!isValidIndonesianMobilePhone(whatsapp)) {
-      setError('Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.');
+      setError(t('Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.', 'Enter 9–12 digits of your mobile number after +62, starting with 8.'));
       return;
     }
 
     if (password.length < 12) {
-      setError('Kata sandi minimal harus 12 karakter.');
+      setError(t('Kata sandi minimal harus 12 karakter.', 'Password must be at least 12 characters.'));
       return;
     }
 
@@ -47,7 +50,7 @@ export const CustomerRegisterPage: React.FC = () => {
       await registerCustomer(name, email, password, whatsapp);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Pendaftaran gagal. Email mungkin sudah terdaftar.');
+      setError(err.message || t('Pendaftaran gagal. Email mungkin sudah terdaftar.', 'Sign-up failed. This email may already be registered.'));
     } finally {
       setLoading(false);
     }
@@ -69,10 +72,10 @@ export const CustomerRegisterPage: React.FC = () => {
       >
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0' }}>
-            Daftar Akun TemenTrip
+            {t('Daftar Akun TemenTrip', 'Create a TemenTrip Account')}
           </h2>
           <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-            Simpan tiket perjalanan & cek riwayat pesanan dengan mudah.
+            {t('Simpan tiket perjalanan & cek riwayat pesanan dengan mudah.', 'Keep your trip tickets and booking history in one place.')}
           </p>
         </div>
 
@@ -97,13 +100,13 @@ export const CustomerRegisterPage: React.FC = () => {
           {/* Name */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-              Nama Lengkap
+              {t('Nama Lengkap', 'Full Name')}
             </label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <User size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px' }} />
               <input 
                 type="text" 
-                placeholder="Masukkan nama lengkap Anda"
+                placeholder={t('Masukkan nama lengkap Anda', 'Enter your full name')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -124,13 +127,13 @@ export const CustomerRegisterPage: React.FC = () => {
           {/* Email */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-              Alamat Email
+              {t('Alamat Email', 'Email Address')}
             </label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <Mail size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px' }} />
               <input 
                 type="email" 
-                placeholder="nama@email.com"
+                placeholder={t('nama@email.com', 'name@email.com')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -151,7 +154,7 @@ export const CustomerRegisterPage: React.FC = () => {
           {/* WhatsApp */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-              Nomor WhatsApp
+              {t('Nomor WhatsApp', 'WhatsApp Number')}
             </label>
             <IndonesianPhoneInput value={whatsapp} onChange={setWhatsapp} required />
           </div>
@@ -159,13 +162,13 @@ export const CustomerRegisterPage: React.FC = () => {
           {/* Password */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-              Kata Sandi
+              {t('Kata Sandi', 'Password')}
             </label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <Lock size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px' }} />
               <input 
                 type={showPassword ? 'text' : 'password'} 
-                placeholder="Minimal 12 karakter"
+                placeholder={t('Minimal 12 karakter', 'At least 12 characters')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -193,13 +196,13 @@ export const CustomerRegisterPage: React.FC = () => {
           {/* Confirm Password */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-              Konfirmasi Kata Sandi
+              {t('Konfirmasi Kata Sandi', 'Confirm Password')}
             </label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <Lock size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px' }} />
               <input 
                 type={showPassword ? 'text' : 'password'} 
-                placeholder="Ulangi kata sandi Anda"
+                placeholder={t('Ulangi kata sandi Anda', 'Re-enter your password')}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
@@ -221,8 +224,8 @@ export const CustomerRegisterPage: React.FC = () => {
           <div>
             <div 
               style={{ 
-                backgroundColor: error.includes('Syarat') ? '#fef2f2' : '#f8fafc',
-                border: error.includes('Syarat') ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
+                backgroundColor: error === termsError ? '#fef2f2' : '#f8fafc',
+                border: error === termsError ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
                 borderRadius: '12px',
                 padding: '12px 14px',
                 display: 'flex',
@@ -261,7 +264,7 @@ export const CustomerRegisterPage: React.FC = () => {
                   margin: 0 
                 }}
               >
-                Saya menyetujui{' '}
+                {t('Saya menyetujui', 'I agree to the')}{' '}
                 <button 
                   type="button"
                   onClick={(e) => {
@@ -279,7 +282,7 @@ export const CustomerRegisterPage: React.FC = () => {
                     fontSize: '13px'
                   }}
                 >
-                  Syarat & Ketentuan Pendaftaran
+                  {t('Syarat & Ketentuan Pendaftaran', 'Registration Terms & Conditions')}
                 </button>
               </label>
             </div>
@@ -302,30 +305,32 @@ export const CustomerRegisterPage: React.FC = () => {
               marginTop: '10px'
             }}
           >
-            {loading ? 'Mendaftarkan Akun...' : 'Daftar Sekarang'}
+            {loading ? t('Mendaftarkan Akun...', 'Creating account...') : t('Daftar Sekarang', 'Sign Up')}
           </button>
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '13px', color: '#64748b' }}>
-          Sudah punya akun?{' '}
+          {t('Sudah punya akun?', 'Already have an account?')}{' '}
           <button 
             onClick={() => navigateTo('masuk')}
             style={{ background: 'none', border: 'none', color: '#007bff', fontWeight: '700', cursor: 'pointer', padding: 0 }}
           >
-            Masuk sekarang
+            {t('Masuk sekarang', 'Sign in')}
           </button>
         </div>
 
         {/* Dedicated Link to Provider Register */}
         <div style={{ marginTop: '16px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
           <span style={{ fontSize: '12.5px', color: '#475569' }}>
-            Ingin mendaftar sebagai <strong>Mitra Provider</strong>?{' '}
+            {lang === 'en'
+              ? <>Want to join as a <strong>partner</strong>?{' '}</>
+              : <>Ingin mendaftar sebagai <strong>Mitra Provider</strong>?{' '}</>}
           </span>
           <button 
             onClick={() => navigateTo('provider-register')} 
             style={{ background: 'none', border: 'none', color: '#007bff', fontWeight: '700', cursor: 'pointer', fontSize: '12.5px', textDecoration: 'underline', padding: 0 }}
           >
-            Daftar Mitra Provider
+            {t('Daftar Mitra Provider', 'Register as a Partner')}
           </button>
         </div>
       </div>
@@ -334,7 +339,7 @@ export const CustomerRegisterPage: React.FC = () => {
       <LegalModalContainer
         isOpen={showRegTermsModal}
         onClose={() => setShowRegTermsModal(false)}
-        title="Syarat & Ketentuan Pendaftaran Customer"
+        title={t('Syarat & Ketentuan Pendaftaran Customer', 'Customer Registration Terms & Conditions')}
       >
         <CustomerRegistrationTermsContent />
       </LegalModalContainer>

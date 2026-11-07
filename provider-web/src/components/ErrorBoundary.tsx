@@ -1,4 +1,5 @@
 import React from 'react';
+import { getLang } from '../i18n';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -39,6 +40,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       return this.props.children;
     }
 
+    // Class component: baca bahasa aktif saat render, tanpa hook.
+    const en = getLang() === 'en';
+
     return (
       <div
         role="alert"
@@ -55,10 +59,11 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           color: '#0f172a',
         }}
       >
-        <h1 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>Halaman gagal dimuat</h1>
+        <h1 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>{en ? 'Page failed to load' : 'Halaman gagal dimuat'}</h1>
         <p style={{ margin: 0, color: '#475569', fontSize: '14px', maxWidth: '420px' }}>
-          Terjadi gangguan saat menampilkan halaman ini. Data pesanan dan pembayaran Anda tidak
-          terpengaruh. Silakan muat ulang halaman atau kembali ke beranda.
+          {en
+            ? 'Something went wrong while showing this page. Your bookings and payments are not affected. Please reload the page or go back to the home page.'
+            : 'Terjadi gangguan saat menampilkan halaman ini. Data pesanan dan pembayaran Anda tidak terpengaruh. Silakan muat ulang halaman atau kembali ke beranda.'}
         </p>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <button
@@ -75,7 +80,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               cursor: 'pointer',
             }}
           >
-            Muat Ulang
+            {en ? 'Reload' : 'Muat Ulang'}
           </button>
           <button
             type="button"
@@ -91,7 +96,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               cursor: 'pointer',
             }}
           >
-            Kembali ke Beranda
+            {en ? 'Back to Home' : 'Kembali ke Beranda'}
           </button>
         </div>
       </div>

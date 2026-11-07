@@ -7,6 +7,7 @@ import { LegalModalContainer, CustomerRegistrationTermsContent } from './compone
 import { getCustomerToken, getProviderToken } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PageSkeleton } from './components/Skeleton';
+import { LanguageProvider, useI18n, useIndonesianOnly } from './i18n';
 
 // Setiap halaman dimuat sebagai chunk terpisah supaya kunjungan pertama tidak
 // perlu mengunduh seluruh aplikasi sekaligus. Loader disimpan terpisah agar
@@ -91,8 +92,13 @@ const CustomerSettingsPage = React.lazy(pageLoaders.CustomerSettingsPage);
 const CustomerTripPlannerPage = React.lazy(pageLoaders.CustomerTripPlannerPage);
 const NewsPage = React.lazy(pageLoaders.NewsPage);
 
+// Area mitra/admin belum dwibahasa; pilihan bahasa customer tidak berlaku di sini.
+const INDONESIAN_ONLY_ROUTES = ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard', 'provider-login', 'provider-register', 'admin-login'];
+
 const AppContent: React.FC = () => {
   const { route, loadingProfile, providerProfile, customerProfile, navigateTo } = useNavigation();
+  const { t } = useI18n();
+  useIndonesianOnly(INDONESIAN_ONLY_ROUTES.includes(route));
   const [showGlobalCustomerTerms, setShowGlobalCustomerTerms] = React.useState(false);
   usePrefetchPages(!!providerProfile || ['dashboard', 'kelola-paket', 'booking', 'keuangan-provider', 'profil-provider', 'tambah-paket', 'admin-dashboard'].includes(route));
 
@@ -172,12 +178,12 @@ const AppContent: React.FC = () => {
     <LegalModalContainer
       isOpen={showGlobalCustomerTerms}
       onClose={() => {}}
-      title="Persetujuan Syarat & Ketentuan Customer TemenTrip"
+      title={t('Persetujuan Syarat & Ketentuan Customer TemenTrip', 'TemenTrip Customer Terms & Conditions')}
       hideCloseButton={true}
     >
       <div>
         <div style={{ backgroundColor: '#e0f2fe', padding: '12px 16px', borderRadius: '10px', color: '#0369a1', fontSize: '13px', fontWeight: '600', marginBottom: '16px', border: '1px solid #bae6fd' }}>
-          Selamat datang di TemenTrip! Sebelum melanjutkan, harap baca dan menyetujui Syarat & Ketentuan Pendaftaran Customer berikut.
+          {t('Selamat datang di TemenTrip! Sebelum melanjutkan, harap baca dan menyetujui Syarat & Ketentuan Pendaftaran Customer berikut.', 'Welcome to TemenTrip! Before you continue, please read and accept the Customer Registration Terms & Conditions below.')}
         </div>
         <CustomerRegistrationTermsContent />
         <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
@@ -201,7 +207,7 @@ const AppContent: React.FC = () => {
               boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
             }}
           >
-            Saya Menyetujui Syarat & Ketentuan & Lanjutkan
+            {t('Saya Menyetujui Syarat & Ketentuan & Lanjutkan', 'I Accept the Terms & Conditions, Continue')}
           </button>
         </div>
       </div>
@@ -372,16 +378,18 @@ const RouteAnalytics: React.FC = () => {
 
 function App() {
   return (
-    <ErrorBoundary>
-      <CustomAlertProvider>
-        <NavigationProvider>
-          <React.Suspense fallback={<PageLoadingFallback />}>
-            <AppContent />
-          </React.Suspense>
-          <RouteAnalytics />
-        </NavigationProvider>
-      </CustomAlertProvider>
-    </ErrorBoundary>
+    <LanguageProvider>
+      <ErrorBoundary>
+        <CustomAlertProvider>
+          <NavigationProvider>
+            <React.Suspense fallback={<PageLoadingFallback />}>
+              <AppContent />
+            </React.Suspense>
+            <RouteAnalytics />
+          </NavigationProvider>
+        </CustomAlertProvider>
+      </ErrorBoundary>
+    </LanguageProvider>
   );
 }
 

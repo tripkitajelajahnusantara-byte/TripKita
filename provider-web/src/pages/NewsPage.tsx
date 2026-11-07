@@ -7,6 +7,7 @@ import {
   type NewsItem, type NewsPage as NewsPageData,
 } from '../utils/news';
 import { Skeleton, SkeletonCards } from '../components/Skeleton';
+import { getLang, useI18n } from '../i18n';
 
 // Artikel dibuka lewat #/berita?id=12 (halaman berikutnya &hal=2) sehingga
 // tautannya dapat dibagikan dan tombol kembali browser berfungsi.
@@ -19,6 +20,10 @@ function readNewsLocation() {
     page: Number.isInteger(page) && page > 1 ? page : 1,
   };
 }
+
+// Dipakai di dalam efek fetch; getLang() dibaca saat gagal agar efek tidak
+// perlu bergantung pada t (ganti bahasa tidak boleh memuat ulang berita).
+const loadFailed = () => (getLang() === 'en' ? 'Could not load news.' : 'Berita gagal dimuat.');
 
 export function NewsPage() {
   const [location, setLocation] = useState(readNewsLocation);
@@ -58,6 +63,7 @@ const NewsCard: React.FC<{ item: NewsItem }> = ({ item }) => (
 const fetchNewsPage = (page: number): Promise<NewsPageData> => request(`/public/news?page=${page}`);
 
 function NewsIndex() {
+  const { t } = useI18n();
   // null = halaman pertama belum dimuat.
   const [items, setItems] = useState<NewsItem[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -70,7 +76,7 @@ function NewsIndex() {
     let cancelled = false;
     fetchNewsPage(1)
       .then((data) => { if (!cancelled) { setItems(data.items); setTotal(data.total); } })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : 'Berita gagal dimuat.'); });
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : loadFailed()); });
     return () => { cancelled = true; };
   }, [attempt]);
 
@@ -84,7 +90,7 @@ function NewsIndex() {
       setTotal(data.total);
       setPage(page + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Berita gagal dimuat.');
+      setError(err instanceof Error ? err.message : loadFailed());
     } finally {
       setLoadingMore(false);
     }
@@ -95,22 +101,22 @@ function NewsIndex() {
   return (
     <div className="news-container">
       <header className="news-head">
-        <h1>Berita</h1>
-        <p>Kabar terbaru dari TemenTrip seputar destinasi, promo, dan layanan.</p>
+        <h1>{t('Berita', 'News')}</h1>
+        <p>{t('Kabar terbaru dari TemenTrip seputar destinasi, promo, dan layanan.', 'The latest from TemenTrip on destinations, promos, and services.')}</p>
       </header>
 
       {error && !items ? (
         <div className="news-state">
           <p>{error}</p>
-          <button type="button" className="news-btn" onClick={() => { setError(''); setAttempt((current) => current + 1); }}>Coba lagi</button>
+          <button type="button" className="news-btn" onClick={() => { setError(''); setAttempt((current) => current + 1); }}>{t('Coba lagi', 'Try again')}</button>
         </div>
       ) : !items ? (
-        <SkeletonCards count={6} label="Memuat berita" minWidth={280} />
+        <SkeletonCards count={6} label={t('Memuat berita', 'Loading news')} minWidth={280} />
       ) : !featured ? (
         <div className="news-state">
           <Newspaper size={32} strokeWidth={1.4} aria-hidden="true" />
-          <h2>Belum ada berita</h2>
-          <p>Kabar terbaru dari TemenTrip akan muncul di sini.</p>
+          <h2>{t('Belum ada berita', 'No news yet')}</h2>
+          <p>{t('Kabar terbaru dari TemenTrip akan muncul di sini.', 'The latest updates from TemenTrip will appear here.')}</p>
         </div>
       ) : (
         <>
@@ -120,7 +126,7 @@ function NewsIndex() {
               <time className="news-date" dateTime={featured.publishedAt ?? undefined}>{formatNewsDate(featured.publishedAt)}</time>
               <h2>{featured.title}</h2>
               {featured.excerpt && <p>{featured.excerpt}</p>}
-              <span className="news-read-more">Baca selengkapnya <ArrowRight size={16} /></span>
+              <span className="news-read-more">{t('Baca selengkapnya', 'Read more')} <ArrowRight size={16} /></span>
             </div>
           </a>
 
@@ -134,7 +140,7 @@ function NewsIndex() {
           {items.length < total && (
             <div className="news-more">
               <button type="button" className="news-btn" disabled={loadingMore} onClick={loadMore}>
-                {loadingMore ? 'Memuat…' : 'Muat berita lainnya'}
+                {loadingMore ? t('Memuat…', 'Loading…') : t('Muat berita lainnya', 'Load more news')}
               </button>
             </div>
           )}
@@ -145,26 +151,28 @@ function NewsIndex() {
 }
 
 function ArticlePager({ id, page, total }: { id: number; page: number; total: number }) {
+  const { t } = useI18n();
   return (
-    <nav className="news-pager" aria-label="Halaman artikel">
+    <nav className="news-pager" aria-label={t('Halaman artikel', 'Article pages')}>
       {page > 1
-        ? <a className="news-pager-step" href={newsHash(id, page - 1)}><ArrowLeft size={16} /> Sebelumnya</a>
-        : <span className="news-pager-step is-disabled" aria-hidden="true"><ArrowLeft size={16} /> Sebelumnya</span>}
+        ? <a className="news-pager-step" href={newsHash(id, page - 1)}><ArrowLeft size={16} /> {t('Sebelumnya', 'Previous')}</a>
+        : <span className="news-pager-step is-disabled" aria-hidden="true"><ArrowLeft size={16} /> {t('Sebelumnya', 'Previous')}</span>}
       <ol>
         {Array.from({ length: total }, (_, index) => index + 1).map((number) => (
           <li key={number}>
-            <a href={newsHash(id, number)} aria-label={`Halaman ${number}`} aria-current={number === page ? 'page' : undefined}>{number}</a>
+            <a href={newsHash(id, number)} aria-label={t(`Halaman ${number}`, `Page ${number}`)} aria-current={number === page ? 'page' : undefined}>{number}</a>
           </li>
         ))}
       </ol>
       {page < total
-        ? <a className="news-pager-step" href={newsHash(id, page + 1)}>Selanjutnya <ArrowRight size={16} /></a>
-        : <span className="news-pager-step is-disabled" aria-hidden="true">Selanjutnya <ArrowRight size={16} /></span>}
+        ? <a className="news-pager-step" href={newsHash(id, page + 1)}>{t('Selanjutnya', 'Next')} <ArrowRight size={16} /></a>
+        : <span className="news-pager-step is-disabled" aria-hidden="true">{t('Selanjutnya', 'Next')} <ArrowRight size={16} /></span>}
     </nav>
   );
 }
 
 function NewsArticle({ id, page }: { id: number; page: number }) {
+  const { t } = useI18n();
   const [article, setArticle] = useState<NewsItem | null>(null);
   const [related, setRelated] = useState<NewsItem[]>([]);
   const [error, setError] = useState<{ notFound: boolean; message: string } | null>(null);
@@ -177,7 +185,7 @@ function NewsArticle({ id, page }: { id: number; page: number }) {
         if (cancelled) return;
         setError({
           notFound: err instanceof ApiError && err.status === 404,
-          message: err instanceof Error ? err.message : 'Berita gagal dimuat.',
+          message: err instanceof Error ? err.message : loadFailed(),
         });
       });
     // Berita lain hanya pelengkap; kegagalannya tidak perlu ditampilkan.
@@ -188,15 +196,15 @@ function NewsArticle({ id, page }: { id: number; page: number }) {
   }, [id]);
 
   const pages = useMemo(() => splitNewsPages(toDisplayHtml(article?.content ?? '')), [article]);
-  const backLink = <a className="news-back" href={newsHash()}><ArrowLeft size={16} /> Semua berita</a>;
+  const backLink = <a className="news-back" href={newsHash()}><ArrowLeft size={16} /> {t('Semua berita', 'All news')}</a>;
 
   if (error) {
     return (
       <div className="news-article">
         {backLink}
         <div className="news-state">
-          <h2>{error.notFound ? 'Berita tidak ditemukan' : 'Berita gagal dimuat'}</h2>
-          <p>{error.notFound ? 'Berita ini mungkin sudah dihapus atau belum diterbitkan.' : error.message}</p>
+          <h2>{error.notFound ? t('Berita tidak ditemukan', 'News not found') : t('Berita gagal dimuat', 'Could not load news')}</h2>
+          <p>{error.notFound ? t('Berita ini mungkin sudah dihapus atau belum diterbitkan.', 'This article may have been removed or not published yet.') : error.message}</p>
         </div>
       </div>
     );
@@ -204,7 +212,7 @@ function NewsArticle({ id, page }: { id: number; page: number }) {
 
   if (!article) {
     return (
-      <div className="news-article" aria-busy="true" aria-label="Memuat berita">
+      <div className="news-article" aria-busy="true" aria-label={t('Memuat berita', 'Loading news')}>
         {backLink}
         <Skeleton width={180} height={14} />
         <Skeleton height={36} style={{ marginTop: 16 }} />
@@ -226,8 +234,8 @@ function NewsArticle({ id, page }: { id: number; page: number }) {
         {backLink}
         <header className="news-article-head">
           <p className="news-date">
-            <time dateTime={article.publishedAt ?? undefined}>{formatNewsDate(article.publishedAt)}</time> · {minutes} menit baca
-            {pages.length > 1 && ` · Halaman ${current} dari ${pages.length}`}
+            <time dateTime={article.publishedAt ?? undefined}>{formatNewsDate(article.publishedAt)}</time> · {t(`${minutes} menit baca`, `${minutes} min read`)}
+            {pages.length > 1 && t(` · Halaman ${current} dari ${pages.length}`, ` · Page ${current} of ${pages.length}`)}
           </p>
           <h1>{article.title}</h1>
         </header>
@@ -244,7 +252,7 @@ function NewsArticle({ id, page }: { id: number; page: number }) {
 
       {isLastPage && related.length > 0 && (
         <section className="news-container news-related" aria-labelledby="news-related-title">
-          <h2 id="news-related-title">Berita lainnya</h2>
+          <h2 id="news-related-title">{t('Berita lainnya', 'More news')}</h2>
           <div className="news-grid">
             {related.map((item) => <NewsCard key={item.id} item={item} />)}
           </div>

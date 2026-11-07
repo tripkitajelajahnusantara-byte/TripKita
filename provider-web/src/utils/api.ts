@@ -1,3 +1,5 @@
+import { getLang } from '../i18n';
+
 const configuredApiBaseURL = import.meta.env.VITE_API_BASE_URL?.trim();
 const isLocalBrowser = typeof window === 'undefined'
   || window.location.hostname === 'localhost'
@@ -217,9 +219,9 @@ export async function request(endpoint: string, options: RequestInit = {}) {
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError' && !options.signal) {
-      throw new ApiError('Permintaan terlalu lama. Periksa koneksi Anda lalu coba lagi.', 0, null);
+      throw new ApiError(getLang() === 'en' ? 'The request took too long. Check your connection and try again.' : 'Permintaan terlalu lama. Periksa koneksi Anda lalu coba lagi.', 0, null);
     }
-    throw new ApiError('Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.', 0, null);
+    throw new ApiError(getLang() === 'en' ? 'Could not reach the server. Check your connection and try again.' : 'Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.', 0, null);
   } finally {
     window.clearTimeout(timeoutId);
   }
@@ -247,7 +249,7 @@ export async function request(endpoint: string, options: RequestInit = {}) {
   const contentType = response.headers.get('Content-Type') || '';
   if (contentType.includes('text/html')) {
     console.error(`[API] ${API_BASE_URL}${endpoint} mengembalikan HTML; periksa konfigurasi VITE_API_BASE_URL.`);
-    throw new ApiError('Server tidak dapat dihubungi dengan benar. Silakan coba lagi nanti.', response.status, response.headers.get('X-Request-ID'));
+    throw new ApiError(getLang() === 'en' ? 'The server did not respond correctly. Please try again later.' : 'Server tidak dapat dihubungi dengan benar. Silakan coba lagi nanti.', response.status, response.headers.get('X-Request-ID'));
   }
   return response.json().catch(() => ({}));
 }

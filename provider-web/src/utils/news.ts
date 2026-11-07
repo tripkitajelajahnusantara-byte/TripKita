@@ -1,5 +1,6 @@
 import { BACKEND_ORIGIN } from './tripImages';
 import { groupNewsBlocks, NEWS_IMAGE_CHARS } from './newsPages';
+import { getLang } from '../i18n';
 
 export interface NewsItem {
   id: number;
@@ -30,7 +31,7 @@ export const toDisplayHtml = (html: string) => html.split(STORED_SRC).join(DISPL
 export const toStoredHtml = (html: string) => html.split(DISPLAY_SRC).join(STORED_SRC);
 
 export const formatNewsDate = (value: string | null | undefined) =>
-  value ? new Date(value).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' }) : '';
+  value ? new Date(value).toLocaleDateString(getLang() === 'en' ? 'en-GB' : 'id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' }) : '';
 
 export function countWords(text: string) {
   const trimmed = text.trim();
@@ -49,7 +50,7 @@ export const newsHash = (id?: number, page = 1) =>
 
 /** Keterangan foto sampul gaya media: "Keterangan (Foto: Sumber)". */
 export function coverCredit(caption: string, source: string) {
-  const credit = source.trim() ? `Foto: ${source.trim()}` : '';
+  const credit = source.trim() ? `${getLang() === 'en' ? 'Photo' : 'Foto'}: ${source.trim()}` : '';
   if (!caption.trim()) return credit;
   return credit ? `${caption.trim()} (${credit})` : caption.trim();
 }

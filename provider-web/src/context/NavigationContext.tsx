@@ -6,6 +6,7 @@ import { request, setProviderToken, getProviderToken, removeProviderToken, setCu
 
 import { AuthModal } from '../components/AuthModal';
 import { normalizeIndonesianPhone } from '../utils/phone';
+import { useI18n } from '../i18n';
 
 export function getRouteFromHash(): Route {
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
@@ -249,6 +250,7 @@ interface NavigationContextType {
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { t } = useI18n();
   const [route, setRoute] = useState<Route>(() => getRouteFromHash());
   const [registerStep, setRegisterStep] = useState<1 | 2>(1);
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
@@ -551,7 +553,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
     });
 
     if (!res?.token || !res?.provider?.role) {
-      throw new Error('Respons login tidak valid. Silakan coba kembali.');
+      throw new Error(t('Respons login tidak valid. Silakan coba kembali.', 'Invalid login response. Please try again.'));
     }
 
     if (res.provider?.role === 'CUSTOMER') {
@@ -559,7 +561,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       try {
         const verifiedProfile = await request('/provider/profile');
         if (verifiedProfile?.role !== 'CUSTOMER') {
-          throw new Error('Sesi customer tidak sesuai dengan akun yang masuk.');
+          throw new Error(t('Sesi customer tidak sesuai dengan akun yang masuk.', "Customer session doesn't match the signed-in account."));
         }
         setCustomerProfile(verifiedProfile);
         setProviderProfile(null);
@@ -574,7 +576,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
       try {
         const verifiedProfile = await request('/provider/profile');
         if (verifiedProfile?.role !== 'PROVIDER' && verifiedProfile?.role !== 'ADMIN') {
-          throw new Error('Sesi provider tidak sesuai dengan akun yang masuk.');
+          throw new Error(t('Sesi provider tidak sesuai dengan akun yang masuk.', "Partner session doesn't match the signed-in account."));
         }
         setProviderProfile(verifiedProfile);
         setCustomerProfile(null);
@@ -796,10 +798,10 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
               !
             </div>
             <h2 id="logout-confirm-title" style={{ margin: '0 0 8px', color: '#0f172a', fontSize: '21px' }}>
-              Keluar dari akun?
+              {t('Keluar dari akun?', 'Sign out of your account?')}
             </h2>
             <p id="logout-confirm-description" style={{ margin: '0 0 24px', color: '#64748b', lineHeight: 1.6, fontSize: '14px' }}>
-              Sesi Anda akan diakhiri. Anda perlu masuk kembali untuk mengakses akun.
+              {t('Sesi Anda akan diakhiri. Anda perlu masuk kembali untuk mengakses akun.', "Your session will end. You'll need to sign in again to access your account.")}
             </p>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
@@ -812,7 +814,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
                   color: '#334155', fontWeight: 700, cursor: 'pointer'
                 }}
               >
-                Batal
+                {t('Batal', 'Cancel')}
               </button>
               <button
                 type="button"
@@ -823,7 +825,7 @@ export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children
                   color: '#ffffff', fontWeight: 700, cursor: 'pointer'
                 }}
               >
-                Ya, Keluar
+                {t('Ya, Keluar', 'Yes, Sign Out')}
               </button>
             </div>
           </div>

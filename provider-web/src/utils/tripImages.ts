@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './api';
+import { getLang } from '../i18n';
 
 // Centralized categories & trip types synced across Web Customer, Web Provider, and Admin
 export const OFFICIAL_CATEGORIES = [
@@ -39,10 +40,11 @@ export function getHighlightsForPackage(pkg: HighlightSource, limit: number = 3)
     .map((line) => `✓ ${line}`);
 
   const facts: string[] = [];
+  const en = getLang() === 'en';
   const duration = Number(pkg.duration) || 0;
-  if (duration > 0) facts.push(`🗓️ ${duration} Hari`);
+  if (duration > 0) facts.push(en ? `🗓️ ${duration} ${duration === 1 ? 'Day' : 'Days'}` : `🗓️ ${duration} Hari`);
   const minGuests = Number(pkg.minGuests) || 0;
-  if (minGuests > 1) facts.push(`👥 Min. ${minGuests} Orang`);
+  if (minGuests > 1) facts.push(en ? `👥 Min. ${minGuests} People` : `👥 Min. ${minGuests} Orang`);
   const meetingPoint = (pkg.meetingPoint || '').trim();
   if (meetingPoint.length > 3) facts.push(`📍 ${meetingPoint}`);
 

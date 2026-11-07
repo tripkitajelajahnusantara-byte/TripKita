@@ -2,8 +2,9 @@ package models
 
 import "time"
 
-// PaymentWindow adalah batas waktu transfer dan unggah bukti sejak booking dibuat.
-// Setelah lewat, booking yang belum mengirim bukti dibatalkan oleh job.
+// PaymentWindow adalah batas waktu pembayaran (Midtrans, atau transfer dan unggah
+// bukti untuk booking manual lama) sejak booking dibuat. Setelah lewat, booking
+// yang belum dibayar dibatalkan oleh job.
 const PaymentWindow = 24 * time.Hour
 
 // RejectedProofReuploadWindow adalah waktu minimal yang selalu dimiliki customer

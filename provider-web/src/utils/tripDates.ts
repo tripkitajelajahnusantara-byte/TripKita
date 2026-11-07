@@ -32,9 +32,9 @@ export function rangeAvailable(start: string, end: string, min: string, max: str
 export function tripEndDate(start: string, duration: number): string {
   return addDays(start, Math.max(1, Math.trunc(Number(duration) || 1)) - 1);
 }
-export function formatTripRange(start: string, end?: string): string {
-  if (!validDate(start)) return 'Belum dipilih';
-  const format = (date: string) => new Intl.DateTimeFormat('id-ID', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00Z`));
+export function formatTripRange(start: string, end?: string, locale = 'id-ID'): string {
+  if (!validDate(start)) return locale.startsWith('en') ? 'Not selected' : 'Belum dipilih';
+  const format = (date: string) => new Intl.DateTimeFormat(locale, { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00Z`));
   return end && validDate(end) && end !== start ? `${format(start)} – ${format(end)}` : format(start);
 }
 export function bookingTimestamp(date: string): string {

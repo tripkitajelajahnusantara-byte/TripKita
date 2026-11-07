@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info, X } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 export type AlertType = 'success' | 'error' | 'warning' | 'info';
 
@@ -30,6 +31,7 @@ export const useCustomAlert = () => {
 };
 
 export const CustomAlertProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [alertConfig, setAlertConfig] = useState<AlertOptions>({
     title: '',
@@ -41,17 +43,17 @@ export const CustomAlertProvider: React.FC<{ children: ReactNode }> = ({ childre
   const showAlert = (options: AlertOptions | string) => {
     if (typeof options === 'string') {
       setAlertConfig({
-        title: 'Pemberitahuan',
+        title: t('Pemberitahuan', 'Notice'),
         message: options,
         type: 'info',
-        confirmText: 'Mengerti'
+        confirmText: t('Mengerti', 'Got it')
       });
     } else {
       setAlertConfig({
-        title: options.title || (options.type === 'error' ? 'Terjadi Kesalahan' : options.type === 'warning' ? 'Peringatan' : options.type === 'success' ? 'Berhasil' : 'Pemberitahuan'),
+        title: options.title || (options.type === 'error' ? t('Terjadi Kesalahan', 'Something Went Wrong') : options.type === 'warning' ? t('Peringatan', 'Warning') : options.type === 'success' ? t('Berhasil', 'Success') : t('Pemberitahuan', 'Notice')),
         message: options.message,
         type: options.type || 'info',
-        confirmText: options.confirmText || 'Mengerti',
+        confirmText: options.confirmText || t('Mengerti', 'Got it'),
         cancelText: options.cancelText,
         onConfirm: options.onConfirm,
         onCancel: options.onCancel
@@ -62,11 +64,11 @@ export const CustomAlertProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const showConfirm = (options: AlertOptions) => {
     setAlertConfig({
-      title: options.title || 'Konfirmasi Aksi',
+      title: options.title || t('Konfirmasi Aksi', 'Please Confirm'),
       message: options.message,
       type: options.type || 'warning',
-      confirmText: options.confirmText || 'Ya, Lanjutkan',
-      cancelText: options.cancelText || 'Batal',
+      confirmText: options.confirmText || t('Ya, Lanjutkan', 'Yes, Continue'),
+      cancelText: options.cancelText || t('Batal', 'Cancel'),
       onConfirm: options.onConfirm,
       onCancel: options.onCancel
     });

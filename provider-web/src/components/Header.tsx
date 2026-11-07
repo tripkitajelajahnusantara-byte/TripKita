@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { Menu, X, User, Settings, LogOut, ChevronDown, Target } from 'lucide-react';
 import { NotificationCenter } from './NotificationCenter';
+import { LanguageSwitch } from './LanguageSwitch';
+import { useI18n } from '../i18n';
 
 export const Header: React.FC = () => {
   const { route, navigateTo, logout, providerProfile, customerProfile, openAuthModal } = useNavigation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const { t } = useI18n();
 
   const handleNav = (targetRoute: Parameters<typeof navigateTo>[0]) => {
     navigateTo(targetRoute);
@@ -36,7 +39,7 @@ export const Header: React.FC = () => {
           className="logo-section"
           role="link"
           tabIndex={0}
-          aria-label="Kembali ke halaman utama TemenTrip"
+          aria-label={t('Kembali ke halaman utama TemenTrip', 'Back to TemenTrip home')}
           onClick={handleLogoClick}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
@@ -70,43 +73,45 @@ export const Header: React.FC = () => {
               className={`nav-link ${route === 'rencana-trip' ? 'active' : ''}`}
               onClick={openTripPlanner}
             >
-              Rencana Trip
+              {t('Rencana Trip', 'Trip Planner')}
             </button>
             <button 
               className={`nav-link ${route === 'riwayat-booking' ? 'active' : ''}`}
               onClick={() => handleNav('riwayat-booking')}
             >
-              Cek Booking
+              {t('Cek Booking', 'My Bookings')}
             </button>
             <button
               className={`nav-link ${route === 'berita' ? 'active' : ''}`}
               onClick={() => handleNav('berita')}
             >
-              Berita
+              {t('Berita', 'News')}
             </button>
             <button 
               className={`nav-link ${route === 'partner-landing' ? 'active' : ''}`}
               onClick={() => handleNav('partner-landing')}
             >
-              Jadi Mitra
+              {t('Jadi Mitra', 'Become a Partner')}
             </button>
             <button 
               className={`nav-link ${route === 'tentang-kami' ? 'active' : ''}`}
               onClick={() => handleNav('tentang-kami')}
             >
-              Tentang Kami
+              {t('Tentang Kami', 'About Us')}
             </button>
             <button 
               className={`nav-link ${route === 'bantuan' ? 'active' : ''}`}
               onClick={() => handleNav('bantuan')}
             >
-              Bantuan
+              {t('Bantuan', 'Help')}
             </button>
           </nav>
         )}
 
         {/* User Account / Auth Actions */}
         <div className="header-actions">
+          {/* Dashboard mitra/admin hanya berbahasa Indonesia, jadi pilihan bahasa khusus halaman customer. */}
+          {!isProviderRoute && <LanguageSwitch className="header-desktop-only" />}
           {isProviderRoute ? (
             providerProfile ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -182,7 +187,7 @@ export const Header: React.FC = () => {
                     >
                       <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
                         <span style={{ display: 'block', fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>
-                          {customerProfile.picName || 'Pelanggan'}
+                          {customerProfile.picName || t('Pelanggan', 'Traveler')}
                         </span>
                         <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>
                           {customerProfile.email || ''}
@@ -211,7 +216,7 @@ export const Header: React.FC = () => {
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e6f4f4'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
-                        <Target size={16} color="#0f8b8d" /> Rencana Trip
+                        <Target size={16} color="#0f8b8d" /> {t('Rencana Trip', 'Trip Planner')}
                       </button>
 
                       <button
@@ -236,7 +241,7 @@ export const Header: React.FC = () => {
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
-                        <Settings size={16} color="#0284c7" /> Pengaturan (Akun & Favorit)
+                        <Settings size={16} color="#0284c7" /> {t('Pengaturan (Akun & Favorit)', 'Settings (Account & Favorites)')}
                       </button>
 
                       <button
@@ -262,7 +267,7 @@ export const Header: React.FC = () => {
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
-                        <LogOut size={16} color="#ef4444" /> Keluar
+                        <LogOut size={16} color="#ef4444" /> {t('Keluar', 'Sign out')}
                       </button>
                     </div>
                   )}
@@ -288,7 +293,7 @@ export const Header: React.FC = () => {
                     transition: 'all 0.2s'
                   }} 
                 >
-                  <User size={15} /> Masuk
+                  <User size={15} /> {t('Masuk', 'Sign in')}
                 </button>
               </div>
             )
@@ -299,7 +304,7 @@ export const Header: React.FC = () => {
         <button
           type="button"
           className="mobile-menu-toggle"
-          aria-label={mobileMenuOpen ? 'Tutup menu' : 'Buka menu'}
+          aria-label={mobileMenuOpen ? t('Tutup menu', 'Close menu') : t('Buka menu', 'Open menu')}
           aria-expanded={mobileMenuOpen}
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
@@ -321,44 +326,44 @@ export const Header: React.FC = () => {
               className={`mobile-nav-link ${route === 'rencana-trip' ? 'active' : ''}`}
               onClick={openTripPlanner}
             >
-              Rencana Trip
+              {t('Rencana Trip', 'Trip Planner')}
             </button>
             <button 
               className={`mobile-nav-link ${route === 'riwayat-booking' ? 'active' : ''}`}
               onClick={() => handleNav('riwayat-booking')}
             >
-              Cek Booking
+              {t('Cek Booking', 'My Bookings')}
             </button>
             <button
               className={`mobile-nav-link ${route === 'berita' ? 'active' : ''}`}
               onClick={() => handleNav('berita')}
             >
-              Berita
+              {t('Berita', 'News')}
             </button>
             <button 
               className={`mobile-nav-link ${route === 'partner-landing' ? 'active' : ''}`}
               onClick={() => handleNav('partner-landing')}
             >
-              Jadi Mitra
+              {t('Jadi Mitra', 'Become a Partner')}
             </button>
             <button 
               className={`mobile-nav-link ${route === 'tentang-kami' ? 'active' : ''}`}
               onClick={() => handleNav('tentang-kami')}
             >
-              Tentang Kami
+              {t('Tentang Kami', 'About Us')}
             </button>
             <button 
               className={`mobile-nav-link ${route === 'bantuan' ? 'active' : ''}`}
               onClick={() => handleNav('bantuan')}
             >
-              Bantuan
+              {t('Bantuan', 'Help')}
             </button>
             {customerProfile && (
               <button 
                 className={`mobile-nav-link ${route === 'pengaturan' ? 'active' : ''}`}
                 onClick={() => handleNav('pengaturan')}
               >
-                Pengaturan (Akun & Favorit)
+                {t('Pengaturan (Akun & Favorit)', 'Settings (Account & Favorites)')}
               </button>
             )}
             {isProviderRoute && providerProfile && (
@@ -370,6 +375,12 @@ export const Header: React.FC = () => {
               </button>
             )}
             <hr className="mobile-divider" />
+            {!isProviderRoute && (
+              <div className="mobile-lang-row">
+                <span>{t('Bahasa', 'Language')}</span>
+                <LanguageSwitch />
+              </div>
+            )}
             {isProviderRoute ? (
               providerProfile ? (
                 <button className="mobile-action-btn logout-btn" onClick={() => { logout(); setMobileMenuOpen(false); }}>Keluar Mitra</button>
@@ -378,9 +389,9 @@ export const Header: React.FC = () => {
               )
             ) : (
               customerProfile ? (
-                <button className="mobile-action-btn logout-btn" onClick={() => { logout(); setMobileMenuOpen(false); }}>Keluar</button>
+                <button className="mobile-action-btn logout-btn" onClick={() => { logout(); setMobileMenuOpen(false); }}>{t('Keluar', 'Sign out')}</button>
               ) : (
-                <button className="mobile-action-btn" onClick={() => handleNav('masuk')}>Masuk</button>
+                <button className="mobile-action-btn" onClick={() => handleNav('masuk')}>{t('Masuk', 'Sign in')}</button>
               )
             )}
           </nav>
@@ -584,6 +595,16 @@ export const Header: React.FC = () => {
 
         .mobile-nav-link.active, .mobile-nav-link:hover {
           color: var(--color-accent);
+        }
+
+        .mobile-lang-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--color-text-medium);
         }
 
         .mobile-divider {

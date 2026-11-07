@@ -5,9 +5,11 @@ import { Mail, Lock, Eye, EyeOff, User, ArrowRight, UserCheck, AlertCircle } fro
 import { LegalModalContainer, CustomerRegistrationTermsContent } from '../components/LegalModals';
 import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
 import { isValidIndonesianMobilePhone } from '../utils/phone';
+import { useI18n } from '../i18n';
 
 export const CustomerLoginPage: React.FC = () => {
   const { login, registerCustomer, navigateTo, customerProfile, logout } = useNavigation();
+  const { t } = useI18n();
 
   // Mode state: false = Masuk, true = Daftar
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -36,43 +38,43 @@ export const CustomerLoginPage: React.FC = () => {
     if (isRegisterMode) {
       // Validate Terms Checkbox
       if (!agreeTerms) {
-        errors.agreeTerms = 'Anda wajib menyetujui Syarat dan Ketentuan Pendaftaran Customer TemenTrip.';
+        errors.agreeTerms = t('Anda wajib menyetujui Syarat dan Ketentuan Pendaftaran Customer TemenTrip.', 'You must agree to the TemenTrip Customer Registration Terms & Conditions.');
       }
 
       // Validate Name
       if (!name || name.trim().length === 0) {
-        errors.name = 'Nama lengkap wajib diisi.';
+        errors.name = t('Nama lengkap wajib diisi.', 'Full name is required.');
       } else if (!/^[a-zA-Z\s]{3,50}$/.test(name.trim())) {
-        errors.name = 'Nama lengkap (3-50 karakter) hanya boleh berisi huruf dan spasi.';
+        errors.name = t('Nama lengkap (3-50 karakter) hanya boleh berisi huruf dan spasi.', 'Full name (3-50 characters) may only contain letters and spaces.');
       }
 
       // Validate WhatsApp
       if (!whatsapp) {
-        errors.whatsapp = 'Nomor WhatsApp wajib diisi.';
+        errors.whatsapp = t('Nomor WhatsApp wajib diisi.', 'WhatsApp number is required.');
       } else if (!isValidIndonesianMobilePhone(whatsapp)) {
-        errors.whatsapp = 'Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.';
+        errors.whatsapp = t('Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.', 'Enter 9–12 digits of your mobile number after +62, starting with 8.');
       }
 
       // Validate Confirm Password
       if (!confirmPassword) {
-        errors.confirmPassword = 'Konfirmasi kata sandi wajib diisi.';
+        errors.confirmPassword = t('Konfirmasi kata sandi wajib diisi.', 'Please confirm your password.');
       } else if (password !== confirmPassword) {
-        errors.confirmPassword = 'Konfirmasi kata sandi tidak cocok dengan kata sandi di atas.';
+        errors.confirmPassword = t('Konfirmasi kata sandi tidak cocok dengan kata sandi di atas.', "Password confirmation doesn't match the password above.");
       }
     }
 
     // Validate Email (Both modes)
     if (!email) {
-      errors.email = 'Alamat email wajib diisi.';
+      errors.email = t('Alamat email wajib diisi.', 'Email address is required.');
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      errors.email = 'Format email tidak valid (harus memiliki "@" dan domain, contoh: user@gmail.com).';
+      errors.email = t('Format email tidak valid (harus memiliki "@" dan domain, contoh: user@gmail.com).', 'Invalid email format (must include "@" and a domain, e.g. user@gmail.com).');
     }
 
     // Validate Password (Both modes)
     if (!password) {
-      errors.password = 'Kata sandi wajib diisi.';
+      errors.password = t('Kata sandi wajib diisi.', 'Password is required.');
     } else if (isRegisterMode && password.length < 12) {
-      errors.password = 'Kata sandi minimal 12 karakter.';
+      errors.password = t('Kata sandi minimal 12 karakter.', 'Password must be at least 12 characters.');
     }
 
     setFieldErrors(errors);
@@ -96,7 +98,7 @@ export const CustomerLoginPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
-      setGeneralError(err.message || 'Proses gagal. Silakan periksa kembali data Anda.');
+      setGeneralError(err.message || t('Proses gagal. Silakan periksa kembali data Anda.', 'Something went wrong. Please check your details and try again.'));
     } finally {
       setLoading(false);
     }
@@ -104,8 +106,8 @@ export const CustomerLoginPage: React.FC = () => {
 
   const handleGoogleSignIn = () => {
     if (isRegisterMode && !agreeTerms) {
-      setGeneralError('Anda wajib menyetujui Syarat dan Ketentuan Pendaftaran Customer TemenTrip sebelum mendaftar.');
-      setFieldErrors(prev => ({ ...prev, agreeTerms: 'Centang kotak ini untuk menyetujui Syarat dan Ketentuan.' }));
+      setGeneralError(t('Anda wajib menyetujui Syarat dan Ketentuan Pendaftaran Customer TemenTrip sebelum mendaftar.', 'You must agree to the TemenTrip Customer Registration Terms & Conditions before signing up.'));
+      setFieldErrors(prev => ({ ...prev, agreeTerms: t('Centang kotak ini untuk menyetujui Syarat dan Ketentuan.', 'Tick this box to agree to the Terms & Conditions.') }));
       return;
     }
     window.location.href = `${API_BASE_URL}/public/auth/google?type=customer`;
@@ -118,9 +120,9 @@ export const CustomerLoginPage: React.FC = () => {
           <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
             <UserCheck size={28} color="#0284c7" />
           </div>
-          <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0' }}>Anda Sudah Masuk</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0' }}>{t('Anda Sudah Masuk', "You're Already Signed In")}</h2>
           <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 24px 0', lineHeight: '1.5' }}>
-            Anda saat ini telah terhubung sebagai <br />
+            {t('Anda saat ini telah terhubung sebagai', "You're currently signed in as")} <br />
             <strong style={{ color: '#0284c7' }}>{customerProfile.picName || customerProfile.businessName}</strong> ({customerProfile.email})
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -128,13 +130,13 @@ export const CustomerLoginPage: React.FC = () => {
               onClick={() => navigateTo('beranda')}
               style={{ padding: '12px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}
             >
-              Lanjutkan Berkeliling Beranda
+              {t('Lanjutkan Berkeliling Beranda', 'Continue to Home')}
             </button>
             <button
               onClick={logout}
               style={{ padding: '11px', backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '12px', fontSize: '13.5px', fontWeight: '700', cursor: 'pointer' }}
             >
-              Keluar Akun
+              {t('Keluar Akun', 'Sign Out')}
             </button>
           </div>
         </div>
@@ -163,12 +165,12 @@ export const CustomerLoginPage: React.FC = () => {
           </div>
 
           <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>
-            {isRegisterMode ? 'Daftar Akun Baru' : 'Selamat Datang Kembali!'}
+            {isRegisterMode ? t('Daftar Akun Baru', 'Create a New Account') : t('Selamat Datang Kembali!', 'Welcome Back!')}
           </h2>
           <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0, lineHeight: '1.5' }}>
             {isRegisterMode 
-              ? 'Buat akun untuk simpan tiket & riwayat trip kamu dengan mudah.'
-              : 'Masuk untuk pesan open trip dan cek tiket perjalanan kamu.'
+              ? t('Buat akun untuk simpan tiket & riwayat trip kamu dengan mudah.', 'Create an account to keep your tickets and trip history in one place.')
+              : t('Masuk untuk pesan open trip dan cek tiket perjalanan kamu.', 'Sign in to book open trips and check your trip tickets.')
             }
           </p>
         </div>
@@ -219,12 +221,12 @@ export const CustomerLoginPage: React.FC = () => {
             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
           </svg>
-          <span>{isRegisterMode ? 'Daftar dengan Google' : 'Masuk dengan Google'}</span>
+          <span>{isRegisterMode ? t('Daftar dengan Google', 'Sign up with Google') : t('Masuk dengan Google', 'Sign in with Google')}</span>
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', margin: '0 0 20px 0', color: '#94a3b8', fontSize: '12px' }}>
           <div style={{ flexGrow: 1, height: '1px', backgroundColor: '#e2e8f0' }}></div>
-          <span style={{ padding: '0 12px', fontWeight: '600' }}>atau email</span>
+          <span style={{ padding: '0 12px', fontWeight: '600' }}>{t('atau email', 'or with email')}</span>
           <div style={{ flexGrow: 1, height: '1px', backgroundColor: '#e2e8f0' }}></div>
         </div>
 
@@ -237,7 +239,7 @@ export const CustomerLoginPage: React.FC = () => {
                 <User size={18} color={fieldErrors.name ? '#ef4444' : '#94a3b8'} style={{ position: 'absolute', left: '14px' }} />
                 <input 
                   type="text" 
-                  placeholder="Nama Lengkap..."
+                  placeholder={t('Nama Lengkap...', 'Full name...')}
                   maxLength={50}
                   value={name}
                   onChange={(e) => {
@@ -270,7 +272,7 @@ export const CustomerLoginPage: React.FC = () => {
               <Mail size={18} color={fieldErrors.email ? '#ef4444' : '#94a3b8'} style={{ position: 'absolute', left: '14px' }} />
               <input 
                 type="email" 
-                placeholder="Alamat Email (contoh: nama@gmail.com)..."
+                placeholder={t('Alamat Email (contoh: nama@gmail.com)...', 'Email address (e.g. name@gmail.com)...')}
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
@@ -322,7 +324,7 @@ export const CustomerLoginPage: React.FC = () => {
               <Lock size={18} color={fieldErrors.password ? '#ef4444' : '#94a3b8'} style={{ position: 'absolute', left: '14px' }} />
               <input 
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Kata Sandi..."
+                placeholder={t('Kata Sandi...', 'Password...')}
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -370,7 +372,7 @@ export const CustomerLoginPage: React.FC = () => {
                 <Lock size={18} color={fieldErrors.confirmPassword ? '#ef4444' : '#94a3b8'} style={{ position: 'absolute', left: '14px' }} />
                 <input 
                   type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="Konfirmasi Kata Sandi..."
+                  placeholder={t('Konfirmasi Kata Sandi...', 'Confirm password...')}
                   value={confirmPassword}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);
@@ -461,7 +463,7 @@ export const CustomerLoginPage: React.FC = () => {
                     margin: 0
                   }}
                 >
-                  Saya menyetujui{' '}
+                  {t('Saya menyetujui', 'I agree to the')}{' '}
                   <button 
                     type="button"
                     onClick={(e) => {
@@ -479,7 +481,7 @@ export const CustomerLoginPage: React.FC = () => {
                       fontSize: '13px'
                     }}
                   >
-                    Syarat & Ketentuan Pendaftaran
+                    {t('Syarat & Ketentuan Pendaftaran', 'Registration Terms & Conditions')}
                   </button>
                 </label>
               </div>
@@ -512,7 +514,7 @@ export const CustomerLoginPage: React.FC = () => {
               gap: '8px'
             }}
           >
-            {loading ? 'Memproses...' : (isRegisterMode ? 'Daftar Akun Sekarang' : 'Masuk Sekarang')}
+            {loading ? t('Memproses...', 'Processing...') : (isRegisterMode ? t('Daftar Akun Sekarang', 'Create Account') : t('Masuk Sekarang', 'Sign In'))}
             {!loading && <ArrowRight size={18} />}
           </button>
         </form>
@@ -521,7 +523,7 @@ export const CustomerLoginPage: React.FC = () => {
         <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid #f1f5f9', textAlign: 'center', fontSize: '13.5px', color: '#64748b' }}>
           {isRegisterMode ? (
             <>
-              Sudah punya akun?{' '}
+              {t('Sudah punya akun?', 'Already have an account?')}{' '}
               <button 
                 type="button"
                 onClick={() => {
@@ -531,12 +533,12 @@ export const CustomerLoginPage: React.FC = () => {
                 }} 
                 style={{ background: 'none', border: 'none', color: '#007bff', fontWeight: '800', cursor: 'pointer', padding: 0 }}
               >
-                Masuk sekarang
+                {t('Masuk sekarang', 'Sign in')}
               </button>
             </>
           ) : (
             <>
-              Belum punya akun?{' '}
+              {t('Belum punya akun?', "Don't have an account?")}{' '}
               <button 
                 type="button"
                 onClick={() => {
@@ -546,7 +548,7 @@ export const CustomerLoginPage: React.FC = () => {
                 }} 
                 style={{ background: 'none', border: 'none', color: '#007bff', fontWeight: '800', cursor: 'pointer', padding: 0 }}
               >
-                Daftar gratis sekarang
+                {t('Daftar gratis sekarang', 'Sign up for free')}
               </button>
             </>
           )}
@@ -554,13 +556,13 @@ export const CustomerLoginPage: React.FC = () => {
 
         <div style={{ marginTop: '16px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
           <span style={{ fontSize: '12.5px', color: '#475569' }}>
-            Mitra Provider / Pemilik Tour?{' '}
+            {t('Mitra Provider / Pemilik Tour?', 'Tour operator or partner?')}{' '}
           </span>
           <span 
             onClick={() => navigateTo('provider-login')} 
             style={{ color: '#00a896', fontWeight: 700, cursor: 'pointer', fontSize: '12.5px', textDecoration: 'underline' }}
           >
-            Masuk ke Dashboard Provider
+            {t('Masuk ke Dashboard Provider', 'Sign in to Partner Dashboard')}
           </span>
         </div>
 
@@ -570,7 +572,7 @@ export const CustomerLoginPage: React.FC = () => {
       <LegalModalContainer
         isOpen={showRegTermsModal}
         onClose={() => setShowRegTermsModal(false)}
-        title="Syarat & Ketentuan Pendaftaran Customer"
+        title={t('Syarat & Ketentuan Pendaftaran Customer', 'Customer Registration Terms & Conditions')}
       >
         <CustomerRegistrationTermsContent />
       </LegalModalContainer>

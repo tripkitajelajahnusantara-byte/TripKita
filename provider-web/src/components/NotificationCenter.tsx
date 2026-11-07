@@ -3,6 +3,7 @@ import { Bell, X, CreditCard, RefreshCw, Calendar, Wallet, Info, UserPlus, Shiel
 import { request } from '../utils/api';
 import { SkeletonList } from './Skeleton';
 import { useNavigation } from '../context/NavigationContext';
+import { useI18n } from '../i18n';
 
 export type NotificationType =
   | 'PAYMENT'
@@ -42,21 +43,22 @@ interface NotificationCenterProps {
 
 const POLL_INTERVAL_MS = 30_000;
 
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(iso: string, t: (id: string, en: string) => string, locale: string): string {
   const created = new Date(iso).getTime();
   if (Number.isNaN(created)) return '';
 
   const diffSeconds = Math.round((Date.now() - created) / 1000);
-  if (diffSeconds < 60) return 'Baru saja';
-  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)} menit lalu`;
-  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)} jam lalu`;
-  if (diffSeconds < 604800) return `${Math.floor(diffSeconds / 86400)} hari lalu`;
+  if (diffSeconds < 60) return t('Baru saja', 'Just now');
+  if (diffSeconds < 3600) { const n = Math.floor(diffSeconds / 60); return t(`${n} menit lalu`, `${n} min ago`); }
+  if (diffSeconds < 86400) { const n = Math.floor(diffSeconds / 3600); return t(`${n} jam lalu`, `${n}h ago`); }
+  if (diffSeconds < 604800) { const n = Math.floor(diffSeconds / 86400); return t(`${n} hari lalu`, `${n}d ago`); }
 
-  return new Date(created).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(created).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect, variant = 'light', align = 'right' }) => {
   const { navigateTo, providerProfile, customerProfile } = useNavigation();
+  const { t, locale } = useI18n();
 
   // Customer dan mitra/admin memakai token yang berbeda, dan `request()`
   // memilih token dari prefiks endpoint. Memakai satu prefiks untuk keduanya
@@ -95,11 +97,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
     } catch (err: any) {
       // Notifikasi bukan fungsi utama halaman; kegagalan muat hanya dilaporkan
       // di dalam panel dan tidak boleh mengosongkan daftar yang sudah tampil.
-      setError(err?.message || 'Notifikasi tidak dapat dimuat.');
+      setError(err?.message || t('Notifikasi tidak dapat dimuat.', 'Notifications could not be loaded.'));
     } finally {
       setLoading(false);
     }
-  }, [basePath, isSignedIn]);
+  }, [basePath, isSignedIn, t]);
 
   useEffect(() => {
     fetchNotifications();
@@ -216,7 +218,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
       <button
         type="button"
         onClick={togglePanel}
-        aria-label={unreadCount > 0 ? `Notifikasi, ${unreadCount} belum dibaca` : 'Notifikasi'}
+        aria-label={unreadCount > 0 ? t(`Notifikasi, ${unreadCount} belum dibaca`, `Notifications, ${unreadCount} unread`) : t('Notifikasi', 'Notifications')}
         aria-expanded={isOpen}
         style={{
           position: 'relative',
@@ -230,7 +232,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
           justifyContent: 'center',
           transition: 'all 0.2s',
         }}
-        title="Notifikasi Aktivitas"
+        title={t('Notifikasi Aktivitas', 'Activity Notifications')}
       >
         <Bell size={18} color={isDark ? '#e2e8f0' : '#334155'} />
         {unreadCount > 0 && (
@@ -287,14 +289,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Bell size={16} color="#0284c7" />
-              <strong style={{ fontSize: '14px', color: '#0f172a' }}>Notifikasi Aktivitas</strong>
+              <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Notifikasi Aktivitas', 'Activity Notifications')}</strong>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {unreadCount > 0 && (
                 <button
                   type="button"
                   onClick={markAllAsRead}
-                  title="Tandai semua dibaca"
+                  title={t('Tandai semua dibaca', 'Mark all as read')}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -308,13 +310,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
                     padding: 0,
                   }}
                 >
-                  <CheckCheck size={14} /> Tandai dibaca
+                  <CheckCheck size={14} /> {t('Tandai dibaca', 'Mark read')}
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                aria-label="Tutup notifikasi"
+                aria-label={t('Tutup notifikasi', 'Close notifications')}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}
               >
                 <X size={16} />
@@ -331,11 +333,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
 
             {loading && notifications.length === 0 ? (
               <div style={{ padding: '8px 6px' }}>
-                <SkeletonList rows={3} label="Memuat notifikasi" />
+                <SkeletonList rows={3} label={t('Memuat notifikasi', 'Loading notifications')} />
               </div>
             ) : notifications.length === 0 ? (
               <div style={{ padding: '30px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-                Belum ada notifikasi baru.
+                {t('Belum ada notifikasi baru.', 'No new notifications.')}
               </div>
             ) : (
               notifications.map((item) => (
@@ -382,7 +384,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onSelect
                     <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: '1.4' }}>
                       {item.message}
                     </p>
-                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>{formatRelativeTime(item.createdAt)}</span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>{formatRelativeTime(item.createdAt, t, locale)}</span>
                   </div>
                 </div>
               ))

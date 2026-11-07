@@ -1102,7 +1102,7 @@ export const AdminDashboardPage: React.FC = () => {
                   : activeView === 'administrasi-refund'
                   ? 'Pantau dan kelola proses refund dana customer.' 
                   : activeView === 'kelola-pembayaran'
-                  ? 'Verifikasi bukti transfer manual maksimal 1×24 jam. Booking baru tampil ke provider setelah pembayaran disetujui admin.'
+                  ? 'Pembayaran Midtrans terkonfirmasi otomatis. Bukti transfer manual (pesanan lama) diverifikasi maksimal 1×24 jam; booking baru tampil ke provider setelah lunas.'
                   : activeView === 'pencairan-provider'
                   ? 'Kelola pengajuan pencairan saldo DP 50% & pelunasan dari mitra provider.'
                   : activeView === 'penghasilan-platform'
