@@ -3201,3 +3201,65 @@ button[aria-busy="true"] {
     padding: 0 !important;
   }
 }
+
+/* Tipografi isi berita. Dipakai editor admin dan halaman Berita customer
+   sekaligus, sehingga yang ditulis admin tampil persis sama di situs. */
+.news-prose {
+  font-size: 17px;
+  line-height: 1.75;
+  color: #1e293b;
+  overflow-wrap: break-word;
+}
+.news-prose > * + * { margin-top: 1.15em; }
+.news-prose h2 {
+  font-size: 1.45em;
+  line-height: 1.3;
+  margin-top: 1.9em;
+  letter-spacing: -0.01em;
+}
+.news-prose h3 {
+  font-size: 1.18em;
+  line-height: 1.35;
+  margin-top: 1.6em;
+}
+.news-prose > :first-child { margin-top: 0; }
+.news-prose strong { font-weight: 700; color: var(--color-text-dark); }
+.news-prose a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.news-prose a:hover { color: var(--color-accent-hover); }
+.news-prose ul, .news-prose ol { padding-left: 1.4em; }
+.news-prose ul { list-style: disc; }
+.news-prose ol { list-style: decimal; }
+.news-prose li + li { margin-top: 0.4em; }
+.news-prose li::marker { color: var(--color-text-light); }
+.news-prose blockquote {
+  border-left: 3px solid var(--color-accent);
+  padding: 2px 0 2px 18px;
+  color: var(--color-text-medium);
+}
+.news-prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.news-prose figcaption {
+  font-size: 14px;
+  color: var(--color-text-light);
+  text-align: center;
+  margin-top: 8px;
+}
+.news-prose hr {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 2.2em 0;
+}
+@media (max-width: 640px) {
+  .news-prose { font-size: 16px; }
+}

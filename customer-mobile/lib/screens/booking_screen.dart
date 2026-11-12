@@ -11,7 +11,6 @@ import 'package:customer_mobile/services/checkout_config.dart';
 import 'package:customer_mobile/services/package_catalog.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
 import 'package:customer_mobile/utils/formatters.dart';
-import 'package:customer_mobile/utils/trip_utils.dart';
 import 'package:customer_mobile/utils/validators.dart';
 import 'package:customer_mobile/widgets/common.dart';
 import 'package:customer_mobile/widgets/form_fields.dart';
@@ -21,8 +20,7 @@ const _genders = ['Laki-laki', 'Perempuan'];
 
 int _ageOnDate(DateTime birthDate, DateTime onDate) {
   var age = onDate.year - birthDate.year;
-  if (onDate.month < birthDate.month ||
-      (onDate.month == birthDate.month && onDate.day < birthDate.day)) {
+  if (onDate.month < birthDate.month || (onDate.month == birthDate.month && onDate.day < birthDate.day)) {
     age--;
   }
   return age;
@@ -132,8 +130,7 @@ class _BookingScreenState extends State<BookingScreen> {
   TripPackage get _pkg => widget.draft.package;
 
   /// Draft dengan layanan tambahan yang sedang dicentang.
-  BookingDraft get _draft =>
-      widget.draft.withAddOns(_pkg.addOns.where((a) => _addOnIds.contains(a.id)).toList());
+  BookingDraft get _draft => widget.draft.withAddOns(_pkg.addOns.where((a) => _addOnIds.contains(a.id)).toList());
 
   @override
   void initState() {
@@ -189,7 +186,8 @@ class _BookingScreenState extends State<BookingScreen> {
 
   bool get _bookerComplete => _bookerErrors(_booker).isEmpty;
   bool _participantComplete(int i) => _participantErrors(_participants[i], i, _pkg, widget.draft.startDate).isEmpty;
-  bool get _allParticipantsComplete => [for (var i = 0; i < _participants.length; i++) _participantComplete(i)].every((ok) => ok);
+  bool get _allParticipantsComplete =>
+      [for (var i = 0; i < _participants.length; i++) _participantComplete(i)].every((ok) => ok);
 
   Future<void> _editBooker() async {
     final saved = await showDesignSheet<_Booker>(
@@ -267,7 +265,7 @@ class _BookingScreenState extends State<BookingScreen> {
       message: Text.rich(TextSpan(
         text: 'Pastikan data pemesan dan seluruh peserta sudah benar sebelum melanjutkan ke pembayaran sebesar ',
         children: [
-          TextSpan(text: formatPrice(total), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark)),
+          TextSpan(text: formatPrice(total), style: const TextStyle(fontWeight: FontWeight.w700)),
         ],
       )),
       confirmLabel: 'Lanjutkan',
@@ -334,7 +332,7 @@ class _BookingScreenState extends State<BookingScreen> {
           child: DefaultTextStyle.merge(
             style: figmaTextStyle,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
               children: [
                 const SectionTitle('Rincian Pesanan'),
                 const SizedBox(height: 12),
@@ -351,7 +349,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 _buildPaymentSummary(),
                 const SizedBox(height: 24),
                 const CancellationPolicyBox(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 Text.rich(
                   TextSpan(
                     text: 'Dengan mengklik Konfirmasi & Bayar, Anda menyetujui ',
@@ -362,7 +360,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       const TextSpan(text: ' TemenTrip.'),
                     ],
                   ),
-                  style: const TextStyle(fontSize: 12, height: 1.5, color: AppColors.textMedium),
+                  style: const TextStyle(fontSize: 12, height: 20 / 12, color: AppColors.textMedium),
                 ),
               ],
             ),
@@ -375,7 +373,8 @@ class _BookingScreenState extends State<BookingScreen> {
           child: ElevatedButton(
             onPressed: _submitting || _config == null ? null : _confirm,
             child: _submitting
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                ? const SizedBox(
+                    width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
                 : const Text('Konfirmasi & Bayar'),
           ),
         ),
@@ -402,38 +401,43 @@ class _BookingScreenState extends State<BookingScreen> {
             onTap: _editBooker,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(filled ? _booker.name.trim() : 'Isi data pemesan',
-                  style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w500, color: filled ? AppColors.textDark : AppColors.textMuted)),
-              if (_booker.email.isNotEmpty || _booker.phone.isNotEmpty) ...[
-                const SizedBox(height: 4),
+                  style: _cardTitle.copyWith(color: filled ? AppColors.textDark : AppColors.textMuted)),
+              if (_booker.email.isNotEmpty || _booker.phone.isNotEmpty)
                 Text(
-                  [if (_booker.email.isNotEmpty) _booker.email, if (_booker.phone.isNotEmpty) displayPhone(_booker.phone)]
-                      .join('  •  '),
-                  style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                  [
+                    if (_booker.email.isNotEmpty) _booker.email,
+                    if (_booker.phone.isNotEmpty) displayPhone(_booker.phone)
+                  ].join(' • '),
+                  style: _cardDetail.copyWith(color: AppColors.textMuted),
                 ),
-              ],
             ]),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 4, 0),
-            child: Row(children: [
-              const Expanded(
-                child: Text('Tambahkan saya sebagai peserta', style: TextStyle(fontSize: 14, color: AppColors.textMedium)),
-              ),
-              Transform.scale(
-                scale: 0.8,
-                child: Switch(value: _sameAsBooker, onChanged: _toggleSameAsBooker),
-              ),
-            ]),
+          SizedBox(
+            height: 44,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(children: [
+                const Expanded(
+                  child: Text('Tambahkan saya sebagai peserta',
+                      style: TextStyle(
+                          fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.textMedium)),
+                ),
+                DesignSwitch(value: _sameAsBooker, onChanged: _toggleSameAsBooker),
+              ]),
+            ),
           ),
         ]),
       ),
       if (invalid) ...[
-        const SizedBox(height: 8),
-        const _ErrorNote('Lengkapi data pemesan untuk melanjutkan'),
+        const SizedBox(height: 12),
+        const NoteBox(tone: NoteTone.danger, text: 'Lengkapi data pemesan untuk melanjutkan'),
       ],
     ]);
   }
+
+  static const _cardTitle =
+      TextStyle(fontSize: 18, height: 28 / 18, fontWeight: FontWeight.w600, color: AppColors.textDark);
+  static const _cardDetail = TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMedium);
 
   Widget _buildAddOns() {
     final guests = widget.draft.guests;
@@ -456,9 +460,9 @@ class _BookingScreenState extends State<BookingScreen> {
             value: _addOnIds.contains(a.id),
             controlAffinity: ListTileControlAffinity.leading,
             contentPadding: const EdgeInsets.only(right: 12),
-            title: Text(a.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-            subtitle: Text(
-                a.perPerson ? '${formatPrice(a.price)}/orang × $guests' : '${formatPrice(a.price)}/pesanan',
+            title: Text(a.name,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textDark)),
+            subtitle: Text(a.perPerson ? '${formatPrice(a.price)}/orang × $guests' : '${formatPrice(a.price)}/pesanan',
                 style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
             secondary: Text('+${formatPrice(a.subtotalFor(guests))}',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
@@ -484,16 +488,14 @@ class _BookingScreenState extends State<BookingScreen> {
         const SizedBox(height: 8),
       ],
       if (anyInvalid) ...[
-        const _ErrorNote('Lengkapi data setiap peserta untuk melanjutkan'),
+        const SizedBox(height: 4),
+        const NoteBox(tone: NoteTone.danger, text: 'Lengkapi data setiap peserta untuk melanjutkan'),
         const SizedBox(height: 8),
       ],
-      const InfoBanner(
-        icon: Icons.info_outline,
-        message: 'Data peserta yang diisi akan digunakan oleh mitra travel untuk asuransi dan pendaftaran.',
-        color: AppColors.warningDark,
-        textColor: Color(0xFFB45309),
-        background: AppColors.warningBg,
-        border: AppColors.warningBg,
+      const SizedBox(height: 4),
+      const NoteBox(
+        tone: NoteTone.warning,
+        text: 'Data peserta yang diisi akan digunakan oleh mitra travel untuk asuransi dan pendaftaran.',
       ),
     ]);
   }
@@ -504,24 +506,96 @@ class _BookingScreenState extends State<BookingScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const SectionTitle('Ringkasan Pembayaran'),
       const SizedBox(height: 12),
-      SectionCard(
-        radius: 8,
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          TripPriceRows(package: d.package, guests: d.guests, addOns: d.addOns),
-          PriceRow('Biaya Layanan',
-              config == null ? (_configError == null ? 'Memuat...' : '-') : formatPrice(config.serviceFee)),
-          if (_configError != null)
-            Row(children: [
-              Expanded(child: ErrorText(_configError)),
-              TextButton(onPressed: _loadConfig, child: const Text('Coba Lagi')),
-            ]),
-          const Divider(height: 24),
-          PriceRow('Total Pembayaran', config == null ? '-' : formatPrice(d.totalWithFee(config.serviceFee)),
-              emphasize: true),
-        ]),
+      PaymentSummaryCard(
+        rows: [
+          ..._priceRows(d),
+          (
+            'Biaya Layanan',
+            config == null ? (_configError == null ? 'Memuat...' : '-') : formatPrice(config.serviceFee)
+          ),
+        ],
+        totalLabel: 'Total Penjualan',
+        total: config == null ? '-' : formatPrice(d.totalWithFee(config.serviceFee)),
+        footer: _configError == null
+            ? null
+            : Row(children: [
+                Expanded(child: ErrorText(_configError)),
+                TextButton(onPressed: _loadConfig, child: const Text('Coba Lagi')),
+              ]),
       ),
     ]);
+  }
+
+  /// Baris harga dasar (per orang atau per unit) lalu layanan tambahan.
+  static List<(String, String)> _priceRows(BookingDraft d) => priceRows(d);
+}
+
+/// Baris "Ringkasan Pembayaran": harga dasar lalu layanan tambahan.
+List<(String, String)> priceRows(BookingDraft d) {
+  final pkg = d.package;
+  final units = pkg.unitsFor(d.guests);
+  return [
+    (
+      units > 0 ? '$units ${pkg.unitLabel} × ${formatPrice(pkg.price)}' : 'Harga (Paket ${d.guests}x)',
+      formatPrice(pkg.basePrice(d.guests)),
+    ),
+    for (final a in d.addOns)
+      (a.perPerson ? '${a.name} (${d.guests}x)' : a.name, '+${formatPrice(a.subtotalFor(d.guests))}'),
+  ];
+}
+
+/// Kartu "Ringkasan Pembayaran": baris 14/20 (jarak 8), garis, lalu total 16/24.
+class PaymentSummaryCard extends StatelessWidget {
+  final List<(String, String)> rows;
+  final String totalLabel;
+  final String total;
+  final Widget? footer;
+  final double radius;
+
+  const PaymentSummaryCard({
+    super.key,
+    required this.rows,
+    required this.totalLabel,
+    required this.total,
+    this.footer,
+    this.radius = 8,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const label = TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMedium);
+    const value = TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.textDark);
+    Widget row((String, String) r, TextStyle l, TextStyle v) =>
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Text(r.$1, style: l)),
+          const SizedBox(width: 12),
+          Text(r.$2, style: v),
+        ]);
+    // Border 1px ikut menjorokkan isi, jadi padding 15 = 16 dari tepi luar.
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (var i = 0; i < rows.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          row(rows[i], label, value),
+        ],
+        if (footer != null) footer!,
+        const Padding(
+          padding: EdgeInsets.only(top: 15.5, bottom: 15.5),
+          child: Divider(height: 1, color: AppColors.borderStrong),
+        ),
+        row(
+          (totalLabel, total),
+          const TextStyle(fontSize: 16, height: 24 / 16, fontWeight: FontWeight.w500, color: AppColors.textDark),
+          const TextStyle(fontSize: 16, height: 24 / 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+        ),
+      ]),
+    );
   }
 }
 
@@ -540,23 +614,25 @@ class OrderSummaryTicket extends StatelessWidget {
     return TicketCard(
       top: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: NetworkPhoto(photos.isEmpty ? '' : photos.first, width: 64, height: 56),
+          borderRadius: BorderRadius.circular(8),
+          child: NetworkPhoto(photos.isEmpty ? '' : photos.first, width: 64, height: 64),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${durationLabel(pkg.durationDays)}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-            const SizedBox(height: 4),
+            Text(tripMetaLabel(pkg),
+                style: const TextStyle(
+                    fontSize: 12, height: 18 / 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
+            const SizedBox(height: 3),
             Text(pkg.name,
-                style: const TextStyle(fontSize: 16, height: 1.35, fontWeight: FontWeight.w500, color: AppColors.textDark)),
+                style: const TextStyle(
+                    fontSize: 16, height: 22 / 16, fontWeight: FontWeight.w500, color: AppColors.textDark)),
           ]),
         ),
       ]),
       bottom: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _labelValue('Tanggal Keberangkatan', start == null ? draft.scheduleLabel : formatDateRange(start, end!)),
-        const Divider(height: 20),
+        const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
         _labelValue('Jumlah Peserta', '${draft.guests} orang'),
       ]),
     );
@@ -564,11 +640,17 @@ class OrderSummaryTicket extends StatelessWidget {
 
   static Widget _labelValue(String label, String value) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-        const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 14, color: AppColors.textMedium)),
+        Text(label, style: const TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMuted)),
+        const SizedBox(height: 3.5),
+        Text(value,
+            style: const TextStyle(
+                fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.textMedium)),
       ]);
 }
+
+/// `OPEN TRIP • 3 HARI`
+String tripMetaLabel(TripPackage pkg) =>
+    '${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${pkg.durationDays} hari'.toUpperCase();
 
 /// Kotak "Kebijakan Pembatalan H-7 TemenTrip".
 class CancellationPolicyBox extends StatelessWidget {
@@ -576,17 +658,19 @@ class CancellationPolicyBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bold = TextStyle(fontWeight: FontWeight.w600, color: AppColors.textBody);
+    const bold = TextStyle(fontWeight: FontWeight.w700);
     Widget bullet(List<InlineSpan> spans) => Padding(
           padding: const EdgeInsets.only(top: 8),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(4, 6, 8, 0),
-              child: CircleAvatar(radius: 2, backgroundColor: AppColors.textMedium),
+            Container(
+              width: 3.75,
+              height: 3.75,
+              margin: const EdgeInsets.fromLTRB(1.5, 6.1, 8.5, 0),
+              decoration: const BoxDecoration(color: AppColors.textMuted, shape: BoxShape.circle),
             ),
             Expanded(
               child: Text.rich(TextSpan(children: spans),
-                  style: const TextStyle(fontSize: 12, height: 1.45, color: AppColors.textMedium)),
+                  style: const TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMedium)),
             ),
           ]),
         );
@@ -595,20 +679,22 @@ class CancellationPolicyBox extends StatelessWidget {
       decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(8)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Row(children: [
-          Icon(Icons.verified_user_outlined, size: 16, color: AppColors.primaryDark),
+          AppIcon('shield_check', size: 16, color: AppColors.accent),
           SizedBox(width: 6),
           Text('Kebijakan Pembatalan H-7 TemenTrip',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
+              style:
+                  TextStyle(fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
         ]),
+        const SizedBox(height: 4),
         bullet(const [
           TextSpan(text: 'Pembatalan '),
-          TextSpan(text: '≥7 hari', style: bold),
+          TextSpan(text: '≥7 HARI', style: bold),
           TextSpan(text: ' sebelum trip berhak mendapatkan pengembalian dana '),
           TextSpan(text: '100% full refund', style: bold),
         ]),
         bullet(const [
           TextSpan(text: 'Pembatalan '),
-          TextSpan(text: '< 7 hari', style: bold),
+          TextSpan(text: '< 7 HARI', style: bold),
           TextSpan(text: ' sebelum trip dikenakan biaya pembatalan 100% '),
           TextSpan(text: '(0% refund / uang hangus)', style: bold),
         ]),
@@ -640,33 +726,14 @@ class _TapCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 21.4, 16),
           child: Row(children: [
             Expanded(child: child),
             const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+            const AppIcon('chevron_right', color: AppColors.icon),
           ]),
         ),
       ),
-    );
-  }
-}
-
-class _ErrorNote extends StatelessWidget {
-  final String text;
-
-  const _ErrorNote(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: AppColors.dangerSoft, borderRadius: BorderRadius.circular(8)),
-      child: Row(children: [
-        const Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.dangerDark),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 12, color: AppColors.dangerDark))),
-      ]),
     );
   }
 }
@@ -681,20 +748,18 @@ class _ParticipantSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = participant;
-    if (p.name.trim().isEmpty) {
-      return Text('Peserta ${index + 1}',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textDark));
-    }
-    const detail = TextStyle(fontSize: 13, height: 1.4, color: AppColors.textMuted);
+    const title = _BookingScreenState._cardTitle;
+    const detail = _BookingScreenState._cardDetail;
+    if (p.name.trim().isEmpty) return Text('Peserta ${index + 1}', style: title);
     final medical = p.medicalHistory.trim();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(p.name.trim(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-      if (p.phone.isNotEmpty) ...[const SizedBox(height: 4), Text(displayPhone(p.phone), style: detail)],
+      Text(p.name.trim(), style: title),
+      if (p.phone.isNotEmpty) Text(displayPhone(p.phone), style: detail.copyWith(color: AppColors.textMuted)),
       if (showPickup) ...[
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Text('Titik jemput: ${p.pickupPoint.trim().isEmpty ? '-' : p.pickupPoint.trim()}', style: detail),
       ],
-      const SizedBox(height: 4),
+      const SizedBox(height: 6),
       Text('Riwayat penyakit & alergi: ${medical.isEmpty ? '-' : medical}', style: detail),
     ]);
   }
@@ -754,36 +819,44 @@ class _BookerFormState extends State<_BookerForm> {
             LabeledField(
               label: 'Nama Lengkap',
               required: true,
+              error: _errors['name'],
               child: TextField(
                 controller: _name,
                 textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(hintText: 'Nama sesuai identitas', errorText: _errors['name']),
+                style: fieldTextStyle,
+                decoration: markError(const InputDecoration(hintText: 'Nama sesuai identitas'), _errors['name']),
               ),
             ),
             const SizedBox(height: 16),
             LabeledField(
               label: 'Alamat Email',
               required: true,
+              error: _errors['email'],
               child: TextField(
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'nama@email.com',
-                  errorText: _errors['email'],
-                  prefixIcon: const Icon(Icons.mail_outline, size: 20, color: AppColors.textMuted),
-                ),
+                style: fieldTextStyle,
+                decoration: markError(
+                    InputDecoration(
+                      hintText: 'nama@email.com',
+                      prefixIconConstraints: fieldPrefixConstraints,
+                      prefixIcon: fieldPrefixIcon('envelope'),
+                    ),
+                    _errors['email']),
               ),
             ),
             const SizedBox(height: 16),
             LabeledField(
               label: 'Nomor WhatsApp / HP',
               required: true,
+              error: _errors['phone'],
               child: PhoneField(controller: _phone, errorText: _errors['phone']),
             ),
             const SizedBox(height: 16),
             LabeledField(
               label: 'Jenis Kelamin',
               required: true,
+              error: _errors['gender'],
               child: SelectField(
                 value: _gender,
                 options: _genders,
@@ -796,6 +869,7 @@ class _BookerFormState extends State<_BookerForm> {
             LabeledField(
               label: 'Tanggal Lahir',
               required: true,
+              error: _errors['birth'],
               child: BirthDateField(
                 valueIso: _birth,
                 errorText: _errors['birth'],
@@ -908,6 +982,8 @@ class _ParticipantFormState extends State<_ParticipantForm> {
         ..remove('pickup')
         ..['pickupSelect'] = 'Wajib diisi.';
     }
+    // Desain mewajibkan "Detail Lainnya" walau titik jemput dipilih ("-" bila tidak ada).
+    if (_pointChosen && _pickupDetail.text.trim().isEmpty) errors['pickupDetail'] = 'Wajib diisi.';
     if (errors.isNotEmpty) {
       setState(() => _errors = errors);
       return;
@@ -936,51 +1012,44 @@ class _ParticipantFormState extends State<_ParticipantForm> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           children: [
             if (note != null) ...[
-              InfoBanner(
-                icon: Icons.info_outline,
-                message: note,
-                color: AppColors.primaryDark,
-                textColor: AppColors.primaryDark,
-                background: AppColors.accentSoft,
-                border: AppColors.accentLight,
-              ),
+              NoteBox(text: note, dense: true),
               const SizedBox(height: 16),
             ],
             if (locked) ...[
-              const InfoBanner(
-                icon: Icons.person_outline,
-                message: 'Peserta ini adalah Anda. Nama, nomor, jenis kelamin, dan tanggal lahir mengikuti data pemesan.',
-                color: AppColors.textMedium,
-                textColor: AppColors.textMedium,
-                background: AppColors.background,
-                border: AppColors.border,
+              const NoteBox(
+                text: 'Peserta ini adalah Anda. Nama, nomor, jenis kelamin, dan tanggal lahir mengikuti data pemesan.',
               ),
               const SizedBox(height: 16),
             ],
             LabeledField(
               label: 'Nama Lengkap',
               required: true,
+              error: _errors['name'],
               child: TextField(
                 controller: _name,
                 enabled: !locked,
                 textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  hintText: 'Nama peserta ${widget.index + 1}',
-                  errorText: _errors['name'],
-                  fillColor: locked ? AppColors.divider : Colors.white,
-                ),
+                style: fieldTextStyle,
+                decoration: markError(
+                    InputDecoration(
+                      hintText: 'Nama peserta ${widget.index + 1}',
+                      fillColor: locked ? AppColors.divider : Colors.white,
+                    ),
+                    _errors['name']),
               ),
             ),
             const SizedBox(height: 16),
             LabeledField(
               label: 'Nomor WhatsApp / HP',
               required: true,
+              error: _errors['phone'],
               child: PhoneField(controller: _phone, errorText: _errors['phone'], enabled: !locked),
             ),
             const SizedBox(height: 16),
             LabeledField(
               label: 'Tanggal Lahir',
               required: true,
+              error: _errors['birth'],
               child: BirthDateField(
                 valueIso: _birth,
                 enabled: !locked,
@@ -992,6 +1061,7 @@ class _ParticipantFormState extends State<_ParticipantForm> {
             LabeledField(
               label: 'Jenis Kelamin',
               required: true,
+              error: _errors['gender'],
               child: SelectField(
                 value: _gender,
                 options: _genders,
@@ -1006,6 +1076,7 @@ class _ParticipantFormState extends State<_ParticipantForm> {
                 LabeledField(
                   label: 'Titik Jemput Peserta',
                   required: true,
+                  error: _errors['pickupSelect'],
                   child: SelectField(
                     value: _pickupSelect,
                     options: [..._points, _otherPickup],
@@ -1017,25 +1088,16 @@ class _ParticipantFormState extends State<_ParticipantForm> {
               ],
               const SizedBox(height: 16),
               LabeledField(
-                label: _pointChosen ? 'Detail Lainnya' : 'Alamat / Patokan Titik Jemput',
-                required: !_pointChosen,
-                child: TextField(
+                label: _points.isNotEmpty ? 'Detail Lainnya' : 'Alamat / Patokan Titik Jemput',
+                required: true,
+                error: _errors['pickup'] ?? _errors['pickupDetail'],
+                child: TextAreaField(
                   controller: _pickupDetail,
-                  minLines: 3,
-                  maxLines: 4,
                   maxLength: 400,
-                  decoration: InputDecoration(
-                    hintText: 'Patokan titik jemput (Contoh: depan pintu keluar Stasiun)',
-                    errorText: _errors['pickup'],
-                    counterText: '',
-                  ),
+                  hintText: 'Patokan titik jemput (Contoh: depan pintu keluar Stasiun)',
+                  errorText: _errors['pickup'] ?? _errors['pickupDetail'],
                 ),
               ),
-              if (widget.package.pickupArea.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text('Area penjemputan: ${widget.package.pickupArea}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-              ],
               if (widget.firstPickup.trim().isNotEmpty)
                 Align(
                   alignment: Alignment.centerLeft,
@@ -1053,6 +1115,7 @@ class _ParticipantFormState extends State<_ParticipantForm> {
               child: TextField(
                 controller: _medical,
                 maxLength: 255,
+                style: fieldTextStyle,
                 decoration: const InputDecoration(hintText: 'Contoh: Asma, Maag, dan lainnya', counterText: ''),
               ),
             ),

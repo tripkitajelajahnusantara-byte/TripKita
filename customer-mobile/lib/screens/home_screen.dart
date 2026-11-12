@@ -2,7 +2,6 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:customer_mobile/main.dart';
 import 'package:customer_mobile/models/package.dart';
@@ -150,50 +149,91 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBrandRow() {
-    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      const CroppedAsset(
-        'assets/images/logo_white.png',
-        width: 120.11,
-        height: 32,
-        left: -0.1606,
-        top: -0.0959,
-        widthFactor: 1.3139,
-        heightFactor: 1.2877,
-      ),
-      Semantics(
-        button: true,
-        label: 'Notifikasi',
-        child: ClipOval(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: Material(
-              color: const Color(0x80FFFFFF),
-              shape: const CircleBorder(side: BorderSide(color: Color(0x4DFFFFFF))),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: _openNotifications,
-                child: const Padding(padding: EdgeInsets.all(10), child: AppIcon('bell', size: 20)),
+    // Turun 4 dari tengah bar: logo y=64 dan lonceng y=60 pada frame Figma.
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: const BoxDecoration(boxShadow: [_heroGlow]),
+          child: Image.asset('assets/images/logo_color.png', width: 122.23, height: 32),
+        ),
+        Semantics(
+          button: true,
+          label: 'Notifikasi',
+          child: ClipOval(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: Material(
+                color: const Color(0x80FFFFFF),
+                shape: const CircleBorder(side: BorderSide(color: Color(0x4DFFFFFF))),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: _openNotifications,
+                  child: const Padding(padding: EdgeInsets.all(10), child: AppIcon('bell', size: 20)),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    ]);
+      ]),
+    );
   }
 
-  /// Frame Figma (status bar 48): foto setinggi 270, kartu pencarian mulai
-  /// y=216. Jarak mengikuti tinggi status bar perangkat.
+  /// Frame Figma (status bar 48): foto setinggi 290, judul y=121, kartu
+  /// pencarian mulai y=241. Jarak mengikuti tinggi status bar perangkat.
   Widget _buildHero(double top) {
+    // Foto Figma 450×300 di x=-35 dengan dasar y=290, tanpa bergantung tinggi
+    // status bar; layar lebih lebar dari 360 memperbesarnya proporsional.
+    final width = MediaQuery.sizeOf(context).width;
+    final k = width > 360 ? width / 360 : 1.0;
     return Stack(children: [
       Positioned(
-        left: 0,
-        right: 0,
-        top: 0,
-        height: top + 222,
-        child: Image.asset('assets/images/home_hero.jpg', fit: BoxFit.cover, alignment: Alignment.topCenter),
+        left: -35 * k,
+        top: top + 242 - 300 * k,
+        width: 450 * k,
+        height: 300 * k,
+        child: Image.asset('assets/images/home_hero.jpg', fit: BoxFit.fill),
+      ),
+      // Lapisan blur Figma di belakang teks: putih 80% (blur σ10) untuk judul,
+      // biru 80% (blur σ8) untuk subjudul.
+      Positioned(
+        left: 12,
+        top: top + 72,
+        width: 180,
+        height: 50,
+        child: const DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+            boxShadow: [BoxShadow(color: Color(0xCCFFFFFF), blurRadius: 16.45)],
+          ),
+        ),
+      ),
+      Positioned(
+        left: 12,
+        top: top + 124,
+        width: 180,
+        height: 34,
+        child: const DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+            boxShadow: [BoxShadow(color: Color(0xCC439ACC), blurRadius: 12.99)],
+          ),
+        ),
+      ),
+      Positioned(
+        left: 22,
+        top: top + 73,
+        child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Booking Nyaman,\nLiburan Tenang',
+              style: TextStyle(fontSize: 20, height: 24 / 20, fontWeight: FontWeight.w700, color: AppColors.brand)),
+          SizedBox(height: 4),
+          Text('Pilih trip favoritmu dan\nbooking dengan mudah',
+              style: TextStyle(fontSize: 12, height: 16 / 12, color: Colors.white)),
+        ]),
       ),
       Padding(
-        padding: EdgeInsets.fromLTRB(16, top + 168, 16, 0),
+        padding: EdgeInsets.fromLTRB(16, top + 193, 16, 0),
         child: Container(
           // Padding 16 dikurangi border 1.
           padding: const EdgeInsets.all(15),
@@ -202,8 +242,8 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.cardBorder),
             boxShadow: const [
-              BoxShadow(color: Color(0x14101828), offset: Offset(0, 4), blurRadius: 12),
-              BoxShadow(color: Color(0x0D0A0D12), offset: Offset(0, 1), blurRadius: 1),
+              BoxShadow(color: Color(0x1A000000), offset: Offset(0, 1), blurRadius: 3),
+              BoxShadow(color: Color(0x0F000000), offset: Offset(0, 1), blurRadius: 2),
             ],
           ),
           child: TripSearchForm(
@@ -301,8 +341,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// Kartu "Plan Trip" menuju fitur Rencana Trip, dengan ilustrasi peta
-/// petualangan (aset "Adventure map" Figma).
+/// Teal gelap judul & subjudul beranda (Figma #024254).
+const _deepTeal = Color(0xFF024254);
+
+/// Cahaya putih buram di belakang logo agar terbaca di atas foto (layer blur
+/// Figma: kotak putih 70%, σ 22.6; sigma Flutter = blurRadius × 0.577 + 0.5).
+const _heroGlow = BoxShadow(color: Color(0xB3FFFFFF), blurRadius: 38.26);
+
+/// Kartu "Plan Trip" menuju fitur Rencana Trip, dengan foto traveler yang
+/// memudar ke kiri di sisi kanan kartu.
 class _PlanTripCard extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -312,47 +359,69 @@ class _PlanTripCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: AppColors.border),
+          boxShadow: const [BoxShadow(color: Color(0x14000000), offset: Offset(0, 2), blurRadius: 12)],
         ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: SizedBox(
-            height: 144,
-            child: Stack(children: [
-              // Aset Figma "Adventure map" sudah terpotong tepi kartu (x 209–328).
-              Positioned(
-                right: 0,
-                top: 0,
-                child: SvgPicture.asset('assets/icons/adventure_map.svg', width: 119, height: 115),
-              ),
-              const Positioned(
-                left: 16,
-                top: 16,
-                width: 200,
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Plan Trip',
-                      style: TextStyle(fontSize: 24, height: 32 / 24, fontWeight: FontWeight.w600, color: AppColors.textBody)),
-                  SizedBox(height: 4),
-                  Text('Atur destinasi, jadwal, dan budget dalam satu rencana',
-                      style: TextStyle(fontSize: 12, height: 18 / 12, color: AppColors.textMuted)),
-                ]),
-              ),
-              const Positioned(
-                left: 16,
-                top: 108,
-                child: Row(children: [
-                  Text('Buat Plan Sekarang',
-                      style: TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 20, color: AppColors.accent),
-                ]),
-              ),
-            ]),
+        child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(color: AppColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              height: 147,
+              child: Stack(children: [
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 144,
+                  child: Image.asset('assets/images/plan_trip_photo.jpg', fit: BoxFit.cover),
+                ),
+                const Positioned(
+                  left: 177,
+                  top: 0,
+                  bottom: 0,
+                  width: 91,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [Colors.white, Color(0x80FFFFFF), Color(0x00FFFFFF)]),
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  left: 0,
+                  top: 16.5,
+                  width: 184,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Padding(
+                      padding: EdgeInsets.only(left: 16),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Plan Trip',
+                            style: TextStyle(fontSize: 20, height: 28 / 20, fontWeight: FontWeight.w600, color: _deepTeal)),
+                        SizedBox(height: 4),
+                        Text('Atur destinasi, jadwal, dan budget dalam satu rencana',
+                            style: TextStyle(fontSize: 12, height: 18 / 12, color: AppColors.textMedium)),
+                      ]),
+                    ),
+                    SizedBox(height: 12),
+                    ColoredBox(color: AppColors.background, child: SizedBox(height: 1)),
+                    SizedBox(height: 12),
+                    Padding(
+                      padding: EdgeInsets.only(left: 16),
+                      child: Text('Buat Plan Sekarang',
+                          style: TextStyle(
+                              fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                    ),
+                  ]),
+                ),
+              ]),
+            ),
           ),
         ),
       ),

@@ -1,3 +1,5 @@
+import { getLang } from '../i18n';
+
 // Rumus harga paket, sama dengan models/package_pricing.go di backend.
 // PER_PERSON: harga x peserta. PER_UNIT: harga per unit (jeep/mobil/paket)
 // berkapasitas unitCapacity orang; satu orang tetap membayar satu unit penuh.
@@ -44,7 +46,7 @@ export function basePrice(pkg: PricedPackage, guests: number): number {
 
 /** Label satuan harga, mis. "/ orang" atau "/ Jeep". */
 export function priceUnitLabel(pkg: PricedPackage): string {
-  return isPerUnit(pkg) ? `/ ${unitName(pkg)}` : '/ orang';
+  return isPerUnit(pkg) ? `/ ${unitName(pkg)}` : getLang() === 'en' ? '/ person' : '/ orang';
 }
 
 export function packageAddOns(pkg: PricedPackage): PackageAddOn[] {

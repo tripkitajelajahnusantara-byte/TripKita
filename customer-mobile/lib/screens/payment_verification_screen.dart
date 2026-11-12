@@ -6,16 +6,15 @@ import 'package:flutter/services.dart';
 
 import 'package:customer_mobile/config/app_config.dart';
 import 'package:customer_mobile/main.dart';
+import 'package:customer_mobile/screens/booking_detail_screen.dart';
 import 'package:customer_mobile/models/booking.dart';
 import 'package:customer_mobile/services/api_service.dart';
 import 'package:customer_mobile/services/checkout_config.dart';
 import 'package:customer_mobile/theme/app_theme.dart';
 import 'package:customer_mobile/utils/external_links.dart';
 import 'package:customer_mobile/utils/formatters.dart';
-import 'package:customer_mobile/utils/trip_utils.dart';
 import 'package:customer_mobile/widgets/bottom_navigation.dart';
 import 'package:customer_mobile/widgets/common.dart';
-import 'package:customer_mobile/widgets/form_fields.dart';
 
 /// Pembayaran booking. Selama menunggu pembayaran tampil "Selesaikan
 /// Pembayaran": online lewat Midtrans Snap (VA, QRIS, e-wallet), atau
@@ -36,6 +35,11 @@ class PaymentVerificationScreen extends StatefulWidget {
   /// baru dibuat).
   final bool openGatewayOnStart;
 
+  /// Dibuka dari tab Booking: kode booking di bawah judul, tombol
+  /// "Hubungi Provider" atau "Pesan Ulang" alih-alih kembali ke beranda.
+  final bool fromList;
+  final VoidCallback? onRebook;
+
   const PaymentVerificationScreen({
     super.key,
     required this.booking,
@@ -44,6 +48,8 @@ class PaymentVerificationScreen extends StatefulWidget {
     this.booker,
     this.participants,
     this.openGatewayOnStart = false,
+    this.fromList = false,
+    this.onRebook,
   });
 
   @override
@@ -55,6 +61,9 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
   CheckoutConfig? _config;
   PlatformFile? _proof;
   bool _loading = false;
+
+  /// Perkiraan progres unggah bukti (0-1) selama permintaan dikirim.
+  double _uploadProgress = 0;
   bool _checking = false;
   bool _gatewayOpened = false;
   bool _stepsOpen = true;
@@ -87,10 +96,16 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
     }
   }
 
-  /// Customer kembali dari halaman Midtrans: status langsung diperbarui.
+  /// Customer kembali dari halaman Midtrans: status langsung dicocokkan ulang
+  /// ke Midtrans agar pembayaran yang notifikasinya terlambat tetap tercatat.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _checkStatus();
+    if (state != AppLifecycleState.resumed) return;
+    if (_booking.usesMidtrans && _booking.status == BookingStatus.pendingPayment && _paymentStarted) {
+      _checkOnlinePayment(silent: true);
+    } else {
+      _checkStatus();
+    }
   }
 
   @override
@@ -126,22 +141,24 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
 
   /// Endpoint pembayaran juga mencocokkan ulang status ke Midtrans, sehingga
   /// pembayaran yang notifikasinya terlambat langsung tercatat.
-  Future<void> _checkOnlinePayment() async {
+  Future<void> _checkOnlinePayment({bool silent = false}) async {
     if (_loading || _checking) return;
     setState(() {
       _checking = true;
-      _error = null;
+      if (!silent) _error = null;
     });
     try {
       await ApiService.startMidtransPayment(_booking.bookingCode);
       final latest = await ApiService.trackBooking(_booking.bookingCode);
       if (!mounted) return;
-      if (latest.status == BookingStatus.pendingPayment) {
-        showSnack(context, 'Pembayaran belum kami terima. Bila sudah membayar, tunggu sebentar lalu cek lagi.');
+      if (!silent && latest.status == BookingStatus.pendingPayment) {
+        showTopToast(context, 'Pembayaran belum kami terima. Bila sudah membayar, tunggu sebentar lalu cek lagi.');
       }
       setState(() => _booking = latest);
     } catch (e) {
-      if (mounted) setState(() => _error = e is ApiException ? e.message : 'Status pembayaran belum dapat diperiksa.');
+      if (mounted && !silent) {
+        setState(() => _error = e is ApiException ? e.message : 'Status pembayaran belum dapat diperiksa.');
+      }
     } finally {
       if (mounted) setState(() => _checking = false);
     }
@@ -173,6 +190,13 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
     });
     try {
       final url = await ApiService.startMidtransPayment(_booking.bookingCode, changeMethod: changeMethod);
+      if (url.isNotEmpty && !isAllowedPaymentUrl(url)) {
+        if (mounted) {
+          setState(() => _error = 'Mode uji hanya boleh memakai Midtrans Sandbox, tetapi server mengirim halaman '
+              'pembayaran sungguhan. Pembayaran tidak dibuka agar tidak ada uang yang ditarik. Hubungi tim TemenTrip.');
+        }
+        return;
+      }
       if (url.isEmpty) {
         // Bukan _checkStatus(): fungsi itu berhenti selama _loading masih true.
         final latest = await ApiService.trackBooking(_booking.bookingCode);
@@ -209,10 +233,20 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
 
   Future<void> _submitProof() async {
     final proof = _proof;
-    if (_loading || proof?.bytes == null) return;
+    if (_loading) return;
+    if (proof?.bytes == null) {
+      setState(() => _error = 'Pilih file bukti transfer terlebih dahulu.');
+      return;
+    }
     setState(() {
       _loading = true;
+      _uploadProgress = 0;
       _error = null;
+    });
+    // shortcut: progres diperkirakan dari waktu (mendekati 90%) karena klien http
+    // tidak melaporkan byte terkirim; ganti dengan progres nyata bila API mendukung.
+    final progress = Timer.periodic(const Duration(milliseconds: 120), (_) {
+      if (mounted) setState(() => _uploadProgress += (0.9 - _uploadProgress) * 0.08);
     });
     try {
       final updated = await ApiService.submitPaymentProof(_booking.bookingCode, proof!.bytes!, proof.name);
@@ -224,6 +258,7 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
     } catch (e) {
       if (mounted) setState(() => _error = e is ApiException ? e.message : 'Bukti transfer belum dapat dikirim.');
     } finally {
+      progress.cancel();
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -234,18 +269,15 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
   }
 
   void _showBookingDetail() {
-    showDesignSheet<void>(
-      context,
-      title: 'Detail Booking',
-      showClose: false,
-      builder: (_) => BookingDetailSheet(
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BookingDetailScreen(
         booking: _booking,
         packageName: widget.packageName,
         draft: widget.draft,
         booker: widget.booker,
         participants: widget.participants,
       ),
-    );
+    ));
   }
 
   void _showHelp() {
@@ -265,8 +297,8 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
   List<String> get _steps => _booking.usesMidtrans
       ? const [
           'Ketuk "Bayar Sekarang" untuk membuka halaman pembayaran Midtrans.',
-          'Pilih metode: virtual account bank, QRIS, atau e-wallet.',
-          'Selesaikan pembayaran sebelum batas waktu. Status pesanan diperbarui otomatis tanpa unggah bukti.',
+          'Pilih virtual account bank, QRIS, atau e-wallet, lalu ikuti petunjuknya sebelum batas waktu.',
+          'Setelah membayar, tutup halaman Midtrans. Status pesanan diperbarui otomatis.',
         ]
       : [
           'Buka aplikasi bank atau ATM Anda.',
@@ -290,35 +322,48 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
       appBar: AppBar(
         titleSpacing: 0,
         title: const Text('Selesaikan Pembayaran'),
+        // Ikon bantuan berpusat di x 338 agar judul tidak terpotong.
         actions: [
           IconButton(
             tooltip: 'Cara membayar',
             onPressed: _showHelp,
-            icon: const Icon(Icons.help_outline_rounded, color: AppColors.accent),
+            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+            padding: EdgeInsets.zero,
+            icon: const AppIcon('question', color: AppColors.accentBright),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 1.7),
         ],
       ),
       body: Column(children: [
-        const CheckoutSteps(current: 1),
+        // Saat digulir, langkah checkout diganti bilah hitung mundur.
         if (_showStickyTimer && deadline != null)
           Container(
             width: double.infinity,
+            height: 34,
             color: AppColors.accent,
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Text('Selesaikan pembayaran dalam  ${_remaining(deadline)}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white)),
-          ),
+            alignment: Alignment.center,
+            child: Text.rich(
+              TextSpan(text: 'Selesaikan pembayaran dalam  ', children: [
+                TextSpan(
+                  text: _remaining(deadline),
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+              ]),
+              style: const TextStyle(
+                  fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w500, color: AppColors.accentLight),
+            ),
+          )
+        else
+          const CheckoutSteps(current: 1),
         Expanded(
           child: DefaultTextStyle.merge(
             style: figmaTextStyle,
             child: ListView(
               controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
               children: [
                 _buildBookingCard(deadline),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 online ? _buildOnlineCard() : _buildTransferCard(),
                 if (!online) ...[
                   const SizedBox(height: 24),
@@ -327,8 +372,8 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
                   _buildUpload(),
                 ],
                 if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  ErrorText(_error),
+                  const SizedBox(height: 16),
+                  NoteBox(text: _error, tone: NoteTone.danger, shadow: false),
                 ],
               ],
             ),
@@ -344,14 +389,16 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
                       ? const _ButtonSpinner()
                       : Text(_paymentStarted ? 'Lanjutkan Pembayaran' : 'Bayar Sekarang'),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 TextButton(
+                  style: TextButton.styleFrom(foregroundColor: AppColors.accent, minimumSize: const Size.fromHeight(36)),
                   onPressed: _loading || _checking ? null : _checkOnlinePayment,
-                  child: Text(_checking ? 'Memeriksa pembayaran...' : 'Sudah bayar? Cek status pembayaran'),
+                  child: Text(_checking ? 'Memeriksa pembayaran...' : 'Sudah bayar? Cek status pembayaran',
+                      style: const TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600)),
                 ),
               ])
             : ElevatedButton(
-                onPressed: _loading || _proof?.bytes == null || _config?.accountNumber.isEmpty != false ? null : _submitProof,
+                onPressed: _loading || _config?.accountNumber.isEmpty != false ? null : _submitProof,
                 child: _loading ? const _ButtonSpinner() : const Text('Kirim Bukti Pembayaran'),
               ),
       ),
@@ -368,96 +415,95 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
     return _Card(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (deadline != null) ...[
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Selesaikan pembayaran', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-                const SizedBox(height: 4),
-                Text(formatDateTimeWib(deadline),
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-              ]),
-            ),
+          Row(children: [
+            const Expanded(child: Text('Selesaikan pembayaran', style: _label)),
             _CountdownBoxes(text: _remaining(deadline)),
           ]),
-          const Padding(padding: EdgeInsets.symmetric(vertical: 14), child: DashedLine(color: AppColors.border)),
+          const SizedBox(height: 3),
+          Text(formatDateTimeWib(deadline),
+              style:
+                  const TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w500, color: AppColors.textDark)),
+          const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: DashedLine(color: AppColors.border)),
         ],
-        const Text('Kode Booking', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-        const SizedBox(height: 2),
-        Row(children: [
-          Expanded(
-            child: Text(_booking.bookingCode,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textDark)),
-          ),
-          CopyChip(_booking.bookingCode, message: 'Kode booking disalin.'),
-        ]),
+        const Text('Kode Booking', style: _label),
+        SizedBox(
+          height: 28,
+          child: Row(children: [
+            Expanded(
+              child: Text(_booking.bookingCode,
+                  style: const TextStyle(
+                      fontSize: 16, height: 1.5, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+            ),
+            CopyChip(_booking.bookingCode, message: 'Kode booking disalin.'),
+          ]),
+        ),
         const SizedBox(height: 12),
-        Text(widget.packageName,
-            style: const TextStyle(fontSize: 16, height: 1.4, fontWeight: FontWeight.w500, color: AppColors.textMedium)),
-        if (_scheduleLine != null) ...[
-          const SizedBox(height: 4),
-          _IconLine(icon: Icons.calendar_today_outlined, text: _scheduleLine!),
-        ],
+        _PackageLines(name: widget.packageName, schedule: _scheduleLine),
       ]),
     );
   }
 
-  /// `25 – 27 Okt 2026 • 3 hari, 2 malam`
+  static const _label = TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMuted);
+
+  /// `25 – 27 Okt 2026 • 3 hari`
   String? get _scheduleLine {
     final start = _booking.tripDate ?? parseIsoDate(widget.draft?.startDate ?? '');
     if (start == null) return null;
     final end = _booking.tripEndDate ?? parseIsoDate(widget.draft?.endDate ?? '') ?? start;
     final days = dateOnly(end).difference(dateOnly(start)).inDays + 1;
-    return '${formatDateRange(start, end)} • ${durationLabel(days)}';
+    return '${formatDateRange(start, end)} • $days hari';
   }
 
   Widget _buildOnlineCard() {
     return _Card(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('Total Pembayaran', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-        const SizedBox(height: 4),
+        const Text('Total Pembayaran', style: _label),
+        const SizedBox(height: 2),
         Text(formatPrice(_booking.totalPrice),
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
-        const Divider(height: 28),
-        Row(children: [
-          const Expanded(child: Text('Metode Pembayaran', style: TextStyle(fontSize: 13, color: AppColors.textMuted))),
-          // Snap mengunci metode setelah dipilih; tagihan lama perlu dihentikan dulu.
-          if (_paymentStarted)
-            TextButton.icon(
-              onPressed: _loading || _checking ? null : () => _payOnline(changeMethod: true),
-              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-              label: const Text('Ganti Metode'),
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+                fontSize: 24, height: 32 / 24, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
+        const Padding(padding: EdgeInsets.symmetric(vertical: 15), child: Divider(height: 1)),
+        SizedBox(
+          height: 24,
+          child: Row(children: [
+            const Expanded(child: Text('Metode Pembayaran', style: _label)),
+            // Snap mengunci metode setelah dipilih; tagihan lama perlu dihentikan dulu.
+            if (_paymentStarted)
+              InkWell(
+                borderRadius: BorderRadius.circular(4),
+                onTap: _loading || _checking ? null : () => _payOnline(changeMethod: true),
+                child: const Text('Ganti Metode',
+                    style: TextStyle(
+                        fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
               ),
-            ),
+          ]),
+        ),
+        const SizedBox(height: 8),
+        const Wrap(spacing: 8, runSpacing: 8, children: [
+          _MethodPill('Virtual Account'),
+          _MethodPill('QRIS'),
+          _MethodPill('E-wallet'),
         ]),
-        SizedBox(height: _paymentStarted ? 4 : 8),
-        const Wrap(spacing: 6, runSpacing: 6, children: [
-          _MethodChip(icon: Icons.account_balance_outlined, label: 'Virtual Account'),
-          _MethodChip(icon: Icons.qr_code_2_rounded, label: 'QRIS'),
-          _MethodChip(icon: Icons.account_balance_wallet_outlined, label: 'E-wallet'),
-        ]),
-        const SizedBox(height: 12),
-        const InfoBanner(
-          icon: Icons.verified_user_outlined,
-          message: 'Pembayaran diproses aman oleh Midtrans. Pesanan terkonfirmasi otomatis setelah bayar, tanpa unggah bukti transfer.',
-          color: AppColors.primaryDark,
-          textColor: AppColors.textMedium,
-          background: AppColors.accentSoft,
-          border: AppColors.accentLight,
+        const SizedBox(height: 16),
+        const NoteBox(
+          text: 'Pembayaran diproses aman oleh Midtrans. Pesanan terkonfirmasi otomatis setelah bayar, '
+              'tanpa unggah bukti transfer.',
+          tone: NoteTone.plain,
         ),
         if (AppConfig.isStaging) ...[
           const SizedBox(height: 8),
-          const InfoBanner(
-            icon: Icons.science_outlined,
-            title: 'Mode uji (Midtrans Sandbox)',
-            message: 'Tidak ada uang sungguhan yang ditarik. Bayar memakai simulator di simulator.sandbox.midtrans.com '
-                'sesuai metode yang dipilih (mis. nomor VA atau QRIS).',
+          const NoteBox(
+            span: TextSpan(children: [
+              TextSpan(text: 'Mode uji (Midtrans Sandbox). ', style: TextStyle(fontWeight: FontWeight.w600)),
+              TextSpan(
+                  text: 'Tidak ada uang sungguhan yang ditarik. Bayar lewat simulator.sandbox.midtrans.com '
+                      'memakai nomor VA atau kode QRIS yang tampil di halaman Midtrans.'),
+            ]),
+            tone: NoteTone.warning,
+            shadow: false,
           ),
         ],
-        const SizedBox(height: 4),
+        const SizedBox(height: 16),
         _buildStepsToggle(),
       ]),
     );
@@ -466,27 +512,44 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
   Widget _buildTransferCard() {
     final config = _config;
     final account = config?.accountNumber ?? '';
+    final bank = config?.bankName ?? 'Memuat...';
     return _Card(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('Total yang Harus Ditransfer', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-        const SizedBox(height: 4),
-        Text(formatPrice(_booking.totalPrice),
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
-        const Divider(height: 28),
-        const Text('Transfer ke:', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-        const SizedBox(height: 6),
-        Text(config?.bankName ?? 'Memuat...',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textBody)),
+        const Text('Total yang Harus Ditransfer', style: _label),
         const SizedBox(height: 2),
-        Text('a.n. ${config?.accountHolder ?? '-'}', style: const TextStyle(fontSize: 13, color: AppColors.textMedium)),
-        const SizedBox(height: 12),
+        Text(formatPrice(_booking.totalPrice),
+            style: const TextStyle(
+                fontSize: 24, height: 32 / 24, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
+        const Padding(padding: EdgeInsets.symmetric(vertical: 15), child: Divider(height: 1)),
+        const Text('Transfer ke:', style: _label),
+        const SizedBox(height: 9),
+        // Blok bank setinggi 50: nama, jarak 4, pemilik rekening; logo di tengah.
+        SizedBox(
+          height: 50,
+          child: Row(children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(bank,
+                    style: const TextStyle(
+                        fontSize: 16, height: 1.5, fontWeight: FontWeight.w600, color: AppColors.textBody)),
+                const SizedBox(height: 4),
+                Text('a.n. ${config?.accountHolder ?? '-'}',
+                    style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMedium)),
+              ]),
+            ),
+            if (bank.toUpperCase().contains('OCBC')) const AppIcon('bank_ocbc', size: 46, height: 32),
+          ]),
+        ),
+        const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+          height: 48,
+          padding: const EdgeInsets.only(left: 12, right: 2),
           decoration: BoxDecoration(color: AppColors.accentSoft, borderRadius: BorderRadius.circular(8)),
           child: Row(children: [
             Expanded(
               child: Text(account.isEmpty ? 'Belum dikonfigurasi' : account,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                  style: const TextStyle(
+                      fontSize: 16, height: 1.5, fontWeight: FontWeight.w600, color: AppColors.textDark)),
             ),
             IconButton(
               tooltip: 'Salin nomor rekening',
@@ -494,26 +557,22 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
                   ? null
                   : () async {
                       await Clipboard.setData(ClipboardData(text: account));
-                      if (mounted) showSnack(context, 'Nomor rekening disalin.');
+                      if (mounted) showTopToast(context, 'Nomor rekening disalin.');
                     },
-              icon: const Icon(Icons.copy_rounded, size: 20, color: AppColors.accent),
+              icon: const AppIcon('copy', size: 16, color: AppColors.accent),
             ),
           ]),
         ),
-        const SizedBox(height: 12),
-        const InfoBanner(
-          icon: Icons.info_outline,
-          message: 'Cantumkan kode booking pada berita transfer agar pembayaran lebih cepat diverifikasi.',
-          color: AppColors.primaryDark,
-          textColor: AppColors.textMedium,
-          background: Colors.white,
-          border: AppColors.border,
+        const SizedBox(height: 16),
+        const NoteBox(
+          text: 'Cantumkan kode booking pada berita transfer agar pembayaran lebih cepat diverifikasi.',
+          tone: NoteTone.plain,
         ),
         if (_booking.paymentReviewNotes.isNotEmpty) ...[
           const SizedBox(height: 8),
           ErrorText('Catatan admin: ${_booking.paymentReviewNotes}'),
         ],
-        const SizedBox(height: 4),
+        const SizedBox(height: 16),
         _buildStepsToggle(),
       ]),
     );
@@ -523,17 +582,21 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       InkWell(
         onTap: () => setState(() => _stepsOpen = !_stepsOpen),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+        child: SizedBox(
+          height: 24,
           child: Row(children: [
             const Expanded(
-              child: Text('Cara Membayar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+              child: Text('Cara Membayar',
+                  style: TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w600, color: AppColors.textDark)),
             ),
-            Icon(_stepsOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: AppColors.textMedium),
+            AppIcon(_stepsOpen ? 'chevron_up' : 'chevron_down', color: AppColors.icon),
           ]),
         ),
       ),
-      if (_stepsOpen) _PaymentSteps(steps: _steps),
+      if (_stepsOpen) ...[
+        const SizedBox(height: 8),
+        _PaymentSteps(steps: _steps),
+      ],
     ]);
   }
 
@@ -543,61 +606,101 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
       return _Card(
         child: InkWell(
           onTap: _loading ? null : _selectProof,
-          borderRadius: BorderRadius.circular(8),
           child: CustomPaint(
             painter: _DashedBorderPainter(),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              child: Column(children: [
-                Icon(Icons.upload_file_rounded, color: AppColors.textMedium),
-                SizedBox(height: 10),
-                Text('Pilih file bukti transfer', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
-                SizedBox(height: 4),
-                Text('JPG, PNG, atau PDF (maks. 5 MB)', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+            child: SizedBox(
+              height: 134,
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: const [BoxShadow(color: Color(0x0D0A0D12), offset: Offset(0, 1), blurRadius: 2)],
+                  ),
+                  child: const AppIcon('upload', size: 16, color: AppColors.textMedium),
+                ),
+                const SizedBox(height: 12),
+                const Text('Pilih file bukti transfer',
+                    style:
+                        TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                const SizedBox(height: 4),
+                const Text('JPG, PNG, atau PDF (max. 5MB)',
+                    style: TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMuted)),
               ]),
             ),
           ),
         ),
       );
     }
-    final sizeMb = (proof.size / (1024 * 1024)).toStringAsFixed(1);
+    final sizeMb = '${(proof.size / (1024 * 1024)).toStringAsFixed(1)} MB';
+    const name = TextStyle(fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w500, color: AppColors.textDark);
+    const size = TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMedium);
+    final delete = IconButton(
+      tooltip: 'Hapus file',
+      onPressed: _loading ? null : () => setState(() => _proof = null),
+      icon: const AppIcon('trash', size: 20, color: AppColors.dangerDark),
+    );
     return _Card(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Container(
-            width: 36,
-            height: 44,
-            alignment: Alignment.bottomCenter,
-            padding: const EdgeInsets.only(bottom: 6),
-            decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(4)),
-            child: Text((proof.extension ?? '').toUpperCase(),
-                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.textMedium)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(_loading ? 'Mengunggah...' : proof.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-              const SizedBox(height: 2),
-              Text('$sizeMb MB', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-            ]),
-          ),
-          IconButton(
-            tooltip: 'Hapus file',
-            onPressed: _loading ? null : () => setState(() => _proof = null),
-            icon: const Icon(Icons.delete_outline_rounded, color: AppColors.dangerDark),
-          ),
-        ]),
-        if (_loading) ...[
-          const SizedBox(height: 10),
-          const ClipRRect(
-            borderRadius: BorderRadius.all(Radius.circular(4)),
-            child: LinearProgressIndicator(minHeight: 6, color: AppColors.accent, backgroundColor: AppColors.accentLight),
-          ),
-        ],
-      ]),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(15, 15, 3, 15),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: _loading
+            // Sedang dikirim: nama diganti "Uploading..." dan bilah progres.
+            ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('Uploading...', style: name),
+                      const SizedBox(height: 2),
+                      Text(sizeMb, style: size),
+                    ]),
+                  ),
+                  delete,
+                ]),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: _uploadProgress,
+                        minHeight: 8,
+                        color: AppColors.accent,
+                        backgroundColor: AppColors.background,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 58,
+                    child: Text('${(_uploadProgress * 100).round()}%',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                            fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.textMedium)),
+                  ),
+                  const SizedBox(width: 13),
+                ]),
+              ])
+            : Row(children: [
+                const SizedBox(width: 5),
+                _FileBadge(extension: proof.extension ?? ''),
+                const SizedBox(width: 17),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(proof.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: name),
+                    const SizedBox(height: 2),
+                    Text(sizeMb, style: size),
+                  ]),
+                ),
+                delete,
+              ]),
+      ),
     );
   }
 
@@ -608,163 +711,270 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
     final paid = _booking.isPaidOrActive;
     final review = _booking.status == BookingStatus.paymentReview;
     final expired = _booking.isPaymentExpired;
-    final IconData icon;
-    final Color color;
-    final Color tint;
-    final Color halo;
+    final StatusKind kind;
     final String title;
     final String subtitle;
     if (paid) {
-      icon = Icons.check_rounded;
-      color = AppColors.success;
-      tint = const Color(0xFFDCFCE7);
-      halo = AppColors.successBg;
+      kind = StatusKind.success;
       title = 'Pembayaran Berhasil';
-      subtitle = 'Pesanan Anda sudah diteruskan ke provider.';
+      subtitle = 'Pesanan Anda sudah diteruskan provider.';
     } else if (review) {
-      icon = Icons.hourglass_bottom_rounded;
-      color = AppColors.warningDark;
-      tint = const Color(0xFFFEF3C7);
-      halo = AppColors.warningBg;
+      kind = StatusKind.pending;
       title = 'Pembayaran sedang Diverifikasi';
       subtitle = 'Diperiksa maksimal 1 × 24 jam. Notifikasi dikirim setelah selesai.';
     } else {
-      icon = Icons.close_rounded;
-      color = AppColors.dangerDark;
-      tint = AppColors.dangerBg;
-      halo = AppColors.dangerSoft;
-      title = expired ? 'Waktu Pembayaran Habis' : bookingStatusStyle(_booking.status).label;
-      subtitle = expired
-          ? 'Kuota sudah dilepas. Silakan buat pesanan baru bila masih ingin berangkat.'
-          : 'Lihat detail pesanan di menu Booking.';
+      kind = StatusKind.failed;
+      title = expired ? 'Pembayaran Gagal' : bookingStatusStyle(_booking.status).label;
+      subtitle = expired ? 'Batas waktu pembayaran sudah terlewati.' : 'Lihat detail pesanan di menu Booking.';
     }
 
+    final failed = kind == StatusKind.failed;
+    final whatsapp = whatsAppUri(_booking.providerWhatsApp);
     return Scaffold(
-      appBar: AppBar(titleSpacing: 0, title: const Text('Status Pembayaran')),
+      backgroundColor: Colors.white,
+      appBar: widget.fromList
+          ? AppBar(
+              leadingWidth: 72,
+              titleSpacing: -7,
+              toolbarHeight: 56,
+              title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Status Pembayaran',
+                    style: TextStyle(
+                        fontSize: 20, height: 28 / 20, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                const SizedBox(height: 6),
+                Text('Kode Booking: ${_booking.bookingCode}',
+                    style: const TextStyle(
+                        fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w500, color: Color(0xFF667085))),
+              ]),
+            )
+          : AppBar(titleSpacing: 0, title: const Text('Status Pembayaran')),
       body: DefaultTextStyle.merge(
         style: figmaTextStyle,
         child: RefreshIndicator(
           onRefresh: _checkStatus,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             children: [
-              _Card(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-                child: Column(children: [
-                  Container(
-                    width: 92,
-                    height: 92,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(color: halo, shape: BoxShape.circle),
-                    child: Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
-                      child: Icon(icon, size: 34, color: color),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textDark)),
-                  const SizedBox(height: 6),
-                  Text(subtitle,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 13, height: 1.45, color: AppColors.textMuted)),
-                  if (review && _booking.paymentReviewDeadline != null) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.schedule_rounded, size: 14, color: AppColors.textMedium),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text('Selesai sebelum ${formatDateTimeWib(_booking.paymentReviewDeadline!).split(', ').skip(1).join(', ')}',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textBody)),
-                        ),
-                      ]),
-                    ),
-                  ],
-                ]),
+              StatusHero(
+                kind: kind,
+                title: title,
+                subtitle: subtitle,
+                deadline: review ? _booking.paymentReviewDeadline : null,
               ),
-              const SizedBox(height: 16),
-              _buildTicketSummary(),
+              SizedBox(height: failed ? 24 : 16),
+              BookingTicketSummary(
+                booking: _booking,
+                packageName: widget.packageName,
+                schedule: _scheduleLine,
+                onDetail: _showBookingDetail,
+                showCode: !failed,
+              ),
+              if (failed && widget.fromList) ...[
+                const SizedBox(height: 24),
+                const NoteBox(
+                  text:
+                      'Pesan ulang untuk mengisi trip dan tanggal yang sama. Ketersediaan kuota dicek sebelum memesan.',
+                ),
+              ],
             ],
           ),
         ),
       ),
       bottomNavigationBar: BottomActionBar(
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          if (review) ...[
-            ElevatedButton(onPressed: () => appShellKey.currentState?.showBookings(), child: const Text('Cek Booking')),
-            const SizedBox(height: 8),
+          if (widget.fromList && failed)
+            ElevatedButton(onPressed: widget.onRebook, child: const Text('Pesan Ulang'))
+          else if (widget.fromList) ...[
+            if (whatsapp != null)
+              OutlinedButton(onPressed: () => openExternal(whatsapp), child: const Text('Hubungi Provider'))
+            else
+              OutlinedButton(onPressed: _goHome, child: const Text('Kembali ke Beranda')),
+          ] else ...[
+            if (review) ...[
+              ElevatedButton(
+                  onPressed: () => appShellKey.currentState?.showBookings(), child: const Text('Cek Booking')),
+              const SizedBox(height: 8),
+            ],
+            OutlinedButton(onPressed: _goHome, child: const Text('Kembali ke Beranda')),
           ],
-          OutlinedButton(onPressed: _goHome, child: const Text('Kembali ke Beranda')),
         ]),
       ),
     );
   }
+}
 
-  Widget _buildTicketSummary() {
+enum StatusKind {
+  pending(Color(0xFFFEF3C7), AppColors.warningBg, AppColors.warningDark, 'hourglass'),
+  success(Color(0xFFDCFCE7), AppColors.successBg, AppColors.success, 'check'),
+  failed(Color(0xFFFEE2E2), AppColors.dangerSoft, AppColors.dangerDark, 'x_bold');
+
+  final Color fill;
+  final Color halo;
+  final Color icon;
+  final String iconName;
+
+  const StatusKind(this.fill, this.halo, this.icon, this.iconName);
+}
+
+/// Kartu status: ikon dalam lingkaran 80 berhalo, judul 20, keterangan 14,
+/// dan pil batas waktu verifikasi.
+class StatusHero extends StatelessWidget {
+  final StatusKind kind;
+  final String title;
+  final String subtitle;
+  final DateTime? deadline;
+
+  const StatusHero({super.key, required this.kind, required this.title, required this.subtitle, this.deadline});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.fromLTRB(16, 9.33, 16, 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-        boxShadow: const [BoxShadow(color: Color(0x0F102A33), blurRadius: 8, offset: Offset(0, 2))],
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: softShadow,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      child: Column(children: [
         Container(
-          color: AppColors.accentSoft,
-          padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-          child: Row(children: [
-            const Icon(Icons.confirmation_number_outlined, color: AppColors.accent, size: 28),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Kode Booking', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                const SizedBox(height: 2),
-                Text(_booking.bookingCode,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+          width: 93.33,
+          height: 93.33,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: kind.halo, shape: BoxShape.circle),
+          child: Container(
+            width: 66.67,
+            height: 66.67,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: kind.fill, shape: BoxShape.circle),
+            child: AppIcon(kind.iconName, size: 40, color: kind.icon),
+          ),
+        ),
+        const SizedBox(height: 9.33),
+        Text(title,
+            textAlign: TextAlign.center,
+            style:
+                const TextStyle(fontSize: 20, height: 28 / 20, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+        const SizedBox(height: 3),
+        Text(subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14, height: 23 / 14, color: AppColors.textMuted)),
+        if (deadline != null) ...[
+          const SizedBox(height: 15),
+          Container(
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 8.5),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border, width: 0.875),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const AppIcon('clock', size: 16, color: AppColors.icon),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text('Selesai sebelum ${formatDateTimeWib(deadline!).split(', ').skip(1).join(', ')}',
+                    style: const TextStyle(
+                        fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.textBody)),
+              ),
+            ]),
+          ),
+        ],
+      ]),
+    );
+  }
+}
+
+/// Kartu tiket booking: kepala kode booking + Salin, nama paket & jadwal,
+/// total pembayaran, lalu baris "Detail Booking".
+class BookingTicketSummary extends StatelessWidget {
+  final Booking booking;
+  final String packageName;
+  final String? schedule;
+  final VoidCallback onDetail;
+
+  /// Tanpa kepala kode booking (radius 8), seperti pada pembayaran gagal.
+  final bool showCode;
+
+  const BookingTicketSummary({
+    super.key,
+    required this.booking,
+    required this.packageName,
+    required this.schedule,
+    required this.onDetail,
+    this.showCode = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(showCode ? 16 : 8),
+        border: Border.all(color: AppColors.border),
+        boxShadow: showCode ? softShadow : null,
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (showCode)
+          Container(
+            height: 73,
+            color: AppColors.accentSoft,
+            padding: const EdgeInsets.fromLTRB(12, 0, 15, 0),
+            child: Row(children: [
+              // Ikon tiket desain memakai mask SVG, jadi dipakai sebagai PNG 3x.
+              Image.asset('assets/images/ticket_booking.png', width: 37, height: 30),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Kode Booking',
+                          style: TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMuted)),
+                      const SizedBox(height: 4),
+                      Text(booking.bookingCode,
+                          style: const TextStyle(
+                              fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                    ]),
+              ),
+              CopyChip(booking.bookingCode, message: 'Kode booking disalin.'),
+            ]),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(15, 16, 15, 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _PackageLines(name: packageName, schedule: schedule),
+            const Padding(padding: EdgeInsets.symmetric(vertical: 15), child: DashedLine(color: AppColors.border)),
+            SizedBox(
+              height: 24,
+              child: Row(children: [
+                const Expanded(
+                  child: Text('Total Pembayaran',
+                      style: TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMuted)),
+                ),
+                Text(formatPrice(booking.totalPrice),
+                    style: const TextStyle(
+                        fontSize: 18, height: 24 / 18, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
               ]),
             ),
-            CopyChip(_booking.bookingCode, message: 'Kode booking disalin.'),
           ]),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(widget.packageName,
-                style: const TextStyle(fontSize: 16, height: 1.4, fontWeight: FontWeight.w500, color: AppColors.textMedium)),
-            if (_scheduleLine != null) ...[
-              const SizedBox(height: 4),
-              _IconLine(icon: Icons.calendar_today_outlined, text: _scheduleLine!),
-            ],
-            const Padding(padding: EdgeInsets.symmetric(vertical: 14), child: DashedLine(color: AppColors.border)),
-            Row(children: [
-              const Expanded(child: Text('Total Pembayaran', style: TextStyle(fontSize: 13, color: AppColors.textMuted))),
-              Text(formatPrice(_booking.totalPrice),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
-            ]),
-          ]),
-        ),
-        const SizedBox(height: 14),
         const Divider(height: 1),
         InkWell(
-          onTap: _showBookingDetail,
-          child: const Padding(
-            padding: EdgeInsets.fromLTRB(16, 14, 12, 14),
-            child: Row(children: [
-              Expanded(
-                child: Text('Detail Booking', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
-              ),
-              Icon(Icons.chevron_right_rounded, color: AppColors.accent),
-            ]),
+          onTap: onDetail,
+          child: const SizedBox(
+            height: 55,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(15, 0, 17.4, 0),
+              child: Row(children: [
+                Expanded(
+                  child: Text('Detail Booking',
+                      style:
+                          TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                ),
+                AppIcon('chevron_right', color: AppColors.accent),
+              ]),
+            ),
           ),
         ),
       ]),
@@ -772,115 +982,91 @@ class _PaymentVerificationScreenState extends State<PaymentVerificationScreen> w
   }
 }
 
-/// Isi lembar "Detail Booking": rincian trip, data pemesan, dan peserta.
-class BookingDetailSheet extends StatelessWidget {
-  final Booking booking;
-  final String packageName;
-  final BookingDraft? draft;
-  final BookerContact? booker;
-  final List<Participant>? participants;
+/// Nama paket (16/24, dua baris) lalu baris jadwal berikon kalender.
+class _PackageLines extends StatelessWidget {
+  final String name;
+  final String? schedule;
 
-  const BookingDetailSheet({
-    super.key,
-    required this.booking,
-    required this.packageName,
-    this.draft,
-    this.booker,
-    this.participants,
-  });
+  const _PackageLines({required this.name, required this.schedule});
 
   @override
   Widget build(BuildContext context) {
-    final pkg = booking.packageDetails ?? draft?.package;
-    final start = booking.tripDate ?? parseIsoDate(draft?.startDate ?? '');
-    final end = booking.tripEndDate ?? parseIsoDate(draft?.endDate ?? '') ?? start;
-    final people = booking.participants.isNotEmpty ? booking.participants : (participants ?? const <Participant>[]);
-    final name = booker?.name ?? booking.customerName;
-    final email = booker?.email ?? booking.customerEmail;
-    final phone = booker?.whatsapp ?? booking.customerPhone;
-    final flexible = pkg?.isFlexiblePickup ?? people.any((p) => p.pickupPoint.isNotEmpty);
-    const label = TextStyle(fontSize: 12, color: AppColors.textMuted);
-    const value = TextStyle(fontSize: 14, color: AppColors.textMedium);
-    const detail = TextStyle(fontSize: 12, height: 1.45, color: AppColors.textMuted);
-
-    Widget card(Widget child) => Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: child,
-        );
-
-    return ListView(
-      shrinkWrap: true,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-      children: [
-        card(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: NetworkPhoto(pkg == null || pkg.photos.isEmpty ? '' : pkg.photos.first, width: 56, height: 48),
-            ),
-            const SizedBox(width: 12),
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(name,
+          style: const TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w500, color: AppColors.textMedium)),
+      if (schedule != null)
+        SizedBox(
+          height: 24,
+          child: Row(children: [
+            const AppIcon('calendar_small', size: 16, color: AppColors.icon),
+            const SizedBox(width: 4),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                if (pkg != null)
-                  Text('${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${durationLabel(pkg.durationDays)}', style: label),
-                const SizedBox(height: 2),
-                Text(packageName, style: const TextStyle(fontSize: 15, height: 1.35, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-              ]),
+              child: Text(schedule!, style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMuted)),
             ),
           ]),
-          const Divider(height: 24),
-          const Text('Tanggal Keberangkatan', style: label),
-          const SizedBox(height: 2),
-          Text(start == null ? '-' : formatDateRange(start, end!), style: value),
-          const Divider(height: 20),
-          const Text('Jumlah Peserta', style: label),
-          const SizedBox(height: 2),
-          Text('${booking.guests > 0 ? booking.guests : people.length} orang', style: value),
-        ])),
-        const SizedBox(height: 16),
-        const SectionTitle('Data Pemesan'),
-        const SizedBox(height: 8),
-        card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(name.isEmpty ? '-' : name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-          if (email.isNotEmpty) ...[const SizedBox(height: 4), Text(email, style: detail)],
-          if (phone.isNotEmpty) Text(displayPhone(phone), style: detail),
-        ])),
-        if (people.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          const SectionTitle('Data Peserta'),
-          const SizedBox(height: 8),
-          for (var i = 0; i < people.length; i++) ...[
-            card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Peserta ${i + 1}', style: label),
-              const SizedBox(height: 4),
-              Text(people[i].name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textDark)),
-              if (people[i].phone.isNotEmpty) ...[const SizedBox(height: 4), Text(displayPhone(people[i].phone), style: detail)],
-              if (flexible) Text('Titik jemput: ${people[i].pickupPoint.isEmpty ? '-' : people[i].pickupPoint}', style: detail),
-              Text('Riwayat penyakit & alergi: ${people[i].medicalHistory.trim().isEmpty ? '-' : people[i].medicalHistory.trim()}',
-                  style: detail),
-            ])),
-            const SizedBox(height: 8),
-          ],
-        ],
-      ],
+        ),
+    ]);
+  }
+}
+
+/// Ikon berkas 27×36 dengan sudut terlipat dan label ekstensi.
+class _FileBadge extends StatelessWidget {
+  final String extension;
+
+  const _FileBadge({required this.extension});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 27,
+      height: 36,
+      child: CustomPaint(
+        painter: _FilePainter(),
+        child: Padding(
+          padding: const EdgeInsets.only(top: 21),
+          child: Text(extension.toUpperCase(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 9, height: 1.17, fontWeight: FontWeight.w700, color: Color(0xFF475467))),
+        ),
+      ),
     );
   }
 }
 
+class _FilePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    const fold = 7.8;
+    final page = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width - fold, 0)
+      ..lineTo(size.width, fold)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(page, Paint()..color = AppColors.divider);
+    final corner = Path()
+      ..moveTo(size.width - fold, 0)
+      ..lineTo(size.width - fold, fold * 0.92)
+      ..lineTo(size.width, fold * 0.92)
+      ..close();
+    canvas.drawPath(corner, Paint()..color = const Color(0xFFD0D5DD));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Kartu putih radius 12 berbingkai (padding 16 dari tepi luar).
 class _Card extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry padding;
 
-  const _Card({required this.child, this.padding = const EdgeInsets.all(16)});
+  const _Card({required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding,
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -891,23 +1077,7 @@ class _Card extends StatelessWidget {
   }
 }
 
-class _IconLine extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _IconLine({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      Icon(icon, size: 14, color: AppColors.textMuted),
-      const SizedBox(width: 6),
-      Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.textMuted))),
-    ]);
-  }
-}
-
-/// Hitung mundur `HH : MM : SS` dalam kotak merah.
+/// Hitung mundur `HH : MM : SS` dalam kotak merah 24×26.
 class _CountdownBoxes extends StatelessWidget {
   final String text;
 
@@ -918,15 +1088,17 @@ class _CountdownBoxes extends StatelessWidget {
     final parts = text.split(':');
     Widget box(String v) => Container(
           constraints: const BoxConstraints(minWidth: 24),
-          height: 24,
+          height: 26,
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 4),
           decoration: BoxDecoration(color: AppColors.dangerDark, borderRadius: BorderRadius.circular(4)),
-          child: Text(v, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+          child: Text(v,
+              style: const TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: Colors.white)),
         );
-    const colon = Padding(
-      padding: EdgeInsets.symmetric(horizontal: 3),
-      child: Text(':', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.dangerDark)),
+    const colon = SizedBox(
+      width: 8,
+      child: Text(':',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.dangerDark)),
     );
     return Semantics(
       label: 'Sisa waktu pembayaran $text',
@@ -935,25 +1107,23 @@ class _CountdownBoxes extends StatelessWidget {
   }
 }
 
-class _MethodChip extends StatelessWidget {
-  final IconData icon;
+/// Pil metode pembayaran Midtrans (hanya informasi; dipilih di halaman Snap).
+class _MethodPill extends StatelessWidget {
   final String label;
 
-  const _MethodChip({required this.icon, required this.label});
+  const _MethodPill(this.label);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.accentSoft,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.accentLight),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 16, color: AppColors.accent),
-        const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textBody)),
-      ]),
+      child: Text(label,
+          style: const TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.textMedium)),
     );
   }
 }
@@ -965,15 +1135,14 @@ class _PaymentSteps extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const style = TextStyle(fontSize: 14, height: 1.6, color: AppColors.textMuted);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       for (var i = 0; i < steps.length; i++)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SizedBox(width: 20, child: Text('${i + 1}.', style: const TextStyle(fontSize: 14, color: AppColors.textMedium))),
-            Expanded(child: Text(steps[i], style: const TextStyle(fontSize: 14, height: 1.45, color: AppColors.textMedium))),
-          ]),
-        ),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: 16, child: Text('${i + 1}.', textAlign: TextAlign.right, style: style)),
+          const SizedBox(width: 4.7),
+          Expanded(child: Text(steps[i], style: style)),
+        ]),
     ]);
   }
 }
@@ -990,13 +1159,13 @@ class _DashedBorderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.accentBorder
+      ..color = const Color(0xFF9AE0E1)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
-    final path = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(8)));
+    final path = Path()..addRect((Offset.zero & size).deflate(0.5));
     for (final metric in path.computeMetrics()) {
-      for (double d = 0; d < metric.length; d += 9) {
-        canvas.drawPath(metric.extractPath(d, d + 5), paint);
+      for (double d = 0; d < metric.length; d += 12) {
+        canvas.drawPath(metric.extractPath(d, d + 6), paint);
       }
     }
   }

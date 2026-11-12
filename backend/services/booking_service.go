@@ -44,6 +44,20 @@ type BookingService interface {
 // ExpirePendingBooking digunakan job rekonsiliasi agar perubahan status yang
 // dibuat di latar belakang tetap melalui jalur notifikasi dan email yang sama.
 func (s *bookingService) ExpirePendingBooking(id uint, cutoff time.Time) error {
+	var current models.Booking
+	if err := database.DB.First(&current, id).Error; err != nil {
+		return err
+	}
+	// Seperti pembatalan: tagihan Midtrans dihentikan dulu di luar transaksi
+	// (panggilan HTTP tidak boleh menahan lock baris). Pembayaran yang terlanjur
+	// masuk dicatat sebagai lunas, dan status yang belum pasti ditunda ke putaran
+	// job berikutnya.
+	if current.Status == models.StatusPendingPayment {
+		if err := s.stopMidtransPayment(&current); err != nil {
+			return err
+		}
+	}
+
 	var booking models.Booking
 	changed := false
 	err := database.DB.Transaction(func(tx *gorm.DB) error {

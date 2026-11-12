@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../i18n';
 
 // Placeholder shimmer dipakai selama data atau halaman dimuat. Bentuknya
 // meniru tata letak akhir supaya halaman langsung terlihat terbuka tanpa teks
@@ -20,9 +21,10 @@ export const Skeleton: React.FC<SkeletonProps> = ({ width = '100%', height = 14,
   />
 );
 
-const SrLoading: React.FC<{ label?: string }> = ({ label = 'Memuat data' }) => (
-  <span className="sr-only">{label}</span>
-);
+const SrLoading: React.FC<{ label?: string }> = ({ label }) => {
+  const { t } = useI18n();
+  return <span className="sr-only">{label ?? t('Memuat data', 'Loading data')}</span>;
+};
 
 // Lebar kolom sedikit bervariasi agar baris tidak terlihat seperti blok seragam.
 const CELL_WIDTHS = ['72%', '88%', '60%', '80%', '54%', '66%'];
@@ -108,9 +110,11 @@ export const SkeletonList: React.FC<SkeletonListProps> = ({ rows = 4, label }) =
 );
 
 // Kerangka halaman penuh untuk pemuatan pertama aplikasi dan chunk halaman.
-export const PageSkeleton: React.FC<{ fullScreen?: boolean }> = ({ fullScreen = false }) => (
+export const PageSkeleton: React.FC<{ fullScreen?: boolean }> = ({ fullScreen = false }) => {
+  const { t } = useI18n();
+  return (
   <div className={`page-skeleton ${fullScreen ? 'is-fullscreen' : ''}`} role="status" aria-live="polite">
-    <SrLoading label="Memuat halaman" />
+    <SrLoading label={t('Memuat halaman', 'Loading page')} />
     <div className="page-skeleton-bar" aria-hidden="true">
       <Skeleton width={132} height={28} radius={8} />
       <Skeleton width={220} height={14} className="page-skeleton-hide-sm" />
@@ -127,4 +131,5 @@ export const PageSkeleton: React.FC<{ fullScreen?: boolean }> = ({ fullScreen = 
       <Skeleton height={260} radius={14} />
     </div>
   </div>
-);
+  );
+};

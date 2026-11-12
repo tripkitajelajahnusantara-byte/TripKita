@@ -11,6 +11,7 @@ import { filterCustomerVisiblePackages, isPackageExpired } from '../utils/public
 import { bookableDates, nearestDate, upcomingDepartures, type Departure } from '../utils/departures';
 import { formatTripRange } from '../utils/tripDates';
 import { priceUnitLabel } from '../utils/pricing';
+import { useI18n } from '../i18n';
 
 interface TripPackage {
   availableDates?: string[];
@@ -44,17 +45,17 @@ interface TripPackage {
 }
 
 // Format YYYY-MM-DD menjadi "15 Okt 2026" untuk ringkasan jadwal
-const formatShortDate = (value?: string) => {
+const formatShortDate = (value: string | undefined, locale: string) => {
   if (!value) return '';
   const iso = value.slice(0, 10);
   const [y, m, d] = iso.split('-').map(Number);
   if (!y || !m || !d) return '';
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  return `${d} ${months[m - 1]} ${y}`;
+  return new Intl.DateTimeFormat(locale, { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(Date.UTC(y, m - 1, d)));
 };
 
 export const CustomerSearchPage: React.FC = () => {
   const { navigateTo, setSelectedPackageForDetail, searchParams } = useNavigation();
+  const { t, term, locale, lang } = useI18n();
   const [packages, setPackages] = useState<TripPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('Rekomendasi');
@@ -69,7 +70,7 @@ export const CustomerSearchPage: React.FC = () => {
       return { list: filterCustomerVisiblePackages(list), error: '' };
     } catch (err: unknown) {
       console.error('Failed to load search packages:', err);
-      return { list: [], error: err instanceof Error && err.message ? err.message : 'Gagal memuat daftar paket wisata.' };
+      return { list: [], error: err instanceof Error && err.message ? err.message : t('Gagal memuat daftar paket wisata.', 'Could not load trips.') };
     }
   };
 
@@ -147,7 +148,7 @@ export const CustomerSearchPage: React.FC = () => {
 
   // Tipe trip boleh lebih dari satu, dipisah koma (mis. 'Private Trip,Honeymoon')
   const selectedTypes = (searchParams.type && searchParams.type !== 'Semua Tipe')
-    ? searchParams.type.split(',').map((t: string) => t.trim()).filter(Boolean)
+    ? searchParams.type.split(',').map((type: string) => type.trim()).filter(Boolean)
     : [];
 
   const keyword = (searchParams.keyword || '').toLowerCase();
@@ -197,6 +198,11 @@ export const CustomerSearchPage: React.FC = () => {
   }
   // Paket yang jadwalnya sudah lewat tetap tampil, tetapi selalu di urutan akhir.
   processedPackages.sort((a, b) => Number(isPackageExpired(a)) - Number(isPackageExpired(b)));
+  const listLabel = selectedTypes.length > 0
+    ? selectedTypes.join(' & ')
+    : (searchParams.category && searchParams.category !== 'Semua Kategori')
+    ? term(searchParams.category)
+    : t('Wisata', 'Trip');
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '24px 20px 80px 20px', fontFamily: 'Inter, sans-serif' }}>
@@ -218,30 +224,26 @@ export const CustomerSearchPage: React.FC = () => {
             marginBottom: '20px'
           }}
         >
-          <ArrowLeft size={16} /> Kembali ke Beranda
+          <ArrowLeft size={16} /> {t('Kembali ke Beranda', 'Back to Home')}
         </button>
 
         {/* Top Header Result Bar with Single Sort Dropdown */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', flexWrap: 'wrap', gap: '14px' }}>
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-              Daftar Paket {
-                selectedTypes.length > 0
-                  ? selectedTypes.join(' & ')
-                  : (searchParams.category && searchParams.category !== 'Semua Kategori')
-                  ? searchParams.category
-                  : 'Wisata'
-              }
+              {t(`Daftar Paket ${listLabel}`, `${listLabel} Packages`)}
             </h2>
             <span style={{ fontSize: '13px', color: '#64748b' }}>
-              Menampilkan <strong>{processedPackages.length}</strong> paket wisata
-              {searchParams.keyword || searchParams.destination ? ` untuk "${searchParams.keyword || searchParams.destination}"` : ''}
+              {lang === 'en'
+                ? <>Showing <strong>{processedPackages.length}</strong> trips</>
+                : <>Menampilkan <strong>{processedPackages.length}</strong> paket wisata</>}
+              {searchParams.keyword || searchParams.destination ? ` ${t('untuk', 'for')} "${searchParams.keyword || searchParams.destination}"` : ''}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', whiteSpace: 'nowrap' }}>
-              Urutkan berdasarkan:
+              {t('Urutkan berdasarkan:', 'Sort by:')}
             </label>
             <select 
               value={sortBy} 
@@ -260,11 +262,11 @@ export const CustomerSearchPage: React.FC = () => {
                 maxWidth: '100%'
               }}
             >
-              <option value="Rekomendasi">Rekomendasi</option>
-              <option value="Terpopuler">Terpopuler (Paling Sering Dipesan)</option>
-              <option value="Rating Tertinggi">Rating Tertinggi</option>
-              <option value="Termurah">Termurah</option>
-              <option value="Termahal">Termahal</option>
+              <option value="Rekomendasi">{t('Rekomendasi', 'Recommended')}</option>
+              <option value="Terpopuler">{t('Terpopuler (Paling Sering Dipesan)', 'Most Popular (Most Booked)')}</option>
+              <option value="Rating Tertinggi">{t('Rating Tertinggi', 'Highest Rated')}</option>
+              <option value="Termurah">{t('Termurah', 'Lowest Price')}</option>
+              <option value="Termahal">{t('Termahal', 'Highest Price')}</option>
             </select>
           </div>
         </div>
@@ -280,9 +282,9 @@ export const CustomerSearchPage: React.FC = () => {
           <div role="status" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '14px 18px', marginBottom: '20px', color: '#92400e' }}>
             <Calendar size={18} style={{ flexShrink: 0, marginTop: '1px' }} />
             <div>
-              <strong style={{ display: 'block', fontSize: '14px' }}>Tidak ada trip pada tanggal yang Anda pilih.</strong>
+              <strong style={{ display: 'block', fontSize: '14px' }}>{t('Tidak ada trip pada tanggal yang Anda pilih.', 'No trips on the date you picked.')}</strong>
               {processedPackages.length > 0 && (
-                <span style={{ fontSize: '13px' }}>Berikut rekomendasi trip dengan tanggal keberangkatan terdekat dari {formatTripRange(targetDate)}.</span>
+                <span style={{ fontSize: '13px' }}>{t('Berikut rekomendasi trip dengan tanggal keberangkatan terdekat dari', 'Here are trips departing closest to')} {formatTripRange(targetDate, undefined, locale)}.</span>
               )}
             </div>
           </div>
@@ -290,7 +292,7 @@ export const CustomerSearchPage: React.FC = () => {
 
         {loading ? (
           <div role="status" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <span className="sr-only">Memuat daftar paket wisata</span>
+            <span className="sr-only">{t('Memuat daftar paket wisata', 'Loading trips')}</span>
             {/* Meniru kartu hasil pencarian: foto di kiri, info paket di kanan */}
             {Array.from({ length: 4 }, (_, i) => (
               <div
@@ -312,20 +314,20 @@ export const CustomerSearchPage: React.FC = () => {
           </div>
         ) : loadError ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #fecaca', color: '#64748b' }}>
-            <h3 style={{ color: '#0f172a', fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>Gagal Memuat Daftar Paket</h3>
+            <h3 style={{ color: '#0f172a', fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>{t('Gagal Memuat Daftar Paket', 'Could Not Load Trips')}</h3>
             <p style={{ fontSize: '13px', margin: '0 0 16px 0' }}>{loadError}</p>
             <button
               type="button"
               onClick={() => fetchPackages()}
               style={{ padding: '10px 22px', backgroundColor: '#007bff', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}
             >
-              Coba Lagi
+              {t('Coba Lagi', 'Try Again')}
             </button>
           </div>
         ) : processedPackages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#64748b' }}>
-            <h3 style={{ color: '#0f172a', fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>Tidak Ada Paket Ditemukan</h3>
-            <p style={{ fontSize: '13px' }}>Coba cari destinasi atau tanggal yang lain.</p>
+            <h3 style={{ color: '#0f172a', fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>{t('Tidak Ada Paket Ditemukan', 'No Trips Found')}</h3>
+            <p style={{ fontSize: '13px' }}>{t('Coba cari destinasi atau tanggal yang lain.', 'Try another destination or date.')}</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -337,11 +339,11 @@ export const CustomerSearchPage: React.FC = () => {
               const nextDeparture = (pkgDate ? departures.find(d => d.date === pkgDate) : null) || departures.find(d => d.seatsLeft > 0) || departures[0];
               const availableSeats = pkg.tripType === 'Open Trip' ? nextDeparture?.seatsLeft || 0 : totalQuotaMax;
               const periodText = pkg.startDate
-                ? `${formatShortDate(pkg.startDate)}${pkg.endDate && pkg.endDate.slice(0, 10) !== pkg.startDate.slice(0, 10) ? ` - ${formatShortDate(pkg.endDate)}` : ''}`
+                ? `${formatShortDate(pkg.startDate, locale)}${pkg.endDate && pkg.endDate.slice(0, 10) !== pkg.startDate.slice(0, 10) ? ` - ${formatShortDate(pkg.endDate, locale)}` : ''}`
                 : '';
               const scheduleText = pkg.tripType === 'Open Trip' && nextDeparture
-                ? `${formatTripRange(nextDeparture.date, nextDeparture.endDate)}${departures.length > 1 ? ` · ${departures.length} pilihan jadwal` : ''}`
-                : (noTripOnDate && pkgDate ? formatTripRange(pkgDate) : (pkg.schedule || '').trim() || periodText);
+                ? `${formatTripRange(nextDeparture.date, nextDeparture.endDate, locale)}${departures.length > 1 ? ` · ${departures.length} ${t('pilihan jadwal', 'dates')}` : ''}`
+                : (noTripOnDate && pkgDate ? formatTripRange(pkgDate, undefined, locale) : (pkg.schedule || '').trim() || periodText);
 
               const badge = getBadgeColor(pkg.category);
               const isFavorite = wishlistIds.includes(Number(pkg.id));
@@ -373,7 +375,7 @@ export const CustomerSearchPage: React.FC = () => {
                     />
                     {expired && (
                       <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#ffffff', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700' }}>
-                        Jadwal sudah lewat
+                        {t('Jadwal sudah lewat', 'Schedule has passed')}
                       </span>
                     )}
                     <button 
@@ -414,11 +416,11 @@ export const CustomerSearchPage: React.FC = () => {
                             fontWeight: '700' 
                           }}
                         >
-                          {pkg.tripType ? `${pkg.tripType} • ${pkg.category}` : pkg.category}
+                          {pkg.tripType ? `${pkg.tripType} • ${term(pkg.category)}` : term(pkg.category)}
                         </span>
 
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Mulai dari</span>
+                          <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{t('Mulai dari', 'From')}</span>
                           <span style={{ fontSize: '19px', fontWeight: '800', color: '#007bff' }}>
                             {formatIDR(pkg.price)} <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>{priceUnitLabel(pkg)}</span>
                           </span>
@@ -475,7 +477,7 @@ export const CustomerSearchPage: React.FC = () => {
                       {scheduleText && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: '500' }}>
                           <Calendar size={14} color="#94a3b8" />
-                          <span>{expired ? 'Jadwal' : 'Jadwal tersedia'}: <strong>{scheduleText}</strong></span>
+                          <span>{expired ? t('Jadwal', 'Schedule') : t('Jadwal tersedia', 'Available dates')}: <strong>{scheduleText}</strong></span>
                         </div>
                       )}
                     </div>
@@ -484,14 +486,14 @@ export const CustomerSearchPage: React.FC = () => {
                     <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: '700' }}>
-                          <Star size={14} fill="#f59e0b" color="#f59e0b" /> {pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Baru'}
+                          <Star size={14} fill="#f59e0b" color="#f59e0b" /> {pkg.rating > 0 ? pkg.rating.toFixed(1) : t('Baru', 'New')}
                         </span>
                         <span style={{ color: '#cbd5e1' }}>|</span>
                         {expired ? (
-                          <span style={{ color: '#64748b', fontWeight: '700' }}>Tidak bisa dipesan</span>
+                          <span style={{ color: '#64748b', fontWeight: '700' }}>{t('Tidak bisa dipesan', 'Not bookable')}</span>
                         ) : (
                           <span style={{ color: availableSeats < 5 ? '#ef4444' : '#10b981', fontWeight: '700' }}>
-                            {pkg.tripType === 'Open Trip' ? (availableSeats > 0 ? `${availableSeats} kursi pada jadwal terpilih` : 'Kuota habis') : 'Pilih tanggal tersedia'}
+                            {pkg.tripType === 'Open Trip' ? (availableSeats > 0 ? t(`${availableSeats} kursi pada jadwal terpilih`, `${availableSeats} left on this date`) : t('Kuota habis', 'Sold out')) : t('Pilih tanggal tersedia', 'Pick an available date')}
                           </span>
                         )}
                       </div>
@@ -523,7 +525,7 @@ export const CustomerSearchPage: React.FC = () => {
                             e.currentTarget.style.color = '#334155';
                           }}
                         >
-                          <Share2 size={14} /> Bagikan
+                          <Share2 size={14} /> {t('Bagikan', 'Share')}
                         </button>
 
                         <button 
@@ -551,7 +553,7 @@ export const CustomerSearchPage: React.FC = () => {
                             e.currentTarget.style.color = '#0284c7';
                           }}
                         >
-                          Lihat Detail <ChevronRight size={15} />
+                          {t('Lihat Detail', 'View Details')} <ChevronRight size={15} />
                         </button>
                       </div>
                     </div>

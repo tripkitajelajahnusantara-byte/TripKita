@@ -80,8 +80,16 @@ class AuthSession extends ChangeNotifier {
   }
 
   // initialize() hanya boleh dipanggil sekali; static final membuatnya lazy.
-  static final Future<void> _googleReady =
-      GoogleSignIn.instance.initialize(serverClientId: AppConfig.googleServerClientId);
+  // Web (Google Identity Services) memakai client ID web yang sama sebagai
+  // clientId karena serverClientId tidak didukung di web.
+  static final Future<void> _googleReady = GoogleSignIn.instance.initialize(
+    clientId: kIsWeb ? AppConfig.googleServerClientId : null,
+    serverClientId: kIsWeb ? null : AppConfig.googleServerClientId,
+  );
+
+  /// Selesai saat Google Sign-In siap; di web tombol resmi Google baru boleh
+  /// dirender setelah ini.
+  static Future<void> get googleReady => _googleReady;
 
   /// Masuk lewat pemilih akun Google bawaan Android. Bernilai false bila
   /// pengguna menutup pemilih akun.
@@ -91,16 +99,28 @@ class AuthSession extends ChangeNotifier {
       await _googleReady;
       account = await GoogleSignIn.instance.authenticate();
     } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled) return false;
-      throw ApiException('Login Google gagal (${e.code.name}). Silakan coba lagi.', 0);
+      // Credential Manager juga melaporkan salah konfigurasi OAuth Android
+      // (package/SHA-1 belum terdaftar, mis. "[16] Account reauth failed.")
+      // sebagai canceled; hanya pembatalan oleh pengguna yang didiamkan.
+      debugPrint('Google Sign-In gagal: ${e.code.name} ${e.description}');
+      final userCanceled = e.code == GoogleSignInExceptionCode.canceled &&
+          RegExp(r'cancell?ed by (the )?user', caseSensitive: false).hasMatch(e.description ?? '');
+      if (userCanceled) return false;
+      throw ApiException('Login Google gagal (${e.code.name}): ${e.description ?? '-'}', 0);
     }
+    await loginWithGoogleAccount(account);
+    return true;
+  }
+
+  /// Tukar ID token akun Google (pemilih akun Android atau tombol Google di
+  /// web) dengan sesi customer.
+  Future<void> loginWithGoogleAccount(GoogleSignInAccount account) async {
     final idToken = account.authentication.idToken;
     if (idToken == null) {
       throw const ApiException('Google tidak mengirim token login. Silakan coba lagi.', 0);
     }
     _generation++;
     await _adoptCustomer(await ApiService.loginWithGoogle(idToken));
-    return true;
   }
 
   Future<void> _adoptCustomer(AuthResult result) async {
@@ -138,6 +158,13 @@ class AuthSession extends ChangeNotifier {
   Future<void> updateProfile(Map<String, dynamic> fields) async {
     final updated = await ApiService.updateProfile(fields);
     _profile = updated;
+    notifyListeners();
+  }
+
+  /// Unggah foto profil lalu muat ulang profil agar fotonya langsung tampil.
+  Future<void> updatePhoto(List<int> bytes, String fileName) async {
+    await ApiService.uploadProfilePhoto(bytes, fileName);
+    _profile = await ApiService.fetchProfile();
     notifyListeners();
   }
 

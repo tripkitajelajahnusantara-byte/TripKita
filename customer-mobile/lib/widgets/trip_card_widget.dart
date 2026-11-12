@@ -240,18 +240,20 @@ const _cardShadow = [
 class _TripCardFrame extends StatelessWidget {
   final VoidCallback onTap;
   final Widget child;
+  final double radius;
+  final bool bordered;
 
-  const _TripCardFrame({required this.onTap, required this.child});
+  const _TripCardFrame({required this.onTap, required this.child, this.radius = 12, this.bordered = true});
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), boxShadow: _cardShadow),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(radius), boxShadow: _cardShadow),
       child: Material(
         color: Colors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.border),
+          borderRadius: BorderRadius.circular(radius),
+          side: bordered ? const BorderSide(color: AppColors.border) : BorderSide.none,
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(onTap: onTap, child: DefaultTextStyle.merge(style: figmaTextStyle, child: child)),
@@ -263,13 +265,14 @@ class _TripCardFrame extends StatelessWidget {
 /// Label kategori biru di kiri atas foto.
 class _CategoryLabel extends StatelessWidget {
   final String text;
+  final double height;
 
-  const _CategoryLabel(this.text);
+  const _CategoryLabel(this.text, {this.height = 21.37});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 21.37,
+      height: height,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       alignment: Alignment.center,
       decoration: const BoxDecoration(
@@ -464,6 +467,77 @@ class TripPopularCard extends StatelessWidget {
               _TripSummary(pkg, fixedHeight: true),
               const SizedBox(height: 8),
               _PriceTag(pkg),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Kartu ringkas 242×268 (rekomendasi Plan Trip): foto, tipe & durasi, nama
+/// satu baris, lokasi, dan harga per orang.
+class TripCompactCard extends StatelessWidget {
+  final TripPackage pkg;
+  final VoidCallback onTap;
+
+  const TripCompactCard({super.key, required this.pkg, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = '${pkg.tripType.isEmpty ? 'Open Trip' : pkg.tripType} • ${pkg.durationDays} hari';
+    return SizedBox(
+      width: 242,
+      child: _TripCardFrame(
+        onTap: onTap,
+        radius: 8,
+        bordered: false,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          SizedBox(
+            height: 136,
+            child: Stack(fit: StackFit.expand, children: [
+              NetworkPhoto(coverImageFor(pkg)),
+              if (pkg.category.isNotEmpty)
+                Positioned(left: 0, top: 12, child: _CategoryLabel(pkg.category, height: 24)),
+              Positioned(right: 12, top: 12, child: _FavoriteHeart(pkg, size: 20)),
+              Positioned(left: 12, bottom: 12, child: _RatingBadge(pkg)),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(meta.toUpperCase(),
+                  style: const TextStyle(fontSize: 12, height: 18 / 12, color: AppColors.textMedium)),
+              const SizedBox(height: 5),
+              Text(pkg.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 16, height: 1.5, fontWeight: FontWeight.w600, color: AppColors.textStrong)),
+              const SizedBox(height: 4.8),
+              Row(children: [
+                const AppIcon('map_pin_small', size: 16, color: AppColors.textMedium),
+                const SizedBox(width: 3),
+                Expanded(
+                  child: Text(pkg.destination,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMedium)),
+                ),
+              ]),
+              const SizedBox(height: 8.3),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(
+                      text: formatPrice(pkg.price),
+                      style: const TextStyle(
+                          fontSize: 20, height: 24 / 20, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
+                  TextSpan(
+                      text: pkg.isPerUnit ? ' /${pkg.unitLabel}' : ' /orang',
+                      style: const TextStyle(fontSize: 16, height: 24 / 16, color: AppColors.textLight)),
+                ])),
+              ),
             ]),
           ),
         ]),

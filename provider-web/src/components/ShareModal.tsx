@@ -3,6 +3,7 @@ import { X, Copy, Check, MessageCircle, Share2, Camera } from 'lucide-react';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from './TripImage';
 import { priceUnitLabel } from '../utils/pricing';
+import { useI18n } from '../i18n';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface ShareModalProps {
 export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) => {
   const [copied, setCopied] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+  const { t } = useI18n();
 
   if (!isOpen || !pkg) return null;
 
@@ -22,14 +24,17 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
     if (navigator.clipboard) {
       navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      setToastMsg('Link detail paket berhasil disalin!');
+      setToastMsg(t('Link detail paket berhasil disalin!', 'Package link copied.'));
       setTimeout(() => setCopied(false), 2500);
       setTimeout(() => setToastMsg(''), 3000);
     }
   };
 
   const handleWhatsAppShare = () => {
-    const text = `Halo! Cek paket wisata "${pkg.name}" di TemenTrip!\n\n📍 Destinasi: ${pkg.destination || 'Indonesia'}\n💰 Harga: Rp ${(pkg.price || 0).toLocaleString('id-ID')} ${priceUnitLabel(pkg)}\n\nLihat detail paket selengkapnya di sini:\n${shareUrl}`;
+    const text = t(
+      `Halo! Cek paket wisata "${pkg.name}" di TemenTrip!\n\n📍 Destinasi: ${pkg.destination || 'Indonesia'}\n💰 Harga: Rp ${(pkg.price || 0).toLocaleString('id-ID')} ${priceUnitLabel(pkg)}\n\nLihat detail paket selengkapnya di sini:\n${shareUrl}`,
+      `Hi! Check out the "${pkg.name}" trip on TemenTrip.\n\n📍 Destination: ${pkg.destination || 'Indonesia'}\n💰 Price: Rp ${(pkg.price || 0).toLocaleString('id-ID')} ${priceUnitLabel(pkg)}\n\nSee the full details here:\n${shareUrl}`
+    );
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
   };
@@ -37,7 +42,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
   const handleInstagramShare = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(`${pkg.name} - Rp ${(pkg.price || 0).toLocaleString('id-ID')}\nLink: ${shareUrl}`);
-      setToastMsg('Link & caption disalin! Buka Instagram untuk membuat Story / Post.');
+      setToastMsg(t('Link & caption disalin! Buka Instagram untuk membuat Story / Post.', 'Link and caption copied. Open Instagram to create a Story or Post.'));
       setTimeout(() => setToastMsg(''), 3500);
     }
     window.open('https://www.instagram.com/', '_blank');
@@ -97,7 +102,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
 
         {/* Title */}
         <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Share2 size={20} color="#007bff" /> Bagikan Paket Wisata
+          <Share2 size={20} color="#007bff" /> {t('Bagikan Paket Wisata', 'Share This Trip')}
         </h3>
 
         {/* Package Preview Box */}
@@ -124,7 +129,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
 
         {/* Share Social Buttons Grid */}
         <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '10px' }}>
-          Bagikan Langsung Ke:
+          {t('Bagikan Langsung Ke:', 'Share directly to:')}
         </span>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '20px' }}>
           {/* WhatsApp */}
@@ -205,7 +210,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
             <div style={{ backgroundColor: '#0284c7', color: '#fff', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {copied ? <Check size={20} /> : <Copy size={20} />}
             </div>
-            <span>Salin Link</span>
+            <span>{t('Salin Link', 'Copy Link')}</span>
           </button>
         </div>
 
@@ -245,7 +250,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, pkg }) 
             }}
           >
             {copied ? <Check size={16} /> : <Copy size={16} />}
-            {copied ? 'Tersalin' : 'Salin'}
+            {copied ? t('Tersalin', 'Copied') : t('Salin', 'Copy')}
           </button>
         </div>
 

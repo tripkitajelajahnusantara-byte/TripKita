@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight, CalendarClock, CheckCircle2, Clock, LoaderCircle, XCircle } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface OfferBooking {
   id?: number;
@@ -18,10 +19,10 @@ interface Props {
   onRespond?: (accept: boolean) => void;
 }
 
-const formatDay = (iso: string) =>
-  new Date(iso).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
-const formatDeadline = (iso: string) =>
-  `${new Date(iso).toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB`;
+const formatDay = (iso: string, locale: string) =>
+  new Date(iso).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
+const formatDeadline = (iso: string, locale: string) =>
+  `${new Date(iso).toLocaleString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB`;
 
 /**
  * Tawaran jadwal pengganti dari penyelenggara. Pelanggan melihat jadwal semula
@@ -30,6 +31,7 @@ const formatDeadline = (iso: string) =>
  */
 export function RescheduleOfferCard({ booking, pending, busy, onRespond }: Props) {
   const [confirming, setConfirming] = useState<'accept' | 'reject' | null>(null);
+  const { t, locale } = useI18n();
   if (!booking.rescheduleDate) return null;
 
   const acceptKey = `reschedule-${booking.id}-accept`;
@@ -38,61 +40,61 @@ export function RescheduleOfferCard({ booking, pending, busy, onRespond }: Props
   const reason = booking.cancellationReason?.trim();
 
   return (
-    <div className="ro-card" role="region" aria-label="Tawaran jadwal pengganti">
+    <div className="ro-card" role="region" aria-label={t('Tawaran jadwal pengganti', 'New date offer')}>
       <div className="ro-head">
         <CalendarClock size={18} aria-hidden="true" />
-        <strong>Penyelenggara menawarkan jadwal pengganti</strong>
+        <strong>{t('Penyelenggara menawarkan jadwal pengganti', 'The organizer is offering a new date')}</strong>
       </div>
 
       <div className="ro-dates">
         <div className="ro-date old">
-          <span>Jadwal semula</span>
-          <strong>{formatDay(booking.tripDate)}</strong>
+          <span>{t('Jadwal semula', 'Original date')}</span>
+          <strong>{formatDay(booking.tripDate, locale)}</strong>
         </div>
         <ArrowRight size={18} className="ro-arrow" aria-hidden="true" />
         <div className="ro-date new">
-          <span>Jadwal baru</span>
-          <strong>{formatDay(booking.rescheduleDate)}</strong>
+          <span>{t('Jadwal baru', 'New date')}</span>
+          <strong>{formatDay(booking.rescheduleDate, locale)}</strong>
         </div>
       </div>
 
-      {reason && <p className="ro-reason"><strong>Sebab:</strong> {reason}</p>}
+      {reason && <p className="ro-reason"><strong>{t('Sebab:', 'Reason:')}</strong> {reason}</p>}
 
       <p className="ro-deadline">
         <Clock size={14} aria-hidden="true" />
         <span>
           {booking.rescheduleResponseDeadline
-            ? <>Jawab sebelum <strong>{formatDeadline(booking.rescheduleResponseDeadline)}</strong>. </>
+            ? <>{t('Jawab sebelum', 'Reply before')} <strong>{formatDeadline(booking.rescheduleResponseDeadline, locale)}</strong>. </>
             : null}
-          Bila tidak dijawab, pesanan otomatis dibatalkan dan dana dikembalikan penuh.
+          {t('Bila tidak dijawab, pesanan otomatis dibatalkan dan dana dikembalikan penuh.', "If you don't reply, the booking is cancelled automatically and fully refunded.")}
         </span>
       </p>
 
       {!onRespond ? (
-        <p className="ro-note">Masuk dengan akun pemesan untuk menerima atau menolak tawaran ini.</p>
+        <p className="ro-note">{t('Masuk dengan akun pemesan untuk menerima atau menolak tawaran ini.', 'Sign in with the account used to book to accept or decline this offer.')}</p>
       ) : confirming ? (
         <div className={`ro-confirm ${confirming}`} role="alertdialog" aria-live="polite">
           <p>
             {confirming === 'accept'
-              ? <>Terima jadwal baru <strong>{formatDay(booking.rescheduleDate)}</strong>? Jadwal trip Anda langsung diperbarui.</>
-              : <>Tolak jadwal baru? Pesanan dibatalkan dan dana Anda <strong>dikembalikan penuh</strong> setelah diproses admin.</>}
+              ? <>{t('Terima jadwal baru', 'Accept the new date')} <strong>{formatDay(booking.rescheduleDate, locale)}</strong>? {t('Jadwal trip Anda langsung diperbarui.', 'Your trip date is updated right away.')}</>
+              : <>{t('Tolak jadwal baru? Pesanan dibatalkan dan dana Anda', 'Decline the new date? The booking is cancelled and you get a')} <strong>{t('dikembalikan penuh', 'full refund')}</strong> {t('setelah diproses admin.', 'once the admin processes it.')}</>}
           </p>
           <div className="ro-actions">
             <button type="button" className={`ro-btn ${confirming === 'accept' ? 'accept' : 'reject-solid'}`} disabled={busy}
               aria-busy={sending} onClick={() => onRespond(confirming === 'accept')}>
-              {sending ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Mengirim…</>
-                : confirming === 'accept' ? 'Ya, terima jadwal baru' : 'Ya, tolak & minta refund'}
+              {sending ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Mengirim…', 'Sending…')}</>
+                : confirming === 'accept' ? t('Ya, terima jadwal baru', 'Yes, accept new date') : t('Ya, tolak & minta refund', 'Yes, decline & refund')}
             </button>
-            <button type="button" className="ro-btn ghost" disabled={busy} onClick={() => setConfirming(null)}>Batal</button>
+            <button type="button" className="ro-btn ghost" disabled={busy} onClick={() => setConfirming(null)}>{t('Batal', 'Cancel')}</button>
           </div>
         </div>
       ) : (
         <div className="ro-actions">
           <button type="button" className="ro-btn accept" disabled={busy} onClick={() => setConfirming('accept')}>
-            <CheckCircle2 size={15} aria-hidden="true" /> Terima jadwal baru
+            <CheckCircle2 size={15} aria-hidden="true" /> {t('Terima jadwal baru', 'Accept new date')}
           </button>
           <button type="button" className="ro-btn reject" disabled={busy} onClick={() => setConfirming('reject')}>
-            <XCircle size={15} aria-hidden="true" /> Tolak & minta refund
+            <XCircle size={15} aria-hidden="true" /> {t('Tolak & minta refund', 'Decline & get refund')}
           </button>
         </div>
       )}

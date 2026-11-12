@@ -10,6 +10,9 @@ class CustomerProfile {
   final String birthDate;
   final String wishlistData;
 
+  /// Path foto profil di backend; kosong bila belum ada.
+  final String profilePhoto;
+
   const CustomerProfile({
     required this.id,
     required this.role,
@@ -19,6 +22,7 @@ class CustomerProfile {
     this.gender = '',
     this.birthDate = '',
     this.wishlistData = '',
+    this.profilePhoto = '',
   });
 
   factory CustomerProfile.fromJson(Map<String, dynamic> json) {
@@ -33,6 +37,7 @@ class CustomerProfile {
       gender: s('gender'),
       birthDate: s('birthDate'),
       wishlistData: s('wishlistData'),
+      profilePhoto: s('profilePhoto'),
     );
   }
 

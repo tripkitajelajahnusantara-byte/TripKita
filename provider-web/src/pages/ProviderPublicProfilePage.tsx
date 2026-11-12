@@ -7,6 +7,7 @@ import { ProviderAvatar } from '../components/ProviderAvatar';
 import { Skeleton, SkeletonCards } from '../components/Skeleton';
 import { ArrowLeft, MapPin, Star, Package, MessageSquare, Award } from 'lucide-react';
 import { filterCustomerVisiblePackages, isPackageExpired, sortBookableFirst } from '../utils/publicPackages';
+import { useI18n } from '../i18n';
 
 interface TripPackage {
   id: number;
@@ -60,6 +61,7 @@ interface PublicReview {
 
 export const ProviderPublicProfilePage: React.FC = () => {
   const { navigateTo, selectedProviderId, setSelectedPackageForDetail } = useNavigation();
+  const { t, term, locale } = useI18n();
   const [providerInfo, setProviderInfo] = useState<PublicProviderProfile | null>(null);
   const [packages, setPackages] = useState<TripPackage[]>([]);
   const [reviews, setReviews] = useState<PublicReview[]>([]);
@@ -72,7 +74,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
 
     const fetchProviderDetail = async () => {
       if (!selectedProviderId) {
-        setLoadError('Provider tidak dipilih.');
+        setLoadError('missing');
         setLoading(false);
         return;
       }
@@ -100,7 +102,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
           setProviderInfo(null);
           setPackages([]);
           setReviews([]);
-          setLoadError('Profil provider tidak tersedia.');
+          setLoadError('unavailable');
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -138,7 +140,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
               <Skeleton width="80%" />
             </div>
           </div>
-          <SkeletonCards count={6} minWidth={240} label="Memuat profil mitra provider" />
+          <SkeletonCards count={6} minWidth={240} label={t('Memuat profil mitra provider', 'Loading partner profile')} />
         </div>
       </div>
     );
@@ -146,8 +148,8 @@ export const ProviderPublicProfilePage: React.FC = () => {
   if (!providerInfo) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
-        <p>{loadError || 'Profil provider tidak tersedia.'}</p>
-        <button type="button" onClick={() => navigateTo('cari-trip')}>Kembali ke daftar trip</button>
+        <p>{loadError === 'missing' ? t('Provider tidak dipilih.', 'No partner selected.') : t('Profil provider tidak tersedia.', 'Partner profile is not available.')}</p>
+        <button type="button" onClick={() => navigateTo('cari-trip')}>{t('Kembali ke daftar trip', 'Back to trips')}</button>
       </div>
     );
   }
@@ -191,7 +193,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
               backdropFilter: 'blur(4px)'
             }}
           >
-            <ArrowLeft size={16} /> Kembali ke Paket Trip
+            <ArrowLeft size={16} /> {t('Kembali ke Paket Trip', 'Back to Trip')}
           </button>
         </div>
       </div>
@@ -247,7 +249,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
                 <span>•</span>
                 <span style={{ color: '#0f172a', fontWeight: '600' }}>{providerInfo.businessCategory}</span>
                 <span>•</span>
-                <span>Bergabung sejak {new Date(providerInfo.createdAt).getFullYear()}</span>
+                <span>{t('Bergabung sejak', 'Joined in')} {new Date(providerInfo.createdAt).getFullYear()}</span>
               </div>
 
               <p style={{ fontSize: '14px', color: '#475569', margin: '0 0 16px 0', lineHeight: '1.6' }}>
@@ -269,23 +271,23 @@ export const ProviderPublicProfilePage: React.FC = () => {
           >
             <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '12px', textAlign: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: '#f59e0b', fontWeight: '800', fontSize: '18px' }}>
-                <Star size={18} fill="#f59e0b" color="#f59e0b" /> {providerInfo.rating > 0 ? `${providerInfo.rating.toFixed(1)} / 5.0` : 'Belum ada rating'}
+                <Star size={18} fill="#f59e0b" color="#f59e0b" /> {providerInfo.rating > 0 ? `${providerInfo.rating.toFixed(1)} / 5.0` : t('Belum ada rating', 'No ratings yet')}
               </div>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>Rating Kepuasan Wisatawan</span>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>{t('Rating Kepuasan Wisatawan', 'Traveler Satisfaction')}</span>
             </div>
 
             <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '12px', textAlign: 'center' }}>
               <div style={{ color: '#007bff', fontWeight: '800', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                <Package size={18} /> {packages.length} Paket
+                <Package size={18} /> {packages.length} {t('Paket', packages.length === 1 ? 'Trip' : 'Trips')}
               </div>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>Paket Wisata Aktif</span>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>{t('Paket Wisata Aktif', 'Active Trips')}</span>
             </div>
 
             <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '12px', textAlign: 'center' }}>
               <div style={{ color: '#10b981', fontWeight: '800', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                 <Award size={18} /> {providerInfo.totalTravelers}
               </div>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>Wisatawan Diberangkatkan</span>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>{t('Wisatawan Diberangkatkan', 'Travelers Served')}</span>
             </div>
           </div>
         </div>
@@ -309,7 +311,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
               transition: 'all 0.2s'
             }}
           >
-            <Package size={16} /> Paket Wisata ({packages.length})
+            <Package size={16} /> {t('Paket Wisata', 'Trips')} ({packages.length})
           </button>
 
           <button 
@@ -329,7 +331,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
               transition: 'all 0.2s'
             }}
           >
-            <MessageSquare size={16} /> Ulasan & Rating ({reviews.length})
+            <MessageSquare size={16} /> {t('Ulasan & Rating', 'Reviews')} ({reviews.length})
           </button>
         </div>
 
@@ -337,7 +339,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
         {activeTab === 'packages' && (
           <div>
             <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-              Daftar Paket Wisata Diselenggarakan Oleh {providerInfo.businessName}
+              {t('Daftar Paket Wisata Diselenggarakan Oleh', 'Trips Organized by')} {providerInfo.businessName}
             </h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' }}>
@@ -371,7 +373,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
                       />
                       {expired && (
                         <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#ffffff', padding: '4px 9px', borderRadius: '6px', fontSize: '10.5px', fontWeight: '700' }}>
-                          Jadwal sudah lewat
+                          {t('Jadwal sudah lewat', 'Date has passed')}
                         </span>
                       )}
                       <span 
@@ -387,7 +389,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
                           fontWeight: '700' 
                         }}
                       >
-                        {pkg.tripType || pkg.category}
+                        {pkg.tripType || term(pkg.category)}
                       </span>
                     </div>
 
@@ -429,11 +431,11 @@ export const ProviderPublicProfilePage: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#f59e0b', fontWeight: '700' }}>
                           <Star size={12} fill="#f59e0b" color="#f59e0b" />
-                          <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Belum ada'}</span>
+                          <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : t('Belum ada', 'No rating')}</span>
                         </div>
 
                         {expired ? (
-                          <span style={{ fontSize: '11.5px', fontWeight: '700', color: '#94a3b8' }}>Tidak bisa dipesan</span>
+                          <span style={{ fontSize: '11.5px', fontWeight: '700', color: '#94a3b8' }}>{t('Tidak bisa dipesan', 'Not bookable')}</span>
                         ) : (
                           <span style={{ fontSize: '13px', fontWeight: '800', color: '#007bff' }}>
                             {formatIDR(pkg.price)}
@@ -452,23 +454,23 @@ export const ProviderPublicProfilePage: React.FC = () => {
         {activeTab === 'reviews' && (
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
             <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-              Ulasan Pengunjung dari Trip {providerInfo.businessName}
+              {t('Ulasan Pengunjung dari Trip', 'Traveler Reviews for')} {providerInfo.businessName}
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {reviews.length === 0 && (
-                <p style={{ color: '#64748b', margin: 0 }}>Belum ada ulasan terverifikasi untuk provider ini.</p>
+                <p style={{ color: '#64748b', margin: 0 }}>{t('Belum ada ulasan terverifikasi untuk provider ini.', 'No verified reviews for this partner yet.')}</p>
               )}
               {reviews.map((rev) => (
                 <div key={rev.id} style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#007bff', color: '#ffffff', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        W
+                        {t('W', 'T')}
                       </div>
                       <div>
-                        <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block' }}>Wisatawan terverifikasi</strong>
-                        <span style={{ fontSize: '11px', color: '#007bff', fontWeight: '600' }}>Paket: {packages.find(pkg => pkg.id === rev.packageId)?.name || 'Paket wisata'}</span>
+                        <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block' }}>{t('Wisatawan terverifikasi', 'Verified traveler')}</strong>
+                        <span style={{ fontSize: '11px', color: '#007bff', fontWeight: '600' }}>{t('Paket', 'Trip')}: {packages.find(pkg => pkg.id === rev.packageId)?.name || t('Paket wisata', 'Trip package')}</span>
                       </div>
                     </div>
 
@@ -478,7 +480,7 @@ export const ProviderPublicProfilePage: React.FC = () => {
                           <Star key={i} size={13} fill={i < rev.rating ? '#f59e0b' : 'none'} color={i < rev.rating ? '#f59e0b' : '#cbd5e1'} />
                         ))}
                       </div>
-                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>{new Date(rev.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>{new Date(rev.createdAt).toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                     </div>
                   </div>
 

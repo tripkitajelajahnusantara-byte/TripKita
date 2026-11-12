@@ -9,10 +9,13 @@ import { User, Heart, Star, Save, Trash2, ChevronRight, MapPin, LoaderCircle } f
 import { IndonesianPhoneInput } from '../components/IndonesianPhoneInput';
 import { isValidIndonesianMobilePhone } from '../utils/phone';
 import { filterCustomerVisiblePackages, isPackageExpired } from '../utils/publicPackages';
+import { LanguageSwitch } from '../components/LanguageSwitch';
+import { useI18n } from '../i18n';
 
 export const CustomerSettingsPage: React.FC = () => {
   const { customerProfile, setCustomerProfile, navigateTo, setSelectedPackageForDetail } = useNavigation();
   const { showAlert } = useCustomAlert();
+  const { t } = useI18n();
 
   const [activeTab, setActiveTab] = useState<'akun' | 'favorit' | 'review'>('akun');
   // Kunci berbasis ref agar klik/enter ganda tidak mengirim dua PUT profil.
@@ -97,11 +100,11 @@ export const CustomerSettingsPage: React.FC = () => {
     e.preventDefault();
     if (isBusy) return;
     if (!namaLengkap.trim()) {
-      showAlert({ type: 'error', message: 'Nama Lengkap wajib diisi.' });
+      showAlert({ type: 'error', message: t('Nama Lengkap wajib diisi.', 'Full name is required.') });
       return;
     }
     if (!isValidIndonesianMobilePhone(whatsapp)) {
-      showAlert({ type: 'error', message: 'Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.' });
+      showAlert({ type: 'error', message: t('Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.', 'Enter 9–12 digits of your mobile number after +62, starting with 8.') });
       return;
     }
 
@@ -135,8 +138,8 @@ export const CustomerSettingsPage: React.FC = () => {
 
         showAlert({
           type: 'success',
-          title: 'Profil Berhasil Diperbarui',
-          message: 'Data akun Anda telah berhasil disimpan di database.'
+          title: t('Profil Berhasil Diperbarui', 'Profile Updated'),
+          message: t('Data akun Anda telah berhasil disimpan di database.', 'Your account details have been saved.')
         });
       } catch (err: any) {
         console.error(err);
@@ -146,10 +149,10 @@ export const CustomerSettingsPage: React.FC = () => {
         // Isian form tetap dibiarkan agar pengguna bisa langsung mencoba lagi.
         showAlert({
           type: 'error',
-          title: 'Profil Gagal Disimpan',
+          title: t('Profil Gagal Disimpan', 'Profile Not Saved'),
           message: err instanceof Error && err.message
             ? err.message
-            : 'Perubahan profil belum tersimpan. Periksa koneksi Anda lalu coba lagi.'
+            : t('Perubahan profil belum tersimpan. Periksa koneksi Anda lalu coba lagi.', 'Your profile changes were not saved. Check your connection and try again.')
         });
       }
     });
@@ -160,7 +163,7 @@ export const CustomerSettingsPage: React.FC = () => {
     setWishlistItems(updated);
     localStorage.setItem('tripkita_customer_wishlist', JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('tripkita_wishlist_updated', { detail: updated }));
-    showAlert({ type: 'success', message: 'Paket berhasil dihapus dari Favorit.' });
+    showAlert({ type: 'success', message: t('Paket berhasil dihapus dari Favorit.', 'Trip removed from Favorites.') });
   };
 
   return (
@@ -170,10 +173,10 @@ export const CustomerSettingsPage: React.FC = () => {
         {/* Page Header */}
         <div style={{ marginBottom: '28px' }}>
           <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>
-            Pengaturan Akun & Profil
+            {t('Pengaturan Akun & Profil', 'Account & Profile Settings')}
           </h1>
           <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-            Kelola data pribadi, paket favorit yang Anda simpan, dan riwayat ulasan ulasan perjalanan Anda.
+            {t('Kelola data pribadi, paket favorit yang Anda simpan, dan riwayat ulasan ulasan perjalanan Anda.', 'Manage your personal details, saved favorite trips, and your trip reviews.')}
           </p>
         </div>
 
@@ -188,7 +191,7 @@ export const CustomerSettingsPage: React.FC = () => {
               </div>
               <div>
                 <strong style={{ display: 'block', fontSize: '14.5px', color: '#0f172a' }}>
-                  {namaLengkap || 'Pelanggan TemenTrip'}
+                  {namaLengkap || t('Pelanggan TemenTrip', 'TemenTrip Traveler')}
                 </strong>
                 <span style={{ fontSize: '12px', color: '#64748b' }}>
                   {email || 'Traveler'}
@@ -217,7 +220,7 @@ export const CustomerSettingsPage: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <User size={18} />
-                  <span>Akun</span>
+                  <span>{t('Akun', 'Account')}</span>
                 </div>
                 <ChevronRight size={16} color={activeTab === 'akun' ? '#0284c7' : '#94a3b8'} />
               </button>
@@ -242,7 +245,7 @@ export const CustomerSettingsPage: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Heart size={18} />
-                  <span>Opsi Favorit</span>
+                  <span>{t('Opsi Favorit', 'Favorites')}</span>
                 </div>
                 <ChevronRight size={16} color={activeTab === 'favorit' ? '#0284c7' : '#94a3b8'} />
               </button>
@@ -267,7 +270,7 @@ export const CustomerSettingsPage: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Star size={18} />
-                  <span>Kumpulan Review</span>
+                  <span>{t('Kumpulan Review', 'My Reviews')}</span>
                 </div>
                 <ChevronRight size={16} color={activeTab === 'review' ? '#0284c7' : '#94a3b8'} />
               </button>
@@ -281,20 +284,20 @@ export const CustomerSettingsPage: React.FC = () => {
             {activeTab === 'akun' && (
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-                  Data Diri Akun
+                  {t('Data Diri Akun', 'Personal Details')}
                 </h2>
 
                 <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-                      Nama Lengkap
+                      {t('Nama Lengkap', 'Full Name')}
                     </label>
                     <input
                       type="text"
                       value={namaLengkap}
                       onChange={(e) => setNamaLengkap(e.target.value)}
-                      placeholder="Masukkan nama lengkap sesuai identitas"
+                      placeholder={t('Masukkan nama lengkap sesuai identitas', 'Enter your full name as shown on your ID')}
                       style={{
                         width: '100%',
                         padding: '12px 16px',
@@ -310,7 +313,7 @@ export const CustomerSettingsPage: React.FC = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-                        Alamat Email (Read-only)
+                        {t('Alamat Email (Read-only)', 'Email Address (Read-only)')}
                       </label>
                       <input
                         type="email"
@@ -332,7 +335,7 @@ export const CustomerSettingsPage: React.FC = () => {
 
                     <div>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-                        Nomor HP / WhatsApp
+                        {t('Nomor HP / WhatsApp', 'Phone / WhatsApp Number')}
                       </label>
                       <IndonesianPhoneInput value={whatsapp} onChange={setWhatsapp} required />
                     </div>
@@ -341,7 +344,7 @@ export const CustomerSettingsPage: React.FC = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-                        Jenis Kelamin
+                        {t('Jenis Kelamin', 'Gender')}
                       </label>
                       <select
                         value={gender}
@@ -358,14 +361,14 @@ export const CustomerSettingsPage: React.FC = () => {
                           cursor: 'pointer'
                         }}
                       >
-                        <option value="Laki-laki">Laki-laki</option>
-                        <option value="Perempuan">Perempuan</option>
+                        <option value="Laki-laki">{t('Laki-laki', 'Male')}</option>
+                        <option value="Perempuan">{t('Perempuan', 'Female')}</option>
                       </select>
                     </div>
 
                     <div>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-                        Tanggal Lahir
+                        {t('Tanggal Lahir', 'Date of Birth')}
                       </label>
                       <input
                         type="date"
@@ -406,11 +409,19 @@ export const CustomerSettingsPage: React.FC = () => {
                       }}
                     >
                       {submitting
-                        ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
-                        : <><Save size={16} /> Simpan Perubahan</>}
+                        ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Menyimpan...', 'Saving...')}</>
+                        : <><Save size={16} /> {t('Simpan Perubahan', 'Save Changes')}</>}
                     </button>
                   </div>
                 </form>
+
+                <div style={{ marginTop: '28px', padding: '16px 20px', backgroundColor: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '14px', color: '#0f172a' }}>{t('Bahasa', 'Language')}</strong>
+                    <span style={{ fontSize: '12.5px', color: '#64748b' }}>{t('Bahasa tampilan situs TemenTrip', 'Display language for the TemenTrip site')}</span>
+                  </div>
+                  <LanguageSwitch />
+                </div>
               </div>
             )}
 
@@ -418,7 +429,7 @@ export const CustomerSettingsPage: React.FC = () => {
             {activeTab === 'favorit' && (
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-                  Paket Wisata Favorit Anda
+                  {t('Paket Wisata Favorit Anda', 'Your Favorite Trips')}
                 </h2>
 
                 {wishlistItems.length === 0 ? (
@@ -427,16 +438,16 @@ export const CustomerSettingsPage: React.FC = () => {
                       <Heart size={30} color="#ef4444" />
                     </div>
                     <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>
-                      Belum Ada Paket Favorit
+                      {t('Belum Ada Paket Favorit', 'No Favorites Yet')}
                     </h3>
                     <p style={{ fontSize: '13.5px', color: '#64748b', marginBottom: '20px' }}>
-                      Anda belum menambahkan paket wisata apa pun ke daftar favorit Anda.
+                      {t('Anda belum menambahkan paket wisata apa pun ke daftar favorit Anda.', "You haven't added any trips to your favorites yet.")}
                     </p>
                     <button
                       onClick={() => navigateTo('cari-trip')}
                       style={{ padding: '10px 24px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' }}
                     >
-                      Jelajahi Paket Wisata
+                      {t('Jelajahi Paket Wisata', 'Explore Trips')}
                     </button>
                   </div>
                 ) : (
@@ -453,7 +464,7 @@ export const CustomerSettingsPage: React.FC = () => {
                           />
                           {expired && (
                             <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#ffffff', padding: '4px 9px', borderRadius: '6px', fontSize: '10.5px', fontWeight: '700' }}>
-                              Jadwal sudah lewat
+                              {t('Jadwal sudah lewat', 'Date has passed')}
                             </span>
                           )}
                           <button
@@ -482,7 +493,7 @@ export const CustomerSettingsPage: React.FC = () => {
                               }}
                               style={{ padding: '6px 14px', backgroundColor: '#e0f2fe', color: '#0284c7', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                             >
-                              Lihat Detail
+                              {t('Lihat Detail', 'View Details')}
                             </button>
                           </div>
                         </div>
@@ -498,7 +509,7 @@ export const CustomerSettingsPage: React.FC = () => {
             {activeTab === 'review' && (
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-                  Kumpulan Review & Ulasan Anda
+                  {t('Kumpulan Review & Ulasan Anda', 'Your Reviews')}
                 </h2>
 
                 {reviewItems.length === 0 ? (
@@ -507,10 +518,10 @@ export const CustomerSettingsPage: React.FC = () => {
                       <Star size={30} color="#d97706" />
                     </div>
                     <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>
-                      Belum Ada Ulasan
+                      {t('Belum Ada Ulasan', 'No Reviews Yet')}
                     </h3>
                     <p style={{ fontSize: '13.5px', color: '#64748b' }}>
-                      Ulasan yang Anda berikan setelah menyelesaikan trip akan tampil di sini.
+                      {t('Ulasan yang Anda berikan setelah menyelesaikan trip akan tampil di sini.', 'Reviews you write after finishing a trip will show up here.')}
                     </p>
                   </div>
                 ) : (
@@ -520,14 +531,14 @@ export const CustomerSettingsPage: React.FC = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                           <div>
                             <span style={{ fontSize: '12px', fontWeight: '800', color: '#0284c7', textTransform: 'uppercase' }}>
-                              Ulasan Perjalanan
+                              {t('Ulasan Perjalanan', 'Trip Review')}
                             </span>
                             <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: '2px 0 0 0' }}>
                               {rev.packageName || 'TemenTrip Package'}
                             </h4>
                           </div>
                           <span style={{ fontSize: '12px', color: '#64748b' }}>
-                            {rev.date || 'Terbaru'}
+                            {rev.date || t('Terbaru', 'Recent')}
                           </span>
                         </div>
 
@@ -543,7 +554,7 @@ export const CustomerSettingsPage: React.FC = () => {
                         </div>
 
                         <p style={{ margin: 0, fontSize: '13.5px', color: '#334155', lineHeight: '1.6' }}>
-                          "{rev.comment || rev.content || 'Tidak ada komentar.'}"
+                          "{rev.comment || rev.content || t('Tidak ada komentar.', 'No comment.')}"
                         </p>
                       </div>
                     ))}

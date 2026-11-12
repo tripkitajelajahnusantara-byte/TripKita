@@ -21,7 +21,7 @@ import (
 func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 	cutoff := time.Now().Add(-models.PaymentWindow)
 	var candidates []models.Booking
-	if err := r.db.WithContext(ctx).Select("id", "xendit_invoice_id", "ipaymu_transaction_id").
+	if err := r.db.WithContext(ctx).Select("id", "payment_method", "xendit_invoice_id", "ipaymu_transaction_id").
 		Where("status = ? AND created_at < ? AND (payment_reviewed_at IS NULL OR payment_reviewed_at < ?)",
 			models.StatusPendingPayment, cutoff, time.Now().Add(-models.RejectedProofReuploadWindow)).
 		Find(&candidates).Error; err != nil {
@@ -38,7 +38,8 @@ func (r *Runner) ExpirePendingBookings(ctx context.Context) {
 		// Booking dari masa payment gateway (sebelum transfer manual) bisa saja
 		// sudah dibayar tetapi webhook-nya tidak pernah diterima. Pastikan dulu
 		// ke gateway; bila tidak dapat dipastikan, tahan untuk diperiksa operator.
-		if strings.TrimSpace(candidate.IPaymuTransactionID) != "" || strings.TrimSpace(candidate.XenditInvoiceID) != "" {
+		// Tagihan Midtrans diperiksa dan dihentikan oleh ExpirePendingBooking.
+		if usesLegacyGateway(candidate) {
 			switch r.checkInvoiceBeforeExpiry(candidate) {
 			case invoiceSettled:
 				settled++
@@ -82,6 +83,17 @@ const (
 	// invoiceUnverified: status tidak dapat dipastikan; booking ditahan.
 	invoiceUnverified
 )
+
+// usesLegacyGateway menandai booking iPaymu/Xendit lama yang statusnya dicek ke
+// iPaymu. Booking Midtrans juga menyimpan order_id di xendit_invoice_id, tetapi
+// order_id itu bukan transaction ID iPaymu sehingga dulu selalu tertahan dan
+// kuotanya tidak pernah dilepas.
+func usesLegacyGateway(b models.Booking) bool {
+	if b.UsesMidtrans() {
+		return false
+	}
+	return strings.TrimSpace(b.IPaymuTransactionID) != "" || strings.TrimSpace(b.XenditInvoiceID) != ""
+}
 
 // checkInvoiceBeforeExpiry memastikan status invoice ke payment gateway sebelum
 // booking dikedaluwarsakan.

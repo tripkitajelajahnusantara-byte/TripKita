@@ -215,4 +215,14 @@ void main() {
       expect(formatIsoLong('2026-10-01'), '1 Oktober 2026');
     });
   });
+
+  test('build staging hanya membuka halaman Midtrans Sandbox', () {
+    const sandbox = 'https://app.sandbox.midtrans.com/snap/v4/redirection/t';
+    const live = 'https://app.midtrans.com/snap/v4/redirection/t';
+    expect(isAllowedPaymentUrl(sandbox, staging: true), isTrue);
+    expect(isAllowedPaymentUrl(live, staging: true), isFalse);
+    expect(isAllowedPaymentUrl(live, staging: false), isTrue);
+    expect(isAllowedPaymentUrl('https://evil.example.com/pay', staging: false), isFalse);
+    expect(isAllowedPaymentUrl('https://midtrans.com.evil.io/pay', staging: false), isFalse);
+  });
 }

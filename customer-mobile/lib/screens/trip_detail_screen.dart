@@ -259,9 +259,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 children: [
                   _buildHero(),
                   _buildInfo(),
-                  const _Band(),
+                  const _Band(height: 8),
                   KeyedSubtree(key: _sectionKeys[0], child: _buildItinerarySummary()),
-                  const _Band(),
+                  const _Band(height: 4),
                   KeyedSubtree(key: _sectionKeys[1], child: _buildFacilities()),
                   const _Band(),
                   KeyedSubtree(key: _sectionKeys[2], child: _buildLocation()),
@@ -298,11 +298,13 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
           SizedBox(
             height: 56,
             child: Row(children: [
-              const SizedBox(width: 4),
+              const SizedBox(width: 8),
               IconButton(
                 tooltip: 'Kembali',
                 onPressed: () => Navigator.maybePop(context),
-                icon: Icon(Icons.arrow_back_rounded, color: iconColor),
+                constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+                padding: EdgeInsets.zero,
+                icon: AppIcon('arrow_left', color: iconColor),
               ),
               const Spacer(),
               ListenableBuilder(
@@ -312,17 +314,23 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                   return IconButton(
                     tooltip: active ? 'Hapus dari favorit' : 'Simpan ke favorit',
                     onPressed: () => WishlistStore.instance.toggle(_pkg, syncToAccount: AuthSession.instance.isLoggedIn),
-                    icon: Icon(active ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        color: active ? AppColors.favorite : iconColor),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    icon: active
+                        ? const Icon(Icons.favorite_rounded, color: AppColors.favorite)
+                        : AppIcon('heart_outline', color: iconColor),
                   );
                 },
               ),
+              const SizedBox(width: 3.3),
               IconButton(
                 tooltip: 'Bagikan',
                 onPressed: () => showSharePackageSheet(context, _pkg, rating: _rating, reviewCount: _reviews.length),
-                icon: Icon(Icons.share_outlined, color: iconColor),
+                constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                padding: EdgeInsets.zero,
+                icon: AppIcon('share', color: iconColor),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 12.7),
             ]),
           ),
           if (_collapsed)
@@ -396,10 +404,10 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   margin: const EdgeInsets.symmetric(horizontal: 2),
-                  width: i == _photoIndex ? 12 : 5,
-                  height: 5,
+                  width: i == _photoIndex ? 12 : 6,
+                  height: 6,
                   decoration: BoxDecoration(
-                    color: i == _photoIndex ? AppColors.accent : Colors.white70,
+                    color: i == _photoIndex ? const Color(0xFF024254) : AppColors.borderStrong,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -409,19 +417,25 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
           right: 16,
           bottom: 12,
           child: Material(
-            color: const Color(0x99102A33),
-            borderRadius: BorderRadius.circular(6),
+            color: const Color(0x99000000),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: AppColors.textBody, width: 0.5),
+            ),
             child: InkWell(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
               onTap: _openGallery,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.photo_camera_outlined, size: 16, color: Colors.white),
-                  const SizedBox(width: 6),
-                  Text(photos.isEmpty ? '0' : '${_photoIndex + 1}/${photos.length}',
-                      style: const TextStyle(fontSize: 12, color: Colors.white)),
-                ]),
+              child: SizedBox(
+                height: 26,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(5, 0, 7, 0),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const AppIcon('camera', size: 16, color: AppColors.divider),
+                    const SizedBox(width: 6),
+                    Text(photos.isEmpty ? '0' : '${_photoIndex + 1}/${photos.length}',
+                        style: const TextStyle(fontSize: 12, height: 16 / 12, color: Colors.white)),
+                  ]),
+                ),
               ),
             ),
           ),
@@ -435,48 +449,57 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     final period = _periodLabel;
     final description = _pkg.description.trim();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           Expanded(
-            child: Text('${_pkg.tripType.isEmpty ? 'Open Trip' : _pkg.tripType} • ${_pkg.durationDays} hari',
-                style: const TextStyle(fontSize: 14, color: AppColors.textMuted)),
+            child: Text('${_pkg.tripType.isEmpty ? 'Open Trip' : _pkg.tripType} • ${_pkg.durationDays} hari'.toUpperCase(),
+                style: const TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
           ),
           if (rating > 0) ...[
-            const Icon(Icons.star_rounded, size: 16, color: AppColors.star),
-            const SizedBox(width: 2),
-            Text(rating.toStringAsFixed(1), style: const TextStyle(fontSize: 14, color: AppColors.textMedium)),
+            const AppIcon('star_fill', size: 16, color: AppColors.warning),
+            const SizedBox(width: 3.3),
+            Text(rating.toStringAsFixed(1),
+                style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMedium)),
           ],
         ]),
-        const SizedBox(height: 8),
+        const SizedBox(height: 7.3),
         Text(_pkg.name,
-            style: const TextStyle(fontSize: 20, height: 1.5, fontWeight: FontWeight.w600, color: AppColors.textStrong)),
-        const SizedBox(height: 6),
-        if (_pkg.destination.isNotEmpty) _InfoLine(icon: Icons.location_on_outlined, text: _pkg.destination),
+            style: const TextStyle(fontSize: 20, height: 1.5, fontWeight: FontWeight.w700, color: AppColors.textStrong)),
+        const SizedBox(height: 5.3),
+        if (_pkg.destination.isNotEmpty) _MetaLine(icon: 'map_pin_small', text: _pkg.destination),
         if (period != null) ...[
           const SizedBox(height: 4),
-          _InfoLine(icon: Icons.calendar_today_outlined, text: period),
+          _MetaLine(icon: 'calendar_small2', text: period),
         ],
-        const Divider(height: 32),
+        const SizedBox(height: 15.3),
+        const Divider(height: 1),
+        const SizedBox(height: 14),
         const SectionTitle('Deskripsi'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 12.7),
         Text(
           description.isEmpty ? 'Deskripsi paket belum dilengkapi oleh provider.' : description,
           maxLines: _descExpanded ? null : 3,
           overflow: _descExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 13, height: 1.55, color: AppColors.textMuted),
+          style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMuted),
         ),
-        if (description.length > 140)
+        if (description.length > 140) ...[
+          const SizedBox(height: 5.5),
           Center(
-            child: TextButton(
-              onPressed: () => setState(() => _descExpanded = !_descExpanded),
+            child: GestureDetector(
+              onTap: () => setState(() => _descExpanded = !_descExpanded),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(_descExpanded ? 'Lebih sedikit' : 'Selengkapnya', style: const TextStyle(fontSize: 13)),
-                const SizedBox(width: 4),
-                Icon(_descExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, size: 20),
+                Text(_descExpanded ? 'Lebih sedikit' : 'Selengkapnya',
+                    style: const TextStyle(fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                const SizedBox(width: 9),
+                RotatedBox(
+                  quarterTurns: _descExpanded ? 2 : 0,
+                  child: const AppIcon('chevron_down_small', size: 16, color: AppColors.accentBright),
+                ),
               ]),
             ),
           ),
+        ],
       ]),
     );
   }
@@ -501,32 +524,39 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
   Widget _buildItinerarySummary() {
     final destinations = _destinationsSummary;
+    const line = TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMuted);
+    Widget row(String icon, String text) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          AppIcon(icon, size: 16, color: AppColors.primaryDark),
+          const SizedBox(width: 5.3),
+          Expanded(child: Text(text, style: line)),
+        ]);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Material(
-        color: AppColors.accentSoft,
+        color: AppColors.accentLight,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: AppColors.accentBorder),
+          side: const BorderSide(color: AppColors.accentSoft),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: _openItinerary,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(14, 11.5, 12.4, 15),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               const Row(children: [
+                SizedBox(width: 1),
                 Expanded(
                   child: Text('Rencana Perjalanan',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                      style: TextStyle(fontSize: 16, height: 1.17, fontWeight: FontWeight.w600, color: AppColors.textDark)),
                 ),
-                Icon(Icons.chevron_right_rounded, color: AppColors.accent),
+                AppIcon('caret_right_teal', color: AppColors.accentBright),
               ]),
-              const SizedBox(height: 10),
-              _InfoLine(icon: Icons.location_on_outlined, text: _gatheringLine, iconColor: AppColors.primaryDark, size: 13),
+              const SizedBox(height: 8.4),
+              row('map_pin_teal', _gatheringLine),
               if (destinations.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                _InfoLine(icon: Icons.route_outlined, text: 'Destinasi wisata: $destinations', iconColor: AppColors.primaryDark, size: 13),
+                const SizedBox(height: 8.4),
+                row('route', 'Destinasi wisata: $destinations'),
               ],
             ]),
           ),
@@ -779,20 +809,11 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     return BottomActionBar(
       child: Row(children: [
         Expanded(
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Mulai dari', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-            const SizedBox(height: 2),
-            Text.rich(TextSpan(
-              text: formatPrice(_pkg.price),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
-              children: [
-                TextSpan(
-                  text: _pkg.isPerUnit ? ' /${_pkg.unitLabel}' : ' /orang',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textMuted),
-                ),
-              ],
-            )),
-          ]),
+          child: PriceCaption(
+            caption: 'Mulai dari',
+            amount: _pkg.price,
+            suffix: _pkg.isPerUnit ? '/${_pkg.unitLabel}' : '/orang',
+          ),
         ),
         const SizedBox(width: 12),
         SizedBox(
@@ -809,10 +830,29 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
 /// Pita abu pemisah antarbagian halaman detail.
 class _Band extends StatelessWidget {
-  const _Band();
+  final double height;
+
+  const _Band({this.height = 6});
 
   @override
-  Widget build(BuildContext context) => Container(height: 6, color: AppColors.divider);
+  Widget build(BuildContext context) => Container(height: height, color: AppColors.divider);
+}
+
+/// Baris ikon 16 + teks 14/20 di bawah judul paket.
+class _MetaLine extends StatelessWidget {
+  final String icon;
+  final String text;
+
+  const _MetaLine({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Transform.translate(offset: const Offset(-1, 0), child: AppIcon(icon, size: 16, color: AppColors.textMedium)),
+      const SizedBox(width: 2),
+      Expanded(child: Text(text, style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMedium))),
+    ]);
+  }
 }
 
 class _InfoLine extends StatelessWidget {

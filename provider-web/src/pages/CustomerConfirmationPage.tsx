@@ -15,10 +15,12 @@ import {
   getMeetingPointCoordinates,
   MeetingPointMap,
 } from '../components/MeetingPointMap';
+import { useI18n } from '../i18n';
 
 export const CustomerConfirmationPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, bookingFormData, setBookingFormData, setSelectedBookingForInvoice, setSelectedPackageForDetail } = useNavigation();
   const { showAlert } = useCustomAlert();
+  const { t, lang, locale } = useI18n();
   // POST /public/bookings membuat pesanan baru; kunci berbasis ref mencegah
   // klik ganda di tick yang sama membuat dua booking dan dua tagihan.
   const { pending, isBusy, run } = useActionLock();
@@ -52,10 +54,10 @@ export const CustomerConfirmationPage: React.FC = () => {
         }
       })
       .catch((err: unknown) => {
-        if (!cancelled) setCheckoutConfigError(err instanceof Error && err.message ? err.message : 'Gagal memuat biaya layanan.');
+        if (!cancelled) setCheckoutConfigError(err instanceof Error && err.message ? err.message : t('Gagal memuat biaya layanan.', "Couldn't load the service fee."));
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [t]);
 
   const [restoring, setRestoring] = useState(!selectedPackageForDetail && !!bookingFormData?.packageId);
   const [restoreError, setRestoreError] = useState('');
@@ -65,14 +67,14 @@ export const CustomerConfirmationPage: React.FC = () => {
     request('/public/packages').then((packages) => {
       if (cancelled) return;
       const found = Array.isArray(packages) ? packages.find(p => Number(p.id) === Number(bookingFormData.packageId)) : null;
-      if (!found) throw new Error('Paket tidak tersedia. Silakan pilih ulang paket dan tanggal.');
+      if (!found) throw new Error(t('Paket tidak tersedia. Silakan pilih ulang paket dan tanggal.', 'This package is not available. Please choose the package and date again.'));
       setSelectedPackageForDetail({ ...found, bookingDate: bookingFormData.tripDate, bookingEndDate: bookingFormData.tripEndDate, bookingGuests: bookingFormData.peserta.length });
-    }).catch(error => { if (!cancelled) setRestoreError(error.message || 'Gagal memuat paket.'); })
+    }).catch(error => { if (!cancelled) setRestoreError(error.message || t('Gagal memuat paket.', "Couldn't load the package.")); })
       .finally(() => { if (!cancelled) setRestoring(false); });
     return () => { cancelled = true; };
-  }, [selectedPackageForDetail, bookingFormData, setSelectedPackageForDetail]);
+  }, [selectedPackageForDetail, bookingFormData, setSelectedPackageForDetail, t]);
 
-  if (restoring && !selectedPackageForDetail) return <p role="status" style={{ padding: 40 }}>Memuat pilihan perjalanan...</p>;
+  if (restoring && !selectedPackageForDetail) return <p role="status" style={{ padding: 40 }}>{t('Memuat pilihan perjalanan...', 'Loading your trip selection...')}</p>;
 
   // Setelah booking dibuat, data form dikosongkan sementara halaman tagihan
   // masih dimuat; tampilkan status pengalihan, bukan pesan "tidak ditemukan".
@@ -80,7 +82,7 @@ export const CustomerConfirmationPage: React.FC = () => {
     return (
       <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }} role="status" aria-live="polite">
         <LoaderCircle size={20} className="btn-spinner" aria-hidden="true" style={{ verticalAlign: 'middle', marginRight: 8 }} />
-        Booking berhasil dibuat. Membuka halaman pembayaran...
+        {t('Booking berhasil dibuat. Membuka halaman pembayaran...', 'Booking created. Opening payment page...')}
       </div>
     );
   }
@@ -88,9 +90,9 @@ export const CustomerConfirmationPage: React.FC = () => {
   if (!selectedPackageForDetail || !bookingFormData) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
-        <p>{restoreError || 'Data pemesanan tidak ditemukan. Silakan isi data pemesan terlebih dahulu.'}</p>
+        <p>{restoreError || t('Data pemesanan tidak ditemukan. Silakan isi data pemesan terlebih dahulu.', 'Booking details not found. Please fill in the booker details first.')}</p>
         <button onClick={() => navigateTo('beranda')} style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
-          Kembali ke Beranda
+          {t('Kembali ke Beranda', 'Back to Home')}
         </button>
       </div>
     );
@@ -111,6 +113,7 @@ export const CustomerConfirmationPage: React.FC = () => {
   const checkoutConfigLoading = (serviceFee === null || cancellationRefundDays === null) && !checkoutConfigError;
   const checkoutReady = serviceFee !== null && cancellationRefundDays !== null;
   const totalCost = baseCost + addOnsTotal + (serviceFee ?? 0);
+  const cancellationPolicyTitle = t(`Kebijakan Pembatalan H-${cancellationRefundDays ?? '—'} TemenTrip`, `TemenTrip ${cancellationRefundDays ?? '—'}-Day Cancellation Policy`);
 
   const formatIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -123,7 +126,7 @@ export const CustomerConfirmationPage: React.FC = () => {
   const handleOpenConfirmModal = () => {
     if (isBusy || redirectingRef.current || !checkoutReady) return;
     if (!isAgreed) {
-      setAgreementError('Anda wajib menyetujui Syarat & Ketentuan untuk melanjutkan.');
+      setAgreementError(t('Anda wajib menyetujui Syarat & Ketentuan untuk melanjutkan.', 'You must agree to the Terms & Conditions to continue.'));
       return;
     }
     setAgreementError('');
@@ -140,7 +143,7 @@ export const CustomerConfirmationPage: React.FC = () => {
     if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
       age--;
     }
-    return age > 0 ? `${age} Tahun` : '0 Tahun';
+    return age > 0 ? t(`${age} Tahun`, `${age} years`) : t('0 Tahun', '0 years');
   };
 
   const handleFinalConfirmBooking = async () => {
@@ -153,13 +156,13 @@ export const CustomerConfirmationPage: React.FC = () => {
     try {
       const selectedTripSchedule = bookingFormData.tripDate || pkg.bookingDate || '';
       if (!validDate(selectedTripSchedule) || Number(bookingFormData.packageId) !== Number(pkg.id)) {
-        throw new Error('Pilihan tanggal tidak valid untuk paket ini. Kembali ke detail paket dan pilih tanggal pada kalender.');
+        throw new Error(t('Pilihan tanggal tidak valid untuk paket ini. Kembali ke detail paket dan pilih tanggal pada kalender.', 'The selected date is not valid for this package. Go back to the package details and pick a date on the calendar.'));
       }
       const tripTimestamp = bookingTimestamp(selectedTripSchedule);
 
 	  const rawPkgId = Number(pkg.id);
 	  if (!Number.isInteger(rawPkgId) || rawPkgId <= 0) {
-		throw new Error('Paket yang dipilih tidak valid. Silakan kembali dan pilih paket lagi.');
+		throw new Error(t('Paket yang dipilih tidak valid. Silakan kembali dan pilih paket lagi.', 'The selected package is not valid. Please go back and choose a package again.'));
 	  }
 
       const payload: any = {
@@ -190,7 +193,7 @@ export const CustomerConfirmationPage: React.FC = () => {
       });
 
 	  const finalBookingCode = response.bookingCode || response.booking_code;
-	  if (!finalBookingCode) throw new Error('Backend tidak mengembalikan kode booking');
+	  if (!finalBookingCode) throw new Error(t('Backend tidak mengembalikan kode booking', 'The server did not return a booking code'));
       const bookingObj = {
         id: response.id || Date.now(),
         bookingCode: finalBookingCode,
@@ -220,10 +223,10 @@ export const CustomerConfirmationPage: React.FC = () => {
       console.error('[Booking Error]', err);
       setShowConfirmModal(false);
       showAlert({
-        title: 'Pembayaran Belum Dapat Diproses',
-        message: err?.message || 'Booking belum dapat dibuat. Silakan coba kembali.',
+        title: t('Pembayaran Belum Dapat Diproses', "Payment Couldn't Be Processed"),
+        message: err?.message || t('Booking belum dapat dibuat. Silakan coba kembali.', "The booking couldn't be created. Please try again."),
         type: 'error',
-        confirmText: 'Coba Lagi',
+        confirmText: t('Coba Lagi', 'Try Again'),
       });
     }
     });
@@ -238,11 +241,11 @@ export const CustomerConfirmationPage: React.FC = () => {
           onClick={() => navigateTo('customer-checkout')}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'transparent', border: 'none', color: '#0284c7', fontWeight: '700', fontSize: '14px', cursor: 'pointer', marginBottom: '20px' }}
         >
-          <ArrowLeft size={18} /> Ubah Data Pemesan & Peserta
+          <ArrowLeft size={18} /> {t('Ubah Data Pemesan & Peserta', 'Edit Booker & Participant Details')}
         </button>
 
         <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0f172a', marginBottom: '30px' }}>
-          Konfirmasi & Pembayaran Trip
+          {t('Konfirmasi & Pembayaran Trip', 'Trip Confirmation & Payment')}
         </h1>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -250,7 +253,7 @@ export const CustomerConfirmationPage: React.FC = () => {
           {/* Pemesan & Peserta Card */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-              Daftar Peserta Trip ({guestsCount} Orang)
+              {t(`Daftar Peserta Trip (${guestsCount} Orang)`, `Trip Participants (${guestsCount} ${guestsCount === 1 ? 'Person' : 'People'})`)}
             </h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -258,40 +261,40 @@ export const CustomerConfirmationPage: React.FC = () => {
                 <div key={idx} style={{ backgroundColor: '#ffffff', borderRadius: '14px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
                     <span style={{ fontSize: '14px', fontWeight: '800', color: '#0284c7' }}>
-                      Peserta {idx + 1}
+                      {t('Peserta', 'Participant')} {idx + 1}
                     </span>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px' }}>
                     <div>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nama Lengkap</span>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>{t('Nama Lengkap', 'Full Name')}</span>
                       <strong style={{ fontSize: '14px', color: '#0f172a' }}>{p.nama || '-'}</strong>
                     </div>
 
                     <div>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Nomor HP / WhatsApp</span>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>{t('Nomor HP / WhatsApp', 'Phone / WhatsApp')}</span>
                       <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.hp || '-'}</span>
                     </div>
 
                     <div>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Jenis Kelamin</span>
-                      <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.gender || '-'}</span>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>{t('Jenis Kelamin', 'Gender')}</span>
+                      <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.gender === 'Laki-laki' ? t('Laki-laki', 'Male') : p.gender === 'Perempuan' ? t('Perempuan', 'Female') : (p.gender || '-')}</span>
                     </div>
 
                     <div>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Tanggal Lahir</span>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>{t('Tanggal Lahir', 'Date of Birth')}</span>
                       <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{p.tanggalLahir || '-'}</span>
                     </div>
 
                     <div>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Umur</span>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>{t('Umur', 'Age')}</span>
                       <span style={{ fontSize: '13.5px', color: '#0f172a', fontWeight: '600' }}>{calculateAge(p.tanggalLahir)}</span>
                     </div>
 
                     <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #f1f5f9', paddingTop: '10px' }}>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>Riwayat Penyakit & Alergi</span>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: '#64748b', fontWeight: '600', marginBottom: '2px' }}>{t('Riwayat Penyakit & Alergi', 'Medical History & Allergies')}</span>
                       <span style={{ fontSize: '13.5px', fontWeight: '600', color: p.riwayatPenyakit && p.riwayatPenyakit !== 'Tidak Ada' ? '#ef4444' : '#10b981' }}>
-                        {p.riwayatPenyakit || 'Tidak Ada'}
+                        {p.riwayatPenyakit || t('Tidak Ada', 'None')}
                       </span>
                     </div>
                   </div>
@@ -302,13 +305,13 @@ export const CustomerConfirmationPage: React.FC = () => {
 
           <FlexiblePickupDetails pkg={pkg} />
           {pkg.pickupMode === 'FLEXIBLE' && <section className="trip-option-panel">
-            <h4>Titik jemput yang diajukan</h4>
-            <dl className="pickup-manifest">{bookingFormData.peserta.map((p, i) => <div key={i}><dt>{p.nama}</dt><dd>{p.pickupPoint || 'Belum diisi — kembali ke data peserta untuk melengkapi.'}</dd></div>)}</dl>
+            <h4>{t('Titik jemput yang diajukan', 'Requested pickup points')}</h4>
+            <dl className="pickup-manifest">{bookingFormData.peserta.map((p, i) => <div key={i}><dt>{p.nama}</dt><dd>{p.pickupPoint || t('Belum diisi — kembali ke data peserta untuk melengkapi.', 'Not filled in yet. Go back to participant details to complete it.')}</dd></div>)}</dl>
           </section>}
           {meetingPointCoordinates && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
               <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px' }}>
-                Titik Kumpul
+                {t('Titik Kumpul', 'Meeting Point')}
               </h2>
               {meetingPointAddress && (
                 <p style={{ fontSize: '13px', color: '#334155', margin: '0 0 14px', lineHeight: 1.6 }}>
@@ -322,7 +325,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                 rel="noopener noreferrer"
                 style={{ display: 'inline-flex', marginTop: '12px', color: '#0284c7', fontSize: '13px', fontWeight: 700 }}
               >
-                Buka petunjuk arah
+                {t('Buka petunjuk arah', 'Get directions')}
               </a>
             </div>
           )}
@@ -330,7 +333,7 @@ export const CustomerConfirmationPage: React.FC = () => {
           {/* Ringkasan Pembayaran Card (Positioned directly below Data Peserta) */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-              Ringkasan Pembayaran
+              {t('Ringkasan Pembayaran', 'Payment Summary')}
             </h2>
 
             <div style={{ marginBottom: '18px', paddingBottom: '16px', borderBottom: '1px solid #f1f5f9' }}>
@@ -342,23 +345,23 @@ export const CustomerConfirmationPage: React.FC = () => {
               </h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>
                 <Calendar size={14} color="#94a3b8" />
-                <span>{formatTripRange(bookingFormData.tripDate || pkg.bookingDate, bookingFormData.tripEndDate || pkg.bookingEndDate)}</span>
+                <span>{formatTripRange(bookingFormData.tripDate || pkg.bookingDate, bookingFormData.tripEndDate || pkg.bookingEndDate, locale)}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b' }}>
                 <Users size={14} color="#94a3b8" />
-                <span>{guestsCount} Peserta</span>
+                <span>{guestsCount} {t('Peserta', guestsCount === 1 ? 'Participant' : 'Participants')}</span>
               </div>
             </div>
 
             {/* Price breakdown */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', fontSize: '13.5px', color: '#64748b' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                <span>{perUnit ? `${unitCount} ${unitName(pkg)} × ${formatIDR(pkg.price)}` : `${formatIDR(pkg.price)} × ${guestsCount} orang`}</span>
+                <span>{perUnit ? `${unitCount} ${unitName(pkg)} × ${formatIDR(pkg.price)}` : `${formatIDR(pkg.price)} × ${guestsCount} ${t('orang', guestsCount === 1 ? 'person' : 'people')}`}</span>
                 <span style={{ color: '#0f172a', fontWeight: '600' }}>{formatIDR(baseCost)}</span>
               </div>
               {perUnit && (
                 <span style={{ fontSize: '12px', marginTop: '-6px' }}>
-                  ≈ {formatIDR(Math.round(baseCost / Math.max(1, guestsCount)))} / orang untuk {guestsCount} peserta
+                  ≈ {formatIDR(Math.round(baseCost / Math.max(1, guestsCount)))} {t(`/ orang untuk ${guestsCount} peserta`, `/ person for ${guestsCount} ${guestsCount === 1 ? 'participant' : 'participants'}`)}
                 </span>
               )}
 
@@ -371,22 +374,22 @@ export const CustomerConfirmationPage: React.FC = () => {
 
               {(serviceFee === null || serviceFee > 0) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Biaya Admin</span>
+                  <span>{t('Biaya Admin', 'Admin Fee')}</span>
                   <span style={{ color: checkoutConfigError ? '#ef4444' : '#0f172a', fontWeight: '600' }}>
-                    {serviceFee !== null ? formatIDR(serviceFee) : (checkoutConfigError ? 'Gagal dimuat' : <Skeleton width={90} height={16} style={{ display: 'inline-block', verticalAlign: 'middle' }} />)}
+                    {serviceFee !== null ? formatIDR(serviceFee) : (checkoutConfigError ? t('Gagal dimuat', 'Failed to load') : <Skeleton width={90} height={16} style={{ display: 'inline-block', verticalAlign: 'middle' }} />)}
                   </span>
                 </div>
               )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1.5px dashed #cbd5e1' }}>
-              <strong style={{ fontSize: '14px', color: '#0f172a' }}>TOTAL PEMBAYARAN</strong>
+              <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('TOTAL PEMBAYARAN', 'TOTAL PAYMENT')}</strong>
               <strong style={{ fontSize: '18px', color: '#0284c7', fontWeight: '800' }}>{checkoutReady ? formatIDR(totalCost) : (checkoutConfigError ? '-' : <Skeleton width={90} height={16} style={{ display: 'inline-block', verticalAlign: 'middle' }} />)}</strong>
             </div>
 
             {checkoutConfigError && (
               <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '700', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <AlertCircle size={14} /> Gagal memuat biaya layanan: {checkoutConfigError} Muat ulang halaman untuk mencoba lagi.
+                <AlertCircle size={14} /> {t('Gagal memuat biaya layanan:', "Couldn't load the service fee:")} {checkoutConfigError} {t('Muat ulang halaman untuk mencoba lagi.', 'Reload the page to try again.')}
               </span>
             )}
           </div>
@@ -394,12 +397,18 @@ export const CustomerConfirmationPage: React.FC = () => {
           {/* Cancellation Policy Banner */}
           <div style={{ backgroundColor: '#f0f9ff', borderRadius: '16px', padding: '16px 20px', border: '1px solid #bae6fd', marginBottom: '16px' }}>
             <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '800', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ShieldCheck size={16} color="#0369a1" /> Kebijakan Pembatalan H-{cancellationRefundDays ?? '—'} TemenTrip
+              <ShieldCheck size={16} color="#0369a1" /> {cancellationPolicyTitle}
             </h4>
             <p style={{ margin: 0, fontSize: '12px', color: '#0c4a6e', lineHeight: '1.5' }}>
+              {lang === 'en' ? <>
+              • Cancellations <strong>≥ {cancellationRefundDays ?? '—'} days before the trip</strong> get a <strong>100% full refund</strong>.<br/>
+              • Cancellations <strong>&lt; {cancellationRefundDays ?? '—'} days before the trip</strong> are charged a 100% cancellation fee (<strong>0% refund / forfeited</strong>).<br/>
+              • If the trip is cancelled by the partner, weather, or low quota, the booker gets a <strong>100% refund</strong> or <strong>one reschedule (max. 1x)</strong>.
+              </> : <>
               • Pembatalan <strong>≥ {cancellationRefundDays ?? '—'} hari sebelum trip</strong> berhak pengembalian dana <strong>100% Full Refund</strong>.<br/>
               • Pembatalan <strong>&lt; {cancellationRefundDays ?? '—'} hari sebelum trip</strong> dikenakan biaya pembatalan 100% (<strong>0% Refund / Uang Hangus</strong>).<br/>
               • Jika trip dibatalkan oleh Provider/Cuaca/Kuota Kurang, Pemesan berhak atas <strong>100% Refund</strong> atau <strong>Reschedule Maks 1x</strong>.
+              </>}
             </p>
           </div>
 
@@ -413,23 +422,23 @@ export const CustomerConfirmationPage: React.FC = () => {
                 style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: '#0284c7', cursor: 'pointer' }}
               />
               <span style={{ fontSize: '13px', color: '#334155', lineHeight: '1.5' }}>
-                Saya telah membaca dan menyetujui{' '}
+                {t('Saya telah membaca dan menyetujui', 'I have read and agree to the')}{' '}
                 <button 
                   type="button" 
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveLegalModal('terms'); }}
                   style={{ background: 'none', border: 'none', padding: 0, color: '#0284c7', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
                 >
-                  Syarat & Ketentuan
+                  {t('Syarat & Ketentuan', 'Terms & Conditions')}
                 </button>
-                {' '}serta{' '}
+                {' '}{t('serta', 'and the')}{' '}
                 <button 
                   type="button" 
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveLegalModal('cancellation'); }}
                   style={{ background: 'none', border: 'none', padding: 0, color: '#0284c7', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
                 >
-                  Kebijakan Pembatalan H-{cancellationRefundDays ?? '—'} TemenTrip
+                  {cancellationPolicyTitle}
                 </button>
-                . Seluruh data peserta yang diisikan adalah benar.
+                {t('. Seluruh data peserta yang diisikan adalah benar.', '. All participant details I entered are correct.')}
               </span>
             </label>
             {agreementError && (
@@ -462,7 +471,7 @@ export const CustomerConfirmationPage: React.FC = () => {
               gap: '8px'
             }}
           >
-            {submitting ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses Booking...</> : checkoutConfigLoading ? 'Memuat Biaya Layanan...' : 'Konfirmasi & Bayar Sekarang'}
+            {submitting ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Memproses Booking...', 'Processing Booking...')}</> : checkoutConfigLoading ? t('Memuat Biaya Layanan...', 'Loading Service Fee...') : t('Konfirmasi & Bayar Sekarang', 'Confirm & Pay Now')}
           </button>
 
         </div>
@@ -503,11 +512,13 @@ export const CustomerConfirmationPage: React.FC = () => {
             </div>
 
             <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0' }}>
-              Konfirmasi Pemesanan
+              {t('Konfirmasi Pemesanan', 'Confirm Booking')}
             </h3>
 
             <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.5', margin: '0 0 26px 0' }}>
-              Apakah Anda yakin data pemesanan dan seluruh peserta sudah benar dan ingin melanjutkan ke pembayaran sebesar <strong style={{ color: '#0f172a' }}>{formatIDR(totalCost)}</strong>?
+              {lang === 'en'
+                ? <>Are your booking and all participant details correct? Continue to payment of <strong style={{ color: '#0f172a' }}>{formatIDR(totalCost)}</strong>?</>
+                : <>Apakah Anda yakin data pemesanan dan seluruh peserta sudah benar dan ingin melanjutkan ke pembayaran sebesar <strong style={{ color: '#0f172a' }}>{formatIDR(totalCost)}</strong>?</>}
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -528,7 +539,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                   cursor: submitting ? 'not-allowed' : 'pointer'
                 }}
               >
-                Batal (No)
+                {t('Batal (No)', 'Cancel')}
               </button>
 
               {/* YES Button */}
@@ -552,7 +563,7 @@ export const CustomerConfirmationPage: React.FC = () => {
                   gap: '6px'
                 }}
               >
-                {submitting ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses Booking...</> : 'Ya, Bayar Sekarang'}
+                {submitting ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Memproses Booking...', 'Processing Booking...')}</> : t('Ya, Bayar Sekarang', 'Yes, Pay Now')}
               </button>
             </div>
 
@@ -564,7 +575,7 @@ export const CustomerConfirmationPage: React.FC = () => {
       <LegalModalContainer
         isOpen={activeLegalModal === 'terms'}
         onClose={() => setActiveLegalModal(null)}
-        title="Syarat & Ketentuan Customer TemenTrip"
+        title={t('Syarat & Ketentuan Customer TemenTrip', 'TemenTrip Customer Terms & Conditions')}
       >
         <GeneralTermsContent cancellationRefundDays={cancellationRefundDays ?? undefined} />
       </LegalModalContainer>
@@ -573,7 +584,7 @@ export const CustomerConfirmationPage: React.FC = () => {
       <LegalModalContainer
         isOpen={activeLegalModal === 'cancellation'}
         onClose={() => setActiveLegalModal(null)}
-        title={`Kebijakan Pembatalan H-${cancellationRefundDays ?? '—'} TemenTrip`}
+        title={cancellationPolicyTitle}
       >
         <CustomerRegistrationTermsContent cancellationRefundDays={cancellationRefundDays ?? undefined} />
       </LegalModalContainer>

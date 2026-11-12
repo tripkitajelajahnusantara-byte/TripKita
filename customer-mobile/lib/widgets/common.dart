@@ -662,6 +662,41 @@ class _CenteredDialog extends StatelessWidget {
   }
 }
 
+/// Notifikasi Figma di atas layar: kotak gelap 48 radius 8, teks 14 putih,
+/// hilang sendiri setelah 3 detik.
+void showTopToast(BuildContext context, String message) {
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) return;
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (context) => Positioned(
+      left: 16,
+      right: 16,
+      top: MediaQuery.paddingOf(context).top + 12,
+      child: IgnorePointer(
+        child: Material(
+          color: AppColors.sheetTitle,
+          borderRadius: BorderRadius.circular(8),
+          elevation: 6,
+          shadowColor: const Color(0x660F172A),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Text(message,
+                style: const TextStyle(
+                    fontSize: 14, height: 20 / 14, letterSpacing: 0, fontWeight: FontWeight.w500, color: Colors.white)),
+          ),
+        ),
+      ),
+    ),
+  );
+  overlay.insert(entry);
+  Future<void>.delayed(const Duration(seconds: 3), () {
+    if (entry.mounted) entry.remove();
+  });
+}
+
 void showSnack(BuildContext context, String message, {bool isError = false}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
@@ -680,16 +715,19 @@ const figmaTextStyle = TextStyle(letterSpacing: 0, height: 1.17);
 class AppIcon extends StatelessWidget {
   final String name;
   final double size;
+
+  /// Tinggi bila ikon tidak persegi; bawaannya sama dengan [size].
+  final double? height;
   final Color? color;
 
-  const AppIcon(this.name, {super.key, this.size = 24, this.color});
+  const AppIcon(this.name, {super.key, this.size = 24, this.height, this.color});
 
   @override
   Widget build(BuildContext context) {
     return SvgPicture.asset(
       'assets/icons/$name.svg',
       width: size,
-      height: size,
+      height: height ?? size,
       colorFilter: color == null ? null : ColorFilter.mode(color!, BlendMode.srcIn),
     );
   }
@@ -791,14 +829,14 @@ class BadgeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shape = StadiumBorder(
-        side: BorderSide(color: selected ? AppColors.brand : AppColors.border, width: 0.875));
+        side: BorderSide(color: selected ? const Color(0xFFC0ECEC) : AppColors.border, width: 0.875));
     return DecoratedBox(
       decoration: const ShapeDecoration(
         shape: StadiumBorder(),
         shadows: [BoxShadow(color: Color(0x0D0A0D12), offset: Offset(0, 0.875), blurRadius: 0.875)],
       ),
       child: Material(
-        color: selected ? AppColors.brandSoft : Colors.white,
+        color: selected ? AppColors.accentSoft : Colors.white,
         shape: shape,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -813,7 +851,7 @@ class BadgeChip extends StatelessWidget {
                     fontSize: 14,
                     height: 1.5,
                     fontWeight: FontWeight.w500,
-                    color: selected ? AppColors.brand : AppColors.textMedium,
+                    color: selected ? AppColors.primaryDark : AppColors.textBody,
                   )),
               if (trailing != null) ...[const SizedBox(width: 4), trailing!],
             ]),
@@ -838,12 +876,13 @@ Future<T?> showDesignSheet<T>(
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
-    useSafeArea: true,
     backgroundColor: Colors.white,
     barrierColor: const Color(0xB3000000),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
     builder: (sheetContext) {
-      final maxHeight = MediaQuery.sizeOf(sheetContext).height * 0.92;
+      // Lembar Figma paling tinggi sampai 32 dari tepi atas layar.
+      final maxHeight =
+          MediaQuery.sizeOf(sheetContext).height - 32 - MediaQuery.paddingOf(sheetContext).bottom;
       final body = builder(sheetContext);
       return Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
@@ -861,40 +900,39 @@ Future<T?> showDesignSheet<T>(
                   Center(
                     child: Container(
                       width: 48,
-                      height: 4,
-                      decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                      height: 5,
+                      decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2.5)),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 48,
+                  // Judul 24/32 pada y 36; isi mulai y 96 tanpa subjudul.
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 23, 16, 0),
                     child: Row(children: [
-                      SizedBox(width: showClose ? 8 : 16),
                       if (showClose) ...[
                         IconButton(
                           tooltip: 'Tutup',
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+                          constraints: const BoxConstraints.tightFor(width: 32, height: 32),
                           onPressed: () => Navigator.pop(sheetContext),
                           icon: const AppIcon('x', color: AppColors.textLight),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 8),
                       ],
                       Expanded(
                         child: Text(title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                            style: const TextStyle(
+                                fontSize: 24, height: 32 / 24, fontWeight: FontWeight.w600, color: AppColors.sheetTitle)),
                       ),
-                      const SizedBox(width: 16),
                     ]),
                   ),
                   if (subtitle != null)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                      child: Text(subtitle, style: const TextStyle(fontSize: 14, color: AppColors.textMuted, height: 1.4)),
+                      padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
+                      child: Text(subtitle, style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMuted)),
                     ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: subtitle == null ? 20 : 16),
                   if (expand) Expanded(child: body) else Flexible(child: body),
                   if (footer != null) footer(sheetContext),
                 ],
@@ -923,7 +961,8 @@ class BottomActionBar extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 12), child: child),
+        // Garis atas 1px menumpang di dalam padding 16 (tinggi bilah 76).
+        child: Padding(padding: const EdgeInsets.all(16), child: child),
       ),
     );
   }
@@ -969,11 +1008,12 @@ class CheckoutSteps extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(label,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: index == current ? FontWeight.w500 : FontWeight.w400,
+                height: 16 / 12,
+                fontWeight: FontWeight.w500,
                 color: index == current ? AppColors.primaryDark : (done ? AppColors.textMedium : AppColors.textLight),
               )),
         ]),
@@ -982,13 +1022,13 @@ class CheckoutSteps extends StatelessWidget {
 
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(children: [step('Data Peserta', 0), const SizedBox(width: 6), step('Pembayaran', 1)]),
     );
   }
 }
 
-/// Judul bagian halaman (18, SemiBold).
+/// Judul bagian halaman (18/28, SemiBold).
 class SectionTitle extends StatelessWidget {
   final String text;
   final Widget? trailing;
@@ -1000,10 +1040,135 @@ class SectionTitle extends StatelessWidget {
     return Row(children: [
       Expanded(
         child: Text(text,
-            style: const TextStyle(fontSize: 18, height: 1.3, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+            style: const TextStyle(fontSize: 18, height: 28 / 18, fontWeight: FontWeight.w600, color: AppColors.textDark)),
       ),
       if (trailing != null) trailing!,
     ]);
+  }
+}
+
+/// Nada kotak catatan Figma: latar, lingkaran ikon, ikon, dan teks.
+enum NoteTone {
+  info(Color(0xFFF2FBFB), Color(0xFFC0ECEC), AppColors.accent, AppColors.primaryDark, 'info'),
+  warning(AppColors.warningBg, AppColors.warningBorder, AppColors.warningDark, Color(0xFFB45309), 'info'),
+  danger(AppColors.dangerSoft, Color(0xFFFECACA), AppColors.dangerDark, AppColors.errorText, 'warning'),
+  plain(Colors.white, AppColors.accentLight, AppColors.accent, AppColors.textBody, 'info', AppColors.background);
+
+  final Color background;
+  final Color circle;
+  final Color icon;
+  final Color text;
+  final String iconName;
+  final Color? border;
+
+  const NoteTone(this.background, this.circle, this.icon, this.text, this.iconName, [this.border]);
+}
+
+/// Kotak catatan: ikon dalam lingkaran 24 lalu teks 12/16.
+class NoteBox extends StatelessWidget {
+  final String? text;
+  final InlineSpan? span;
+  final NoteTone tone;
+  final Color? background;
+  final Color? textColor;
+  final bool shadow;
+
+  /// Padding vertikal 8 (bukan 12), seperti catatan usia di form peserta.
+  final bool dense;
+
+  const NoteBox({
+    super.key,
+    this.text,
+    this.span,
+    this.tone = NoteTone.info,
+    this.background,
+    this.textColor,
+    this.shadow = true,
+    this.dense = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      // Border 1px ikut menjorokkan isi, jadi padding dikurangi 1.
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: dense ? 8 : 12) -
+          EdgeInsets.all(tone.border == null ? 0 : 1),
+      decoration: BoxDecoration(
+        color: background ?? tone.background,
+        borderRadius: BorderRadius.circular(8),
+        border: tone.border == null ? null : Border.all(color: tone.border!),
+        boxShadow: shadow ? softShadow : null,
+      ),
+      // Teks satu baris di tengah ikon; teks panjang mulai sejajar atas ikon.
+      child: Row(crossAxisAlignment: dense ? CrossAxisAlignment.center : CrossAxisAlignment.start, children: [
+        Container(
+          width: 24,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: tone.circle, shape: BoxShape.circle),
+          child: AppIcon(tone.iconName, size: 12, color: tone.icon),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 24),
+            alignment: Alignment.centerLeft,
+            child: Text.rich(
+              span ?? TextSpan(text: text),
+              style: TextStyle(fontSize: 12, height: 16 / 12, color: textColor ?? tone.text),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// Bayangan tipis kotak catatan Figma (0,1,2 6% + 0,1,3 10%).
+const softShadow = [
+  BoxShadow(color: Color(0x0F101828), offset: Offset(0, 1), blurRadius: 2),
+  BoxShadow(color: Color(0x1A101828), offset: Offset(0, 1), blurRadius: 3),
+];
+
+/// Sakelar Figma 36×20 dengan kenop 16.
+class DesignSwitch extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  const DesignSwitch({super.key, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      toggled: value,
+      child: GestureDetector(
+        onTap: onChanged == null ? null : () => onChanged!(!value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: 36,
+          height: 20,
+          padding: const EdgeInsets.all(2),
+          alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+          decoration: BoxDecoration(
+            color: value ? AppColors.accent : AppColors.border,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Container(
+            width: 16,
+            height: 16,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: Color(0x1A0A0D12), offset: Offset(0, 1), blurRadius: 3),
+                BoxShadow(color: Color(0x1A0A0D12), offset: Offset(0, 1), blurRadius: 2, spreadRadius: -1),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1019,53 +1184,70 @@ class TicketCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final notchColor = Theme.of(context).scaffoldBackgroundColor;
     Widget notch(bool left) => Positioned(
-          left: left ? -7 : null,
-          right: left ? null : -7,
-          top: -7,
+          left: left ? -8 : null,
+          right: left ? null : -8,
+          top: -8,
           child: Container(
-            width: 14,
-            height: 14,
+            width: 16,
+            height: 16,
             decoration: BoxDecoration(
               color: notchColor,
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.borderStrong),
             ),
           ),
         );
+    // Takik dipotong tepi kartu sehingga hanya setengah lingkaran di dalam.
     return Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(padding: const EdgeInsets.all(16), child: top),
+        Padding(padding: const EdgeInsets.fromLTRB(15, 15, 15, 20), child: top),
         Stack(clipBehavior: Clip.none, children: [
-          const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: DashedLine()),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 15), child: DashedLine()),
           notch(true),
           notch(false),
         ]),
-        Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), child: bottom),
+        Padding(padding: const EdgeInsets.fromLTRB(15, 20, 15, 15), child: bottom),
       ]),
     );
   }
 }
 
+/// Garis putus Figma: ujung 2px, lalu putus 4 jarak 4 dari kedua sisi.
 class DashedLine extends StatelessWidget {
   final Color color;
 
   const DashedLine({super.key, this.color = AppColors.borderStrong});
 
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final count = (constraints.maxWidth / 7).floor();
-      return Row(children: [
-        for (var i = 0; i < count; i++)
-          Expanded(child: Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 1.5), color: color)),
-      ]);
-    });
+  Widget build(BuildContext context) =>
+      SizedBox(height: 1, width: double.infinity, child: CustomPaint(painter: _DashPainter(color)));
+}
+
+class _DashPainter extends CustomPainter {
+  final Color color;
+
+  const _DashPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final w = size.width;
+    canvas
+      ..drawRect(const Rect.fromLTWH(0, 0, 2, 1), paint)
+      ..drawRect(Rect.fromLTWH(w - 2, 0, 2, 1), paint);
+    for (double x = 6; x + 4 <= w - 6; x += 8) {
+      canvas.drawRect(Rect.fromLTWH(x, 0, 4, 1), paint);
+    }
   }
+
+  @override
+  bool shouldRepaint(_DashPainter oldDelegate) => oldDelegate.color != color;
 }
 
 /// Tombol pil kecil "Salin" yang menyalin [text] ke clipboard.
@@ -1077,18 +1259,20 @@ class CopyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Pil 76x28: ikon salin 16, jarak 8, lalu "Salin" 14 SemiBold.
     return OutlinedButton.icon(
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, 30),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        minimumSize: const Size(76, 28),
+        fixedSize: const Size.fromHeight(28),
+        padding: const EdgeInsets.fromLTRB(10, 0, 12, 0),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        textStyle: const TextStyle(fontFamily: 'Roboto', fontSize: 13, fontWeight: FontWeight.w500),
+        textStyle: const TextStyle(fontFamily: 'Roboto', fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600),
       ),
       onPressed: () async {
         await Clipboard.setData(ClipboardData(text: text));
         if (context.mounted) showSnack(context, message);
       },
-      icon: const Icon(Icons.copy_rounded, size: 16),
+      icon: const AppIcon('copy', size: 16, color: AppColors.accent),
       label: const Text('Salin'),
     );
   }
@@ -1105,20 +1289,27 @@ Future<bool> showActionDialog(
 }) async {
   final result = await showDialog<bool>(
     context: context,
+    // Desain memusatkan dialog pada seluruh layar, bukan area aman.
+    useSafeArea: false,
     builder: (context) => Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textDark)),
-          const SizedBox(height: 8),
+          Text(title,
+              style: const TextStyle(fontSize: 24, height: 28 / 24, fontWeight: FontWeight.w700, color: AppColors.sheetTitle)),
+          const SizedBox(height: 14),
           DefaultTextStyle.merge(
-            style: const TextStyle(fontSize: 14, height: 1.45, color: AppColors.textMedium),
+            style: const TextStyle(fontSize: 16, height: 1.5, color: AppColors.textMedium),
             child: message,
           ),
-          const SizedBox(height: 16),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text(confirmLabel)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 17),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(confirmLabel),
+          ),
+          const SizedBox(height: 12),
           OutlinedButton(onPressed: () => Navigator.pop(context, false), child: Text(cancelLabel)),
         ]),
       ),

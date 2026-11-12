@@ -13,6 +13,7 @@ import heroImage from '../assets/hero.jpg';
 import { useCancellationRefundDays } from '../utils/checkoutConfig';
 import { filterCustomerVisiblePackages, isPackageExpired, sortBookableFirst } from '../utils/publicPackages';
 import { priceUnitLabel } from '../utils/pricing';
+import { useI18n } from '../i18n';
 interface TripPackage {
   id: number;
   providerId: number;
@@ -82,6 +83,7 @@ const getTodayIsoDate = () => {
 
 export const CustomerLandingPage: React.FC = () => {
   const refundDays = useCancellationRefundDays();
+  const { t, term, locale } = useI18n();
   const { navigateTo, setSelectedPackageForDetail, setSearchParams, customerProfile, openAuthModal } = useNavigation();
   const [packages, setPackages] = useState<TripPackage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,10 +104,11 @@ export const CustomerLandingPage: React.FC = () => {
 
   // Minimum date for date picker (today - no backdates)
   const todayStr = getTodayIsoDate();
+  const allDatesLabel = t('Semua Tanggal', 'Any Date');
 
   const handleSearchSubmit = () => {
     if (!searchDate) {
-      setDateError('Tanggal wajib diisi');
+      setDateError(t('Tanggal wajib diisi', 'Please choose a date'));
       return;
     }
     setDateError('');
@@ -137,7 +140,7 @@ export const CustomerLandingPage: React.FC = () => {
       return { list: sortBookableFirst(byRating).slice(0, HOME_PACKAGE_LIMIT), error: '' };
     } catch (err: unknown) {
       console.error('Failed to load packages:', err);
-      return { list: [], error: err instanceof Error && err.message ? err.message : 'Gagal memuat paket wisata.' };
+      return { list: [], error: err instanceof Error && err.message ? err.message : t('Gagal memuat paket wisata.', 'Could not load trip packages.') };
     }
   };
 
@@ -206,11 +209,10 @@ export const CustomerLandingPage: React.FC = () => {
   };
 
   const formatDateIndo = (dateStr: string) => {
-    if (!dateStr) return 'Pilih tanggal';
+    if (!dateStr) return t('Pilih tanggal', 'Choose a date');
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    return d.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
   const getImageUrl = (pkgId: number, name: string, category: string, uploadedImage?: string) => {
@@ -243,11 +245,11 @@ export const CustomerLandingPage: React.FC = () => {
       >
         <div style={{ width: '100%', maxWidth: '1120px', zIndex: 2, textAlign: 'left' }}>
           <h1 className="hero-title" style={{ fontSize: 'clamp(24px, 5vw, 44px)', fontWeight: '800', marginBottom: '16px', lineHeight: '1.2', color: '#ffffff', letterSpacing: '-0.5px', textShadow: '0 2px 10px rgba(0, 0, 0, 0.4)' }}>
-            Cari Trip Wisata <br />
-            Indonesia dengan Mudah
+            {t('Cari Trip Wisata', 'Find Your Next Trip')} <br />
+            {t('Indonesia dengan Mudah', 'Across Indonesia, Easily')}
           </h1>
           <p style={{ fontSize: 'clamp(14px, 2.5vw, 16.5px)', color: '#f1f5f9', marginBottom: '24px', fontWeight: 600, maxWidth: '500px', lineHeight: '1.5', textShadow: '0 1px 6px rgba(0, 0, 0, 0.5)' }}>
-            Bandingkan paket open trip dan private trip dari mitra lokal, lalu pesan dan bayar online.
+            {t('Bandingkan paket open trip dan private trip dari mitra lokal, lalu pesan dan bayar online.', 'Compare open and private trips from local partners, then book and pay online.')}
           </p>
           <button 
             onClick={() => {
@@ -269,7 +271,7 @@ export const CustomerLandingPage: React.FC = () => {
             onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0369a1'}
             onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#0284c7'}
           >
-            Explore Trip
+            {t('Jelajahi Trip', 'Explore Trips')}
           </button>
         </div>
       </div>
@@ -290,7 +292,7 @@ export const CustomerLandingPage: React.FC = () => {
             {/* Destination Selection */}
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
-                <MapPin size={16} color="#007bff" /> Destination
+                <MapPin size={16} color="#007bff" /> {t('Destinasi', 'Destination')}
               </label>
               <select 
                 value={searchDest} 
@@ -307,7 +309,7 @@ export const CustomerLandingPage: React.FC = () => {
                   cursor: 'pointer'
                 }}
               >
-                <option value="">Pilih destinasi</option>
+                <option value="">{t('Pilih destinasi', 'Choose a destination')}</option>
                 {indonesiaProvinces.map(dest => (
                   <option key={dest} value={dest}>{dest}</option>
                 ))}
@@ -317,7 +319,7 @@ export const CustomerLandingPage: React.FC = () => {
             {/* Date Selection */}
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
-                <Calendar size={16} color="#007bff" /> Tanggal <span style={{ color: '#ef4444' }}>*</span>
+                <Calendar size={16} color="#007bff" /> {t('Tanggal', 'Date')} <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <div style={{ position: 'relative', width: '100%' }}>
                 <button
@@ -342,7 +344,7 @@ export const CustomerLandingPage: React.FC = () => {
                     fontFamily: 'inherit'
                   }}
                 >
-                  <span>{searchDate === ALL_DATES ? ALL_DATES : formatDateIndo(searchDate)}</span>
+                  <span>{searchDate === ALL_DATES ? allDatesLabel : formatDateIndo(searchDate)}</span>
                   <Calendar size={16} color="#007bff" />
                 </button>
                 {dateMenuOpen && (
@@ -351,7 +353,7 @@ export const CustomerLandingPage: React.FC = () => {
                     <div onClick={() => setDateMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
                     <div
                       role="dialog"
-                      aria-label="Pilih tanggal"
+                      aria-label={t('Pilih tanggal', 'Choose a date')}
                       onKeyDown={(e) => { if (e.key === 'Escape') setDateMenuOpen(false); }}
                       style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 21, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}
                     >
@@ -363,13 +365,13 @@ export const CustomerLandingPage: React.FC = () => {
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', textAlign: 'left', padding: '10px 12px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', color: searchDate === ALL_DATES ? '#0284c7' : '#0f172a', backgroundColor: searchDate === ALL_DATES ? '#e0f2fe' : '#f8fafc' }}
                       >
                         <span>
-                          {ALL_DATES}
-                          <span style={{ display: 'block', fontSize: '11.5px', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>Lihat paket tanpa menentukan tanggal</span>
+                          {allDatesLabel}
+                          <span style={{ display: 'block', fontSize: '11.5px', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>{t('Lihat paket tanpa menentukan tanggal', 'Browse trips without picking a date')}</span>
                         </span>
                         {searchDate === ALL_DATES && <Check size={16} />}
                       </button>
                       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '6px 12px 4px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>
-                        Tanggal tertentu
+                        {t('Tanggal tertentu', 'Specific date')}
                         <input
                           type="date"
                           min={todayStr}
@@ -393,7 +395,7 @@ export const CustomerLandingPage: React.FC = () => {
             {/* Type Trip Selection */}
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
-                <Users size={16} color="#007bff" /> Type Trip
+                <Users size={16} color="#007bff" /> {t('Tipe Trip', 'Trip Type')}
               </label>
               <select 
                 value={searchType} 
@@ -411,7 +413,7 @@ export const CustomerLandingPage: React.FC = () => {
                 }}
               >
                 {tripTypesList.map(type => (
-                  <option key={type} value={type}>{type}</option>
+                  <option key={type} value={type}>{term(type)}</option>
                 ))}
               </select>
             </div>
@@ -419,7 +421,7 @@ export const CustomerLandingPage: React.FC = () => {
             {/* Category Selection */}
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
-                <LayoutGrid size={16} color="#007bff" /> Kategori
+                <LayoutGrid size={16} color="#007bff" /> {t('Kategori', 'Category')}
               </label>
               <select 
                 value={searchCategory} 
@@ -437,7 +439,7 @@ export const CustomerLandingPage: React.FC = () => {
                 }}
               >
                 {categoriesList.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                  <option key={cat} value={cat}>{term(cat)}</option>
                 ))}
               </select>
             </div>
@@ -451,8 +453,8 @@ export const CustomerLandingPage: React.FC = () => {
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }}
-                placeholder="Cari destinasi atau nama trip, mis. Dieng"
-                aria-label="Cari destinasi atau nama trip"
+                placeholder={t('Cari destinasi atau nama trip, mis. Dieng', 'Search a destination or trip, e.g. Dieng')}
+                aria-label={t('Cari destinasi atau nama trip', 'Search a destination or trip')}
                 style={{ width: '100%', height: '100%', padding: '12px 14px 12px 38px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '14px', color: '#1e293b', backgroundColor: '#ffffff', boxSizing: 'border-box', fontFamily: 'inherit' }}
               />
             </div>
@@ -476,7 +478,7 @@ export const CustomerLandingPage: React.FC = () => {
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0369a1'}
               onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#0284c7'}
             >
-              <Search size={18} /> Cari Trip
+              <Search size={18} /> {t('Cari Trip', 'Search Trips')}
             </button>
           </div>
         </div>
@@ -502,10 +504,10 @@ export const CustomerLandingPage: React.FC = () => {
           </div>
           <div style={{ flex: '1 1 260px', minWidth: 0 }}>
             <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
-              Rencana Trip &amp; Target Tabungan
+              {t('Rencana Trip & Target Tabungan', 'Trip Planner & Savings Goal')}
             </h2>
             <p style={{ fontSize: '13px', color: '#475569', margin: 0, lineHeight: '1.5' }}>
-              Susun trip impian bersama pasangan, teman, atau keluarga. Tentukan target budget dan pantau progres tabunganmu.
+              {t('Susun trip impian bersama pasangan, teman, atau keluarga. Tentukan target budget dan pantau progres tabunganmu.', 'Plan a dream trip with your partner, friends, or family. Set a budget goal and track your savings.')}
             </p>
           </div>
           <div className="planner-cta-action" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
@@ -514,10 +516,10 @@ export const CustomerLandingPage: React.FC = () => {
               onClick={openTripPlanner}
               style={{ backgroundColor: '#0f8b8d', color: '#ffffff', border: 'none', padding: '11px 22px', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(15, 139, 141, 0.25)' }}
             >
-              {customerProfile ? 'Buka Rencana Trip' : 'Mulai Rencanakan Trip'} <ChevronRight size={16} />
+              {customerProfile ? t('Buka Rencana Trip', 'Open Trip Planner') : t('Mulai Rencanakan Trip', 'Start Planning')} <ChevronRight size={16} />
             </button>
             {!customerProfile && (
-              <span style={{ fontSize: '11.5px', color: '#64748b' }}>Gratis, cukup masuk atau daftar akun</span>
+              <span style={{ fontSize: '11.5px', color: '#64748b' }}>{t('Gratis, cukup masuk atau daftar akun', 'Free. Just sign in or create an account')}</span>
             )}
           </div>
         </div>
@@ -533,32 +535,32 @@ export const CustomerLandingPage: React.FC = () => {
       <div id="main-trips-section" className="container" style={{ marginTop: '45px', maxWidth: '1120px', margin: '45px auto 0 auto', padding: '0 20px' }}>
         
         {loading ? (
-          <SkeletonCards count={8} minWidth={235} label="Memuat paket wisata" />
+          <SkeletonCards count={8} minWidth={235} label={t('Memuat paket wisata', 'Loading trip packages')} />
         ) : loadError ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '16px', color: '#64748b', border: '1px solid #fecaca' }}>
-            <h3 style={{ color: '#0f172a', fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>Gagal Memuat Paket Wisata</h3>
+            <h3 style={{ color: '#0f172a', fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>{t('Gagal Memuat Paket Wisata', 'Could Not Load Trips')}</h3>
             <p style={{ margin: '0 0 16px 0' }}>{loadError}</p>
             <button
               type="button"
               onClick={() => fetchPackages()}
               style={{ padding: '10px 22px', backgroundColor: '#007bff', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}
             >
-              Coba Lagi
+              {t('Coba Lagi', 'Try Again')}
             </button>
           </div>
         ) : processedPackages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 20px', backgroundColor: '#ffffff', borderRadius: '16px', color: '#64748b', border: '1px solid #e2e8f0' }}>
-            <h3 style={{ color: '#0f172a', fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>Paket Wisata Tidak Ditemukan</h3>
-            <p>Coba pilih tanggal lain atau gunakan filter destinasi yang berbeda.</p>
+            <h3 style={{ color: '#0f172a', fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>{t('Paket Wisata Tidak Ditemukan', 'No Trips Found')}</h3>
+            <p>{t('Coba pilih tanggal lain atau gunakan filter destinasi yang berbeda.', 'Try another date or a different destination filter.')}</p>
           </div>
         ) : (
           <div style={{ marginBottom: '45px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
               <div>
                 <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-                  Semua trip
+                  {t('Semua trip', 'All trips')}
                 </h2>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>Open Trip, Private Trip, Honeymoon, Family, dan Corporate dari mitra terverifikasi</span>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>{t('Open Trip, Private Trip, Honeymoon, Family, dan Corporate dari mitra terverifikasi', 'Open Trip, Private Trip, Honeymoon, Family, and Corporate from verified partners')}</span>
               </div>
               <button
                 type="button"
@@ -568,7 +570,7 @@ export const CustomerLandingPage: React.FC = () => {
                 }}
                 style={{ background: 'none', border: 'none', padding: 0, fontSize: '13px', color: '#007bff', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
               >
-                Cari &amp; filter trip <ChevronRight size={14} />
+                {t('Cari & filter trip', 'Search & filter trips')} <ChevronRight size={14} />
               </button>
             </div>
 
@@ -618,14 +620,14 @@ export const CustomerLandingPage: React.FC = () => {
                             fontWeight: '700'
                           }}
                         >
-                          Jadwal sudah lewat
+                          {t('Jadwal sudah lewat', 'Schedule has passed')}
                         </span>
                       )}
                       <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px' }}>
                         <button
                           onClick={(e) => handleSharePackage(e, pkg)}
-                          title="Bagikan Paket"
-                          aria-label="Bagikan paket"
+                          title={t('Bagikan Paket', 'Share Trip')}
+                          aria-label={t('Bagikan paket', 'Share trip')}
                           style={{
                             backgroundColor: 'rgba(255, 255, 255, 0.95)',
                             border: 'none',
@@ -645,8 +647,8 @@ export const CustomerLandingPage: React.FC = () => {
 
                         <button
                           onClick={(e) => toggleFavorite(e, pkg)}
-                          title="Simpan ke Favorit"
-                          aria-label="Simpan ke favorit"
+                          title={t('Simpan ke Favorit', 'Save to Favorites')}
+                          aria-label={t('Simpan ke favorit', 'Save to favorites')}
                           style={{
                             backgroundColor: 'rgba(255, 255, 255, 0.95)',
                             border: 'none',
@@ -678,8 +680,8 @@ export const CustomerLandingPage: React.FC = () => {
                         }}
                       >
                         {isOpenTrip
-                          ? (pkg.tripType ? `${pkg.tripType} • ${pkg.category}` : pkg.category)
-                          : `${pkg.tripType} • Min ${Math.max(1, Number(pkg.minGuests) || 1)} Orang`}
+                          ? (pkg.tripType ? `${pkg.tripType} • ${term(pkg.category)}` : term(pkg.category))
+                          : `${pkg.tripType} • Min ${Math.max(1, Number(pkg.minGuests) || 1)} ${t('Orang', 'People')}`}
                       </span>
                     </div>
 
@@ -723,11 +725,11 @@ export const CustomerLandingPage: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#f59e0b', fontWeight: '700' }}>
                           <Star size={12} fill="#f59e0b" color="#f59e0b" />
-                          <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Baru'}</span>
+                          <span>{pkg.rating > 0 ? pkg.rating.toFixed(1) : t('Baru', 'New')}</span>
                         </div>
 
                         {expired ? (
-                          <span style={{ fontSize: '11.5px', fontWeight: '700', color: '#94a3b8' }}>Tidak bisa dipesan</span>
+                          <span style={{ fontSize: '11.5px', fontWeight: '700', color: '#94a3b8' }}>{t('Tidak bisa dipesan', 'Not bookable')}</span>
                         ) : (
                           <span style={{ fontSize: '13px', fontWeight: '800', color: '#007bff' }}>
                             {formatIDR(pkg.price)} <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 'normal' }}>{priceUnitLabel(pkg)}</span>
@@ -761,8 +763,8 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShieldCheck size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Mitra diverifikasi</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Admin TemenTrip memeriksa setiap mitra sebelum paketnya bisa dipesan</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Mitra lokal terverifikasi', 'Verified local partners')}</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{t('Tim TemenTrip memeriksa setiap mitra sebelum paketnya tayang, jadi kamu bisa pesan dengan tenang.', 'Our team checks every partner before their trips go live, so you can book with peace of mind.')}</span>
           </div>
 
           {/* Item 2 */}
@@ -770,8 +772,12 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <RotateCcw size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Aturan refund jelas</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{refundDays ? `Batal paling lambat ${refundDays} hari sebelum trip` : 'Batal sesuai batas kebijakan refund'}, atau trip dibatalkan mitra: dana kembali penuh</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Batal? Uang kembali penuh', 'Plans changed? Full refund')}</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>
+              {refundDays
+                ? t(`Berlaku bila kamu batal paling lambat ${refundDays} hari sebelum berangkat, atau trip dibatalkan mitra.`, `When you cancel at least ${refundDays} days before departure, or when the partner cancels the trip.`)
+                : t('Berlaku bila kamu batal sesuai batas kebijakan refund, atau trip dibatalkan mitra.', 'When you cancel within the refund window, or when the partner cancels the trip.')}
+            </span>
           </div>
 
           {/* Item 3 */}
@@ -779,8 +785,8 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CreditCard size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Transfer & upload bukti</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Kuota ditahan 24 jam hingga bukti pembayaran dikirim</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Bayar online tanpa ribet', 'Hassle-free online payment')}</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{t('Pilih virtual account, QRIS, atau e-wallet lewat Midtrans. Pesanan terkonfirmasi otomatis, tanpa kirim bukti transfer.', 'Pay by virtual account, QRIS, or e-wallet via Midtrans. Your booking confirms automatically, no receipt needed.')}</span>
           </div>
 
           {/* Item 4 */}
@@ -788,8 +794,8 @@ export const CustomerLandingPage: React.FC = () => {
             <div style={{ backgroundColor: '#e0f2fe', padding: '12px', borderRadius: '50%', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MessageSquare size={24} />
             </div>
-            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Ulasan dari peserta</strong>
-            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>Ulasan hanya bisa ditulis setelah trip selesai</span>
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t('Ulasan asli dari peserta', 'Real reviews, real trips')}</strong>
+            <span style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>{t('Hanya peserta yang sudah ikut trip yang bisa memberi ulasan, jadi kamu tahu pengalaman sebenarnya.', 'Only travelers who joined the trip can review it, so you see what it is really like.')}</span>
           </div>
         </div>
       </div>

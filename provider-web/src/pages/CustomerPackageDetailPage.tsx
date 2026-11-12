@@ -18,6 +18,7 @@ import { isCustomerVisiblePackage, isPackageExpired } from '../utils/publicPacka
 import { upcomingDepartures } from '../utils/departures';
 import { FlexiblePickupDetails } from '../components/TripPickup';
 import { addOnSubtotal, basePrice, isPerUnit, packageAddOns, selectAddOns, unitName, unitsFor } from '../utils/pricing';
+import { useI18n } from '../i18n';
 
 // Ambil bagian tanggal (YYYY-MM-DD) dari string tanggal paket, '' bila tidak valid
 const normalizeIsoDate = (value: unknown) => {
@@ -44,6 +45,9 @@ interface PublicProviderProfile {
 export const CustomerPackageDetailPage: React.FC = () => {
   const { navigateTo, selectedPackageForDetail, setSelectedPackageForDetail, setSelectedProviderId, customerProfile, openAuthModal } = useNavigation();
   const { showAlert } = useCustomAlert();
+  const { t, term, locale } = useI18n();
+  const people = (n: number) => t(`${n} orang`, n === 1 ? '1 person' : `${n} people`);
+  const participants = (n: number) => t(`${n} peserta`, n === 1 ? '1 participant' : `${n} participants`);
 
   // Traveloka Calendar Modal State
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
@@ -95,7 +99,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
           setSelectedPackageForDetail({ ...found, ...(preservedBookingDate ? { bookingDate: preservedBookingDate } : {}) });
         } else {
           setSelectedPackageForDetail(null);
-          setDeepLinkError('Paket tidak tersedia atau provider sedang dinonaktifkan.');
+          setDeepLinkError(t('Paket tidak tersedia atau provider sedang dinonaktifkan.', 'This trip is unavailable or its partner is currently inactive.'));
         }
       })
       .catch((err: any) => {
@@ -103,7 +107,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
           // Fail closed: snapshot paket lama tidak boleh tetap tampil ketika
           // status publik terbarunya gagal diverifikasi.
           setSelectedPackageForDetail(null);
-          setDeepLinkError(err?.message || 'Paket belum dapat dimuat.');
+          setDeepLinkError(err?.message || t('Paket belum dapat dimuat.', 'Could not load this trip.'));
         }
       })
       .finally(() => {
@@ -151,12 +155,11 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const isOpenTrip = !pkg.tripType || pkg.tripType === 'Open Trip';
   const formatDateIndoFull = (dateStr: string) => {
-    if (!isOpenTrip) return formatTripRange(dateStr);
-    if (!dateStr) return 'Pilih Tanggal';
+    if (!isOpenTrip) return formatTripRange(dateStr, undefined, locale);
+    if (!dateStr) return t('Pilih Tanggal', 'Pick a Date');
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    return d.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
   const todayIso = jakartaToday();
@@ -234,7 +237,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
   const departureOptions = isOpenTrip ? upcomingDepartures(pkg, todayIso) : [];
   const selectedDeparture = departureOptions.find(d => d.date === customStartDate)
     || departureOptions.find(d => d.seatsLeft >= minRequiredGuests) || departureOptions[0];
-  const openTripDeparture = selectedDeparture ? { startIso: selectedDeparture.date, endIso: selectedDeparture.endDate, label: formatTripRange(selectedDeparture.date, selectedDeparture.endDate) } : null;
+  const openTripDeparture = selectedDeparture ? { startIso: selectedDeparture.date, endIso: selectedDeparture.endDate, label: formatTripRange(selectedDeparture.date, selectedDeparture.endDate, locale) } : null;
   const hasUpcomingDeparture = !!openTripDeparture;
   const openTripUnavailable = isOpenTrip && !hasUpcomingDeparture;
   // Paket yang seluruh jadwalnya sudah lewat tetap bisa dilihat, tetapi tidak bisa dipesan.
@@ -243,10 +246,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
   if (!availabilityCheckPending && !selectedPackageForDetail && (deepLinkError || !/[?&]id=\d+/.test(window.location.hash))) {
     return (
       <div className="container" style={{ maxWidth: '560px', margin: '0 auto', padding: '80px 20px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '22px', marginBottom: '8px' }}>Paket tidak dapat ditampilkan</h1>
-        <p style={{ color: '#64748b' }}>{deepLinkError || 'Paket belum dipilih. Silakan cari paket wisata terlebih dahulu.'}</p>
+        <h1 style={{ fontSize: '22px', marginBottom: '8px' }}>{t('Paket tidak dapat ditampilkan', 'This trip cannot be shown')}</h1>
+        <p style={{ color: '#64748b' }}>{deepLinkError || t('Paket belum dipilih. Silakan cari paket wisata terlebih dahulu.', 'No trip selected. Please search for a trip first.')}</p>
         <button type="button" className="btn btn-primary" onClick={() => navigateTo('cari-trip')} style={{ marginTop: '16px' }}>
-          Cari Paket Wisata
+          {t('Cari Paket Wisata', 'Search Trips')}
         </button>
       </div>
     );
@@ -255,7 +258,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
   if (availabilityCheckPending || !selectedPackageForDetail) {
     return (
       <div className="container" style={{ maxWidth: '1120px', margin: '0 auto', padding: '20px', textAlign: 'center' }}>
-        <span className="sr-only" role="status" aria-live="polite">Memuat detail paket wisata</span>
+        <span className="sr-only" role="status" aria-live="polite">{t('Memuat detail paket wisata', 'Loading trip details')}</span>
         {/* Kerangka halaman detail: judul, galeri foto, konten utama + kartu pemesanan */}
         <div aria-hidden="true" style={{ textAlign: 'left' }}>
           <Skeleton width="45%" height={28} radius={8} style={{ marginBottom: '10px' }} />
@@ -279,7 +282,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
           </div>
         </div>
         <button onClick={() => navigateTo('beranda')} style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
-          Kembali ke Beranda
+          {t('Kembali ke Beranda', 'Back to Home')}
         </button>
       </div>
     );
@@ -319,7 +322,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
         if (Array.isArray(parsed) && parsed.length > 0) {
           const days: { day: string; activities: { time: string; title: string; desc: string }[] }[] = [];
           parsed.forEach((item: any) => {
-            const dayLabel = `Hari ${item.day}`;
+            const dayLabel = t(`Hari ${item.day}`, `Day ${item.day}`);
             if (Array.isArray(item.activities)) {
               const activities = item.activities
                 .map((act: any) => ({
@@ -387,39 +390,40 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
   const continueBooking = () => {
     if (isExpired) {
-      showAlert({ type: 'warning', title: 'Jadwal Sudah Lewat', message: 'Jadwal paket ini sudah lewat sehingga tidak dapat dipesan. Silakan pilih paket wisata lain.' });
+      showAlert({ type: 'warning', title: t('Jadwal Sudah Lewat', 'Schedule Has Passed'), message: t('Jadwal paket ini sudah lewat sehingga tidak dapat dipesan. Silakan pilih paket wisata lain.', 'This trip\'s schedule has passed, so it can no longer be booked. Please choose another trip.') });
       return;
     }
     if (openTripUnavailable) {
-      showAlert({ type: 'warning', title: 'Belum Ada Jadwal', message: 'Belum ada jadwal keberangkatan yang akan datang untuk Open Trip ini.' });
+      showAlert({ type: 'warning', title: t('Belum Ada Jadwal', 'No Schedule Yet'), message: t('Belum ada jadwal keberangkatan yang akan datang untuk Open Trip ini.', 'There are no upcoming departures for this Open Trip yet.') });
       return;
     }
     if (availableSeats <= 0) {
-      showAlert({ type: 'warning', title: 'Kuota Habis', message: 'Maaf, kuota untuk paket ini telah habis. Silakan pilih paket wisata lain.' });
+      showAlert({ type: 'warning', title: t('Kuota Habis', 'Sold Out'), message: t('Maaf, kuota untuk paket ini telah habis. Silakan pilih paket wisata lain.', 'Sorry, this trip is fully booked. Please choose another trip.') });
       return;
     }
     if (guestsCount < minRequiredGuests) {
-      showAlert({ type: 'warning', title: 'Jumlah Peserta Kurang', message: `Minimal pemesanan untuk paket ${pkg.tripType || 'ini'} adalah ${minRequiredGuests} orang.` });
+      showAlert({ type: 'warning', title: t('Jumlah Peserta Kurang', 'Not Enough Participants'), message: t(`Minimal pemesanan untuk paket ${pkg.tripType || 'ini'} adalah ${minRequiredGuests} orang.`, `${pkg.tripType || 'This trip'} needs at least ${minRequiredGuests} participants.`) });
       return;
     }
     if (guestsCount > availableSeats) {
-      showAlert({ type: 'warning', title: 'Melebihi Sisa Kuota', message: `Jumlah peserta (${guestsCount} orang) melebihi sisa kuota yang tersedia (${availableSeats} seat).` });
+      showAlert({ type: 'warning', title: t('Melebihi Sisa Kuota', 'Not Enough Seats'), message: t(`Jumlah peserta (${guestsCount} orang) melebihi sisa kuota yang tersedia (${availableSeats} seat).`, `The number of participants (${guestsCount}) is more than the seats left (${availableSeats}).`) });
       return;
     }
     if (!isOpenTrip && isRangeBooked) {
-      showAlert({ type: 'error', title: 'Jadwal Terbooking', message: `Rentang tanggal ${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)} sudah TERBOOKING oleh pemesan lain. Silakan pilih rentang tanggal lain.` });
+      showAlert({ type: 'error', title: t('Jadwal Terbooking', 'Dates Already Booked'), message: t(`Rentang tanggal ${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)} sudah TERBOOKING oleh pemesan lain. Silakan pilih rentang tanggal lain.`, `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)} is already booked by someone else. Please choose other dates.`) });
       return;
     }
     if (isSelectedDateClosed) {
-      showAlert({ type: 'error', title: 'Tanggal Tidak Dibuka', message: `Penyelenggara tidak membuka tanggal ${formatDateIndoFull(customStartDate)} untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.` });
+      showAlert({ type: 'error', title: t('Tanggal Tidak Dibuka', 'Date Not Open'), message: t(`Penyelenggara tidak membuka tanggal ${formatDateIndoFull(customStartDate)} untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.`, `The partner has not opened ${formatDateIndoFull(customStartDate)} for this trip. Please pick one of the available dates on the calendar.`) });
       return;
     }
     if (isDateOutsidePeriod) {
-      showAlert({ type: 'warning', title: 'Di Luar Periode Paket', message: `Tanggal ${formatDateIndoFull(customStartDate)} berada di luar periode paket${pkgStartIso ? ` (${formatDateIndoFull(pkgStartIso)}${pkgEndIso ? ` - ${formatDateIndoFull(pkgEndIso)}` : ''})` : ''}. Silakan pilih tanggal lain pada kalender.` });
+      const period = pkgStartIso ? ` (${formatDateIndoFull(pkgStartIso)}${pkgEndIso ? ` - ${formatDateIndoFull(pkgEndIso)}` : ''})` : '';
+      showAlert({ type: 'warning', title: t('Di Luar Periode Paket', 'Outside Trip Period'), message: t(`Tanggal ${formatDateIndoFull(customStartDate)} berada di luar periode paket${period}. Silakan pilih tanggal lain pada kalender.`, `${formatDateIndoFull(customStartDate)} is outside the trip period${period}. Please pick another date on the calendar.`) });
       return;
     }
     if (!isOpenTrip && customStartDate < h7MinDateStr) {
-      showAlert({ type: 'warning', title: 'Pemesanan Wajib H-7', message: `Pemesanan paket ${pkg.tripType || 'ini'} wajib H-7 sebelum keberangkatan. Tanggal paling awal yang dapat dipesan adalah ${formatDateIndoFull(h7MinDateStr)}.` });
+      showAlert({ type: 'warning', title: t('Pemesanan Wajib H-7', 'Book 7 Days Ahead'), message: t(`Pemesanan paket ${pkg.tripType || 'ini'} wajib H-7 sebelum keberangkatan. Tanggal paling awal yang dapat dipesan adalah ${formatDateIndoFull(h7MinDateStr)}.`, `${pkg.tripType || 'This trip'} must be booked at least 7 days before departure. The earliest date you can book is ${formatDateIndoFull(h7MinDateStr)}.`) });
       return;
     }
     // Generate ISO string to match what's expected in booking
@@ -429,7 +433,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
       : customStartDate;
     
     if (!finalBookingDate) {
-      showAlert({ type: 'warning', title: 'Pilih Tanggal Keberangkatan', message: 'Silakan pilih tanggal keberangkatan terlebih dahulu.' });
+      showAlert({ type: 'warning', title: t('Pilih Tanggal Keberangkatan', 'Pick a Departure Date'), message: t('Silakan pilih tanggal keberangkatan terlebih dahulu.', 'Please pick a departure date first.') });
       return;
     }
     const updatedPkg = {
@@ -469,7 +473,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
             cursor: 'pointer'
           }}
         >
-          <ArrowLeft size={16} /> Kembali ke Daftar Trip
+          <ArrowLeft size={16} /> {t('Kembali ke Daftar Trip', 'Back to Trips')}
         </button>
       </div>
 
@@ -638,7 +642,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                       gap: '6px'
                     }}
                   >
-                    <Layers size={16} /> Lihat semua foto ({photos.length})
+                    <Layers size={16} /> {t('Lihat semua foto', 'See all photos')} ({photos.length})
                   </div>
                 </div>
               </div>
@@ -669,7 +673,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   <MapPin size={16} color="#007bff" /> {pkg.destination}
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Calendar size={16} color="#007bff" /> Kategori: <strong>{pkg.category}</strong>
+                  <Calendar size={16} color="#007bff" /> {t('Kategori', 'Category')}: <strong>{term(pkg.category)}</strong>
                 </span>
               </div>
             </div>
@@ -677,10 +681,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Description */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px 0' }}>
-                Deskripsi Paket Wisata
+                {t('Deskripsi Paket Wisata', 'Trip Description')}
               </h2>
               <p style={{ fontSize: '14px', color: '#475569', lineHeight: '1.7', margin: 0 }}>
-                {pkg.description || 'Deskripsi paket belum dilengkapi oleh provider.'}
+                {pkg.description || t('Deskripsi paket belum dilengkapi oleh provider.', 'The partner has not added a description yet.')}
               </p>
             </div>
 
@@ -688,10 +692,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {displayDestinations.length > 0 && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
-                Destinasi yang Dikunjungi
+                {t('Destinasi yang Dikunjungi', 'Places You Will Visit')}
               </h2>
               <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
-                {displayDestinations.length} tempat, urut sesuai rute perjalanan
+                {t(`${displayDestinations.length} tempat, urut sesuai rute perjalanan`, `${displayDestinations.length} places, in route order`)}
               </p>
               <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                 {displayDestinations.map((name, idx) => (
@@ -712,10 +716,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Itinerary */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 20px 0' }}>
-                Rencana Perjalanan (Itinerary)
+                {t('Rencana Perjalanan (Itinerary)', 'Itinerary')}
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {displayItinerary.length === 0 && <p style={{ color: '#64748b', margin: 0 }}>Itinerary belum dilengkapi oleh provider.</p>}
+                {displayItinerary.length === 0 && <p style={{ color: '#64748b', margin: 0 }}>{t('Itinerary belum dilengkapi oleh provider.', 'The partner has not added an itinerary yet.')}</p>}
                 {displayItinerary.map((day, dayIndex) => (
                   <section
                     key={`${day.day}-${dayIndex}`}
@@ -746,7 +750,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                           }}
                         >
                           <strong style={{ fontSize: '12.5px', color: '#0284c7', lineHeight: '1.5', flex: '0 0 105px' }}>
-                            {activity.time || 'Waktu fleksibel'}
+                            {activity.time || t('Waktu fleksibel', 'Flexible time')}
                           </strong>
                           <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                             <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block', lineHeight: '1.5' }}>{activity.title}</strong>
@@ -763,17 +767,17 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Fasilitas Termasuk & Tidak Termasuk */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 20px 0', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
-                Fasilitas Paket
+                {t('Fasilitas Paket', 'Facilities')}
               </h2>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                 {/* Termasuk */}
                 <div>
                   <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#10b981', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <CheckCircle2 size={16} /> Fasilitas Termasuk
+                    <CheckCircle2 size={16} /> {t('Fasilitas Termasuk', 'Included')}
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {displayIncludedFacilities.length === 0 && <span style={{ fontSize: '13px', color: '#64748b' }}>Belum diinformasikan.</span>}
+                    {displayIncludedFacilities.length === 0 && <span style={{ fontSize: '13px', color: '#64748b' }}>{t('Belum diinformasikan.', 'Not specified yet.')}</span>}
                     {displayIncludedFacilities.map((fac: string, idx: number) => (
                       <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: '#334155' }}>
                         <CheckCircle2 size={15} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -786,10 +790,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 {/* Tidak Termasuk */}
                 <div>
                   <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#ef4444', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <XCircle size={16} /> Fasilitas Tidak Termasuk
+                    <XCircle size={16} /> {t('Fasilitas Tidak Termasuk', 'Not Included')}
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {displayExcludedFacilities.length === 0 && <span style={{ fontSize: '13px', color: '#64748b' }}>Belum diinformasikan.</span>}
+                    {displayExcludedFacilities.length === 0 && <span style={{ fontSize: '13px', color: '#64748b' }}>{t('Belum diinformasikan.', 'Not specified yet.')}</span>}
                     {displayExcludedFacilities.map((fac: string, idx: number) => (
                       <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: '#64748b' }}>
                         <XCircle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -805,10 +809,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {addOnsList.length > 0 && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <PlusCircle size={18} color="#007bff" /> Layanan Tambahan (Add-On Opsional)
+                <PlusCircle size={18} color="#007bff" /> {t('Layanan Tambahan (Add-On Opsional)', 'Optional Add-Ons')}
               </h2>
               <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
-                Pilih fasilitas ekstra untuk melengkapi petualangan Anda (opsional). Harganya otomatis ditambahkan ke total.
+                {t('Pilih fasilitas ekstra untuk melengkapi petualangan Anda (opsional). Harganya otomatis ditambahkan ke total.', 'Add extras to your trip if you like. Their price is added to the total automatically.')}
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -844,14 +848,14 @@ export const CustomerPackageDetailPage: React.FC = () => {
                             {addon.name}
                           </span>
                           <span style={{ display: 'block', fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                            {formatIDR(addon.price)} {addon.perPerson ? '/ orang' : '/ pesanan'}
+                            {formatIDR(addon.price)} {addon.perPerson ? t('/ orang', '/ person') : t('/ pesanan', '/ booking')}
                           </span>
                         </span>
                       </div>
                       <span style={{ flexShrink: 0, marginLeft: 'auto', textAlign: 'right' }}>
                         <strong style={{ display: 'block', fontSize: '13.5px', color: '#007bff' }}>+{formatIDR(subtotal)}</strong>
                         {addon.perPerson && (
-                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>untuk {guestsCount} orang</span>
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>{t('untuk', 'for')} {people(guestsCount)}</span>
                         )}
                       </span>
                     </label>
@@ -865,7 +869,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Titik Kumpul / Google Maps Embed (Posisi Tepat Dibawah Layanan Tambahan) */}
             {pkg.pickupMode !== 'FLEXIBLE' && <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MapPin size={18} color="#0284c7" /> Lokasi Titik Kumpul (Meeting Point)
+                <MapPin size={18} color="#0284c7" /> {t('Lokasi Titik Kumpul (Meeting Point)', 'Meeting Point')}
               </h2>
               {activeMeetingPointCoordinates ? (
                 <>
@@ -882,7 +886,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                     rel="noopener noreferrer"
                     style={{ display: 'inline-flex', marginTop: '12px', color: '#0284c7', fontSize: '13px', fontWeight: 700 }}
                   >
-                    Buka petunjuk arah
+                    {t('Buka petunjuk arah', 'Get directions')}
                   </a>
                 </>
               ) : activeMeetingPoint ? (
@@ -891,7 +895,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   <strong>{activeMeetingPoint}</strong>
                 </p>
               ) : (
-                <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>Titik kumpul belum dilengkapi oleh provider.</p>
+                <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>{t('Titik kumpul belum dilengkapi oleh provider.', 'The partner has not added a meeting point yet.')}</p>
               )}
             </div>
 
@@ -899,7 +903,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Profil Provider Penyelenggara Section */}
             {(() => {
               const pId = Number(pkg.providerId || pkg.provider?.id);
-              const currentProviderName = publicProvider?.businessName || 'Mitra TemenTrip';
+              const currentProviderName = publicProvider?.businessName || t('Mitra TemenTrip', 'TemenTrip Partner');
               const currentProviderCity = publicProvider?.operationalCity || 'Indonesia';
               const providerRating = publicProvider?.rating || 0;
 
@@ -915,7 +919,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                     <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Diselenggarakan Oleh Mitra Provider
+                      {t('Diselenggarakan Oleh Mitra Provider', 'Hosted by Partner')}
                     </span>
                   </div>
 
@@ -970,7 +974,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                         </span>
                         <span>•</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: '700' }}>
-                          <Star size={13} fill={providerRating > 0 ? '#f59e0b' : 'none'} color="#f59e0b" /> {providerRating > 0 ? `${providerRating.toFixed(1)} / 5.0` : 'Belum ada rating'}
+                          <Star size={13} fill={providerRating > 0 ? '#f59e0b' : 'none'} color="#f59e0b" /> {providerRating > 0 ? `${providerRating.toFixed(1)} / 5.0` : t('Belum ada rating', 'No ratings yet')}
                         </span>
                       </div>
                     </div>
@@ -997,7 +1001,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                         transition: 'all 0.2s'
                       }}
                     >
-                      Lihat Profil & Paket <ChevronRight size={14} />
+                      {t('Lihat Profil & Paket', 'View Profile & Trips')} <ChevronRight size={14} />
                     </button>
                   </div>
                 </div>
@@ -1009,16 +1013,16 @@ export const CustomerPackageDetailPage: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <MessageSquare size={18} color="#007bff" /> Ulasan & Rating Pengunjung
+                    <MessageSquare size={18} color="#007bff" /> {t('Ulasan & Rating Pengunjung', 'Traveler Reviews & Ratings')}
                   </h2>
                   <span style={{ fontSize: '13px', color: '#64748b' }}>
-                    Berdasarkan <strong>{reviewsList.length}</strong> ulasan wisatawan terverifikasi
+                    {t('Berdasarkan', 'Based on')} <strong>{reviewsList.length}</strong> {t('ulasan wisatawan terverifikasi', 'verified traveler reviews')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 14px', borderRadius: '30px' }}>
                   <Star size={18} fill={reviewsList.length > 0 ? '#f59e0b' : 'none'} color="#f59e0b" />
                   <span style={{ fontSize: '15px', fontWeight: '800', color: '#b45309' }}>
-                    {reviewsList.length > 0 ? `${(reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)} / 5.0` : 'Belum ada rating'}
+                    {reviewsList.length > 0 ? `${(reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)} / 5.0` : t('Belum ada rating', 'No ratings yet')}
                   </span>
                 </div>
               </div>
@@ -1026,19 +1030,19 @@ export const CustomerPackageDetailPage: React.FC = () => {
               {/* Reviews List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
                 {currentReviews.length === 0 && (
-                  <p style={{ color: '#64748b', margin: 0 }}>Belum ada ulasan terverifikasi untuk paket ini.</p>
+                  <p style={{ color: '#64748b', margin: 0 }}>{t('Belum ada ulasan terverifikasi untuk paket ini.', 'No verified reviews for this trip yet.')}</p>
                 )}
                 {currentReviews.map((rev) => (
                   <div key={rev.id} style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#007bff', color: '#ffffff', fontWeight: '700', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          W
+                          {t('W', 'T')}
                         </div>
                         <div>
-                          <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block' }}>Wisatawan terverifikasi</strong>
+                          <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block' }}>{t('Wisatawan terverifikasi', 'Verified traveler')}</strong>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
-                            <CheckCircle2 size={12} /> Terverifikasi Pembeli
+                            <CheckCircle2 size={12} /> {t('Terverifikasi Pembeli', 'Verified Buyer')}
                           </div>
                         </div>
                       </div>
@@ -1049,7 +1053,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                             <Star key={i} size={13} fill={i < rev.rating ? '#f59e0b' : 'none'} color={i < rev.rating ? '#f59e0b' : '#cbd5e1'} />
                           ))}
                         </div>
-                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>{new Date(rev.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>{new Date(rev.createdAt).toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                       </div>
                     </div>
 
@@ -1064,7 +1068,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
               {totalReviewPages > 1 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginBottom: '28px', flexWrap: 'wrap', gap: '10px' }}>
                   <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
-                    Halaman {reviewPage} dari {totalReviewPages} ({reviewsList.length} Ulasan)
+                    {t(`Halaman ${reviewPage} dari ${totalReviewPages} (${reviewsList.length} Ulasan)`, `Page ${reviewPage} of ${totalReviewPages} (${reviewsList.length} reviews)`)}
                   </span>
 
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -1085,7 +1089,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                         gap: '4px'
                       }}
                     >
-                      <ChevronLeft size={14} /> Sebelumnya
+                      <ChevronLeft size={14} /> {t('Sebelumnya', 'Previous')}
                     </button>
 
                     {[...Array(totalReviewPages)].map((_, idx) => (
@@ -1125,7 +1129,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
                         gap: '4px'
                       }}
                     >
-                      Berikutnya <ChevronRight size={14} />
+                      {t('Berikutnya', 'Next')} <ChevronRight size={14} />
                     </button>
                   </div>
                 </div>
@@ -1151,13 +1155,13 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Price Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
               <div>
-                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', display: 'block' }}>{perUnit ? `Harga per ${pkgUnitName}` : 'Harga per orang'}</span>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', display: 'block' }}>{perUnit ? t(`Harga per ${pkgUnitName}`, `Price per ${pkgUnitName}`) : t('Harga per orang', 'Price per person')}</span>
                 <div style={{ fontSize: '24px', fontWeight: '800', color: '#007bff' }}>
                   {formatIDR(pkg.price)}
                 </div>
                 {perUnit && (
                   <span style={{ fontSize: '11.5px', color: '#64748b', display: 'block', marginTop: '2px', lineHeight: 1.5 }}>
-                    Maks. {unitCapacity} orang per {pkgUnitName} · ≈ {formatIDR(perPersonShare)}/orang untuk {guestsCount} peserta
+                    {t(`Maks. ${unitCapacity} orang per ${pkgUnitName} · ≈ ${formatIDR(perPersonShare)}/orang untuk ${guestsCount} peserta`, `Max ${people(unitCapacity)} per ${pkgUnitName} · ≈ ${formatIDR(perPersonShare)}/person for ${participants(guestsCount)}`)}
                   </span>
                 )}
               </div>
@@ -1168,14 +1172,14 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
             {isExpired && (
               <div role="status" style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '12px 14px', marginBottom: '16px', fontSize: '12.5px', color: '#334155', lineHeight: '1.5' }}>
-                <strong style={{ display: 'block', color: '#0f172a', marginBottom: '2px' }}>Jadwal paket ini sudah lewat</strong>
-                Paket tetap ditampilkan sebagai referensi, tetapi tidak dapat dipesan lagi.
+                <strong style={{ display: 'block', color: '#0f172a', marginBottom: '2px' }}>{t('Jadwal paket ini sudah lewat', 'This trip\'s schedule has passed')}</strong>
+                {t('Paket tetap ditampilkan sebagai referensi, tetapi tidak dapat dipesan lagi.', 'It is still shown for reference but can no longer be booked.')}
                 <button
                   type="button"
                   onClick={() => navigateTo('cari-trip')}
                   style={{ display: 'block', marginTop: '8px', background: 'none', border: 'none', padding: 0, color: '#0284c7', fontWeight: '700', fontSize: '12.5px', cursor: 'pointer' }}
                 >
-                  Cari trip lain yang tersedia
+                  {t('Cari trip lain yang tersedia', 'Find another available trip')}
                 </button>
               </div>
             )}
@@ -1186,17 +1190,17 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {isOpenTrip ? (
               <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', border: '1px solid #dbeafe' }}>
                 <label style={{ fontSize: '12px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-                  Jadwal Keberangkatan (Open Trip)
+                  {t('Jadwal Keberangkatan (Open Trip)', 'Departure Dates (Open Trip)')}
                 </label>
                 
-                {departureOptions.length > 0 ? <div className="departure-list" role="group" aria-label="Pilih tanggal keberangkatan">
+                {departureOptions.length > 0 ? <div className="departure-list" role="group" aria-label={t('Pilih tanggal keberangkatan', 'Pick a departure date')}>
                   {departureOptions.map(departure => <button key={departure.date} type="button" className="departure-row" aria-pressed={selectedDeparture?.date === departure.date}
                     disabled={departure.seatsLeft < minRequiredGuests} onClick={() => { setCustomStartDate(departure.date); setCustomEndDate(departure.endDate); }}>
-                    <strong>{formatTripRange(departure.date, departure.endDate)}</strong>
-                    <span>{departure.closed ? 'Jadwal ditutup' : departure.seatsLeft < minRequiredGuests ? 'Kuota tidak mencukupi' : `${departure.seatsLeft} kursi tersisa`}</span>
+                    <strong>{formatTripRange(departure.date, departure.endDate, locale)}</strong>
+                    <span>{departure.closed ? t('Jadwal ditutup', 'Closed') : departure.seatsLeft < minRequiredGuests ? t('Kuota tidak mencukupi', 'Not enough seats') : t(`${departure.seatsLeft} kursi tersisa`, `Seats left: ${departure.seatsLeft}`)}</span>
                   </button>)}
-                </div> : <p>Belum ada jadwal keberangkatan yang tersedia.</p>}
-                <p style={{ fontSize: 12, color: '#475569' }}>Kuota dan jumlah peserta di bawah mengikuti tanggal yang dipilih.</p>
+                </div> : <p>{t('Belum ada jadwal keberangkatan yang tersedia.', 'No departure dates available yet.')}</p>}
+                <p style={{ fontSize: 12, color: '#475569' }}>{t('Kuota dan jumlah peserta di bawah mengikuti tanggal yang dipilih.', 'Seats and participant count below follow the selected date.')}</p>
                 {hasUpcomingDeparture && typeof pkg.schedule === 'string' && pkg.schedule.trim() && (
                   <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-line' }}>
                     {pkg.schedule.trim()}
@@ -1214,15 +1218,15 @@ export const CustomerPackageDetailPage: React.FC = () => {
                   return (
                     <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fffbebfb', border: '1px solid #fde68a', borderRadius: '10px', fontSize: '12px', color: '#92400e', fontWeight: '700', lineHeight: '1.5' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                        <span>Minimal Kuota Open Trip:</span>
+                        <span>{t('Minimal Kuota Open Trip:', 'Open Trip minimum:')}</span>
                         <strong style={{ color: '#0f172a' }}>{quotaMin} Pax</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                        <span>Status Kuota Terisi:</span>
+                        <span>{t('Status Kuota Terisi:', 'Seats filled:')}</span>
                         <strong style={{ color: '#0284c7' }}>{quotaUsed} / {quotaMin} Pax</strong>
                       </div>
                       <div style={{ color: '#92400e', backgroundColor: '#fef3c7', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', marginTop: '4px', textAlign: 'center' }}>
-                        Kurang {quotaShortage} orang lagi agar kuota minimum terpenuhi dan trip berangkat.
+                        {t(`Kurang ${quotaShortage} orang lagi agar kuota minimum terpenuhi dan trip berangkat.`, `Still need ${people(quotaShortage)} to reach the minimum so the trip can depart.`)}
                       </div>
                     </div>
                   );
@@ -1232,10 +1236,10 @@ export const CustomerPackageDetailPage: React.FC = () => {
               <div style={{ backgroundColor: '#f0f7ff', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', border: '1px solid #dbeafe' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <label style={{ fontSize: '12.5px', color: '#007bff', fontWeight: '700', textTransform: 'uppercase' }}>
-                    Pilih Jadwal
+                    {t('Pilih Jadwal', 'Pick Dates')}
                   </label>
                   <span style={{ fontSize: '11px', color: '#007bff', fontWeight: '700', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px' }}>
-                    Min. H-7
+                    {t('Min. H-7', '7 days ahead')}
                   </span>
                 </div>
                 
@@ -1257,20 +1261,20 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#007bff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Calendar size={15} color="#007bff" /> Kalender Jadwal Perjalanan
+                      <Calendar size={15} color="#007bff" /> {t('Kalender Jadwal Perjalanan', 'Trip Calendar')}
                     </span>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: '#007bff', backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>
-                      Pilih Tanggal &gt;
+                      {t('Pilih Tanggal', 'Pick Dates')} &gt;
                     </span>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#f8fafc', padding: '8px 10px', borderRadius: '8px' }}>
                     <div>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Tanggal Mulai</span>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>{t('Tanggal Mulai', 'Start Date')}</span>
                       <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customStartDate)}</strong>
                     </div>
                     <div>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>Tanggal Selesai</span>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', display: 'block' }}>{t('Tanggal Selesai', 'End Date')}</span>
                       <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>{formatDateIndoFull(customEndDate)}</strong>
                     </div>
                   </div>
@@ -1278,25 +1282,25 @@ export const CustomerPackageDetailPage: React.FC = () => {
 
                 {(pkgStartIso || pkgEndIso) && (
                   <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', display: 'block', marginTop: '8px' }}>
-                    Periode paket: {pkgStartIso ? formatDateIndoFull(pkgStartIso) : '-'} s/d {pkgEndIso ? formatDateIndoFull(pkgEndIso) : 'tanpa batas'}
+                    {t('Periode paket', 'Trip period')}: {pkgStartIso ? formatDateIndoFull(pkgStartIso) : '-'} {t('s/d', 'to')} {pkgEndIso ? formatDateIndoFull(pkgEndIso) : t('tanpa batas', 'no end date')}
                   </span>
                 )}
 
                 {isDateOutsidePeriod && (
                   <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '10px 12px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
-                    <XCircle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />Tanggal {formatDateIndoFull(customStartDate)} berada di luar periode paket. Silakan pilih tanggal mulai antara {formatDateIndoFull(periodMinDateIso)}{periodMaxDateIso ? ` dan ${formatDateIndoFull(periodMaxDateIso)}` : ''} pada kalender.
+                    <XCircle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />{t('Tanggal', 'Date')} {formatDateIndoFull(customStartDate)} {t('berada di luar periode paket. Silakan pilih tanggal mulai antara', 'is outside the trip period. Please pick a start date between')} {formatDateIndoFull(periodMinDateIso)}{periodMaxDateIso ? ` ${t('dan', 'and')} ${formatDateIndoFull(periodMaxDateIso)}` : ''} {t('pada kalender.', 'on the calendar.')}
                   </div>
                 )}
 
                 {isSelectedDateClosed && !isRangeBooked && (
                   <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '10px 12px', borderRadius: '8px', color: '#92400e', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
-                    <AlertTriangle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />Tanggal {formatDateIndoFull(customStartDate)} tidak dibuka penyelenggara untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.
+                    <AlertTriangle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />{t('Tanggal', 'Date')} {formatDateIndoFull(customStartDate)} {t('tidak dibuka penyelenggara untuk paket ini. Silakan pilih salah satu tanggal yang tersedia pada kalender.', 'is not open for this trip. Please pick one of the available dates on the calendar.')}
                   </div>
                 )}
 
                 {isRangeBooked && (
                   <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', padding: '10px 12px', borderRadius: '8px', color: '#991b1b', fontSize: '11.5px', fontWeight: '700', marginTop: '10px', lineHeight: '1.5' }}>
-                    <XCircle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />Dalam rentang tanggal yang Anda pilih ({customStartDate === customEndDate ? formatDateIndoFull(customStartDate) : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`}), terdapat tanggal yang sudah terbooking ({bookedDatesInRange.map(d => formatDateIndoFull(d)).join(', ')} FULL). Silakan pilih rentang tanggal lain pada kalender.
+                    <XCircle size={14} style={{ verticalAlign: '-2px', marginRight: '6px', flexShrink: 0 }} aria-hidden="true" />{t('Dalam rentang tanggal yang Anda pilih', 'Your selected dates')} ({customStartDate === customEndDate ? formatDateIndoFull(customStartDate) : `${formatDateIndoFull(customStartDate)} - ${formatDateIndoFull(customEndDate)}`}), {t('terdapat tanggal yang sudah terbooking', 'include dates that are already booked')} ({bookedDatesInRange.map(d => formatDateIndoFull(d)).join(', ')} FULL). {t('Silakan pilih rentang tanggal lain pada kalender.', 'Please pick other dates on the calendar.')}
                   </div>
                 )}
               </div>
@@ -1307,13 +1311,13 @@ export const CustomerPackageDetailPage: React.FC = () => {
               {(() => {
                 return (
                   <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-                    <span>Jumlah Peserta</span>
+                    <span>{t('Jumlah Peserta', 'Participants')}</span>
                     <span style={{ color: availableSeats > 0 && guestsCount <= availableSeats ? '#10b981' : '#ef4444', fontWeight: '800' }}>
-                      {!isOpenTrip ? `Maks. ${availableSeats} orang / booking` : availableSeats <= 0
-                        ? 'Sisa 0 seat' 
+                      {!isOpenTrip ? t(`Maks. ${availableSeats} orang / booking`, `Max ${people(availableSeats)} / booking`) : availableSeats <= 0
+                        ? t('Sisa 0 seat', '0 seats left') 
                         : guestsCount > availableSeats 
-                        ? `Melebihi Kuota (${availableSeats} seat)` 
-                        : `Tersedia ${availableSeats} kursi`}
+                        ? t(`Melebihi Kuota (${availableSeats} seat)`, `Over limit (${availableSeats} left)`) 
+                        : t(`Tersedia ${availableSeats} kursi`, `Seats available: ${availableSeats}`)}
                     </span>
                   </label>
                 );
@@ -1322,7 +1326,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '8px 14px' }}>
                 <Users size={18} color="#94a3b8" />
                 <span style={{ flexGrow: 1, fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>
-                  {guestsCount} Orang
+                  {t(`${guestsCount} Orang`, guestsCount === 1 ? '1 person' : `${guestsCount} people`)}
                 </span>
                 
                 <button 
@@ -1352,7 +1356,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
               </div>
               {minRequiredGuests > 1 && (
                 <span style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'block', fontWeight: '600' }}>
-                  * Minimal pemesanan paket {pkg.tripType || 'ini'} adalah {minRequiredGuests} orang.
+                  {t(`* Minimal pemesanan paket ${pkg.tripType || 'ini'} adalah ${minRequiredGuests} orang.`, `* ${pkg.tripType || 'This trip'} needs at least ${minRequiredGuests} participants.`)}
                 </span>
               )}
             </div>
@@ -1360,20 +1364,20 @@ export const CustomerPackageDetailPage: React.FC = () => {
             {/* Total Summary */}
             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12.5px', color: '#64748b', marginBottom: '4px' }}>
-                <span>{perUnit ? `${unitCount} ${pkgUnitName} × ${formatIDR(pkg.price)}` : `${formatIDR(pkg.price)} × ${guestsCount} orang`}</span>
+                <span>{perUnit ? `${unitCount} ${pkgUnitName} × ${formatIDR(pkg.price)}` : `${formatIDR(pkg.price)} × ${people(guestsCount)}`}</span>
                 <span>{formatIDR(tripBasePrice)}</span>
               </div>
               {perUnit && (
                 <div style={{ fontSize: '11.5px', color: '#64748b', marginBottom: '6px', lineHeight: 1.5 }}>
-                  <span style={{ display: 'block' }}>{guestsCount} peserta · ≈ {formatIDR(perPersonShare)} / orang</span>
+                  <span style={{ display: 'block' }}>{t(`${guestsCount} peserta · ≈ ${formatIDR(perPersonShare)} / orang`, `${participants(guestsCount)} · ≈ ${formatIDR(perPersonShare)} / person`)}</span>
                   {unitCount > 1 && (
                     <span style={{ display: 'block', color: '#b45309', fontWeight: '600' }}>
-                      {guestsCount} peserta melebihi kapasitas 1 {pkgUnitName} ({unitCapacity} orang), jadi dibutuhkan {unitCount} {pkgUnitName}.
+                      {t(`${guestsCount} peserta melebihi kapasitas 1 ${pkgUnitName} (${unitCapacity} orang), jadi dibutuhkan ${unitCount} ${pkgUnitName}.`, `${participants(guestsCount)} exceed the capacity of 1 ${pkgUnitName} (${people(unitCapacity)}), so ${unitCount} ${pkgUnitName} are needed.`)}
                     </span>
                   )}
                   {freeSeatsInUnit > 0 && (
                     <span style={{ display: 'block', color: '#059669', fontWeight: '600' }}>
-                      Masih muat {freeSeatsInUnit} orang lagi tanpa biaya tambahan.
+                      {t(`Masih muat ${freeSeatsInUnit} orang lagi tanpa biaya tambahan.`, `Room for ${people(freeSeatsInUnit)} more at no extra cost.`)}
                     </span>
                   )}
                 </div>
@@ -1387,7 +1391,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
               ))}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '800', color: '#0f172a', borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '4px' }}>
-                <span>Total Estimasi</span>
+                <span>{t('Total Estimasi', 'Estimated Total')}</span>
                 <span style={{ color: '#007bff' }}>{formatIDR(estimatedTotal)}</span>
               </div>
             </div>
@@ -1411,12 +1415,12 @@ export const CustomerPackageDetailPage: React.FC = () => {
                 transition: 'all 0.2s'
               }}
             >
-              {isExpired ? 'Jadwal Sudah Lewat (Tidak Bisa Dipesan)' :
-               availableSeats <= 0 ? 'Kuota Habis (Tidak Bisa Dipesan)' :
-               guestsCount > availableSeats ? 'Peserta Melebihi Kuota' :
-               openTripUnavailable ? 'Belum Ada Jadwal Keberangkatan' :
-               (!isOpenTrip && isRangeBooked) ? 'Tanggal Terbooking (Tidak Tersedia)' :
-               dateBlocked ? 'Tanggal Tidak Tersedia' : 'Pesan Sekarang'}
+              {isExpired ? t('Jadwal Sudah Lewat (Tidak Bisa Dipesan)', 'Schedule Passed (Not Bookable)') :
+               availableSeats <= 0 ? t('Kuota Habis (Tidak Bisa Dipesan)', 'Sold Out (Not Bookable)') :
+               guestsCount > availableSeats ? t('Peserta Melebihi Kuota', 'Too Many Participants') :
+               openTripUnavailable ? t('Belum Ada Jadwal Keberangkatan', 'No Departures Yet') :
+               (!isOpenTrip && isRangeBooked) ? t('Tanggal Terbooking (Tidak Tersedia)', 'Dates Booked (Unavailable)') :
+               dateBlocked ? t('Tanggal Tidak Tersedia', 'Dates Unavailable') : t('Pesan Sekarang', 'Book Now')}
             </button>
 
           </div>
@@ -1445,7 +1449,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
       >
         <div>
           <span style={{ fontSize: '11px', color: '#64748b', display: 'block', fontWeight: '600' }}>
-            Total ({guestsCount} orang{perUnit ? ` · ${unitCount} ${pkgUnitName}` : ''})
+            Total ({people(guestsCount)}{perUnit ? ` · ${unitCount} ${pkgUnitName}` : ''})
           </span>
           <span style={{ fontSize: '17px', fontWeight: '800', color: '#007bff' }}>
             {formatIDR(estimatedTotal)}
@@ -1468,7 +1472,7 @@ export const CustomerPackageDetailPage: React.FC = () => {
             whiteSpace: 'nowrap'
           }}
         >
-          {isExpired ? 'Jadwal Lewat' : availableSeats <= 0 ? 'Kuota Habis' : openTripUnavailable ? 'Belum Ada Jadwal' : 'Pesan Sekarang'}
+          {isExpired ? t('Jadwal Lewat', 'Schedule Passed') : availableSeats <= 0 ? t('Kuota Habis', 'Sold Out') : openTripUnavailable ? t('Belum Ada Jadwal', 'No Schedule') : t('Pesan Sekarang', 'Book Now')}
         </button>
       </div>
 

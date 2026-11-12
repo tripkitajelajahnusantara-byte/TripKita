@@ -55,6 +55,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 	departureCtrl := controllers.NewDepartureController(c.DepartureService)
 	tripPlanCtrl := controllers.NewTripPlanController(c.TripPlanService)
 	geocodingCtrl := controllers.NewGeocodingController(c.GeocodingService)
+	newsCtrl := controllers.NewNewsController(db)
+	newsCommentCtrl := controllers.NewNewsCommentController(db)
 
 	// Direktori unggahan tidak pernah disajikan utuh di environment mana pun:
 	// hanya foto paket ("pkg_") yang publik. Dokumen verifikasi dan bukti
@@ -71,6 +73,11 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			public.GET("/packages", packageCtrl.GetAllPublic)
 			public.GET("/providers/:id", packageCtrl.GetPublicProviderProfile)
 			public.GET("/checkout-config", bookingCtrl.GetCheckoutConfig)
+			public.GET("/news", newsCtrl.PublicList)
+			public.GET("/news/:id", newsCtrl.PublicGet)
+			public.GET("/news-highlights", newsCtrl.Highlights)
+			// Auth opsional hanya untuk menandai komentar milik pembaca sendiri.
+			public.GET("/news/:id/comments", middleware.OptionalAuthMiddleware(db, cfg), newsCommentCtrl.List)
 
 			// Reviews public read endpoints
 			public.GET("/reviews/package/:packageId", reviewCtrl.GetReviewsByPackage)
@@ -113,8 +120,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			authProfile.PUT("/profile", authCtrl.UpdateProfile)
 			authProfile.POST("/upload", middleware.ProviderAccountRequired(), middleware.RateLimit(10, time.Hour), uploadCtrl.UploadDocument)
 			authProfile.GET("/documents", middleware.ProviderAccountRequired(), uploadCtrl.GetProviderDocument)
-			authProfile.POST("/profile/photo", middleware.ProviderAccountRequired(), middleware.RateLimit(20, time.Hour), uploadCtrl.UploadProfilePhoto)
-			authProfile.DELETE("/profile/photo", middleware.ProviderAccountRequired(), uploadCtrl.DeleteProfilePhoto)
+			authProfile.POST("/profile/photo", middleware.ProfileOwnerRequired(), middleware.RateLimit(20, time.Hour), uploadCtrl.UploadProfilePhoto)
+			authProfile.DELETE("/profile/photo", middleware.ProfileOwnerRequired(), uploadCtrl.DeleteProfilePhoto)
 
 			// Notification Center endpoints
 			authProfile.GET("/notifications", notifCtrl.GetUserNotifications)
@@ -203,6 +210,19 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			admin.GET("/revenue", payoutCtrl.AdminGetPlatformRevenue)
 			admin.PUT("/payouts/:id/process", payoutCtrl.AdminProcessPayout)
 			admin.GET("/payouts/:id/pdf-receipt", payoutCtrl.GetPayoutPDFReceipt)
+
+			// Berita: hanya admin yang menulis; foto memakai penyimpanan publik
+			// yang sama dengan foto paket.
+			admin.GET("/news", newsCtrl.AdminList)
+			admin.GET("/news/:id", newsCtrl.AdminGet)
+			admin.POST("/news", newsCtrl.Create)
+			admin.PUT("/news/:id", newsCtrl.Update)
+			admin.DELETE("/news/:id", newsCtrl.Delete)
+			admin.POST("/news/photos", middleware.RateLimit(120, time.Hour), uploadCtrl.UploadPackagePhoto)
+			admin.PUT("/news-placements", newsCtrl.SavePlacements)
+			admin.GET("/news-comments", newsCommentCtrl.AdminList)
+			admin.PUT("/news-comments/:id/visibility", newsCommentCtrl.AdminSetHidden)
+			admin.DELETE("/news-comments/:id", newsCommentCtrl.AdminDelete)
 		}
 
 		// CUSTOMER ROUTES (Auth + Customer Role Required)
@@ -221,6 +241,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config, c *services.Container) *gin.En
 			customer.POST("/trip-plans", tripPlanCtrl.Create)
 			customer.PUT("/trip-plans/:id", tripPlanCtrl.Update)
 			customer.DELETE("/trip-plans/:id", tripPlanCtrl.Delete)
+
+			customer.POST("/news/:id/comments", middleware.RateLimit(30, time.Hour), newsCommentCtrl.Create)
+			customer.PUT("/news-comments/:id", middleware.RateLimit(60, time.Hour), newsCommentCtrl.Update)
+			customer.DELETE("/news-comments/:id", newsCommentCtrl.Delete)
 		}
 	}
 

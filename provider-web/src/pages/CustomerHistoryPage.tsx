@@ -8,6 +8,7 @@ import { Skeleton } from '../components/Skeleton';
 import { RescheduleOfferCard } from '../components/RescheduleOfferCard';
 import { BookingPickupSummary } from '../components/TripPickup';
 import { bookingAddOns } from '../utils/pricing';
+import { useI18n } from '../i18n';
 
 interface BookingItem {
   pickupMode?: string;
@@ -52,13 +53,14 @@ interface BookingItem {
 
 // Unit (mis. 2 Jeep) dan fasilitas tambahan yang tersimpan pada booking.
 const BookingExtras: React.FC<{ booking: BookingItem; formatIDR: (n: number) => string }> = ({ booking, formatIDR }) => {
+  const { t } = useI18n();
   const addOns = bookingAddOns(booking);
   if (!booking.unitCount && addOns.length === 0) return null;
   return (
     <div style={{ marginTop: '6px', fontSize: '12.5px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-      {!!booking.unitCount && <span>Unit: {booking.unitCount} {booking.unitName || 'Unit'}</span>}
+      {!!booking.unitCount && <span>{t('Unit', 'Units')}: {booking.unitCount} {booking.unitName || t('Unit', 'unit(s)')}</span>}
       {addOns.map((a) => (
-        <span key={a.id || a.name}>+ {a.name}{a.perPerson ? ` (×${booking.guests} orang)` : ''} · {formatIDR(a.subtotal)}</span>
+        <span key={a.id || a.name}>+ {a.name}{a.perPerson ? t(` (×${booking.guests} orang)`, ` (×${booking.guests} pax)`) : ''} · {formatIDR(a.subtotal)}</span>
       ))}
     </div>
   );
@@ -82,7 +84,8 @@ const DEFAULT_PAYMENT_WINDOW_SECONDS = 24 * 60 * 60;
 
 const isOnlinePayment = (booking: { paymentMethod?: string }) => String(booking.paymentMethod || '').startsWith('Midtrans');
 
-const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; deadlineAt?: string; label?: string; onExpire?: () => void }> = ({ createdAt, windowSeconds, deadlineAt, label = 'Batas Transfer', onExpire }) => {
+const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; deadlineAt?: string; label?: string; onExpire?: () => void }> = ({ createdAt, windowSeconds, deadlineAt, label, onExpire }) => {
+  const { t } = useI18n();
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const onExpireRef = useRef(onExpire);
 
@@ -122,13 +125,14 @@ const CountdownTimer: React.FC<{ createdAt?: string; windowSeconds: number; dead
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', padding: '5px 12px', borderRadius: '30px', fontSize: '12px', fontWeight: '800' }}>
       <Clock size={14} color="#ea580c" />
-      <span>{label}: {hours}:{minutes}:{seconds}</span>
+      <span>{label ?? t('Batas Transfer', 'Transfer deadline')}: {hours}:{minutes}:{seconds}</span>
     </div>
   );
 };
 
 export const CustomerHistoryPage: React.FC = () => {
   const { navigateTo, customerProfile, setSelectedPackageForDetail, setSelectedBookingForInvoice } = useNavigation();
+  const { t, term, locale } = useI18n();
 
   // Batas waktu pembayaran dari backend (detik)
   const [paymentWindowSeconds, setPaymentWindowSeconds] = useState<number>(DEFAULT_PAYMENT_WINDOW_SECONDS);
@@ -173,7 +177,7 @@ export const CustomerHistoryPage: React.FC = () => {
   const cancellingLoading = pending === 'cancel-booking';
 
   const canCancelBooking = () => !!customerProfile && customerProfile.role === 'CUSTOMER';
-  const guestCancelMessage = 'Pembatalan booking tamu harus dilakukan melalui layanan pelanggan untuk verifikasi identitas.';
+  const guestCancelMessage = t('Pembatalan booking tamu harus dilakukan melalui layanan pelanggan untuk verifikasi identitas.', 'Guest bookings can only be cancelled through customer service so we can verify your identity.');
 
   // Hak batal dicek sebelum modal dibuka; sebelumnya tamu baru ditolak setelah
   // menekan "Ya, Batalkan" di modal konfirmasi.
@@ -224,7 +228,7 @@ export const CustomerHistoryPage: React.FC = () => {
       setCancelConfirmBooking(null);
     } catch (err: any) {
       console.error('Failed to cancel booking:', err);
-      alert('Gagal membatalkan pesanan: ' + (err.message || 'Terjadi kesalahan sistem'));
+      alert(t('Gagal membatalkan pesanan: ', 'Could not cancel the booking: ') + (err.message || t('Terjadi kesalahan sistem', 'A system error occurred')));
     }
 	});
   };
@@ -263,7 +267,7 @@ export const CustomerHistoryPage: React.FC = () => {
     setTrackedBooking(null);
     
     if (!searchCode.trim()) {
-      setTrackingError('Silakan masukkan Kode Booking Anda terlebih dahulu.');
+      setTrackingError(t('Silakan masukkan Kode Booking Anda terlebih dahulu.', 'Please enter your booking code first.'));
       return;
     }
 
@@ -274,11 +278,11 @@ export const CustomerHistoryPage: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       if (err?.status === 404) {
-        setTrackingError('Kode booking tidak ditemukan. Masukkan kode secara lengkap, contoh: TK-20260928-AB12CD34.');
+        setTrackingError(t('Kode booking tidak ditemukan. Masukkan kode secara lengkap, contoh: TK-20260928-AB12CD34.', 'Booking code not found. Enter the full code, for example: TK-20260928-AB12CD34.'));
       } else if (err?.status === 401 || err?.status === 403) {
-        setTrackingError('Pesanan ini terhubung ke akun TemenTrip. Silakan masuk dengan akun pemesan untuk melihatnya.');
+        setTrackingError(t('Pesanan ini terhubung ke akun TemenTrip. Silakan masuk dengan akun pemesan untuk melihatnya.', 'This booking is linked to a TemenTrip account. Please sign in with the account used to book it.'));
       } else {
-        setTrackingError(err?.message || 'Status booking belum dapat dimuat. Coba lagi beberapa saat.');
+        setTrackingError(err?.message || t('Status booking belum dapat dimuat. Coba lagi beberapa saat.', 'Booking status could not be loaded. Please try again shortly.'));
       }
     } finally {
       setTrackingLoading(false);
@@ -337,14 +341,14 @@ export const CustomerHistoryPage: React.FC = () => {
       setReviewedMap(prev => ({ ...prev, [selectedReviewBooking.id]: true }));
       setSelectedReviewBooking(null);
       setModalNotice({
-        title: 'Ulasan Berhasil Terkirim!',
-        message: 'Terima kasih! Ulasan dan penilaian bintang Anda telah berhasil dikirim dan tersimpan di database.'
+        title: t('Ulasan Berhasil Terkirim!', 'Review Submitted'),
+        message: t('Terima kasih! Ulasan dan penilaian bintang Anda telah berhasil dikirim dan tersimpan di database.', 'Thank you. Your review and star rating have been submitted and saved.')
       });
     } catch (err: any) {
       console.error(err);
       setModalNotice({
-        title: 'Gagal Mengirim Ulasan',
-        message: err.message || 'Gagal menyimpan ulasan ke database.',
+        title: t('Gagal Mengirim Ulasan', 'Review Not Submitted'),
+        message: err.message || t('Gagal menyimpan ulasan ke database.', 'Your review could not be saved.'),
         isError: true
       });
     }
@@ -366,8 +370,8 @@ export const CustomerHistoryPage: React.FC = () => {
         setTrackedBooking({ ...trackedBooking, ...result.booking });
       }
       setModalNotice({
-        title: accept ? 'Jadwal Pengganti Diterima' : 'Jadwal Pengganti Ditolak',
-        message: result?.message || 'Jawaban Anda telah tersimpan.',
+        title: accept ? t('Jadwal Pengganti Diterima', 'New Date Accepted') : t('Jadwal Pengganti Ditolak', 'New Date Declined'),
+        message: result?.message || t('Jawaban Anda telah tersimpan.', 'Your reply has been saved.'),
         // Menolak jadwal pengganti adalah pilihan yang sah (diteruskan ke
         // refund), bukan kegagalan, jadi ditampilkan sebagai konfirmasi biasa.
         isError: false,
@@ -375,8 +379,8 @@ export const CustomerHistoryPage: React.FC = () => {
       await fetchHistory();
     } catch (err: any) {
       setModalNotice({
-        title: 'Jawaban Gagal Dikirim',
-        message: err?.message || 'Jawaban Anda tidak dapat disimpan. Silakan coba lagi.',
+        title: t('Jawaban Gagal Dikirim', 'Reply Not Sent'),
+        message: err?.message || t('Jawaban Anda tidak dapat disimpan. Silakan coba lagi.', 'Your reply could not be saved. Please try again.'),
         isError: true,
       });
     }
@@ -387,7 +391,7 @@ export const CustomerHistoryPage: React.FC = () => {
     switch (status) {
       case 'COMPLETED':
         return {
-          label: 'Trip Selesai (Completed)',
+          label: t('Trip Selesai (Completed)', 'Trip Completed'),
           color: '#10b981',
           bgColor: '#dcfce7',
           icon: <CheckCircle2 size={14} color="#10b981" />
@@ -397,21 +401,21 @@ export const CustomerHistoryPage: React.FC = () => {
       case 'Dikonfirmasi':
       case 'Selesai':
         return {
-          label: 'Lunas & Aktif',
+          label: t('Lunas & Aktif', 'Paid & Active'),
           color: '#10b981',
           bgColor: '#dcfce7',
           icon: <CheckCircle2 size={14} color="#10b981" />
         };
       case 'EXPIRED':
         return {
-          label: 'Kadaluwarsa (Batas Waktu Habis)',
+          label: t('Kadaluwarsa (Batas Waktu Habis)', 'Expired (Deadline Passed)'),
           color: '#ef4444',
           bgColor: '#fee2e2',
           icon: <XCircle size={14} color="#ef4444" />
         };
 	  case 'FAILED':
 		return {
-		  label: 'Pembayaran Gagal',
+		  label: t('Pembayaran Gagal', 'Payment Failed'),
 		  color: '#ef4444',
 		  bgColor: '#fee2e2',
 		  icon: <XCircle size={14} color="#ef4444" />
@@ -421,14 +425,14 @@ export const CustomerHistoryPage: React.FC = () => {
 	  case 'CANCELLED_BY_CUSTOMER':
 	  case 'CANCELLED_BY_PROVIDER':
         return {
-          label: 'Pesanan Dibatalkan',
+          label: t('Pesanan Dibatalkan', 'Booking Cancelled'),
           color: '#ef4444',
           bgColor: '#fee2e2',
           icon: <XCircle size={14} color="#ef4444" />
         };
       case 'PAYMENT_REVIEW':
         return {
-          label: 'Menunggu Konfirmasi Admin',
+          label: t('Menunggu Konfirmasi Admin', 'Awaiting Admin Review'),
           color: '#2563eb',
           bgColor: '#eff6ff',
           icon: <Clock size={14} color="#2563eb" />
@@ -436,35 +440,35 @@ export const CustomerHistoryPage: React.FC = () => {
       case 'PENDING_PAYMENT':
       case 'Menunggu':
         return {
-          label: 'Menunggu Pembayaran',
+          label: t('Menunggu Pembayaran', 'Awaiting Payment'),
           color: '#f59e0b',
           bgColor: '#fffbeb',
           icon: <Clock size={14} color="#f59e0b" />
         };
       case 'RESCHEDULE_OFFERED':
         return {
-          label: 'Menunggu Jawaban Anda (Jadwal Pengganti)',
+          label: t('Menunggu Jawaban Anda (Jadwal Pengganti)', 'Your Reply Needed (New Date)'),
           color: '#d97706',
           bgColor: '#fffbeb',
           icon: <AlertCircle size={14} color="#d97706" />
         };
       case 'REFUND_REQUIRED':
         return {
-          label: 'Proses Refund',
+          label: t('Proses Refund', 'Refund in Progress'),
           color: '#3b82f6',
           bgColor: '#eff6ff',
           icon: <AlertCircle size={14} color="#3b82f6" />
         };
 	  case 'REFUNDED':
 		return {
-		  label: 'Refund Selesai',
+		  label: t('Refund Selesai', 'Refunded'),
 		  color: '#10b981',
 		  bgColor: '#dcfce7',
 		  icon: <CheckCircle2 size={14} color="#10b981" />
 		};
       default:
         return {
-          label: 'Dibatalkan',
+          label: t('Dibatalkan', 'Cancelled'),
           color: '#ef4444',
           bgColor: '#fee2e2',
           icon: <XCircle size={14} color="#ef4444" />
@@ -479,16 +483,16 @@ export const CustomerHistoryPage: React.FC = () => {
         {/* Track Ticket Widget */}
         <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: '30px', border: '1px solid #e2e8f0' }}>
           <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0' }}>
-            Lacak Tiket Pesanan Anda
+            {t('Lacak Tiket Pesanan Anda', 'Track Your Booking')}
           </h2>
           <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
-            Ingin mencari pesanan Anda yang hilang? Masukkan Kode Booking (Contoh: TK-20260928-XXXXXXXX) di bawah ini.
+            {t('Ingin mencari pesanan Anda yang hilang? Masukkan Kode Booking (Contoh: TK-20260928-XXXXXXXX) di bawah ini.', "Can't find your booking? Enter your booking code below (e.g. TK-20260928-XXXXXXXX).")}
           </p>
 
           <form onSubmit={handleTrackTicket} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <input
               type="text"
-              placeholder="Masukkan Kode Booking Anda..."
+              placeholder={t('Masukkan Kode Booking Anda...', 'Enter your booking code...')}
               value={searchCode}
               onChange={(e) => setSearchCode(e.target.value)}
               style={{
@@ -519,7 +523,7 @@ export const CustomerHistoryPage: React.FC = () => {
                 whiteSpace: 'nowrap'
               }}
             >
-              {trackingLoading ? 'Melacak...' : 'Cari Tiket'}
+              {trackingLoading ? t('Melacak...', 'Searching...') : t('Cari Tiket', 'Find Booking')}
             </button>
           </form>
 
@@ -530,7 +534,7 @@ export const CustomerHistoryPage: React.FC = () => {
           {/* Tracked Ticket Result Box */}
           {trackedBooking && (
             <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a', marginBottom: '14px' }}>Hasil Pencarian Tiket</h3>
+              <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a', marginBottom: '14px' }}>{t('Hasil Pencarian Tiket', 'Search Result')}</h3>
               <div 
                 style={{ 
                   backgroundColor: '#f8fafc', 
@@ -569,8 +573,8 @@ export const CustomerHistoryPage: React.FC = () => {
                     {trackedBooking.packageDetails?.name || trackedBooking.packageName}
                   </strong>
                   <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: '#64748b' }}>
-                    <span>Tanggal: {new Date(trackedBooking.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                    <span>Peserta: {trackedBooking.guests} orang</span>
+                    <span>{t('Tanggal', 'Date')}: {new Date(trackedBooking.tripDate).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    <span>{t(`Peserta: ${trackedBooking.guests} orang`, `Participants: ${trackedBooking.guests}`)}</span>
                   </div>
                   <BookingExtras booking={trackedBooking} formatIDR={formatIDR} />
                 </div>
@@ -585,13 +589,13 @@ export const CustomerHistoryPage: React.FC = () => {
                 )}
                 {CANCELLED_WITH_REASON.includes(trackedBooking.status) && trackedBooking.cancellationReason && (
                   <p style={{ margin: 0, fontSize: '12.5px', lineHeight: 1.55, color: '#7f1d1d', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 12px' }}>
-                    <strong>Keterangan pembatalan:</strong> {trackedBooking.cancellationReason}
+                    <strong>{t('Keterangan pembatalan:', 'Cancellation note:')}</strong> {trackedBooking.cancellationReason}
                   </p>
                 )}
 
                 <div style={{ borderTop: '1px dotted #cbd5e1', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
-                    <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>TOTAL HARGA</span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>{t('TOTAL HARGA', 'TOTAL PRICE')}</span>
                     <span style={{ fontSize: '15px', fontWeight: '800', color: '#00a896' }}>{formatIDR(trackedBooking.totalPrice)}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -613,11 +617,11 @@ export const CustomerHistoryPage: React.FC = () => {
                           cursor: 'pointer'
                         }}
                       >
-                        Selesaikan Pembayaran
+                        {t('Selesaikan Pembayaran', 'Complete Payment')}
                       </button>
                     )}
                     {trackedBooking.status === 'PAYMENT_REVIEW' && trackedBooking.paymentProofSubmittedAt && (
-                      <CountdownTimer createdAt={trackedBooking.paymentProofSubmittedAt} windowSeconds={adminReviewWindowSeconds} label="Batas Konfirmasi Admin" />
+                      <CountdownTimer createdAt={trackedBooking.paymentProofSubmittedAt} windowSeconds={adminReviewWindowSeconds} label={t('Batas Konfirmasi Admin', 'Admin review deadline')} />
                     )}
                     {(trackedBooking.status === 'PAID' || trackedBooking.status === 'CONFIRMED') && getWhatsAppURL(
                       trackedBooking.providerWhatsApp || bookings.find(item => item.bookingCode === trackedBooking.bookingCode)?.providerWhatsApp
@@ -639,7 +643,7 @@ export const CustomerHistoryPage: React.FC = () => {
                           fontSize: '13px'
                         }}
                       >
-                        <MessageSquare size={14} /> Hubungi Provider
+                        <MessageSquare size={14} /> {t('Hubungi Provider', 'Contact Provider')}
                       </a>
                     )}
                   </div>
@@ -651,12 +655,12 @@ export const CustomerHistoryPage: React.FC = () => {
 
         {/* History List Header */}
         <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', marginBottom: '20px' }}>
-          {customerProfile && customerProfile.role === 'CUSTOMER' ? 'Riwayat Pemesanan Akun Anda' : 'Detail Status Pemesanan Tiket'}
+          {customerProfile && customerProfile.role === 'CUSTOMER' ? t('Riwayat Pemesanan Akun Anda', 'Your Booking History') : t('Detail Status Pemesanan Tiket', 'Booking Status Details')}
         </h1>
 
         {loading ? (
           <div role="status" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <span className="sr-only">Memuat riwayat pesanan</span>
+            <span className="sr-only">{t('Memuat riwayat pesanan', 'Loading booking history')}</span>
             {/* Kerangka kartu pesanan: judul + status, detail jadwal, lalu baris harga */}
             {Array.from({ length: 3 }, (_, i) => (
               <div
@@ -681,12 +685,12 @@ export const CustomerHistoryPage: React.FC = () => {
           <div style={{ textAlign: 'center', padding: '50px 24px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#64748b' }}>
             <Calendar size={44} color="#007bff" style={{ marginBottom: '14px' }} />
             <h3 style={{ color: '#0f172a', fontSize: '16px', fontWeight: '800', marginBottom: '6px' }}>
-              {customerProfile ? 'Belum Ada Pemesanan Terdaftar' : 'Melacak Tiket Pesanan (Mode Tamu)'}
+              {customerProfile ? t('Belum Ada Pemesanan Terdaftar', 'No Bookings Yet') : t('Melacak Tiket Pesanan (Mode Tamu)', 'Track a Booking (Guest Mode)')}
             </h3>
             <p style={{ fontSize: '13.5px', maxWidth: '500px', margin: '0 auto 20px auto', lineHeight: '1.5' }}>
-              {customerProfile 
-                ? 'Anda belum memiliki riwayat transaksi di akun ini.' 
-                : 'Anda saat ini mengakses tanpa akun. Masukkan Kode Booking yang telah Anda salin pada kolom pencarian di atas untuk melacak pesanan Anda.'}
+              {customerProfile
+                ? t('Anda belum memiliki riwayat transaksi di akun ini.', "You don't have any bookings on this account yet.")
+                : t('Anda saat ini mengakses tanpa akun. Masukkan Kode Booking yang telah Anda salin pada kolom pencarian di atas untuk melacak pesanan Anda.', "You're not signed in. Enter the booking code you saved in the search box above to track your booking.")}
             </p>
             
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -695,14 +699,14 @@ export const CustomerHistoryPage: React.FC = () => {
                   onClick={() => navigateTo('masuk' as any)}
                   style={{ padding: '11px 22px', backgroundColor: '#007bff', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: '700', fontSize: '13.5px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,123,255,0.25)' }}
                 >
-                  🔑 Masuk ke Akun Saya
+                  🔑 {t('Masuk ke Akun Saya', 'Sign In to My Account')}
                 </button>
               )}
               <button 
                 onClick={() => navigateTo('beranda')}
                 style={{ padding: '11px 22px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '10px', fontWeight: '700', fontSize: '13.5px', cursor: 'pointer' }}
               >
-                Cari Paket Wisata
+                {t('Cari Paket Wisata', 'Find Trips')}
               </button>
             </div>
           </div>
@@ -711,8 +715,8 @@ export const CustomerHistoryPage: React.FC = () => {
             {bookings.map((booking, idx) => {
               const isExpired = booking.status === 'EXPIRED' || (booking.status === 'PENDING_PAYMENT' && isBookingExpired(booking.createdAt, (booking as any).paymentDeadline));
               const badge = getStatusBadge(isExpired ? 'EXPIRED' : booking.status);
-              const tripName = booking.packageDetails?.name || booking.packageName || 'Paket Wisata Nusantara';
-              const formattedTripDate = new Date(booking.tripDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+              const tripName = booking.packageDetails?.name || booking.packageName || t('Paket Wisata Nusantara', 'Indonesia Trip Package');
+              const formattedTripDate = new Date(booking.tripDate).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
               
               return (
                 <div 
@@ -733,7 +737,7 @@ export const CustomerHistoryPage: React.FC = () => {
                       <span style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>{booking.bookingCode}</span>
                       <span style={{ fontSize: '12px', color: '#94a3b8' }}>
                         {booking.createdAt && !isNaN(new Date(booking.createdAt).getTime()) 
-                          ? new Date(booking.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+                          ? new Date(booking.createdAt).toLocaleDateString(locale, { day: 'numeric', month: 'short' })
                           : ''}
                       </span>
                     </div>
@@ -760,14 +764,14 @@ export const CustomerHistoryPage: React.FC = () => {
                       {tripName}
                     </h4>
                     <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: '#64748b' }}>
-                      <span>Tanggal: {formattedTripDate}</span>
-                      <span>Peserta: {booking.guests} orang</span>
+                      <span>{t('Tanggal', 'Date')}: {formattedTripDate}</span>
+                      <span>{t(`Peserta: ${booking.guests} orang`, `Participants: ${booking.guests}`)}</span>
                     </div>
                     <BookingExtras booking={booking} formatIDR={formatIDR} />
                   </div>
 
                   {booking.pickupMode === 'FLEXIBLE' && <details style={{ margin: '12px 0' }}>
-                    <summary style={{ cursor: 'pointer', fontSize: 13, color: '#0369a1', fontWeight: 600 }}>Lihat rencana penjemputan</summary>
+                    <summary style={{ cursor: 'pointer', fontSize: 13, color: '#0369a1', fontWeight: 600 }}>{t('Lihat rencana penjemputan', 'View pickup plan')}</summary>
                     <BookingPickupSummary mode={booking.pickupMode} instructions={booking.pickupInstructions} participants={booking.participants} />
                   </details>}
                   {booking.status === 'RESCHEDULE_OFFERED' && (
@@ -781,17 +785,17 @@ export const CustomerHistoryPage: React.FC = () => {
 
                   {CANCELLED_WITH_REASON.includes(booking.status) && booking.cancellationReason && (
                     <p style={{ margin: 0, fontSize: '12.5px', lineHeight: 1.55, color: '#7f1d1d', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 12px' }}>
-                      <strong>Keterangan pembatalan:</strong> {booking.cancellationReason}
+                      <strong>{t('Keterangan pembatalan:', 'Cancellation note:')}</strong> {booking.cancellationReason}
                     </p>
                   )}
 
                   {booking.status === 'PAYMENT_REVIEW' && (
                     <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                       <div>
-                        <strong style={{ color: '#1d4ed8' }}>Bukti transfer sedang diperiksa admin</strong>
-                        <div style={{ color: '#475569', fontSize: '13px', marginTop: '4px' }}>Booking belum diteruskan ke provider sampai pembayaran disetujui.</div>
+                        <strong style={{ color: '#1d4ed8' }}>{t('Bukti transfer sedang diperiksa admin', 'Admin is reviewing your transfer proof')}</strong>
+                        <div style={{ color: '#475569', fontSize: '13px', marginTop: '4px' }}>{t('Booking belum diteruskan ke provider sampai pembayaran disetujui.', "The booking won't be sent to the provider until the payment is approved.")}</div>
                       </div>
-                      {booking.paymentProofSubmittedAt && <CountdownTimer createdAt={booking.paymentProofSubmittedAt} windowSeconds={adminReviewWindowSeconds} label="Batas Konfirmasi Admin" />}
+                      {booking.paymentProofSubmittedAt && <CountdownTimer createdAt={booking.paymentProofSubmittedAt} windowSeconds={adminReviewWindowSeconds} label={t('Batas Konfirmasi Admin', 'Admin review deadline')} />}
                     </div>
                   )}
 
@@ -801,13 +805,16 @@ export const CustomerHistoryPage: React.FC = () => {
                       <div style={{ backgroundColor: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                           <strong style={{ fontSize: '13.5px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <XCircle size={16} color="#dc2626" /> Batas Waktu Pembayaran Habis (Kadaluwarsa)
+                            <XCircle size={16} color="#dc2626" /> {t('Batas Waktu Pembayaran Habis (Kadaluwarsa)', 'Payment Deadline Passed (Expired)')}
                           </strong>
-                          <span style={{ fontSize: '12px', fontWeight: '800', color: '#dc2626', backgroundColor: '#fee2e2', padding: '4px 12px', borderRadius: '20px' }}>KADALUWARSA</span>
+                          <span style={{ fontSize: '12px', fontWeight: '800', color: '#dc2626', backgroundColor: '#fee2e2', padding: '4px 12px', borderRadius: '20px' }}>{t('KADALUWARSA', 'EXPIRED')}</span>
                         </div>
-                        
+
                         <p style={{ fontSize: '13px', color: '#7f1d1d', margin: 0, lineHeight: '1.5' }}>
-                          Batas waktu pembayaran {Math.round(paymentWindowSeconds / 3600)} jam untuk transaksi ini telah kadaluwarsa. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.
+                          {t(
+                            `Batas waktu pembayaran ${Math.round(paymentWindowSeconds / 3600)} jam untuk transaksi ini telah kadaluwarsa. Silakan lakukan pemesanan ulang jika Anda ingin mengikuti trip ini.`,
+                            `The ${Math.round(paymentWindowSeconds / 3600)}-hour payment window for this booking has expired. Please book again if you still want to join this trip.`
+                          )}
                         </p>
 
                         <div style={{ marginTop: '4px' }}>
@@ -834,7 +841,7 @@ export const CustomerHistoryPage: React.FC = () => {
                               boxShadow: '0 4px 10px rgba(220, 38, 38, 0.25)'
                             }}
                           >
-                            Pesan Ulang Trip Ini
+                            {t('Pesan Ulang Trip Ini', 'Book This Trip Again')}
                           </button>
                         </div>
                       </div>
@@ -842,32 +849,32 @@ export const CustomerHistoryPage: React.FC = () => {
                       /* ACTIVE PENDING PAYMENT BANNER */
                       <div style={{ backgroundColor: '#f0f9ff', border: '1.5px solid #0284c7', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>Menunggu Pembayaran</strong>
-                          <CountdownTimer createdAt={booking.createdAt} deadlineAt={(booking as any).paymentDeadline} windowSeconds={paymentWindowSeconds} label={isOnlinePayment(booking) ? 'Batas Pembayaran' : undefined} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
+                          <strong style={{ fontSize: '13.5px', color: '#0369a1' }}>{t('Menunggu Pembayaran', 'Awaiting Payment')}</strong>
+                          <CountdownTimer createdAt={booking.createdAt} deadlineAt={(booking as any).paymentDeadline} windowSeconds={paymentWindowSeconds} label={isOnlinePayment(booking) ? t('Batas Pembayaran', 'Payment deadline') : undefined} onExpire={() => { handleExpireBooking(booking.id); fetchHistory(); }} />
                         </div>
 
                         {booking.paymentReviewNotes && (
                           <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', lineHeight: 1.5 }}>
-                            <strong>Bukti transfer sebelumnya ditolak admin:</strong> {booking.paymentReviewNotes}. Silakan unggah ulang bukti yang benar.
+                            <strong>{t('Bukti transfer sebelumnya ditolak admin:', 'Your previous transfer proof was rejected by admin:')}</strong> {booking.paymentReviewNotes}. {t('Silakan unggah ulang bukti yang benar.', 'Please upload the correct proof again.')}
                           </div>
                         )}
-                        
+
                         <span style={{ fontSize: '13px', color: '#0f172a' }}>
                           {isOnlinePayment(booking) ? (
-                            <>Bayar online sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> lewat virtual account, QRIS, atau e-wallet sebelum countdown berakhir. Pesanan terkonfirmasi otomatis.</>
+                            <>{t('Bayar online sebesar', 'Pay')} <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> {t('lewat virtual account, QRIS, atau e-wallet sebelum countdown berakhir. Pesanan terkonfirmasi otomatis.', 'online via virtual account, QRIS, or e-wallet before the countdown ends. Your booking is confirmed automatically.')}</>
                           ) : (
-                            <>Silakan transfer sebesar <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> lalu unggah bukti pembayaran sebelum countdown berakhir.</>
+                            <>{t('Silakan transfer sebesar', 'Please transfer')} <strong style={{ color: '#0284c7', fontSize: '15px' }}>{formatIDR(booking.totalPrice)}</strong> {t('lalu unggah bukti pembayaran sebelum countdown berakhir.', 'and upload your payment proof before the countdown ends.')}</>
                           )}
                         </span>
                         
                         <div style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
                           <div style={{ fontSize: '13px', color: '#1e293b', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <div><span style={{ color: '#64748b' }}>Tipe Trip:</span> <strong>{booking.packageDetails?.tripType || 'Open Trip'}</strong></div>
+                            <div><span style={{ color: '#64748b' }}>{t('Tipe Trip:', 'Trip Type:')}</span> <strong>{booking.packageDetails?.tripType || 'Open Trip'}</strong></div>
                             {booking.packageDetails?.category && (
-                              <div><span style={{ color: '#64748b' }}>Kategori:</span> <strong>{booking.packageDetails.category}</strong></div>
+                              <div><span style={{ color: '#64748b' }}>{t('Kategori:', 'Category:')}</span> <strong>{term(booking.packageDetails.category)}</strong></div>
                             )}
-                            <div><span style={{ color: '#64748b' }}>Tujuan Trip:</span> <strong>{booking.packageDetails?.destination || tripName}</strong></div>
-                            <div><span style={{ color: '#64748b' }}>Nama Pemesan:</span> <strong>{booking.customerName || (customerProfile as any)?.name || 'Pelanggan'}</strong></div>
+                            <div><span style={{ color: '#64748b' }}>{t('Tujuan Trip:', 'Destination:')}</span> <strong>{booking.packageDetails?.destination || tripName}</strong></div>
+                            <div><span style={{ color: '#64748b' }}>{t('Nama Pemesan:', 'Booked By:')}</span> <strong>{booking.customerName || (customerProfile as any)?.name || t('Pelanggan', 'Traveler')}</strong></div>
                           </div>
 
                           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -885,7 +892,7 @@ export const CustomerHistoryPage: React.FC = () => {
                                 cursor: 'pointer'
                               }}
                             >
-                              Batalkan
+                              {t('Batalkan', 'Cancel')}
                             </button>
 
                             <button
@@ -906,7 +913,7 @@ export const CustomerHistoryPage: React.FC = () => {
                                 boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
                               }}
                             >
-                              Selesaikan Pembayaran
+                              {t('Selesaikan Pembayaran', 'Complete Payment')}
                             </button>
                           </div>
                         </div>
@@ -918,12 +925,12 @@ export const CustomerHistoryPage: React.FC = () => {
                     <div style={{ backgroundColor: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                         <strong style={{ fontSize: '13.5px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <XCircle size={16} color="#dc2626" /> Pesanan Dibatalkan oleh Pelanggan
+                          <XCircle size={16} color="#dc2626" /> {t('Pesanan Dibatalkan oleh Pelanggan', 'Booking Cancelled by Customer')}
                         </strong>
-                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#dc2626', backgroundColor: '#fee2e2', padding: '4px 12px', borderRadius: '20px' }}>DIBATALKAN</span>
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#dc2626', backgroundColor: '#fee2e2', padding: '4px 12px', borderRadius: '20px' }}>{t('DIBATALKAN', 'CANCELLED')}</span>
                       </div>
                       <p style={{ fontSize: '13px', color: '#7f1d1d', margin: 0, lineHeight: '1.5' }}>
-                        Pesanan ini telah Anda batalkan. Jika Anda ingin mengikuti trip ini kembali, Anda dapat melakukan pemesanan ulang.
+                        {t('Pesanan ini telah Anda batalkan. Jika Anda ingin mengikuti trip ini kembali, Anda dapat melakukan pemesanan ulang.', "You cancelled this booking. If you'd like to join this trip after all, you can book it again.")}
                       </p>
                     </div>
                   )}
@@ -932,7 +939,7 @@ export const CustomerHistoryPage: React.FC = () => {
 
                   <div style={{ borderTop: '1px dotted #e2e8f0', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontSize: '10px', color: '#94a3b8', display: 'block' }}>TOTAL HARGA</span>
+                      <span style={{ fontSize: '10px', color: '#94a3b8', display: 'block' }}>{t('TOTAL HARGA', 'TOTAL PRICE')}</span>
                       <span style={{ fontSize: '16px', fontWeight: '800', color: '#00a896' }}>{formatIDR(booking.totalPrice)}</span>
                     </div>
 
@@ -957,7 +964,7 @@ export const CustomerHistoryPage: React.FC = () => {
                                 fontSize: '13px'
                               }}
                             >
-                              <MessageSquare size={14} /> Hubungi Provider
+                              <MessageSquare size={14} /> {t('Hubungi Provider', 'Contact Provider')}
                             </a>
                           )}
                           
@@ -981,7 +988,7 @@ export const CustomerHistoryPage: React.FC = () => {
                                     cursor: 'not-allowed'
                                   }}
                                 >
-                                  ✓ Sudah Diulas
+                                  ✓ {t('Sudah Diulas', 'Reviewed')}
                                 </button>
                               );
                             }
@@ -993,8 +1000,8 @@ export const CustomerHistoryPage: React.FC = () => {
                                 onClick={() => {
                                   if (!isFinished) {
                                     setModalNotice({
-                                      title: 'Ulasan Belum Aktif',
-                                      message: 'Fitur ulasan dan penilaian bintang akan otomatis aktif setelah jadwal perjalanan (trip) Anda selesai dilaksanakan.'
+                                      title: t('Ulasan Belum Aktif', 'Reviews Not Open Yet'),
+                                      message: t('Fitur ulasan dan penilaian bintang akan otomatis aktif setelah jadwal perjalanan (trip) Anda selesai dilaksanakan.', 'Reviews and star ratings open automatically once your trip has finished.')
                                     });
                                     return;
                                   }
@@ -1016,9 +1023,9 @@ export const CustomerHistoryPage: React.FC = () => {
                                   cursor: isFinished ? 'pointer' : 'not-allowed',
                                   opacity: isFinished ? 1 : 0.75
                                 }}
-                                title={isFinished ? 'Klik untuk memberikan ulasan' : 'Ulasan dapat diberikan setelah waktu trip berakhir'}
+                                title={isFinished ? t('Klik untuk memberikan ulasan', 'Click to leave a review') : t('Ulasan dapat diberikan setelah waktu trip berakhir', 'You can leave a review after the trip ends')}
                               >
-                                ⭐ Beri Ulasan {isFinished ? '(Aktif)' : '(Terkunci)'}
+                                ⭐ {t('Beri Ulasan', 'Review')} {isFinished ? t('(Aktif)', '(Open)') : t('(Terkunci)', '(Locked)')}
                               </button>
                             );
                           })()}
@@ -1036,13 +1043,13 @@ export const CustomerHistoryPage: React.FC = () => {
         {selectedReviewBooking && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '20px' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', maxWidth: '480px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>Beri Ulasan & Rating</h3>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>{t('Beri Ulasan & Rating', 'Review & Rating')}</h3>
               <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
-                Bagikan pengalaman seru Anda mengikuti trip <strong>{selectedReviewBooking.packageDetails?.name || selectedReviewBooking.packageName}</strong>!
+                {t('Bagikan pengalaman seru Anda mengikuti trip', 'Share your experience on the trip')} <strong>{selectedReviewBooking.packageDetails?.name || selectedReviewBooking.packageName}</strong>!
               </p>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>Pilih Bintang Rating:</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>{t('Pilih Bintang Rating:', 'Choose a Star Rating:')}</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -1058,10 +1065,10 @@ export const CustomerHistoryPage: React.FC = () => {
               </div>
 
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>Tulis Ulasan Anda:</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>{t('Tulis Ulasan Anda:', 'Write Your Review:')}</label>
                 <textarea
                   rows={4}
-                  placeholder="Ceritakan keseruan trip, pelayanan tour guide, dan fasilitasnya..."
+                  placeholder={t('Ceritakan keseruan trip, pelayanan tour guide, dan fasilitasnya...', 'Tell us about the trip, the tour guide, and the facilities...')}
                   value={reviewText}
                   onChange={(e) => setReviewText(e.target.value)}
                   style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
@@ -1075,7 +1082,7 @@ export const CustomerHistoryPage: React.FC = () => {
                   disabled={sendingReview}
                   style={{ padding: '10px 18px', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
                 >
-                  Batal
+                  {t('Batal', 'Cancel')}
                 </button>
                 <button
                   type="button"
@@ -1084,7 +1091,7 @@ export const CustomerHistoryPage: React.FC = () => {
                   aria-busy={sendingReview}
                   style={{ padding: '10px 20px', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: sendingReview ? 'not-allowed' : 'pointer', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
-                  {sendingReview ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Mengirim...</> : 'Kirim Ulasan'}
+                  {sendingReview ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Mengirim...', 'Sending...')}</> : t('Kirim Ulasan', 'Submit Review')}
                 </button>
               </div>
             </div>
@@ -1147,7 +1154,7 @@ export const CustomerHistoryPage: React.FC = () => {
                   boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
                 }}
               >
-                OK, Mengerti
+                {t('OK, Mengerti', 'OK, Got It')}
               </button>
             </div>
           </div>
@@ -1187,11 +1194,11 @@ export const CustomerHistoryPage: React.FC = () => {
               </div>
 
               <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0' }}>
-                Konfirmasi Pembatalan Pesanan
+                {t('Konfirmasi Pembatalan Pesanan', 'Confirm Cancellation')}
               </h3>
 
               <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.6', margin: '0 0 24px 0' }}>
-                Apakah Anda yakin ingin membatalkan pesanan <strong style={{ color: '#0f172a' }}>{cancelConfirmBooking.bookingCode}</strong>? Status pesanan akan diubah menjadi <strong>Dibatalkan</strong>.
+                {t('Apakah Anda yakin ingin membatalkan pesanan', 'Are you sure you want to cancel booking')} <strong style={{ color: '#0f172a' }}>{cancelConfirmBooking.bookingCode}</strong>? {t('Status pesanan akan diubah menjadi', 'Its status will change to')} <strong>{t('Dibatalkan', 'Cancelled')}</strong>.
               </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -1209,7 +1216,7 @@ export const CustomerHistoryPage: React.FC = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  Tidak (Kembali)
+                  {t('Tidak (Kembali)', 'No, Go Back')}
                 </button>
 
                 <button
@@ -1232,7 +1239,7 @@ export const CustomerHistoryPage: React.FC = () => {
                     gap: '6px'
                   }}
                 >
-                  {cancellingLoading ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Membatalkan...</> : 'Ya, Batalkan'}
+                  {cancellingLoading ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Membatalkan...', 'Cancelling...')}</> : t('Ya, Batalkan', 'Yes, Cancel')}
                 </button>
               </div>
             </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface PhotoPlaceholderProps {
   style?: React.CSSProperties;
@@ -9,11 +10,13 @@ interface PhotoPlaceholderProps {
 }
 
 // Placeholder netral saat mitra belum mengunggah foto (tanpa foto stok)
-export const PhotoPlaceholder: React.FC<PhotoPlaceholderProps> = ({ style, className, iconSize = 32, showText = true }) => (
+export const PhotoPlaceholder: React.FC<PhotoPlaceholderProps> = ({ style, className, iconSize = 32, showText = true }) => {
+  const { t } = useI18n();
+  return (
   <div
     className={className}
     role="img"
-    aria-label="Foto belum tersedia"
+    aria-label={t('Foto belum tersedia', 'No photo yet')}
     style={{
       width: '100%',
       height: '100%',
@@ -30,10 +33,11 @@ export const PhotoPlaceholder: React.FC<PhotoPlaceholderProps> = ({ style, class
   >
     <ImageIcon size={iconSize} color="#7dd3fc" strokeWidth={1.5} />
     {showText && (
-      <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Foto belum tersedia</span>
+      <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>{t('Foto belum tersedia', 'No photo yet')}</span>
     )}
   </div>
-);
+  );
+};
 
 type TripImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
   placeholderIconSize?: number;

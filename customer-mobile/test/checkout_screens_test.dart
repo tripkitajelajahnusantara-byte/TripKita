@@ -95,11 +95,11 @@ void main() {
     await tester.pumpAndSettle();
     final urgent = find.textContaining('2 kuota tersisa', findRichText: true);
     expect(urgent, findsOneWidget);
-    final next = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Lanjutkan'));
+    final next = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Pilih Jadwal'));
     expect(next.onPressed, isNull, reason: 'belum ada jadwal dipilih');
     await tester.tap(urgent);
     await tester.pump();
-    expect(tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Lanjutkan')).onPressed, isNotNull);
+    expect(tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Pilih Jadwal')).onPressed, isNotNull);
   });
 
   testWidgets('Selesaikan Pesanan: data kosong ditandai, form peserta meminta titik jemput', (tester) async {

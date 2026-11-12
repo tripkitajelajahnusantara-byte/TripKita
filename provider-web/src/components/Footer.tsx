@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { LegalModalContainer, GeneralTermsContent, PrivacyPolicyContent } from './LegalModals';
 import { useNavigation } from '../context/NavigationContext';
+import { useI18n } from '../i18n';
 import { Mail, Phone, MapPin, Clock, ShieldCheck, ChevronRight } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const { navigateTo, route } = useNavigation();
+  const { t } = useI18n();
 
   return (
     <footer className="site-footer">
@@ -19,17 +21,17 @@ export const Footer: React.FC = () => {
               {route === 'partner-landing' && <span className="logo-badge">Partner</span>}
             </div>
             <p className="brand-description">
-              TemenTrip (PT TripKita Jelajah Nusantara) adalah platform untuk memesan paket wisata dari mitra lokal di Indonesia: Open Trip, Private Trip, serta trip keluarga dan rombongan.
+              {t('TemenTrip (PT TripKita Jelajah Nusantara) adalah platform untuk memesan paket wisata dari mitra lokal di Indonesia: Open Trip, Private Trip, serta trip keluarga dan rombongan.', 'TemenTrip (PT TripKita Jelajah Nusantara) is a platform for booking tour packages from local partners across Indonesia: Open Trip, Private Trip, and family or group trips.')}
             </p>
             <div className="security-badge">
               <ShieldCheck size={16} color="#00c9a7" />
-              <span>Pembayaran aman &amp; terverifikasi TemenTrip</span>
+              <span>{t('Pembayaran aman & otomatis lewat Midtrans', 'Secure, automatic payment via Midtrans')}</span>
             </div>
           </div>
 
           {/* Column 2: Kontak resmi */}
           <div className="footer-col contact-col">
-            <h4 className="footer-col-title">Kontak</h4>
+            <h4 className="footer-col-title">{t('Kontak', 'Contact')}</h4>
             <ul className="contact-info-list">
               <li>
                 <Mail size={16} className="contact-icon email-icon" />
@@ -52,14 +54,14 @@ export const Footer: React.FC = () => {
               <li>
                 <Clock size={16} className="contact-icon time-icon" />
                 <div>
-                  <span className="contact-label">Layanan pelanggan:</span>
-                  <span className="contact-text">Hubungi kami melalui WhatsApp atau email.</span>
+                  <span className="contact-label">{t('Layanan pelanggan:', 'Customer service:')}</span>
+                  <span className="contact-text">{t('Hubungi kami melalui WhatsApp atau email.', 'Reach us via WhatsApp or email.')}</span>
                 </div>
               </li>
               <li>
                 <MapPin size={16} className="contact-icon map-icon" />
                 <div>
-                  <span className="contact-label">Alamat:</span>
+                  <span className="contact-label">{t('Alamat:', 'Address:')}</span>
                   <span className="contact-text">
                     Jl. Puskesmas No.35-22, RT.11/RW.7, Duri Kosambi, Kec. Cengkareng, Kota Jakarta Barat, DKI Jakarta 11750
                   </span>
@@ -70,31 +72,31 @@ export const Footer: React.FC = () => {
 
           {/* Column 3: Quick Links */}
           <div className="footer-col nav-col">
-            <h4 className="footer-col-title">Navigasi Utama</h4>
+            <h4 className="footer-col-title">{t('Navigasi Utama', 'Menu')}</h4>
             <ul className="footer-links-list">
               <li>
                 <button type="button" onClick={() => navigateTo('beranda')} className="footer-nav-btn">
-                  <ChevronRight size={14} /> Beranda
+                  <ChevronRight size={14} /> {t('Beranda', 'Home')}
                 </button>
               </li>
               <li>
                 <button type="button" onClick={() => navigateTo('cari-trip')} className="footer-nav-btn">
-                  <ChevronRight size={14} /> Cari Trip Wisata
+                  <ChevronRight size={14} /> {t('Cari Trip Wisata', 'Find Trips')}
                 </button>
               </li>
               <li>
                 <button type="button" onClick={() => navigateTo('riwayat-booking')} className="footer-nav-btn">
-                  <ChevronRight size={14} /> Cek Booking & Voucher
+                  <ChevronRight size={14} /> {t('Cek Booking & Voucher', 'My Bookings')}
                 </button>
               </li>
               <li>
                 <button type="button" onClick={() => navigateTo('rencana-trip')} className="footer-nav-btn">
-                  <ChevronRight size={14} /> Perencana Trip (Tabungan)
+                  <ChevronRight size={14} /> {t('Perencana Trip (Tabungan)', 'Trip Planner')}
                 </button>
               </li>
               <li>
                 <button type="button" onClick={() => navigateTo('partner-landing')} className="footer-nav-btn highlight-partner">
-                  <ChevronRight size={14} /> Jadi Mitra Provider
+                  <ChevronRight size={14} /> {t('Jadi Mitra Provider', 'Become a Partner')}
                 </button>
               </li>
             </ul>
@@ -102,26 +104,31 @@ export const Footer: React.FC = () => {
 
           {/* Column 4: Customer Help & Info */}
           <div className="footer-col info-col">
-            <h4 className="footer-col-title">Pusat Informasi</h4>
+            <h4 className="footer-col-title">{t('Pusat Informasi', 'Information')}</h4>
             <ul className="footer-links-list">
               <li>
                 <button type="button" onClick={() => navigateTo('tentang-kami')} className="footer-nav-btn">
-                  <ChevronRight size={14} /> Tentang Kami
+                  <ChevronRight size={14} /> {t('Tentang Kami', 'About Us')}
+                </button>
+              </li>
+              <li>
+                <button type="button" onClick={() => navigateTo('berita')} className="footer-nav-btn">
+                  <ChevronRight size={14} /> {t('Berita TemenTrip', 'News')}
                 </button>
               </li>
               <li>
                 <button type="button" onClick={() => navigateTo('bantuan')} className="footer-nav-btn">
-                  <ChevronRight size={14} /> Pusat Bantuan & FAQ
+                  <ChevronRight size={14} /> {t('Pusat Bantuan & FAQ', 'Help & FAQ')}
                 </button>
               </li>
               <li>
                 <button type="button" onClick={() => setShowPrivacy(true)} className="footer-nav-btn">
-                  <ChevronRight size={14} /> Kebijakan Privasi
+                  <ChevronRight size={14} /> {t('Kebijakan Privasi', 'Privacy Policy')}
                 </button>
               </li>
               <li>
                 <button type="button" onClick={() => setShowTerms(true)} className="footer-nav-btn">
-                  <ChevronRight size={14} /> Syarat & Ketentuan
+                  <ChevronRight size={14} /> {t('Syarat & Ketentuan', 'Terms & Conditions')}
                 </button>
               </li>
             </ul>
@@ -133,15 +140,15 @@ export const Footer: React.FC = () => {
       <div className="footer-bottom">
         <div className="container footer-bottom-container">
           <span className="copyright-text">
-            © {new Date().getFullYear()} TemenTrip (PT TripKita Jelajah Nusantara). Hak cipta dilindungi undang-undang.
+            © {new Date().getFullYear()} TemenTrip (PT TripKita Jelajah Nusantara). {t('Hak cipta dilindungi undang-undang.', 'All rights reserved.')}
           </span>
           <div className="footer-legal-links">
             <button type="button" onClick={() => setShowPrivacy(true)} className="footer-legal-btn">
-              Kebijakan Privasi
+              {t('Kebijakan Privasi', 'Privacy Policy')}
             </button>
             <span className="legal-dot">•</span>
             <button type="button" onClick={() => setShowTerms(true)} className="footer-legal-btn">
-              Syarat & Ketentuan
+              {t('Syarat & Ketentuan', 'Terms & Conditions')}
             </button>
           </div>
         </div>
@@ -151,7 +158,7 @@ export const Footer: React.FC = () => {
       <LegalModalContainer
         isOpen={showTerms}
         onClose={() => setShowTerms(false)}
-        title="Syarat & Ketentuan TemenTrip"
+        title={t('Syarat & Ketentuan TemenTrip', 'TemenTrip Terms & Conditions')}
       >
         <GeneralTermsContent />
       </LegalModalContainer>
@@ -159,7 +166,7 @@ export const Footer: React.FC = () => {
       <LegalModalContainer
         isOpen={showPrivacy}
         onClose={() => setShowPrivacy(false)}
-        title="Kebijakan Privasi TemenTrip"
+        title={t('Kebijakan Privasi TemenTrip', 'TemenTrip Privacy Policy')}
       >
         <PrivacyPolicyContent />
       </LegalModalContainer>

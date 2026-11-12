@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './api';
+import { getLang } from '../i18n';
 
 // Centralized categories & trip types synced across Web Customer, Web Provider, and Admin
 export const OFFICIAL_CATEGORIES = [
@@ -39,10 +40,11 @@ export function getHighlightsForPackage(pkg: HighlightSource, limit: number = 3)
     .map((line) => `✓ ${line}`);
 
   const facts: string[] = [];
+  const en = getLang() === 'en';
   const duration = Number(pkg.duration) || 0;
-  if (duration > 0) facts.push(`🗓️ ${duration} Hari`);
+  if (duration > 0) facts.push(en ? `🗓️ ${duration} ${duration === 1 ? 'Day' : 'Days'}` : `🗓️ ${duration} Hari`);
   const minGuests = Number(pkg.minGuests) || 0;
-  if (minGuests > 1) facts.push(`👥 Min. ${minGuests} Orang`);
+  if (minGuests > 1) facts.push(en ? `👥 Min. ${minGuests} People` : `👥 Min. ${minGuests} Orang`);
   const meetingPoint = (pkg.meetingPoint || '').trim();
   if (meetingPoint.length > 3) facts.push(`📍 ${meetingPoint}`);
 
@@ -53,7 +55,7 @@ export function getHighlightsForPackage(pkg: HighlightSource, limit: number = 3)
   return highlights;
 }
 
-const BACKEND_ORIGIN = API_BASE_URL.replace(/\/api\/v1$/, '');
+export const BACKEND_ORIGIN = API_BASE_URL.replace(/\/api\/v1$/, '');
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2']);
 
 // Mengubah nilai foto dari database menjadi URL yang dapat dimuat browser.
@@ -78,6 +80,8 @@ export function resolveMediaUrl(raw: unknown): string {
     return trimmed;
   }
   if (trimmed.startsWith('//')) return '';
+  // Foto bawaan seed berita disajikan web app sendiri (public/news-covers), bukan backend.
+  if (/^\/news-covers\/[a-z0-9-]+\.webp$/.test(trimmed)) return trimmed;
   if (trimmed.startsWith('/') || trimmed.startsWith('uploads/') || trimmed.startsWith('storage/') || /\.(jpe?g|png|webp|gif)$/i.test(trimmed)) {
     return trimmed.startsWith('/') ? `${BACKEND_ORIGIN}${trimmed}` : `${BACKEND_ORIGIN}/${trimmed}`;
   }

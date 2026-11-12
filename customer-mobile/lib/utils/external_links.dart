@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:customer_mobile/config/app_config.dart';
+
 /// Tautan `wa.me` untuk nomor mitra, atau null bila nomornya tidak valid.
 Uri? whatsAppUri(String? phone) {
   if (phone == null || phone.isEmpty) return null;
@@ -30,4 +32,12 @@ Future<bool> openInAppBrowser(Uri uri) async {
     if (await launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.inAppBrowserView)) return true;
   } catch (_) {}
   return openExternal(uri);
+}
+
+/// Build staging hanya boleh membuka Midtrans Sandbox, supaya uji coba tidak
+/// pernah menarik uang sungguhan bila server memakai key production.
+bool isAllowedPaymentUrl(String url, {bool staging = AppConfig.isStagingBuild}) {
+  final host = Uri.tryParse(url)?.host.toLowerCase() ?? '';
+  if (!host.endsWith('.midtrans.com')) return false;
+  return !staging || host.endsWith('.sandbox.midtrans.com');
 }

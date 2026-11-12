@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCancellationRefundDays } from '../utils/checkoutConfig';
+import { useI18n } from '../i18n';
 import { 
   HelpCircle, 
   CreditCard, 
@@ -20,6 +21,7 @@ interface FAQItem {
 }
 
 export const CustomerHelpPage: React.FC = () => {
+  const { t } = useI18n();
   const refundDays = useCancellationRefundDays();
   const [activeCategory, setActiveCategory] = useState<string>('semua');
   const [openFaqId, setOpenFaqId] = useState<string | null>('faq-1');
@@ -29,52 +31,79 @@ export const CustomerHelpPage: React.FC = () => {
     {
       id: 'faq-1',
       category: 'pemesanan',
-      question: 'Bagaimana cara memesan paket wisata di TemenTrip?',
-      answer: 'Pilih paket dari Beranda, tentukan tanggal keberangkatan dan jumlah peserta, lalu klik "Pesan Sekarang". Setelah Booking ID dibuat, kuota ditahan 24 jam dan Anda diarahkan ke halaman transfer serta upload bukti pembayaran.'
+      question: t('Bagaimana cara memesan paket wisata di TemenTrip?', 'How do I book a trip on TemenTrip?'),
+      answer: t(
+        'Pilih paket dari Beranda, tentukan tanggal keberangkatan dan jumlah peserta, lalu klik "Pesan Sekarang". Setelah Booking ID dibuat, kuota ditahan 24 jam dan Anda diarahkan ke halaman pembayaran online melalui Midtrans.',
+        'Choose a trip from the Home page, pick the departure date and number of participants, then click "Book Now". Once your Booking ID is created, your spots are held for 24 hours and you are taken to the online payment page powered by Midtrans.'
+      )
     },
     {
       id: 'faq-2',
       category: 'pembayaran',
-      question: 'Bagaimana skema pembayaran di TemenTrip?',
-      answer: 'Pembayaran dilakukan penuh di muka melalui transfer ke rekening TemenTrip, tanpa uang muka (DP) dari customer. Batas pembayaran mengikuti countdown 24 jam. Setelah bukti disetujui admin, buku besar TemenTrip mencatat separuh hak mitra tersedia untuk diajukan dan separuh sisanya setelah perjalanan selesai.'
+      question: t('Bagaimana skema pembayaran di TemenTrip?', 'How does payment work on TemenTrip?'),
+      answer: t(
+        'Pembayaran dilakukan penuh di muka secara online melalui Midtrans, tanpa uang muka (DP) dari customer. Batas pembayaran mengikuti countdown 24 jam. Setelah pembayaran terkonfirmasi, buku besar TemenTrip mencatat separuh hak mitra tersedia untuk diajukan dan separuh sisanya setelah perjalanan selesai.',
+        "You pay the full amount upfront online through Midtrans, with no down payment. The payment deadline follows the 24-hour countdown. Once your payment is confirmed, the TemenTrip ledger releases half of the partner's share for withdrawal and the other half after the trip is completed."
+      )
     },
     {
       id: 'faq-3',
       category: 'pembayaran',
-      question: 'Metode pembayaran apa saja yang didukung?',
-      answer: 'Untuk sementara pembayaran dilakukan melalui transfer bank manual ke rekening TemenTrip yang tercantum pada halaman pembayaran, lalu customer mengunggah bukti transfer.'
+      question: t('Metode pembayaran apa saja yang didukung?', 'Which payment methods are supported?'),
+      answer: t(
+        'Pembayaran dilakukan online melalui Midtrans: virtual account bank, QRIS, e-wallet, atau metode lain yang tampil di halaman pembayaran. Pembayaran terkonfirmasi otomatis, tanpa perlu mengunggah bukti transfer.',
+        'Payments are made online through Midtrans: bank virtual account, QRIS, e-wallet, or any other method shown on the payment page. Your payment is confirmed automatically, so there is no need to upload a receipt.'
+      )
     },
     {
       id: 'faq-4',
       category: 'pemesanan',
-      question: 'Bagaimana cara menghubungi provider setelah pembayaran?',
-      answer: 'Masuk ke akun Anda lalu buka riwayat booking. Setelah pembayaran terkonfirmasi, tombol "Hubungi Provider" akan tersedia bila provider memiliki nomor WhatsApp aktif.'
+      question: t('Bagaimana cara menghubungi provider setelah pembayaran?', 'How do I contact the provider after paying?'),
+      answer: t(
+        'Masuk ke akun Anda lalu buka riwayat booking. Setelah pembayaran terkonfirmasi, tombol "Hubungi Provider" akan tersedia bila provider memiliki nomor WhatsApp aktif.',
+        'Sign in to your account and open your booking history. Once your payment is confirmed, a "Contact Provider" button appears if the provider has an active WhatsApp number.'
+      )
     },
     {
       id: 'faq-5',
       category: 'pemesanan',
-      question: 'Bagaimana jika saya tidak sengaja lupa atau kehilangan Kode Booking?',
-      answer: 'Masuk ke akun Anda untuk melihat semua e-voucher dan riwayat transaksi. Anda juga bisa menghubungi kami melalui email tripkitajelajahnusantara@gmail.com.'
+      question: t('Bagaimana jika saya tidak sengaja lupa atau kehilangan Kode Booking?', 'What if I forget or lose my Booking Code?'),
+      answer: t(
+        'Masuk ke akun Anda untuk melihat semua e-voucher dan riwayat transaksi. Anda juga bisa menghubungi kami melalui email tripkitajelajahnusantara@gmail.com.',
+        'Sign in to your account to see all your e-vouchers and transaction history. You can also email us at tripkitajelajahnusantara@gmail.com.'
+      )
     },
     {
       id: 'faq-6',
       category: 'refund',
-      question: 'Bagaimana jika trip dibatalkan atau dijadwal ulang oleh mitra?',
-      answer: 'Tiga hari sebelum keberangkatan (H-3), mitra memeriksa kuota untuk Open Trip atau kondisi cuaca untuk jenis trip lainnya. Jika mitra membatalkan trip, pembayaran Anda dikembalikan penuh. Jika mitra menawarkan jadwal baru, jadwal itu hanya berlaku setelah Anda setujui; jika Anda menolak atau tidak menanggapi, pembayaran Anda dikembalikan penuh.'
+      question: t('Bagaimana jika trip dibatalkan atau dijadwal ulang oleh mitra?', 'What if the partner cancels or reschedules the trip?'),
+      answer: t(
+        'Tiga hari sebelum keberangkatan (H-3), mitra memeriksa kuota untuk Open Trip atau kondisi cuaca untuk jenis trip lainnya. Jika mitra membatalkan trip, pembayaran Anda dikembalikan penuh. Jika mitra menawarkan jadwal baru, jadwal itu hanya berlaku setelah Anda setujui; jika Anda menolak atau tidak menanggapi, pembayaran Anda dikembalikan penuh.',
+        'Three days before departure (D-3), the partner checks the quota for Open Trips or the weather for other trip types. If the partner cancels the trip, you get a full refund. If the partner offers a new date, it only applies once you accept it; if you decline or do not respond, you get a full refund.'
+      )
     },
     {
       id: 'faq-7',
       category: 'pembayaran',
-      question: 'Bagaimana pembayaran saya diproses?',
-      answer: 'Setelah transfer, unggah bukti pembayaran sebelum countdown berakhir. Status berubah menjadi Menunggu Konfirmasi Admin dan wajib diperiksa maksimal 1×24 jam. Status dapat dipantau melalui Cek Booking.'
+      question: t('Bagaimana pembayaran saya diproses?', 'How is my payment processed?'),
+      answer: t(
+        'Selesaikan pembayaran di halaman Midtrans sebelum countdown 24 jam berakhir. Pembayaran terkonfirmasi otomatis dan booking langsung diteruskan ke mitra, tanpa perlu unggah bukti. Jika pembayaran gagal atau kedaluwarsa, Anda bisa mencoba lagi dari halaman pembayaran selama batas waktu belum lewat. Status dapat dipantau melalui Cek Booking.',
+        'Complete your payment on the Midtrans page before the 24-hour countdown ends. Payment is confirmed automatically and your booking goes straight to the partner, with no receipt upload needed. If a payment fails or expires, you can try again from the payment page as long as the deadline has not passed. You can track the status in Check Booking.'
+      )
     },
     {
       id: 'faq-8',
       category: 'refund',
-      question: 'Bagaimana jika saya ingin membatalkan pesanan?',
+      question: t('Bagaimana jika saya ingin membatalkan pesanan?', 'What if I want to cancel my booking?'),
       answer: refundDays
-        ? `Jika Anda membatalkan paling lambat ${refundDays} hari sebelum tanggal trip, pembayaran dikembalikan penuh. Pembatalan kurang dari ${refundDays} hari sebelum trip tidak mendapat refund.`
-        : 'Pembatalan sebelum batas waktu kebijakan refund mendapat pengembalian penuh; setelah batas itu tidak mendapat refund. Detail batasnya tertera di halaman konfirmasi pesanan.'
+        ? t(
+            `Jika Anda membatalkan paling lambat ${refundDays} hari sebelum tanggal trip, pembayaran dikembalikan penuh. Pembatalan kurang dari ${refundDays} hari sebelum trip tidak mendapat refund.`,
+            `If you cancel at least ${refundDays} days before the trip date, you get a full refund. Cancellations less than ${refundDays} days before the trip are not refunded.`
+          )
+        : t(
+            'Pembatalan sebelum batas waktu kebijakan refund mendapat pengembalian penuh; setelah batas itu tidak mendapat refund. Detail batasnya tertera di halaman konfirmasi pesanan.',
+            'Cancellations made before the refund policy deadline get a full refund; after that deadline there is no refund. The exact deadline is shown on your booking confirmation page.'
+          )
     }
   ];
 
@@ -94,15 +123,15 @@ export const CustomerHelpPage: React.FC = () => {
       {/* Help Hero Header */}
       <section className="help-hero">
         <div className="container help-hero-container">
-          <h1>Pusat bantuan</h1>
-          <p>Jawaban untuk pertanyaan seputar pemesanan, pembayaran, pembatalan, dan cara menghubungi mitra.</p>
+          <h1>{t('Pusat bantuan', 'Help center')}</h1>
+          <p>{t('Jawaban untuk pertanyaan seputar pemesanan, pembayaran, pembatalan, dan cara menghubungi mitra.', 'Answers to questions about booking, payment, cancellation, and contacting partners.')}</p>
 
           {/* Search Box */}
           <div className="help-search-box">
             <Search size={20} color="#0284c7" />
             <input 
               type="text" 
-              placeholder="Cari pertanyaan... (contoh: cara bayar, refund, provider)"
+              placeholder={t('Cari pertanyaan... (contoh: cara bayar, refund, provider)', 'Search questions... (e.g. how to pay, refund, provider)')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -116,23 +145,23 @@ export const CustomerHelpPage: React.FC = () => {
           <div className="categories-grid">
             <div role="button" tabIndex={0} aria-pressed={activeCategory === 'semua'} className={`category-card ${activeCategory === 'semua' ? 'active' : ''}`} onClick={() => setActiveCategory('semua')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveCategory('semua'); } }}>
               <div className="cat-icon bg-blue"><HelpCircle size={22} color="#0284c7" /></div>
-              <h3>Semua Bantuan</h3>
-              <p>Tampilkan semua pertanyaan</p>
+              <h3>{t('Semua Bantuan', 'All Topics')}</h3>
+              <p>{t('Tampilkan semua pertanyaan', 'Show all questions')}</p>
             </div>
             <div role="button" tabIndex={0} aria-pressed={activeCategory === 'pemesanan'} className={`category-card ${activeCategory === 'pemesanan' ? 'active' : ''}`} onClick={() => setActiveCategory('pemesanan')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveCategory('pemesanan'); } }}>
               <div className="cat-icon bg-teal"><Calendar size={22} color="#00c9a7" /></div>
-              <h3>Pemesanan</h3>
-              <p>Cara booking & cek voucher</p>
+              <h3>{t('Pemesanan', 'Booking')}</h3>
+              <p>{t('Cara booking & cek voucher', 'How to book & check vouchers')}</p>
             </div>
             <div role="button" tabIndex={0} aria-pressed={activeCategory === 'pembayaran'} className={`category-card ${activeCategory === 'pembayaran' ? 'active' : ''}`} onClick={() => setActiveCategory('pembayaran')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveCategory('pembayaran'); } }}>
               <div className="cat-icon bg-purple"><CreditCard size={22} color="#8b5cf6" /></div>
-              <h3>Pembayaran</h3>
-              <p>Transfer manual & upload bukti</p>
+              <h3>{t('Pembayaran', 'Payment')}</h3>
+              <p>{t('Bayar online via Midtrans', 'Pay online via Midtrans')}</p>
             </div>
             <div role="button" tabIndex={0} aria-pressed={activeCategory === 'refund'} className={`category-card ${activeCategory === 'refund' ? 'active' : ''}`} onClick={() => setActiveCategory('refund')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveCategory('refund'); } }}>
               <div className="cat-icon bg-green"><ShieldCheck size={22} color="#10b981" /></div>
-              <h3>Pembatalan & refund</h3>
-              <p>Aturan refund dan jadwal ulang</p>
+              <h3>{t('Pembatalan & refund', 'Cancellation & refund')}</h3>
+              <p>{t('Aturan refund dan jadwal ulang', 'Refund and reschedule rules')}</p>
             </div>
           </div>
         </div>
@@ -142,7 +171,7 @@ export const CustomerHelpPage: React.FC = () => {
       <section className="faq-section">
         <div className="container faq-container">
           <div className="section-header">
-            <h2 className="section-title">Pertanyaan yang sering diajukan</h2>
+            <h2 className="section-title">{t('Pertanyaan yang sering diajukan', 'Frequently asked questions')}</h2>
           </div>
 
           <div className="faq-list">
@@ -166,7 +195,7 @@ export const CustomerHelpPage: React.FC = () => {
             ) : (
               <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
                 <HelpCircle size={40} color="#94a3b8" style={{ marginBottom: '12px' }} />
-                <p style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>Pertanyaan tidak ditemukan. Silakan hubungi kami melalui kontak di bawah.</p>
+                <p style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>{t('Pertanyaan tidak ditemukan. Silakan hubungi kami melalui kontak di bawah.', 'No matching questions. Please contact us using the details below.')}</p>
               </div>
             )}
           </div>
@@ -178,8 +207,8 @@ export const CustomerHelpPage: React.FC = () => {
         <div className="container contact-container">
           <div className="contact-card-main">
             <div className="contact-info-left">
-              <h2>Masih butuh bantuan?</h2>
-              <p>Hubungi kami melalui WhatsApp atau email.</p>
+              <h2>{t('Masih butuh bantuan?', 'Still need help?')}</h2>
+              <p>{t('Hubungi kami melalui WhatsApp atau email.', 'Contact us via WhatsApp or email.')}</p>
 
               <div className="contact-methods-list">
                 <div className="contact-method-item">
@@ -207,7 +236,7 @@ export const CustomerHelpPage: React.FC = () => {
                     <MapPin size={20} color="#f59e0b" />
                   </div>
                   <div>
-                    <span className="method-label">Alamat:</span>
+                    <span className="method-label">{t('Alamat:', 'Address:')}</span>
                     <span className="method-value-text">Jl. Puskesmas No.35-22, RT.11/RW.7, Duri Kosambi, Kecamatan Cengkareng, Kota Jakarta Barat, Daerah Khusus Ibukota Jakarta</span>
                   </div>
                 </div>

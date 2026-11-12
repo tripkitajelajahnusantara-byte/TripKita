@@ -6,6 +6,7 @@ import { useActionLock } from '../utils/useActionLock';
 import { getTripImage } from '../utils/tripImages';
 import { TripImage } from '../components/TripImage';
 import { SkeletonCards } from '../components/Skeleton';
+import { useI18n } from '../i18n';
 import type { TripPlan, TripChecklistItem, TripSavingsLog, PackageItem } from '../types';
 import { 
   Target, Calendar, Users, Wallet, CheckCircle2, Circle, Compass, ListChecks, CalendarClock, Star, 
@@ -32,13 +33,24 @@ const getMaximumTargetDate = () => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
-const formatDateIndo = (dateStr: string) => {
+const formatDateIndo = (dateStr: string, locale = 'id-ID') => {
   if (!dateStr) return 'Pilih tanggal trip';
   const [year, month, day] = dateStr.split('-').map(Number);
   const d = year && month && day ? new Date(year, month - 1, day) : new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
-  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+};
+
+// Label checklist bawaan disimpan dalam bahasa Indonesia; hanya tampilannya yang diterjemahkan.
+const DEFAULT_CHECKLIST_EN: Record<string, string> = {
+  'Tentukan Destinasi & Target Budget Liburan': 'Set Destination & Trip Budget',
+  'Capai 25% Tabungan Perjalanan': 'Reach 25% of Trip Savings',
+  'Capai 50% Tabungan Perjalanan': 'Reach 50% of Trip Savings',
+  'Capai 75% Tabungan Perjalanan': 'Reach 75% of Trip Savings',
+  'Capai 100% Target Tabungan': 'Reach 100% of Savings Goal',
+  'Cari & Pesan Paket Open Trip di TemenTrip': 'Find & Book an Open Trip on TemenTrip',
+  'Siapkan Barang Bawaan & Pakaian Liburan': 'Pack Your Bags & Travel Clothes',
+  'Berangkat sesuai jadwal': 'Depart as scheduled',
 };
 
 const normalizeTripPlan = (raw: any): TripPlan => {
@@ -72,14 +84,14 @@ const formatRupiah = (val: number) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 };
 
-const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => {
+const getMotivationContent = (pct: number, isExpired: boolean, dest: string, t: (id: string, en: string) => string) => {
   const pctLabel = Math.min(100, Math.max(0, Math.floor(pct)));
 
   if (isExpired && pct < 100) {
     return {
       icon: CalendarClock,
-      title: 'Tanggal keberangkatan sudah lewat',
-      text: `Tabungan untuk ${dest} baru ${pctLabel}% dari target. Ubah tanggal keberangkatan jika rencana ini masih berjalan.`,
+      title: t('Tanggal keberangkatan sudah lewat', 'Departure date has passed'),
+      text: t(`Tabungan untuk ${dest} baru ${pctLabel}% dari target. Ubah tanggal keberangkatan jika rencana ini masih berjalan.`, `Savings for ${dest} are only at ${pctLabel}% of the goal. Change the departure date if this plan is still on.`),
       bg: '#fffbe6',
       border: '#ffe58f',
       titleColor: '#d48806',
@@ -90,8 +102,8 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
   if (pct >= 100) {
     return {
       icon: CheckCircle2,
-      title: 'Target tabungan tercapai',
-      text: `Tabungan untuk ${dest} sudah 100% dari target. Anda bisa mulai memilih paket trip.`,
+      title: t('Target tabungan tercapai', 'Savings goal reached'),
+      text: t(`Tabungan untuk ${dest} sudah 100% dari target. Anda bisa mulai memilih paket trip.`, `Savings for ${dest} are at 100% of the goal. You can start choosing a trip.`),
       bg: '#dcfce7',
       border: '#86efac',
       titleColor: '#15803d',
@@ -102,8 +114,8 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
   if (pct >= 75) {
     return {
       icon: Wallet,
-      title: `Tabungan mencapai ${pctLabel}% dari target`,
-      text: `Sisa kurang dari 25% lagi untuk trip ke ${dest}.`,
+      title: t(`Tabungan mencapai ${pctLabel}% dari target`, `Savings at ${pctLabel}% of goal`),
+      text: t(`Sisa kurang dari 25% lagi untuk trip ke ${dest}.`, `Less than 25% to go for your trip to ${dest}.`),
       bg: '#ecfdf5',
       border: '#a7f3d0',
       titleColor: '#047857',
@@ -114,8 +126,8 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
   if (pct >= 50) {
     return {
       icon: Wallet,
-      title: `Tabungan mencapai ${pctLabel}% dari target`,
-      text: `Lebih dari setengah dana untuk trip ke ${dest} sudah terkumpul.`,
+      title: t(`Tabungan mencapai ${pctLabel}% dari target`, `Savings at ${pctLabel}% of goal`),
+      text: t(`Lebih dari setengah dana untuk trip ke ${dest} sudah terkumpul.`, `You've saved more than half the funds for your trip to ${dest}.`),
       bg: '#e0e7ff',
       border: '#c7d2fe',
       titleColor: '#4338ca',
@@ -126,8 +138,8 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
   if (pct >= 25) {
     return {
       icon: Wallet,
-      title: `Tabungan mencapai ${pctLabel}% dari target`,
-      text: `Catat setoran berikutnya agar progres trip ke ${dest} tetap terpantau.`,
+      title: t(`Tabungan mencapai ${pctLabel}% dari target`, `Savings at ${pctLabel}% of goal`),
+      text: t(`Catat setoran berikutnya agar progres trip ke ${dest} tetap terpantau.`, `Log your next deposit to keep tracking your trip to ${dest}.`),
       bg: '#e0f2fe',
       border: '#bae6fd',
       titleColor: '#0284c7',
@@ -138,8 +150,8 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
   // 0% - 24% Progress
   return {
     icon: Wallet,
-    title: pctLabel > 0 ? `Tabungan mencapai ${pctLabel}% dari target` : 'Belum ada tabungan tercatat',
-    text: `Tambahkan setoran untuk mulai melacak progres trip ke ${dest}.`,
+    title: pctLabel > 0 ? t(`Tabungan mencapai ${pctLabel}% dari target`, `Savings at ${pctLabel}% of goal`) : t('Belum ada tabungan tercatat', 'No savings logged yet'),
+    text: t(`Tambahkan setoran untuk mulai melacak progres trip ke ${dest}.`, `Add a deposit to start tracking your trip to ${dest}.`),
     bg: '#e6f4f4',
     border: '#b2e0e0',
     titleColor: '#0f8b8d',
@@ -152,6 +164,10 @@ const getMotivationContent = (pct: number, isExpired: boolean, dest: string) => 
 
 export const CustomerTripPlannerPage: React.FC = () => {
   const { customerProfile, navigateTo, setSelectedPackageForDetail } = useNavigation();
+  const { t, lang, locale } = useI18n();
+  const checklistLabel = (label: string) => (lang === 'en' ? DEFAULT_CHECKLIST_EN[label] ?? label : label);
+  // Label tanggal tersimpan berbahasa Indonesia; versi Inggris diformat ulang dari tanggalnya.
+  const planDateLabel = (plan: TripPlan) => (lang === 'en' && plan.targetMonth ? formatDateIndo(plan.targetMonth, locale) : plan.targetMonthLabel);
 
   // Local storage is retained only as a one-time migration/cache. The backend
   // is the source of truth so web and mobile always show the same plans.
@@ -273,7 +289,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
       .catch((error) => {
         if (cancelled) return;
         console.error('Gagal memuat rencana trip', error);
-        setPlannerError(error instanceof Error ? error.message : 'Rencana trip belum dapat dimuat.');
+        setPlannerError(error instanceof Error ? error.message : t('Rencana trip belum dapat dimuat.', 'Could not load your trip plans.'));
         setPlans([]);
       })
       .finally(() => {
@@ -341,7 +357,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
       await persistPlan(plan);
       return true;
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Perubahan rencana trip gagal disimpan.');
+      alert(error instanceof Error ? error.message : t('Perubahan rencana trip gagal disimpan.', 'Could not save changes to your trip plan.'));
       return false;
     }
   };
@@ -379,7 +395,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
   // Start creating a new plan from Home List
   const handleStartNewPlan = () => {
     if (plans.length >= 10) {
-      alert('Batas maksimal 10 rencana trip telah tercapai. Silakan hapus rencana lama terlebih dahulu jika ingin membuat rencana baru.');
+      alert(t('Batas maksimal 10 rencana trip telah tercapai. Silakan hapus rencana lama terlebih dahulu jika ingin membuat rencana baru.', 'You can have up to 10 trip plans. Delete an old plan before creating a new one.'));
       return;
     }
     setDestination('');
@@ -406,20 +422,20 @@ export const CustomerTripPlannerPage: React.FC = () => {
   const handleProceedToDetail = (e: React.FormEvent) => {
     e.preventDefault();
     if (!destination.trim()) {
-      alert('Silakan isi destinasi impian Anda.');
+      alert(t('Silakan isi destinasi impian Anda.', 'Please enter your dream destination.'));
       return;
     }
     if (targetDate < getTodayIsoDate() || targetDate > getMaximumTargetDate()) {
-      alert('Tanggal keberangkatan harus antara hari ini dan maksimal 5 tahun ke depan.');
+      alert(t('Tanggal keberangkatan harus antara hari ini dan maksimal 5 tahun ke depan.', 'Departure date must be between today and 5 years from now.'));
       return;
     }
     if (!Number.isInteger(participants) || participants < 1 || participants > 100) {
-      alert('Jumlah peserta harus antara 1 dan 100 orang.');
+      alert(t('Jumlah peserta harus antara 1 dan 100 orang.', 'Number of travelers must be between 1 and 100.'));
       return;
     }
     const numBudget = parseInt(targetBudget.replace(/\D/g, ''), 10);
     if (isNaN(numBudget) || numBudget <= 0) {
-      alert('Silakan masukkan target budget yang valid.');
+      alert(t('Silakan masukkan target budget yang valid.', 'Please enter a valid budget goal.'));
       return;
     }
 
@@ -480,10 +496,10 @@ export const CustomerTripPlannerPage: React.FC = () => {
     await run('save-plan', async () => {
       try {
         const saved = await persistPlan(finalPlan);
-        alert(`Rencana trip ke "${saved.destination}" berhasil disimpan. Email dan notifikasi konfirmasi telah diproses.`);
+        alert(t(`Rencana trip ke "${saved.destination}" berhasil disimpan. Email dan notifikasi konfirmasi telah diproses.`, `Your trip plan to "${saved.destination}" has been saved. A confirmation email and notification are on their way.`));
         setViewState('LIST');
       } catch (error) {
-        alert(error instanceof Error ? error.message : 'Rencana trip gagal disimpan.');
+        alert(error instanceof Error ? error.message : t('Rencana trip gagal disimpan.', 'Could not save your trip plan.'));
       }
     });
   };
@@ -499,7 +515,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
       return;
     }
 
-    if (!window.confirm(`Apakah Anda yakin ingin membatalkan rencana trip ke "${activePlan.destination}"? Tindakan ini akan menghapus semua data yang sudah diisi.`)) {
+    if (!window.confirm(t(`Apakah Anda yakin ingin membatalkan rencana trip ke "${activePlan.destination}"? Tindakan ini akan menghapus semua data yang sudah diisi.`, `Cancel your trip plan to "${activePlan.destination}"? This will delete everything you've entered.`))) {
       return;
     }
     const planToCancel = activePlan;
@@ -509,7 +525,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
           await request(`/customer/trip-plans/${planToCancel.id}`, { method: 'DELETE' });
         }
       } catch (error) {
-        alert(error instanceof Error ? error.message : 'Rencana trip gagal dihapus.');
+        alert(error instanceof Error ? error.message : t('Rencana trip gagal dihapus.', 'Could not delete your trip plan.'));
         return;
       }
       const filtered = plans.filter(p => p.id !== planToCancel.id);
@@ -533,7 +549,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
   const handleDeletePlanFromList = async (e: React.MouseEvent, planId: string, destName: string) => {
     e.stopPropagation();
     if (isBusy) return;
-    if (!window.confirm(`Apakah Anda yakin ingin menghapus rencana trip ke "${destName}"?`)) {
+    if (!window.confirm(t(`Apakah Anda yakin ingin menghapus rencana trip ke "${destName}"?`, `Delete your trip plan to "${destName}"?`))) {
       return;
     }
 
@@ -541,7 +557,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
       try {
         if (/^\d+$/.test(planId)) await request(`/customer/trip-plans/${planId}`, { method: 'DELETE' });
       } catch (error) {
-        alert(error instanceof Error ? error.message : 'Rencana trip gagal dihapus.');
+        alert(error instanceof Error ? error.message : t('Rencana trip gagal dihapus.', 'Could not delete your trip plan.'));
         return;
       }
       const filtered = plans.filter(p => p.id !== planId);
@@ -570,7 +586,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
         try {
           await persistPlan(draftPlan);
         } catch (error) {
-          alert(error instanceof Error ? error.message : 'Draft rencana trip gagal disimpan.');
+          alert(error instanceof Error ? error.message : t('Draft rencana trip gagal disimpan.', 'Could not save your trip plan draft.'));
           return;
         }
       }
@@ -594,7 +610,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
         });
         setViewState('LIST');
       } catch (error) {
-        alert(error instanceof Error ? error.message : 'Draft rencana trip gagal disimpan.');
+        alert(error instanceof Error ? error.message : t('Draft rencana trip gagal disimpan.', 'Could not save your trip plan draft.'));
       }
     });
   };
@@ -620,7 +636,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
     if (isBusy || !activePlan) return;
     const amount = parseInt(savingsInput.replace(/\D/g, ''), 10);
     if (isNaN(amount) || amount <= 0) {
-      alert('Masukkan nominal tabungan yang valid.');
+      alert(t('Masukkan nominal tabungan yang valid.', 'Please enter a valid savings amount.'));
       return;
     }
 
@@ -662,7 +678,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
   const handleDeleteSavingsLog = async (e: React.MouseEvent, logId: string) => {
     e.stopPropagation();
     if (isBusy || !activePlan) return;
-    if (!window.confirm('Apakah Anda yakin ingin menghapus catatan tabungan ini?')) return;
+    if (!window.confirm(t('Apakah Anda yakin ingin menghapus catatan tabungan ini?', 'Delete this savings entry?'))) return;
 
     const updatedLogs = activePlan.savingsLogs.filter(l => l.id !== logId);
     const newSavedTotal = updatedLogs.reduce((acc, curr) => acc + curr.amount, 0);
@@ -682,23 +698,23 @@ export const CustomerTripPlannerPage: React.FC = () => {
     if (!activePlan) return;
 
     if (id === '1') {
-      setAutoItemModalInfo('Item "Tentukan Destinasi & Target Budget Liburan" otomatis tercentang ketika rencana trip impian berhasil dibuat.');
+      setAutoItemModalInfo(t('Item "Tentukan Destinasi & Target Budget Liburan" otomatis tercentang ketika rencana trip impian berhasil dibuat.', '"Set Destination & Trip Budget" is checked automatically once your trip plan is created.'));
       return;
     }
     if (id === '2') {
-      setAutoItemModalInfo('Item "Capai 25% Tabungan Perjalanan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 25% dari target budget.');
+      setAutoItemModalInfo(t('Item "Capai 25% Tabungan Perjalanan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 25% dari target budget.', '"Reach 25% of Trip Savings" is checked automatically once your total savings reach 25% of your budget goal.'));
       return;
     }
     if (id === '3') {
-      setAutoItemModalInfo('Item "Capai 50% Tabungan Perjalanan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 50% dari target budget.');
+      setAutoItemModalInfo(t('Item "Capai 50% Tabungan Perjalanan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 50% dari target budget.', '"Reach 50% of Trip Savings" is checked automatically once your total savings reach 50% of your budget goal.'));
       return;
     }
     if (id === '4') {
-      setAutoItemModalInfo('Item "Capai 75% Tabungan Perjalanan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 75% dari target budget.');
+      setAutoItemModalInfo(t('Item "Capai 75% Tabungan Perjalanan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 75% dari target budget.', '"Reach 75% of Trip Savings" is checked automatically once your total savings reach 75% of your budget goal.'));
       return;
     }
     if (id === '5') {
-      setAutoItemModalInfo('Item "Capai 100% Target Tabungan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 100% dari target budget.');
+      setAutoItemModalInfo(t('Item "Capai 100% Target Tabungan" otomatis tercentang oleh sistem ketika total tabungan terkumpul sudah mencapai 100% dari target budget.', '"Reach 100% of Savings Goal" is checked automatically once your total savings reach 100% of your budget goal.'));
       return;
     }
 
@@ -751,7 +767,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
   const handleDeleteChecklistItem = async (e: React.MouseEvent, itemId: string) => {
     e.stopPropagation();
     if (isBusy || !activePlan) return;
-    if (!window.confirm('Apakah Anda yakin ingin menghapus item checklist ini?')) return;
+    if (!window.confirm(t('Apakah Anda yakin ingin menghapus item checklist ini?', 'Delete this checklist item?'))) return;
 
     const updatedChecklist = activePlan.checklist.filter(item => item.id !== itemId);
     const updatedPlan: TripPlan = { ...activePlan, checklist: updatedChecklist };
@@ -780,19 +796,19 @@ export const CustomerTripPlannerPage: React.FC = () => {
         {/* Header Title Section */}
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Target size={28} color="#0f8b8d" /> Rencana Trip &amp; Target Tabungan
+            <Target size={28} color="#0f8b8d" /> {t('Rencana Trip & Target Tabungan', 'Trip Plans & Savings Goals')}
           </h1>
           <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0 }}>
-            Susun liburan impianmu bersama pasangan atau teman, atur target tabungan bulanan, dan wujudkan trip impian tanpa beban.
+            {t('Susun liburan impianmu bersama pasangan atau teman, atur target tabungan bulanan, dan wujudkan trip impian tanpa beban.', 'Plan your dream trip with your partner or friends, set a monthly savings goal, and get there without the stress.')}
           </p>
         </div>
 
         {loadingPlans && (
-          <SkeletonCards count={3} minWidth={290} label="Memuat rencana trip" />
+          <SkeletonCards count={3} minWidth={290} label={t('Memuat rencana trip', 'Loading trip plans')} />
         )}
         {!loadingPlans && plannerError && (
           <div style={{ padding: '18px', marginBottom: '20px', borderRadius: '14px', background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
-            {plannerError} Muat ulang halaman untuk mencoba kembali.
+            {plannerError} {t('Muat ulang halaman untuk mencoba kembali.', 'Reload the page to try again.')}
           </div>
         )}
 
@@ -832,15 +848,15 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
                   }}
                 >
-                  <HeartHandshake size={14} /> Perencana tabungan trip
+                  <HeartHandshake size={14} /> {t('Perencana tabungan trip', 'Trip savings planner')}
                 </span>
                 
                 <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#ffffff', margin: '14px 0 8px 0', lineHeight: 1.3, textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-                  Rencanakan trip bersama pasangan, teman, atau keluarga
+                  {t('Rencanakan trip bersama pasangan, teman, atau keluarga', 'Plan a trip with your partner, friends, or family')}
                 </h2>
                 
                 <p style={{ fontSize: '14px', color: '#f0f9ff', margin: 0, lineHeight: 1.6, fontWeight: '500', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
-                  Tentukan destinasi, target budget, dan tanggal berangkat. Catat setiap setoran tabungan untuk melihat progresnya.
+                  {t('Tentukan destinasi, target budget, dan tanggal berangkat. Catat setiap setoran tabungan untuk melihat progresnya.', 'Set a destination, budget goal, and departure date. Log each savings deposit to see your progress.')}
                 </p>
               </div>
             </div>
@@ -849,13 +865,13 @@ export const CustomerTripPlannerPage: React.FC = () => {
             <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '28px', border: '1px solid #e2e8f0', boxShadow: '0 10px 30px rgba(0,0,0,0.04)', marginBottom: '28px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Compass size={20} color="#0f8b8d" /> Daftar Rencana Trip Saya ({plans.length}/10)
+                  <Compass size={20} color="#0f8b8d" /> {t('Daftar Rencana Trip Saya', 'My Trip Plans')} ({plans.length}/10)
                 </h2>
               </div>
 
               {plans.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
-                  Belum ada rencana trip yang dibuat.<br />
+                  {t('Belum ada rencana trip yang dibuat.', "You haven't created any trip plans yet.")}<br />
                   <button
                     onClick={handleStartNewPlan}
                     style={{
@@ -871,7 +887,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       boxShadow: '0 4px 14px rgba(15,139,141,0.25)'
                     }}
                   >
-                    + Buat Rencana Trip Baru
+                    + {t('Buat Rencana Trip Baru', 'Create New Trip Plan')}
                   </button>
                 </div>
               ) : (
@@ -898,10 +914,10 @@ export const CustomerTripPlannerPage: React.FC = () => {
                           <div style={{ padding: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                               <span style={{ fontSize: '11px', fontWeight: '800', padding: '4px 10px', borderRadius: '12px', backgroundColor: p.status === 'SAVED' ? '#dcfce7' : '#fef3c7', color: p.status === 'SAVED' ? '#166534' : '#92400e' }}>
-                                {p.status === 'SAVED' ? 'Tersimpan' : 'Draft'}
+                                {p.status === 'SAVED' ? t('Tersimpan', 'Saved') : 'Draft'}
                               </span>
                               <span style={{ fontSize: '13px', fontWeight: '800', color: '#0f8b8d', backgroundColor: '#e6f4f4', padding: '3px 10px', borderRadius: '12px' }}>
-                                {pct}% Terkumpul
+                                {pct}% {t('Terkumpul', 'Funded')}
                               </span>
                             </div>
 
@@ -910,24 +926,24 @@ export const CustomerTripPlannerPage: React.FC = () => {
                             </h3>
 
                             <div style={{ fontSize: '12.5px', color: '#64748b', marginBottom: '14px', display: 'flex', gap: '16px', fontWeight: '600' }}>
-                              <span><Calendar size={13} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {p.targetMonthLabel}</span>
-                              <span><Users size={13} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {p.participants} Peserta</span>
+                              <span><Calendar size={13} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {planDateLabel(p)}</span>
+                              <span><Users size={13} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {p.participants} {t('Peserta', p.participants === 1 ? 'Traveler' : 'Travelers')}</span>
                             </div>
 
                             {/* Financial Stats Summary Box */}
                             <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '12px', border: '1px solid #f1f5f9', marginBottom: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                               <div>
-                                <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Terkumpul</div>
+                                <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>{t('Terkumpul', 'Collected')}</div>
                                 <div style={{ fontSize: '13px', fontWeight: '800', color: '#10b981', marginTop: '2px' }}>{formatRupiah(p.savedAmount)}</div>
                               </div>
                               <div>
-                                <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Target Budget</div>
+                                <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>{t('Target Budget', 'Budget Goal')}</div>
                                 <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>{formatRupiah(p.targetBudget)}</div>
                               </div>
                               <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #e2e8f0', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Sisa Dibutuhkan:</span>
+                                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>{t('Sisa Dibutuhkan:', 'Still Needed:')}</span>
                                 <strong style={{ fontSize: '12px', color: remaining > 0 ? '#ef4444' : '#10b981', fontWeight: '800' }}>
-                                  {remaining > 0 ? formatRupiah(remaining) : 'Lunas'}
+                                  {remaining > 0 ? formatRupiah(remaining) : t('Lunas', 'Fully funded')}
                                 </strong>
                               </div>
                             </div>
@@ -958,13 +974,13 @@ export const CustomerTripPlannerPage: React.FC = () => {
                                 boxShadow: '0 2px 8px rgba(15,139,141,0.2)'
                               }}
                             >
-                              Lihat Detail &rarr;
+                              {t('Lihat Detail', 'View Details')} &rarr;
                             </button>
 
                             {/* Edit Icon (Pencil) & Hapus Icon */}
                             <button
                               onClick={() => handleStartEditPlan(p)}
-                              title="Edit Rencana"
+                              title={t('Edit Rencana', 'Edit Plan')}
                               style={{
                                 backgroundColor: '#ffffff',
                                 border: '1px solid #cbd5e1',
@@ -983,7 +999,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
 
                             <button
                               onClick={(e) => handleDeletePlanFromList(e, p.id, p.destination)}
-                              title="Hapus Rencana"
+                              title={t('Hapus Rencana', 'Delete Plan')}
                               disabled={isBusy}
                               aria-busy={pending === `delete-plan-${p.id}`}
                               style={{
@@ -1027,7 +1043,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                           gap: '8px'
                         }}
                       >
-                        <Plus size={16} /> + Buat Rencana Baru ({plans.length}/10)
+                        <Plus size={16} /> + {t('Buat Rencana Baru', 'New Plan')} ({plans.length}/10)
                       </button>
                     </div>
                   )}
@@ -1073,22 +1089,22 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
                   }}
                 >
-                  <HeartHandshake size={14} /> Perencana tabungan trip
+                  <HeartHandshake size={14} /> {t('Perencana tabungan trip', 'Trip savings planner')}
                 </span>
                 
                 <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#ffffff', margin: '14px 0 8px 0', lineHeight: 1.3, textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-                  Rencanakan trip bersama pasangan, teman, atau keluarga
+                  {t('Rencanakan trip bersama pasangan, teman, atau keluarga', 'Plan a trip with your partner, friends, or family')}
                 </h2>
                 
                 <p style={{ fontSize: '14px', color: '#f0f9ff', margin: 0, lineHeight: 1.6, fontWeight: '500', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
-                  Tentukan destinasi, target budget, dan tanggal berangkat. Catat setiap setoran tabungan untuk melihat progresnya.
+                  {t('Tentukan destinasi, target budget, dan tanggal berangkat. Catat setiap setoran tabungan untuk melihat progresnya.', 'Set a destination, budget goal, and departure date. Log each savings deposit to see your progress.')}
                 </p>
               </div>
             </div>
 
             <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '28px', border: '1px solid #e2e8f0', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', marginBottom: '32px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Compass size={20} color="#0f8b8d" /> {isEditingExisting ? 'Edit Rencana Trip' : 'Buat Rencana Trip Impian Baru'}
+                <Compass size={20} color="#0f8b8d" /> {isEditingExisting ? t('Edit Rencana Trip', 'Edit Trip Plan') : t('Buat Rencana Trip Impian Baru', 'Create a New Dream Trip Plan')}
               </h2>
 
               <form onSubmit={handleProceedToDetail} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px' }}>
@@ -1096,11 +1112,11 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 {/* Destinasi */}
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Destinasi Impian <span style={{ color: '#ef4444' }}>*</span>
+                    {t('Destinasi Impian', 'Dream Destination')} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="Contoh: Palu, Raja Ampat, Bali, Bandung..."
+                    placeholder={t('Contoh: Palu, Raja Ampat, Bali, Bandung...', 'e.g. Palu, Raja Ampat, Bali, Bandung...')}
                     value={destination}
                     onChange={(e) => setDestination(e.target.value)}
                     style={{
@@ -1120,7 +1136,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 {/* Rencana Waktu Keberangkatan dengan Kalender Picker */}
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Rencana Waktu Keberangkatan <span style={{ color: '#ef4444' }}>*</span>
+                    {t('Rencana Waktu Keberangkatan', 'Planned Departure Date')} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <div 
                     onClick={() => {
@@ -1150,7 +1166,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                         boxSizing: 'border-box'
                       }}
                     >
-                      <span>{formatDateIndo(targetDate)}</span>
+                      <span>{targetDate ? formatDateIndo(targetDate, locale) : t('Pilih tanggal trip', 'Choose a trip date')}</span>
                       <Calendar size={18} color="#0f8b8d" />
                     </div>
                     <input 
@@ -1173,14 +1189,14 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     />
                   </div>
                   <span style={{ fontSize: '10.5px', color: '#94a3b8', display: 'block', marginTop: '4px' }}>
-                    Tanggal sebelum hari ini di-lock secara otomatis.
+                    {t('Tanggal sebelum hari ini di-lock secara otomatis.', 'Past dates are locked.')}
                   </span>
                 </div>
 
                 {/* Jumlah Peserta */}
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Jumlah Peserta (Orang) <span style={{ color: '#ef4444' }}>*</span>
+                    {t('Jumlah Peserta (Orang)', 'Number of Travelers')} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="number"
@@ -1205,11 +1221,11 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 {/* Total Target Budget */}
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Total Target Budget (Rp) <span style={{ color: '#ef4444' }}>*</span>
+                    {t('Total Target Budget (Rp)', 'Total Budget Goal (Rp)')} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="Contoh: 5.000.000"
+                    placeholder={t('Contoh: 5.000.000', 'e.g. 5.000.000')}
                     value={targetBudget}
                     onChange={(e) => {
                       const raw = e.target.value.replace(/\D/g, '');
@@ -1249,7 +1265,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       cursor: 'pointer'
                     }}
                   >
-                    Batal
+                    {t('Batal', 'Cancel')}
                   </button>
                   
                   <button
@@ -1269,7 +1285,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       gap: '8px'
                     }}
                   >
-                    Lanjut ke Detail &amp; Rencana Trip &rarr;
+                    {t('Lanjut ke Detail & Rencana Trip', 'Continue to Plan Details')} &rarr;
                   </button>
                 </div>
               </form>
@@ -1301,8 +1317,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 }}
               >
                 {pending === 'back-to-list'
-                  ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
-                  : <><ArrowLeft size={16} /> &larr; Kembali ke Daftar Rencana Trip Saya</>}
+                  ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Menyimpan...', 'Saving...')}</>
+                  : <><ArrowLeft size={16} /> &larr; {t('Kembali ke Daftar Rencana Trip Saya', 'Back to My Trip Plans')}</>}
               </button>
             </div>
 
@@ -1312,18 +1328,18 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ backgroundColor: '#e6f4f4', color: '#0f8b8d', fontSize: '11px', fontWeight: '800', padding: '4px 10px', borderRadius: '20px', textTransform: 'uppercase' }}>
-                      Target Liburan
+                      {t('Target Liburan', 'Trip Goal')}
                     </span>
                     <span style={{ fontSize: '11px', fontWeight: '800', padding: '4px 10px', borderRadius: '20px', backgroundColor: activePlan.status === 'SAVED' ? '#dcfce7' : '#fef3c7', color: activePlan.status === 'SAVED' ? '#166534' : '#92400e' }}>
-                      Status: {activePlan.status === 'SAVED' ? 'Tersimpan' : 'Draft (Belum Disimpan)'}
+                      Status: {activePlan.status === 'SAVED' ? t('Tersimpan', 'Saved') : t('Draft (Belum Disimpan)', 'Draft (Not Saved)')}
                     </span>
                   </div>
                   <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', margin: '8px 0 2px 0' }}>
                     {activePlan.destination}
                   </h2>
                   <div style={{ display: 'flex', gap: '16px', fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>
-                    <span><Calendar size={14} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {activePlan.targetMonthLabel}</span>
-                    <span><Users size={14} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {activePlan.participants} Peserta</span>
+                    <span><Calendar size={14} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {planDateLabel(activePlan)}</span>
+                    <span><Users size={14} style={{ display: 'inline', verticalAlign: '-2px', color: '#0f8b8d' }} /> {activePlan.participants} {t('Peserta', activePlan.participants === 1 ? 'Traveler' : 'Travelers')}</span>
                   </div>
                 </div>
 
@@ -1344,14 +1360,14 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     boxShadow: '0 4px 14px rgba(15,139,141,0.3)'
                   }}
                 >
-                  <Wallet size={16} /> + Catat Tabungan Bulan Ini
+                  <Wallet size={16} /> + {t('Catat Tabungan Bulan Ini', 'Log Savings')}
                 </button>
               </div>
 
               {/* Savings Progress Bar */}
               <div style={{ backgroundColor: '#f8fafc', borderRadius: '16px', padding: '18px', border: '1px solid #f1f5f9' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', color: '#334155', marginBottom: '8px' }}>
-                  <span>Progres tabungan</span>
+                  <span>{t('Progres tabungan', 'Savings progress')}</span>
                   <span style={{ color: '#0f8b8d' }}>{savedPercentage}%</span>
                 </div>
                 
@@ -1369,19 +1385,19 @@ export const CustomerTripPlannerPage: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
                   <div style={{ backgroundColor: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Terkumpul</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>{t('Terkumpul', 'Collected')}</div>
                     <div style={{ fontSize: '15px', fontWeight: '800', color: '#10b981', marginTop: '2px' }}>
                       {formatRupiah(activePlan.savedAmount)}
                     </div>
                   </div>
                   <div style={{ backgroundColor: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Target Total</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>{t('Target Total', 'Total Goal')}</div>
                     <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>
                       {formatRupiah(activePlan.targetBudget)}
                     </div>
                   </div>
                   <div style={{ backgroundColor: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Sisa Dibutuhkan</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>{t('Sisa Dibutuhkan', 'Still Needed')}</div>
                     <div style={{ fontSize: '15px', fontWeight: '800', color: '#ef4444', marginTop: '2px' }}>
                       {formatRupiah(remainingBudget)}
                     </div>
@@ -1399,7 +1415,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 td.setHours(0, 0, 0, 0);
                 return t < td;
               })();
-              const motivation = getMotivationContent(savedPercentage, isExpired, activePlan.destination);
+              const motivation = getMotivationContent(savedPercentage, isExpired, activePlan.destination, t);
               return (
                 <div style={{ backgroundColor: motivation.bg, borderRadius: '20px', padding: '18px 24px', border: `1px solid ${motivation.border}`, marginBottom: '28px', display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <motivation.icon size={24} color={motivation.titleColor} style={{ flexShrink: 0 }} aria-hidden="true" />
@@ -1421,7 +1437,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
               {/* Scrollable Checklist Persiapan Liburan with Edit/Hapus for Manual items (Point 3) */}
               <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 6px 20px rgba(0,0,0,0.03)' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ListChecks size={18} color="#0f8b8d" /> Checklist persiapan trip
+                  <ListChecks size={18} color="#0f8b8d" /> {t('Checklist persiapan trip', 'Trip prep checklist')}
                 </h3>
 
                 {/* Scrollable Container Box */}
@@ -1459,14 +1475,14 @@ export const CustomerTripPlannerPage: React.FC = () => {
                               textDecoration: completed ? 'line-through' : 'none'
                             }}
                           >
-                            {item.label}
+                            {checklistLabel(item.label)}
                           </span>
                         </div>
 
                         {/* Automated items show system badge (cannot be deleted/edited) */}
                         {isAutomated ? (
                           <span 
-                            title="Item ini diperbarui otomatis oleh sistem"
+                            title={t('Item ini diperbarui otomatis oleh sistem', 'Updated automatically by the system')}
                             style={{ 
                               fontSize: '10px', 
                               fontWeight: '700', 
@@ -1479,7 +1495,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                               gap: '4px' 
                             }}
                           >
-                            <ShieldCheck size={12} /> Otomatis
+                            <ShieldCheck size={12} /> {t('Otomatis', 'Auto')}
                           </span>
                         ) : (
                           /* Manual items have Edit & Hapus icons (Point 3) */
@@ -1488,7 +1504,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setEditingChecklistId(item.id);
-                                setEditingChecklistLabel(item.label);
+                                setEditingChecklistLabel(checklistLabel(item.label));
                               }}
                               title="Edit item"
                               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#0f8b8d' }}
@@ -1499,7 +1515,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                               onClick={(e) => handleDeleteChecklistItem(e, item.id)}
                               disabled={isBusy}
                               aria-busy={pending === `delete-checklist-${item.id}`}
-                              title="Hapus item"
+                              title={t('Hapus item', 'Delete item')}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#ef4444' }}
                             >
                               <Trash2 size={14} />
@@ -1515,7 +1531,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                 <form onSubmit={handleAddChecklistItem} style={{ display: 'flex', gap: '8px' }}>
                   <input
                     type="text"
-                    placeholder="Tambah item checklist baru..."
+                    placeholder={t('Tambah item checklist baru...', 'Add a checklist item...')}
                     value={newChecklistItem}
                     onChange={(e) => setNewChecklistItem(e.target.value)}
                     style={{
@@ -1542,7 +1558,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       cursor: 'pointer'
                     }}
                   >
-                    {pending === 'add-checklist' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Tambah'}
+                    {pending === 'add-checklist' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Menyimpan...', 'Saving...')}</> : t('Tambah', 'Add')}
                   </button>
                 </form>
               </div>
@@ -1550,12 +1566,14 @@ export const CustomerTripPlannerPage: React.FC = () => {
               {/* Scrollable Riwayat Tabungan Bulanan with Edit & Hapus options (Point 3) */}
               <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 6px 20px rgba(0,0,0,0.03)' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Wallet size={18} color="#0f8b8d" /> Riwayat Catatan Tabungan
+                  <Wallet size={18} color="#0f8b8d" /> {t('Riwayat Catatan Tabungan', 'Savings History')}
                 </h3>
 
                 {activePlan.savingsLogs.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '36px 0', color: '#94a3b8', fontSize: '13px' }}>
-                    Belum ada tabungan yang dicatat.<br />Klik tombol <strong>"+ Catat Tabungan Bulan Ini"</strong> di atas.
+                    {lang === 'en'
+                      ? <>No savings logged yet.<br />Click <strong>"+ Log Savings"</strong> above.</>
+                      : <>Belum ada tabungan yang dicatat.<br />Klik tombol <strong>"+ Catat Tabungan Bulan Ini"</strong> di atas.</>}
                   </div>
                 ) : (
                   /* Scrollable Container Box for Savings Logs */
@@ -1574,8 +1592,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                         }}
                       >
                         <div>
-                          <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>{formatDateIndo(log.date)}</div>
-                          <div style={{ fontSize: '12.5px', color: '#334155', fontWeight: '700' }}>{log.note || 'Tabungan bulanan'}</div>
+                          <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>{formatDateIndo(log.date, locale)}</div>
+                          <div style={{ fontSize: '12.5px', color: '#334155', fontWeight: '700' }}>{!log.note || log.note === 'Tabungan bulanan' ? t('Tabungan bulanan', 'Monthly savings') : log.note}</div>
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1586,7 +1604,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                           {/* Edit & Hapus options for savings logs (Point 3) */}
                           <button
                             onClick={() => handleOpenSavingsModal(log)}
-                            title="Edit Catatan"
+                            title={t('Edit Catatan', 'Edit Entry')}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#0f8b8d' }}
                           >
                             <Edit3 size={14} />
@@ -1595,7 +1613,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                             onClick={(e) => handleDeleteSavingsLog(e, log.id)}
                             disabled={isBusy}
                             aria-busy={pending === `delete-log-${log.id}`}
-                            title="Hapus Catatan"
+                            title={t('Hapus Catatan', 'Delete Entry')}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#ef4444' }}
                           >
                             <Trash2 size={14} />
@@ -1612,7 +1630,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
             <div style={{ marginTop: '32px', marginBottom: '32px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Compass size={20} color="#0f8b8d" /> Rekomendasi Paket Open Trip ke {activePlan.destination}
+                  <Compass size={20} color="#0f8b8d" /> {t('Rekomendasi Paket Open Trip ke', 'Recommended Open Trips to')} {activePlan.destination}
                 </h3>
                 <button
                   onClick={() => autoSaveDraftAndNavigate('cari-trip')}
@@ -1620,15 +1638,15 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   aria-busy={pending === 'navigate'}
                   style={{ background: 'none', border: 'none', color: '#0f8b8d', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}
                 >
-                  {pending === 'navigate' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : <>Lihat Semua Paket &gt;</>}
+                  {pending === 'navigate' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Menyimpan...', 'Saving...')}</> : <>{t('Lihat Semua Paket', 'See All Trips')} &gt;</>}
                 </button>
               </div>
 
               {loadingPackages ? (
-                <SkeletonCards count={3} minWidth={260} label="Memuat rekomendasi paket" />
+                <SkeletonCards count={3} minWidth={260} label={t('Memuat rekomendasi paket', 'Loading recommended trips')} />
               ) : matchingPackages.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '32px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '13.5px' }}>
-                  Belum ada paket trip spesifik untuk lokasi <strong>{activePlan.destination}</strong>. Silakan cek halaman cari trip untuk pilihan destinasi populer lainnya.
+                  {t('Belum ada paket trip spesifik untuk lokasi', 'No trips found yet for')} <strong>{activePlan.destination}</strong>. {t('Silakan cek halaman cari trip untuk pilihan destinasi populer lainnya.', 'Check the trip search page for other popular destinations.')}
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
@@ -1663,7 +1681,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                         <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0', lineHeight: 1.3 }}>{pkg.name}</h4>
                         <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 10px 0' }}>{pkg.destination}</p>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                          <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Star size={13} aria-hidden="true" /> {pkg.rating && Number(pkg.rating) > 0 ? Number(pkg.rating).toFixed(1) : 'Baru'}</span>
+                          <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Star size={13} aria-hidden="true" /> {pkg.rating && Number(pkg.rating) > 0 ? Number(pkg.rating).toFixed(1) : t('Baru', 'New')}</span>
                           <strong style={{ fontSize: '14px', color: '#0f8b8d', fontWeight: '800' }}>{typeof pkg.price === 'number' ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(pkg.price) : pkg.price}</strong>
                         </div>
                       </div>
@@ -1690,10 +1708,10 @@ export const CustomerTripPlannerPage: React.FC = () => {
             >
               <div>
                 <div style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>
-                  Selesai Menyusun Rencana Trip?
+                  {t('Selesai Menyusun Rencana Trip?', 'Done planning your trip?')}
                 </div>
                 <div style={{ fontSize: '12.5px', color: '#64748b' }}>
-                  Simpan rencana ini agar tersimpan permanen di akunmu dan bisa dipantau kapan saja.
+                  {t('Simpan rencana ini agar tersimpan permanen di akunmu dan bisa dipantau kapan saja.', 'Save this plan to your account so you can check on it anytime.')}
                 </div>
               </div>
 
@@ -1713,7 +1731,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  {pending === 'cancel-plan' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Memproses...</> : 'Batalkan Rencana Trip'}
+                  {pending === 'cancel-plan' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Memproses...', 'Processing...')}</> : t('Batalkan Rencana Trip', 'Cancel Trip Plan')}
                 </button>
 
                 <button
@@ -1736,8 +1754,8 @@ export const CustomerTripPlannerPage: React.FC = () => {
                   }}
                 >
                   {pending === 'save-plan'
-                    ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</>
-                    : <><Save size={16} /> Simpan Rencana Trip</>}
+                    ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Menyimpan...', 'Saving...')}</>
+                    : <><Save size={16} /> {t('Simpan Rencana Trip', 'Save Trip Plan')}</>}
                 </button>
               </div>
             </div>
@@ -1754,17 +1772,17 @@ export const CustomerTripPlannerPage: React.FC = () => {
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', maxWidth: '400px', width: '100%', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Wallet size={20} color="#0f8b8d" /> {editingLogId ? 'Edit Catatan Tabungan' : 'Catat Tabungan Bulan Ini'}
+                <Wallet size={20} color="#0f8b8d" /> {editingLogId ? t('Edit Catatan Tabungan', 'Edit Savings Entry') : t('Catat Tabungan Bulan Ini', "Log This Month's Savings")}
               </h3>
               
               <form onSubmit={handleSaveSavings}>
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px' }}>
-                    Nominal Disisihkan (Rp) <span style={{ color: '#ef4444' }}>*</span>
+                    {t('Nominal Disisihkan (Rp)', 'Amount Saved (Rp)')} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="Contoh: 500.000"
+                    placeholder={t('Contoh: 500.000', 'e.g. 500.000')}
                     value={savingsInput}
                     onChange={(e) => {
                       const raw = e.target.value.replace(/\D/g, '');
@@ -1787,11 +1805,11 @@ export const CustomerTripPlannerPage: React.FC = () => {
 
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px' }}>
-                    Catatan Opsional
+                    {t('Catatan Opsional', 'Note (optional)')}
                   </label>
                   <input
                     type="text"
-                    placeholder="Contoh: Gaji bulan ini, Bonus proyek..."
+                    placeholder={t('Contoh: Gaji bulan ini, Bonus proyek...', "e.g. This month's salary, project bonus...")}
                     value={savingsNote}
                     onChange={(e) => setSavingsNote(e.target.value)}
                     style={{
@@ -1825,7 +1843,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       cursor: 'pointer'
                     }}
                   >
-                    Batal
+                    {t('Batal', 'Cancel')}
                   </button>
                   <button
                     type="submit"
@@ -1846,7 +1864,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       boxShadow: '0 4px 12px rgba(15,139,141,0.25)'
                     }}
                   >
-                    {pending === 'save-savings' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Simpan Tabungan'}
+                    {pending === 'save-savings' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Menyimpan...', 'Saving...')}</> : t('Simpan Tabungan', 'Save Entry')}
                   </button>
                 </div>
               </form>
@@ -1859,13 +1877,13 @@ export const CustomerTripPlannerPage: React.FC = () => {
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', maxWidth: '400px', width: '100%', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Edit3 size={20} color="#0f8b8d" /> Edit Item Checklist
+                <Edit3 size={20} color="#0f8b8d" /> {t('Edit Item Checklist', 'Edit Checklist Item')}
               </h3>
               
               <form onSubmit={handleSaveEditChecklist}>
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '6px' }}>
-                    Label Item Checklist
+                    {t('Label Item Checklist', 'Item Label')}
                   </label>
                   <input
                     type="text"
@@ -1900,7 +1918,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       cursor: 'pointer'
                     }}
                   >
-                    Batal
+                    {t('Batal', 'Cancel')}
                   </button>
                   <button
                     type="submit"
@@ -1920,7 +1938,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                       gap: '6px'
                     }}
                   >
-                    {pending === 'edit-checklist' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> Menyimpan...</> : 'Simpan Perubahan'}
+                    {pending === 'edit-checklist' ? <><LoaderCircle size={14} className="btn-spinner" aria-hidden="true" /> {t('Menyimpan...', 'Saving...')}</> : t('Simpan Perubahan', 'Save Changes')}
                   </button>
                 </div>
               </form>
@@ -1933,7 +1951,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', maxWidth: '420px', width: '100%', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
               <h3 style={{ fontSize: '16.5px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Info size={20} color="#0284c7" /> Informasi Item Sistem Otomatis
+                <Info size={20} color="#0284c7" /> {t('Informasi Item Sistem Otomatis', 'About Automatic Items')}
               </h3>
               <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5, margin: '0 0 20px 0' }}>
                 {autoItemModalInfo}
@@ -1952,7 +1970,7 @@ export const CustomerTripPlannerPage: React.FC = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  Mengerti
+                  {t('Mengerti', 'Got it')}
                 </button>
               </div>
             </div>

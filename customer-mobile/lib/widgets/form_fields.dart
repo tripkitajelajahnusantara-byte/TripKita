@@ -3,30 +3,64 @@ import 'package:flutter/services.dart';
 
 import 'package:customer_mobile/theme/app_theme.dart';
 import 'package:customer_mobile/utils/formatters.dart';
+import 'package:customer_mobile/widgets/common.dart';
 
-/// Label form Figma (14, abu tua) dengan tanda wajib merah, lalu isian.
+/// Label form Figma (14/20, abu tua) dengan tanda wajib merah, lalu isian.
 class LabeledField extends StatelessWidget {
   final String label;
   final bool required;
   final Widget child;
 
-  const LabeledField({super.key, required this.label, required this.child, this.required = false});
+  /// Pesan galat 14/20 merah tua, rata kiri 6px di bawah isian.
+  final String? error;
+
+  const LabeledField({super.key, required this.label, required this.child, this.required = false, this.error});
 
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text.rich(TextSpan(
         text: label,
-        style: const TextStyle(fontSize: 14, color: AppColors.textBody),
+        style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMedium),
         children: [
           if (required) const TextSpan(text: ' *', style: TextStyle(color: AppColors.dangerDark)),
         ],
       )),
       const SizedBox(height: 6),
       child,
+      if (error != null) ...[
+        const SizedBox(height: 6),
+        Text(error!, style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.errorText)),
+      ],
     ]);
   }
 }
+
+const _errorOutline = OutlineInputBorder(
+  borderRadius: BorderRadius.all(Radius.circular(8)),
+  borderSide: BorderSide(color: AppColors.dangerDark),
+);
+
+/// Garis isian merah bila [error] terisi. Teks galat ditampilkan [LabeledField]
+/// karena galat bawaan InputDecorator menjorok mengikuti padding isian.
+InputDecoration markError(InputDecoration decoration, String? error) => error == null
+    ? decoration
+    : decoration.copyWith(
+        enabledBorder: _errorOutline,
+        focusedBorder: _errorOutline.copyWith(borderSide: const BorderSide(color: AppColors.dangerDark, width: 1.5)),
+      );
+
+/// Teks isian Figma (16, gelap).
+const fieldTextStyle = TextStyle(fontSize: 16, height: 1.5, letterSpacing: 0, color: AppColors.textDark);
+
+/// Ikon awalan isian (24) dengan jarak 12 dari tepi dan 8 ke teks (4 di
+/// antaranya sudah ditambahkan InputDecorator).
+Widget fieldPrefixIcon(String name) => Padding(
+      padding: const EdgeInsets.only(left: 12, right: 4),
+      child: AppIcon(name, color: AppColors.icon),
+    );
+
+const fieldPrefixConstraints = BoxConstraints(minWidth: 40, minHeight: 24);
 
 /// Bagian lokal nomor HP tanpa awalan negara: `081234` / `6281234` /
 /// `+6281234` → `81234`.
@@ -64,38 +98,54 @@ class PhoneField extends StatelessWidget {
       enabled: enabled,
       keyboardType: TextInputType.phone,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(13)],
-      style: const TextStyle(fontSize: 15, color: AppColors.textDark),
-      decoration: InputDecoration(
-        hintText: '81234567890',
-        errorText: errorText,
-        fillColor: enabled ? Colors.white : AppColors.divider,
-        prefixIconConstraints: const BoxConstraints(minHeight: 40),
-        prefixIcon: Container(
-          margin: const EdgeInsets.only(right: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: const BoxDecoration(border: Border(right: BorderSide(color: AppColors.borderStrong))),
-          child: const Row(mainAxisSize: MainAxisSize.min, children: [
-            _IndonesianFlag(),
-            SizedBox(width: 8),
-            Text('+62', style: TextStyle(fontSize: 15, color: AppColors.textMedium)),
-          ]),
-        ),
-      ),
+      style: fieldTextStyle,
+      decoration: markError(
+          InputDecoration(
+            hintText: '81234567890',
+            fillColor: enabled ? Colors.white : AppColors.divider,
+            prefixIconConstraints: const BoxConstraints(minWidth: 80, minHeight: 38),
+            // Awalan selebar 76 (bendera, +62) dengan garis pemisah, lalu 8 ke nomor
+            // (4 di antaranya dari InputDecorator).
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Container(
+                width: 76,
+                height: 38,
+                padding: const EdgeInsets.only(left: 12),
+                decoration: BoxDecoration(
+                  border: Border(
+                    right: BorderSide(color: errorText == null ? AppColors.borderStrong : AppColors.dangerDark),
+                  ),
+                ),
+                child: const Row(children: [
+                  IndonesianFlag(),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: Text('+62',
+                        softWrap: false,
+                        overflow: TextOverflow.clip,
+                        style: TextStyle(fontSize: 16, height: 1.5, color: AppColors.textMedium)),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          errorText),
     );
   }
 }
 
-class _IndonesianFlag extends StatelessWidget {
-  const _IndonesianFlag();
+/// Bendera Indonesia 20×15.
+class IndonesianFlag extends StatelessWidget {
+  const IndonesianFlag({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: 20,
-      height: 14,
-      decoration: BoxDecoration(border: Border.all(color: AppColors.border, width: 0.5)),
+      height: 15,
       child: Column(children: [
-        Expanded(child: Container(color: const Color(0xFFE70011))),
+        Expanded(child: Container(color: const Color(0xFFE31D1C))),
         Expanded(child: Container(color: Colors.white)),
       ]),
     );
@@ -109,25 +159,31 @@ class BirthDateField extends StatelessWidget {
   final String? errorText;
   final bool enabled;
 
+  /// Tanggal rencana keberangkatan: hari ini sampai 5 tahun ke depan.
+  final bool future;
+
   const BirthDateField({
     super.key,
     required this.valueIso,
     required this.onChanged,
     this.errorText,
     this.enabled = true,
+    this.future = false,
   });
 
   Future<void> _pick(BuildContext context) async {
     final today = dateOnly(DateTime.now());
-    final initial = parseIsoDate(valueIso) ?? DateTime(2000);
+    final first = future ? today : DateTime(1920);
+    final last = future ? DateTime(today.year + 5, today.month, today.day) : today;
+    final initial = parseIsoDate(valueIso) ?? (future ? today.add(const Duration(days: 30)) : DateTime(2000));
     final picked = await showDatePicker(
       context: context,
-      initialDate: initial.isAfter(today) ? today : initial,
+      initialDate: initial.isBefore(first) ? first : (initial.isAfter(last) ? last : initial),
       initialEntryMode: DatePickerEntryMode.calendarOnly,
-      initialDatePickerMode: DatePickerMode.year,
-      firstDate: DateTime(1920),
-      lastDate: today,
-      helpText: 'Tanggal lahir',
+      initialDatePickerMode: future ? DatePickerMode.day : DatePickerMode.year,
+      firstDate: first,
+      lastDate: last,
+      helpText: future ? 'Rencana tanggal keberangkatan' : 'Tanggal lahir',
     );
     if (picked != null) onChanged(toIsoDate(picked));
   }
@@ -140,19 +196,59 @@ class BirthDateField extends StatelessWidget {
       onTap: enabled ? () => _pick(context) : null,
       child: InputDecorator(
         isEmpty: date == null,
-        decoration: InputDecoration(
-          hintText: 'DD/MM/YYYY',
-          errorText: errorText,
-          enabled: enabled,
-          fillColor: enabled ? Colors.white : AppColors.divider,
-          prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20, color: AppColors.textMuted),
-        ),
+        decoration: markError(
+            InputDecoration(
+              hintText: 'DD/MM/YYYY',
+              enabled: enabled,
+              fillColor: enabled ? Colors.white : AppColors.divider,
+              prefixIconConstraints: fieldPrefixConstraints,
+              prefixIcon: fieldPrefixIcon('calendar'),
+            ),
+            errorText),
         child: Text(
           date == null ? '' : '${twoDigits(date.day)}/${twoDigits(date.month)}/${date.year}',
-          style: const TextStyle(fontSize: 15, color: AppColors.textDark),
+          style: fieldTextStyle,
         ),
       ),
     );
+  }
+}
+
+/// Area teks Figma setinggi 128 dengan tanda ubah ukuran di pojok kanan bawah.
+class TextAreaField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final String? errorText;
+  final int? maxLength;
+
+  const TextAreaField({super.key, required this.controller, required this.hintText, this.errorText, this.maxLength});
+
+  @override
+  Widget build(BuildContext context) {
+    const text = TextStyle(fontSize: 16, height: 20 / 16, letterSpacing: 0, color: AppColors.textDark);
+    return Stack(children: [
+      SizedBox(
+        height: 128,
+        child: TextField(
+          controller: controller,
+          expands: true,
+          maxLines: null,
+          textAlignVertical: TextAlignVertical.top,
+          maxLength: maxLength,
+          style: text,
+          decoration: markError(
+              InputDecoration(
+                hintText: hintText,
+                hintMaxLines: 3,
+                hintStyle: text.copyWith(color: AppColors.textLight),
+                counterText: '',
+                contentPadding: const EdgeInsets.fromLTRB(12, 6.5, 12, 8),
+              ),
+              errorText),
+        ),
+      ),
+      const Positioned(top: 110, right: 6, child: AppIcon('resize_handle', size: 12)),
+    ]);
   }
 }
 
@@ -178,13 +274,12 @@ class SelectField extends StatelessWidget {
     return DropdownButtonFormField<String>(
       value: options.contains(value) ? value : null,
       isExpanded: true,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textMedium),
-      hint: Text(hint, style: const TextStyle(fontSize: 15, color: AppColors.textLight)),
-      style: const TextStyle(fontSize: 15, color: AppColors.textDark, fontFamily: 'Roboto'),
-      decoration: InputDecoration(
-        errorText: errorText,
-        fillColor: onChanged == null ? AppColors.divider : Colors.white,
-      ),
+      isDense: true,
+      icon: const AppIcon('chevron_down', color: AppColors.icon),
+      hint: Text(hint, style: const TextStyle(fontSize: 16, height: 1.17, color: AppColors.textLight)),
+      style: fieldTextStyle.copyWith(fontFamily: 'Roboto', height: 1.17),
+      decoration:
+          markError(InputDecoration(fillColor: onChanged == null ? AppColors.divider : Colors.white), errorText),
       items: [
         for (final o in options) DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)),
       ],

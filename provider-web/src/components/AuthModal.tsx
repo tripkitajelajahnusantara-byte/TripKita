@@ -5,6 +5,7 @@ import { X, Mail, Lock, Eye, EyeOff, User, AlertCircle, ArrowRight } from 'lucid
 import { LegalModalContainer, CustomerRegistrationTermsContent } from './LegalModals';
 import { IndonesianPhoneInput } from './IndonesianPhoneInput';
 import { isValidIndonesianMobilePhone } from '../utils/phone';
+import { useI18n } from '../i18n';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onSuccess
 }) => {
   const { login, registerCustomer } = useNavigation();
+  const { t } = useI18n();
 
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   
@@ -52,35 +54,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     if (mode === 'register') {
       if (!agreeTerms) {
-        errors.agreeTerms = 'Anda wajib menyetujui Syarat & Ketentuan Pendaftaran Customer.';
+        errors.agreeTerms = t('Anda wajib menyetujui Syarat & Ketentuan Pendaftaran Customer.', 'You must agree to the Customer Registration Terms & Conditions.');
       }
       if (!name || name.trim().length === 0) {
-        errors.name = 'Nama lengkap wajib diisi.';
+        errors.name = t('Nama lengkap wajib diisi.', 'Full name is required.');
       } else if (!/^[a-zA-Z\s]{3,50}$/.test(name.trim())) {
-        errors.name = 'Nama lengkap (3-50 karakter) hanya boleh huruf dan spasi.';
+        errors.name = t('Nama lengkap (3-50 karakter) hanya boleh huruf dan spasi.', 'Full name (3-50 characters) may only contain letters and spaces.');
       }
       if (!whatsapp) {
-        errors.whatsapp = 'Nomor WhatsApp wajib diisi.';
+        errors.whatsapp = t('Nomor WhatsApp wajib diisi.', 'WhatsApp number is required.');
       } else if (!isValidIndonesianMobilePhone(whatsapp)) {
-        errors.whatsapp = 'Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.';
+        errors.whatsapp = t('Masukkan 9–12 digit nomor seluler setelah +62, diawali angka 8.', 'Enter 9–12 digits of your mobile number after +62, starting with 8.');
       }
       if (!confirmPassword) {
-        errors.confirmPassword = 'Konfirmasi kata sandi wajib diisi.';
+        errors.confirmPassword = t('Konfirmasi kata sandi wajib diisi.', 'Please confirm your password.');
       } else if (password !== confirmPassword) {
-        errors.confirmPassword = 'Konfirmasi kata sandi tidak cocok dengan kata sandi.';
+        errors.confirmPassword = t('Konfirmasi kata sandi tidak cocok dengan kata sandi.', "Password confirmation doesn't match.");
       }
     }
 
     if (!email) {
-      errors.email = 'Alamat email wajib diisi.';
+      errors.email = t('Alamat email wajib diisi.', 'Email address is required.');
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      errors.email = 'Format email tidak valid (contoh: user@gmail.com).';
+      errors.email = t('Format email tidak valid (contoh: user@gmail.com).', 'Invalid email format (e.g. user@gmail.com).');
     }
 
     if (!password) {
-      errors.password = 'Kata sandi wajib diisi.';
+      errors.password = t('Kata sandi wajib diisi.', 'Password is required.');
     } else if (mode === 'register' && password.length < 12) {
-      errors.password = 'Kata sandi minimal 12 karakter.';
+      errors.password = t('Kata sandi minimal 12 karakter.', 'Password must be at least 12 characters.');
     }
 
     setFieldErrors(errors);
@@ -104,7 +106,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (onSuccess) onSuccess();
     } catch (err: any) {
       console.error(err);
-      setGeneralError(err.message || 'Proses gagal. Silakan periksa kembali data Anda.');
+      setGeneralError(err.message || t('Proses gagal. Silakan periksa kembali data Anda.', 'Something went wrong. Please check your details and try again.'));
     } finally {
       setLoading(false);
     }
@@ -112,8 +114,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleGoogleSignIn = () => {
     if (mode === 'register' && !agreeTerms) {
-      setGeneralError('Anda wajib menyetujui Syarat & Ketentuan sebelum mendaftar.');
-      setFieldErrors(prev => ({ ...prev, agreeTerms: 'Centang untuk menyetujui Syarat & Ketentuan.' }));
+      setGeneralError(t('Anda wajib menyetujui Syarat & Ketentuan sebelum mendaftar.', 'You must agree to the Terms & Conditions before signing up.'));
+      setFieldErrors(prev => ({ ...prev, agreeTerms: t('Centang untuk menyetujui Syarat & Ketentuan.', 'Tick to agree to the Terms & Conditions.') }));
       return;
     }
     const currentHash = window.location.hash;
@@ -189,12 +191,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             style={{ height: '36px', width: 'auto', marginBottom: '12px', objectFit: 'contain' }}
           />
           <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>
-            {mode === 'login' ? 'Masuk ke TemenTrip' : 'Daftar Akun TemenTrip'}
+            {mode === 'login' ? t('Masuk ke TemenTrip', 'Sign in to TemenTrip') : t('Daftar Akun TemenTrip', 'Create a TemenTrip Account')}
           </h2>
           <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: '1.4' }}>
             {mode === 'login'
-              ? 'Silakan masuk atau daftar akun untuk melanjutkan.'
-              : 'Daftar akun baru untuk pesan open trip & kelola tiket Anda.'
+              ? t('Silakan masuk atau daftar akun untuk melanjutkan.', 'Sign in or create an account to continue.')
+              : t('Daftar akun baru untuk pesan open trip & kelola tiket Anda.', 'Create an account to book open trips and manage your tickets.')
             }
           </p>
         </div>
@@ -230,7 +232,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               transition: 'all 0.2s'
             }}
           >
-            Masuk
+            {t('Masuk', 'Sign in')}
           </button>
           <button
             type="button"
@@ -252,7 +254,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               transition: 'all 0.2s'
             }}
           >
-            Daftar Akun
+            {t('Daftar Akun', 'Sign up')}
           </button>
         </div>
 
@@ -285,13 +287,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {mode === 'register' && (
             <div>
               <label style={{ fontSize: '12px', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
-                Nama Lengkap
+                {t('Nama Lengkap', 'Full Name')}
               </label>
               <div style={{ position: 'relative' }}>
                 <User size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="text"
-                  placeholder="Contoh: Budi Santoso"
+                  placeholder={t('Contoh: Budi Santoso', 'e.g. Budi Santoso')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   style={{
@@ -312,13 +314,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* Email (Login & Register) */}
           <div>
             <label style={{ fontSize: '12px', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
-              Alamat Email
+              {t('Alamat Email', 'Email Address')}
             </label>
             <div style={{ position: 'relative' }}>
               <Mail size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="email"
-                placeholder="nama@email.com"
+                placeholder={t('nama@email.com', 'name@email.com')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={{
@@ -339,7 +341,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {mode === 'register' && (
             <div>
               <label style={{ fontSize: '12px', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
-                Nomor WhatsApp
+                {t('Nomor WhatsApp', 'WhatsApp Number')}
               </label>
               <IndonesianPhoneInput
                 value={whatsapp}
@@ -357,13 +359,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* Password (Login & Register) */}
           <div>
             <label style={{ fontSize: '12px', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
-              Kata Sandi
+              {t('Kata Sandi', 'Password')}
             </label>
             <div style={{ position: 'relative' }}>
               <Lock size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder={mode === 'register' ? 'Minimal 12 karakter' : 'Kata sandi'}
+                placeholder={mode === 'register' ? t('Minimal 12 karakter', 'At least 12 characters') : t('Kata sandi', 'Password')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 style={{
@@ -391,13 +393,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {mode === 'register' && (
             <div>
               <label style={{ fontSize: '12px', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
-                Konfirmasi Kata Sandi
+                {t('Konfirmasi Kata Sandi', 'Confirm Password')}
               </label>
               <div style={{ position: 'relative' }}>
                 <Lock size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="Ulangi kata sandi"
+                  placeholder={t('Ulangi kata sandi', 'Re-enter password')}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   style={{
@@ -433,7 +435,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   style={{ accentColor: '#0284c7', width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer', flexShrink: 0 }}
                 />
                 <span>
-                  Saya menyetujui{' '}
+                  {t('Saya menyetujui', 'I agree to the TemenTrip')}{' '}
                   <span
                     onClick={(e) => {
                       e.preventDefault();
@@ -441,9 +443,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     }}
                     style={{ color: '#0284c7', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
                   >
-                    Syarat dan Ketentuan Pendaftaran Customer
-                  </span>{' '}
-                  TemenTrip.
+                    {t('Syarat dan Ketentuan Pendaftaran Customer', 'Customer Registration Terms & Conditions')}
+                  </span>{t(' TemenTrip.', '.')}
                 </span>
               </label>
               {fieldErrors.agreeTerms && <span style={{ fontSize: '11px', color: '#ef4444', marginTop: '2px', display: 'block' }}>{fieldErrors.agreeTerms}</span>}
@@ -473,7 +474,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               transition: 'all 0.2s'
             }}
           >
-            {loading ? 'Memproses...' : mode === 'login' ? 'Masuk Sekarang' : 'Daftar Akun'}
+            {loading ? t('Memproses...', 'Processing...') : mode === 'login' ? t('Masuk Sekarang', 'Sign In') : t('Daftar Akun', 'Sign Up')}
             {!loading && <ArrowRight size={16} />}
           </button>
         </form>
@@ -481,7 +482,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Divider */}
         <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', gap: '10px' }}>
           <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-          <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '600' }}>atau</span>
+          <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '600' }}>{t('atau', 'or')}</span>
           <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
         </div>
 
@@ -513,7 +514,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
           </svg>
-          {mode === 'login' ? 'Masuk dengan Google' : 'Daftar dengan Google'}
+          {mode === 'login' ? t('Masuk dengan Google', 'Sign in with Google') : t('Daftar dengan Google', 'Sign up with Google')}
         </button>
 
       </div>
@@ -522,7 +523,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       <LegalModalContainer
         isOpen={showRegTermsModal}
         onClose={() => setShowRegTermsModal(false)}
-        title="Syarat & Ketentuan Pendaftaran Customer"
+        title={t('Syarat & Ketentuan Pendaftaran Customer', 'Customer Registration Terms & Conditions')}
       >
         <CustomerRegistrationTermsContent />
       </LegalModalContainer>

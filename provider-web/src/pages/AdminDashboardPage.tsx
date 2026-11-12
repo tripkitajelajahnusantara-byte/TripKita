@@ -20,7 +20,10 @@ import {
   DollarSign,
   Wallet,
   LoaderCircle,
-  TrendingUp
+  TrendingUp,
+  Newspaper,
+  LayoutTemplate,
+  MessageSquare
 } from 'lucide-react';
 import { getProtectedDocumentURL, openProtectedDocument, request } from '../utils/api';
 import { NotificationCenter, type NotificationItem } from '../components/NotificationCenter';
@@ -29,6 +32,9 @@ import { useActionLock } from '../utils/useActionLock';
 import { Skeleton, SkeletonTable } from '../components/Skeleton';
 import { AdminRevenuePanel } from '../components/AdminRevenuePanel';
 import { AdminBookingMonitor } from '../components/AdminBookingMonitor';
+import { AdminNewsPanel } from '../components/AdminNewsPanel';
+import { AdminNewsHomePanel } from '../components/AdminNewsHomePanel';
+import { AdminNewsCommentsPanel } from '../components/AdminNewsCommentsPanel';
 
 
 interface ProviderAdminData {
@@ -159,7 +165,7 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 export const AdminDashboardPage: React.FC = () => {
   const { providerProfile, logout, navigateTo } = useNavigation();
   const [providers, setProviders] = useState<ProviderAdminData[]>([]);
-  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider' | 'penghasilan-platform' | 'monitoring-booking'>('kelola-provider');
+  const [activeView, setActiveView] = useState<'dashboard' | 'kelola-provider' | 'administrasi-refund' | 'kelola-pembayaran' | 'pencairan-provider' | 'penghasilan-platform' | 'monitoring-booking' | 'berita' | 'pengaturan-beranda' | 'kelola-komentar'>('kelola-provider');
   const [monitorProviderId, setMonitorProviderId] = useState<number | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Semua Kategori');
@@ -1032,6 +1038,24 @@ export const AdminDashboardPage: React.FC = () => {
             >
               <TrendingUp size={18} /> Penghasilan TemenTrip
             </button>
+            <button
+              className={`menu-btn ${activeView === 'berita' ? 'active' : ''}`}
+              onClick={() => { setActiveView('berita'); setSelectedProvider(null); }}
+            >
+              <Newspaper size={18} /> Berita
+            </button>
+            <button
+              className={`menu-btn ${activeView === 'pengaturan-beranda' ? 'active' : ''}`}
+              onClick={() => { setActiveView('pengaturan-beranda'); setSelectedProvider(null); }}
+            >
+              <LayoutTemplate size={18} /> Pengaturan Beranda
+            </button>
+            <button
+              className={`menu-btn ${activeView === 'kelola-komentar' ? 'active' : ''}`}
+              onClick={() => { setActiveView('kelola-komentar'); setSelectedProvider(null); }}
+            >
+              <MessageSquare size={18} /> Kelola Komentar
+            </button>
           </nav>
         </div>
 
@@ -1084,6 +1108,12 @@ export const AdminDashboardPage: React.FC = () => {
                   ? 'Pengajuan Pencairan Dana Provider (Payouts)'
                   : activeView === 'penghasilan-platform'
                   ? 'Penghasilan TemenTrip'
+                  : activeView === 'berita'
+                  ? 'Berita'
+                  : activeView === 'pengaturan-beranda'
+                  ? 'Pengaturan Beranda'
+                  : activeView === 'kelola-komentar'
+                  ? 'Kelola Komentar'
                   : 'Pusat Verifikasi Mitra'}
               </h1>
               <p>
@@ -1092,11 +1122,17 @@ export const AdminDashboardPage: React.FC = () => {
                   : activeView === 'administrasi-refund'
                   ? 'Pantau dan kelola proses refund dana customer.' 
                   : activeView === 'kelola-pembayaran'
-                  ? 'Verifikasi bukti transfer manual maksimal 1×24 jam. Booking baru tampil ke provider setelah pembayaran disetujui admin.'
+                  ? 'Pembayaran Midtrans terkonfirmasi otomatis. Bukti transfer manual (pesanan lama) diverifikasi maksimal 1×24 jam; booking baru tampil ke provider setelah lunas.'
                   : activeView === 'pencairan-provider'
                   ? 'Kelola pengajuan pencairan saldo DP 50% & pelunasan dari mitra provider.'
                   : activeView === 'penghasilan-platform'
                   ? 'Biaya layanan dan komisi TemenTrip dari setiap booking berbayar. Booking yang direfund penuh tidak dihitung.'
+                  : activeView === 'berita'
+                  ? 'Tulis dan kelola berita yang tampil di menu Berita pada situs customer.'
+                  : activeView === 'pengaturan-beranda'
+                  ? 'Pilih dan urutkan Berita Utama serta Pilihan Redaksi di halaman Berita customer. Hanya berita yang sudah terbit yang bisa dipilih.'
+                  : activeView === 'kelola-komentar'
+                  ? 'Pantau komentar pembaca. Komentar yang disembunyikan atau dihapus tidak tampil di situs customer.'
                   : 'Kelola dan verifikasi semua mitra yang terdaftar di TemenTrip.'}
               </p>
             </div>
@@ -1471,6 +1507,12 @@ export const AdminDashboardPage: React.FC = () => {
                   )}
                 </div>
               </div>
+            ) : activeView === 'berita' ? (
+              <AdminNewsPanel />
+            ) : activeView === 'pengaturan-beranda' ? (
+              <AdminNewsHomePanel />
+            ) : activeView === 'kelola-komentar' ? (
+              <AdminNewsCommentsPanel />
             ) : activeView === 'penghasilan-platform' ? (
               /* View 6: Penghasilan TemenTrip */
               <AdminRevenuePanel />

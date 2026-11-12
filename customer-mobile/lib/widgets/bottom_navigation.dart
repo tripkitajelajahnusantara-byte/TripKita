@@ -11,7 +11,7 @@ const _tabs = {
   AppTab.beranda: ('Beranda', 'house', 'house_fill'),
   AppTab.cariTrip: ('Cari Trip', 'nav_search', 'magnifying_glass_fill'),
   AppTab.booking: ('Booking', 'ticket', 'ticket_fill'),
-  AppTab.rencanaTrip: ('Plan Trip', 'calendar_heart', 'calendar_heart_fill'),
+  AppTab.rencanaTrip: ('Plan trip', 'calendar_heart', 'calendar_heart_fill'),
   AppTab.akun: ('Profil', 'user', 'user_fill'),
 };
 
@@ -44,7 +44,7 @@ class TripKitaBottomNavigation extends StatelessWidget {
                     onTap: () => onSelect(tab),
                     child: Stack(alignment: Alignment.topCenter, children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.only(top: 12, bottom: 16),
                         child: Column(mainAxisSize: MainAxisSize.min, children: [
                           AppIcon(tab == current ? activeIcon : icon,
                               color: tab == current ? AppColors.primaryDark : AppColors.textMuted),

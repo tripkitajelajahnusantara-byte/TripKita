@@ -1,993 +1,292 @@
 import 'package:flutter/material.dart';
-import 'package:customer_mobile/models/booking.dart';
-import 'package:customer_mobile/models/review.dart';
-import 'package:customer_mobile/widgets/bottom_navigation.dart';
-import 'package:intl/intl.dart';
 
+import 'package:customer_mobile/models/booking.dart';
+import 'package:customer_mobile/screens/booking_list_screen.dart';
+import 'package:customer_mobile/screens/booking_screen.dart';
+import 'package:customer_mobile/services/api_service.dart';
+import 'package:customer_mobile/theme/app_theme.dart';
+import 'package:customer_mobile/utils/formatters.dart';
+import 'package:customer_mobile/widgets/common.dart';
+import 'package:customer_mobile/widgets/form_fields.dart';
+
+/// "Detail Booking": kode, ajakan memberi ulasan (booking selesai), rincian
+/// trip, data pemesan & peserta, dan ringkasan pembayaran.
 class BookingDetailScreen extends StatefulWidget {
-  final Function(int, {Map<String, dynamic>? arguments}) onNavigate;
-  final Map<String, dynamic>? arguments;
+  final Booking booking;
+  final String packageName;
+
+  /// Data form pemesanan, dipakai sebelum backend mengembalikan peserta.
+  final BookingDraft? draft;
+  final BookerContact? booker;
+  final List<Participant>? participants;
+  final VoidCallback? onReviewed;
 
   const BookingDetailScreen({
-    Key? key,
-    required this.onNavigate,
-    this.arguments,
-  }) : super(key: key);
+    super.key,
+    required this.booking,
+    required this.packageName,
+    this.draft,
+    this.booker,
+    this.participants,
+    this.onReviewed,
+  });
 
   @override
   State<BookingDetailScreen> createState() => _BookingDetailScreenState();
 }
 
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
-  late Booking booking;
+  /// Null selama status ulasan belum diketahui.
+  bool? _reviewed;
+
+  Booking get _b => widget.booking;
 
   @override
   void initState() {
     super.initState();
-    if (widget.arguments != null && widget.arguments!['booking'] != null) {
-      booking = widget.arguments!['booking'] as Booking;
-    } else {
-      // Fallback fallback
-      booking = Booking.mockBookings.first;
+    if (_b.status == BookingStatus.completed) {
+      ApiService.isBookingReviewed(_b.id).then((v) {
+        if (mounted) setState(() => _reviewed = v);
+      }).catchError((_) {
+        if (mounted) setState(() => _reviewed = false);
+      });
     }
   }
 
-  // Helper to calculate countdown string
-  String _calculateCountdown(DateTime targetDate) {
-    final now = DateTime.now();
-    final difference = targetDate.difference(now);
-
-    if (difference.isNegative) {
-      return 'Trip telah dimulai / selesai';
-    }
-
-    final days = difference.inDays;
-    final hours = difference.inHours % 24;
-    final minutes = difference.inMinutes % 60;
-
-    if (days > 0) {
-      return 'H-$days Hari $hours Jam';
-    } else if (hours > 0) {
-      return 'H-$hours Jam $minutes Menit';
-    } else {
-      return 'H-$minutes Menit Keberangkatan';
+  Future<void> _review(int stars) async {
+    final sent = await showReviewSheet(context, _b, initialStars: stars);
+    if (sent == true && mounted) {
+      setState(() => _reviewed = true);
+      widget.onReviewed?.call();
+      showTopToast(context, 'Ulasan berhasil dikirim');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isSuccess = booking.status == 'PAID' || booking.status == 'CONFIRMED' || booking.status == 'COMPLETED';
-    final bool isFailed = booking.status == 'FAILED' || booking.status == 'EXPIRED';
-
+    final pkg = _b.packageDetails ?? widget.draft?.package;
+    final start = _b.tripDate ?? parseIsoDate(widget.draft?.startDate ?? '');
+    final end = _b.tripEndDate ?? parseIsoDate(widget.draft?.endDate ?? '') ?? start;
+    final people = _b.participants.isNotEmpty ? _b.participants : (widget.participants ?? const <Participant>[]);
+    final guests = _b.guests > 0 ? _b.guests : people.length;
+    final flexible = pkg?.isFlexiblePickup ?? people.any((p) => p.pickupPoint.isNotEmpty);
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF374151)),
-          onPressed: () {
-            // Navigate back to Bookings list (Index 2)
-            widget.onNavigate(2);
-          },
-        ),
-        title: const Text(
-          'Detail Booking',
-          style: TextStyle(color: Color(0xFF1F2937), fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      appBar: AppBar(titleSpacing: 0, title: const Text('Detail Booking')),
+      body: DefaultTextStyle.merge(
+        style: figmaTextStyle,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           children: [
-            // Status Header Banner
-            _buildStatusHeaderBanner(isSuccess, isFailed),
-
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Successful flow details
-                  if (isSuccess) ...[
-                    _buildCountdownCard(),
-                    const SizedBox(height: 20),
-                    if (booking.status == 'COMPLETED') ...[
-                      _buildReviewCard(),
-                      const SizedBox(height: 20),
-                    ],
-                    _buildDigitalVoucherCard(),
-                    const SizedBox(height: 20),
-                    _buildItineraryCard(),
-                    const SizedBox(height: 20),
-                    _buildTripInfoDetailsCard(),
-                    const SizedBox(height: 20),
-                    _buildParticipantsCard(),
-                  ],
-
-                  // Failed flow details
-                  if (isFailed) ...[
-                    _buildFailureExplanationCard(),
-                    const SizedBox(height: 20),
-                    _buildTripSummaryMiniCard(),
-                  ],
-
-                  // Pending flow details
-                  if (booking.status == 'PENDING_PAYMENT') ...[
-                    _buildPendingActionCard(),
-                    const SizedBox(height: 20),
-                    _buildTripSummaryMiniCard(),
-                  ],
-
-                  const SizedBox(height: 40),
-                ],
-              ),
+            _codeCard(),
+            if (_b.status == BookingStatus.completed && _reviewed == false) ...[
+              const SizedBox(height: 16),
+              _ratingCard(),
+            ],
+            const SizedBox(height: 16),
+            _TripCard(
+              photo: pkg == null || pkg.photos.isEmpty ? '' : pkg.photos.first,
+              meta: pkg == null ? '' : tripMetaLabel(pkg),
+              name: widget.packageName,
+              date: start == null ? '-' : formatDateRange(start, end!),
+              guests: guests,
             ),
+            const SizedBox(height: 14),
+            const SectionTitle('Data Pemesan'),
+            const SizedBox(height: 10),
+            _bookerCard(),
+            if (people.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const SectionTitle('Data Peserta'),
+              const SizedBox(height: 10),
+              for (var i = 0; i < people.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                _ParticipantCard(index: i, participant: people[i], showPickup: flexible),
+              ],
+            ],
+            const SizedBox(height: 14),
+            const SectionTitle('Ringkasan Pembayaran'),
+            const SizedBox(height: 10),
+            _summary(pkg == null
+                ? null
+                : BookingDraft(
+                    package: pkg,
+                    guests: guests,
+                    startDate: '',
+                    endDate: '',
+                    scheduleLabel: '',
+                    addOns: _b.addOns.isNotEmpty ? _b.addOns : widget.draft?.addOns ?? const [],
+                  )),
           ],
         ),
       ),
-      bottomNavigationBar: TripKitaBottomNavigation(
-        currentIndex: 2, // Booking active
-        onTap: (index) {
-          widget.onNavigate(index);
-        },
-      ),
     );
   }
 
-  Widget _buildStatusHeaderBanner(bool isSuccess, bool isFailed) {
-    String text = 'Menunggu Pembayaran';
-    Color bgColor = Colors.orange.shade500;
-    IconData icon = Icons.hourglass_empty;
+  static final _cardDecoration = BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(8),
+    border: Border.all(color: AppColors.border),
+  );
 
-    if (isSuccess) {
-      text = 'Booking Berhasil & Terkonfirmasi';
-      bgColor = const Color(0xFF0F8B8D); // Teal
-      icon = Icons.check_circle_outline;
-    } else if (isFailed) {
-      text = 'Booking Gagal / Kedaluwarsa';
-      bgColor = Colors.red.shade600;
-      icon = Icons.error_outline;
-    }
-
+  Widget _codeCard() {
     return Container(
-      color: bgColor,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-          ),
-          Text(
-            booking.bookingCode,
-            style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.5),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCountdownCard() {
-    final countdownStr = _calculateCountdown(booking.tripDate);
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F8B8D), Color(0xFF14A0A3)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F8B8D).withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.timer, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Hitung Mundur Keberangkatan',
-                  style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  countdownStr,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDigitalVoucherCard() {
-    final package = booking.packageDetails;
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        children: [
-          // Header info
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.confirmation_num_outlined, color: Color(0xFF0F8B8D), size: 16),
-                    SizedBox(width: 6),
-                    Text('E-VOUCHER TEMENTRIP', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF0F8B8D), letterSpacing: 1)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  package?.name ?? 'Open Trip Wisata',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1F2937)),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(Icons.location_on_outlined, size: 12, color: Colors.grey.shade400),
-                    const SizedBox(width: 4),
-                    Text(package?.destination ?? 'Destinasi', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Dash line separator
-          Row(
-            children: List.generate(
-              30,
-              (i) => Expanded(
-                child: Container(
-                  height: 1,
-                  color: i % 2 == 0 ? Colors.grey.shade300 : Colors.transparent,
-                ),
-              ),
-            ),
-          ),
-
-          // Ticket detail & Simulated QR
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildTicketInfoLabel('Tanggal Keberangkatan', DateFormat('dd MMM yyyy').format(booking.tripDate)),
-                      const SizedBox(height: 14),
-                      _buildTicketInfoLabel('Meeting Point', package?.meetingPoint ?? 'Bandara Domine Eduard Osok, Sorong'),
-                      const SizedBox(height: 14),
-                      _buildTicketInfoLabel('Pax Terdaftar', '${booking.guests} Tamu'),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 20),
-                // Simulated Check-in QR code box
-                Column(
-                  children: [
-                    Container(
-                      width: 90,
-                      height: 90,
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: CustomPaint(
-                        painter: TicketQrPainter(),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text('Scan to Board', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF6B7280))),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTicketInfoLabel(String title, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: TextStyle(color: Colors.grey.shade400, fontSize: 10)),
-        const SizedBox(height: 3),
-        Text(
-          value,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF374151)),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildItineraryCard() {
-    final package = booking.packageDetails;
-    final itinerary = package?.itinerary ?? [];
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Itinerary (Rencana Perjalanan)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937))),
-          const SizedBox(height: 16),
-          if (itinerary.isEmpty)
-            Text('Informasi itinerary lengkap akan dikirimkan oleh Provider.', style: TextStyle(color: Colors.grey.shade400, fontSize: 12))
-          else
-            ...List.generate(itinerary.length, (idx) {
-              final item = itinerary[idx];
-              final isLast = idx == itinerary.length - 1;
-              return IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Column(
-                      children: [
-                        Container(
-                          width: 14,
-                          height: 14,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF0F8B8D),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                            ),
-                          ),
-                        ),
-                        if (!isLast)
-                          Expanded(
-                            child: Container(
-                              width: 2,
-                              color: const Color(0xFF0F8B8D).withOpacity(0.3),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 16.0),
-                        child: Text(
-                          item,
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF4B5563), height: 1.4),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTripInfoDetailsCard() {
-    final package = booking.packageDetails;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Informasi Perjalanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937))),
-          const SizedBox(height: 16),
-          _buildInfoRowIcon(Icons.watch_later_outlined, 'Durasi Trip', package?.duration ?? '3 Hari 2 Malam'),
-          const Divider(height: 24),
-          _buildInfoRowIcon(Icons.directions_boat_outlined, 'Tipe Perjalanan', package?.tripType ?? 'Open Trip'),
-          const Divider(height: 24),
-          _buildInfoRowIcon(Icons.business_center_outlined, 'Fasilitas Utama', package?.facilities.join(', ') ?? 'Peralatan standar, konsumsi'),
-          const Divider(height: 24),
-          _buildInfoRowIcon(Icons.info_outline, 'Sudah Termasuk', package?.includes.join(', ') ?? 'Perijinan & Tiket Masuk'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRowIcon(IconData icon, String title, String body) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: const Color(0xFF0F8B8D), size: 18),
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 15),
+      decoration: _cardDecoration,
+      child: Row(children: [
+        const Text('Kode Booking', style: TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.textMuted)),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: TextStyle(color: Colors.grey.shade400, fontSize: 10)),
-              const SizedBox(height: 4),
-              Text(body, style: const TextStyle(fontSize: 12, color: Color(0xFF374151), fontWeight: FontWeight.bold, height: 1.3)),
-            ],
-          ),
+          child: Text(_b.bookingCode,
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
         ),
-      ],
+      ]),
     );
   }
 
-  Widget _buildParticipantsCard() {
-    final participants = booking.participants;
+  Widget _ratingCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Daftar Peserta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937))),
-          const SizedBox(height: 16),
-          if (participants.isEmpty)
-            Text('Hanya Pemesan: ${booking.customerName}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))
-          else
-            ...List.generate(participants.length, (idx) {
-              final p = participants[idx];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: const Color(0xFFE0F2F1),
-                      radius: 16,
-                      child: Text('${idx + 1}', style: const TextStyle(color: Color(0xFF0F8B8D), fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(p.fullName.isNotEmpty ? p.fullName : 'Peserta ${idx + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF374151))),
-                          const SizedBox(height: 2),
-                          Text('${p.gender} • Lahir ${p.dateOfBirth}', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
+      height: 126,
+      padding: const EdgeInsets.fromLTRB(15, 15, 15, 0),
+      decoration: _cardDecoration,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Bagaimana Trip Anda?',
+            style: TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+        const SizedBox(height: 4),
+        const Text('Ketuk bintang untuk memberikan penilaian',
+            style: TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMuted)),
+        const SizedBox(height: 12.5),
+        Transform.translate(offset: const Offset(-2, 0), child: StarRow(value: 0, onChanged: _review)),
+      ]),
     );
   }
 
-  // --- FAILED FLOW LAYOUTS ---
-  Widget _buildFailureExplanationCard() {
+  Widget _bookerCard() {
+    final name = widget.booker?.name ?? _b.customerName;
+    final email = widget.booker?.email ?? _b.customerEmail;
+    final phone = widget.booker?.whatsapp ?? _b.customerPhone;
+    const detail = TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMedium);
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.red.shade100),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.error, color: Colors.red.shade600, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Transaksi Gagal / Kedaluwarsa',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red.shade800),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Batas waktu pembayaran 24 jam telah habis tanpa adanya konfirmasi transfer dari bank pengirim atau e-wallet. Booking ini dibatalkan secara otomatis oleh sistem.',
-            style: TextStyle(color: Colors.red.shade700, fontSize: 11, height: 1.4),
-          ),
-          const Divider(height: 24, thickness: 1),
-          const Text(
-            'Solusi Anda:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF374151)),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '1. Lakukan booking ulang untuk paket open trip yang sama.\n2. Hubungi Customer Service jika saldo Anda terpotong namun booking gagal.',
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 11, height: 1.4),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Navigate to Trip List screen (Index 1)
-                    widget.onNavigate(1);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF374151),
-                    side: BorderSide(color: Colors.grey.shade300),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Cari Trip Lagi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Navigate to chat/support (Index 3)
-                    widget.onNavigate(3);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F8B8D),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Hubungi CS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      constraints: const BoxConstraints(minHeight: 88),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+      alignment: Alignment.centerLeft,
+      decoration: _cardDecoration,
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(name.isEmpty ? '-' : name,
+            style: const TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+        if (email.isNotEmpty) ...[const SizedBox(height: 4), Text(email, style: detail)],
+        if (phone.isNotEmpty) ...[const SizedBox(height: 4), Text(displayPhone(phone), style: detail)],
+      ]),
     );
   }
 
-  // --- PENDING FLOW LAYOUTS ---
-  Widget _buildPendingActionCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.orange.shade100),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.hourglass_bottom, color: Colors.orange.shade800, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Menunggu Pembayaran',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.orange.shade800),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Lengkapi pembayaran Anda dengan metode pembayaran yang telah dipilih sebelumnya agar voucher keberangkatan dapat segera diterbitkan.',
-            style: TextStyle(color: Color(0xFF6B7280), fontSize: 11, height: 1.4),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                // Navigate back to checkout screen (Index 7)
-                widget.onNavigate(7, arguments: {'booking': booking});
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F8B8D),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Bayar Sekarang', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTripSummaryMiniCard() {
-    final currencyFormatter = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    );
-
-    final package = booking.packageDetails;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Rincian Pemesanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1F2937))),
-          const SizedBox(height: 14),
-          _buildTextInfoRow('Paket Trip', package?.name ?? 'Open Trip'),
-          const Divider(height: 20),
-          _buildTextInfoRow('Tanggal Trip', DateFormat('dd MMMM yyyy').format(booking.tripDate)),
-          const Divider(height: 20),
-          _buildTextInfoRow('Jumlah Pax', '${booking.guests} Pax'),
-          const Divider(height: 20),
-          _buildTextInfoRow('Total Transaksi', currencyFormatter.format(booking.totalPrice), isBoldValue: true, valueColor: const Color(0xFF0F8B8D)),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F9FF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFBAE6FD)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Icon(Icons.shield_outlined, size: 16, color: Color(0xFF0284C7)),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Aturan Pembatalan Strict H-7:\n• ≥ 7 Hari sebelum trip: Full Refund 100%\n• < 7 Hari sebelum trip: 0% Refund (Uang Hangus)\n• Pembatalan oleh Provider/Cuaca: 100% Refund / Reschedule',
-                    style: TextStyle(fontSize: 10, color: Color(0xFF0369A1), height: 1.4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextInfoRow(String label, String value, {bool isBoldValue = false, Color? valueColor}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11)),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: TextStyle(
-              fontWeight: isBoldValue ? FontWeight.w800 : FontWeight.bold,
-              fontSize: 11,
-              color: valueColor ?? const Color(0xFF374151),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReviewCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF0F8B8D).withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F8B8D).withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Icon(Icons.star_rounded, color: Colors.amber, size: 24),
-              SizedBox(width: 8),
-              Text(
-                'Ulasan & Rating Trip',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1F2937)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            booking.hasReviewed
-                ? 'Terima kasih telah memberikan ulasan untuk trip ini!'
-                : 'Trip Anda telah selesai. Bagikan pengalaman terbaik Anda bersama provider ini!',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.4),
-          ),
-          const SizedBox(height: 14),
-          if (booking.hasReviewed) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      ...List.generate(5, (index) {
-                        return Icon(
-                          index < (booking.reviewRating ?? 5.0).toInt() ? Icons.star : Icons.star_border,
-                          size: 16,
-                          color: Colors.amber.shade600,
-                        );
-                      }),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${booking.reviewRating ?? 5.0} / 5.0',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                  if (booking.reviewComment != null && booking.reviewComment!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      '"${booking.reviewComment}"',
-                      style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF4B5563)),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ] else ...[
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  _showReviewBottomSheet(context);
-                },
-                icon: const Icon(Icons.rate_review_outlined, size: 18),
-                label: const Text('Beri Ulasan & Rating ⭐', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F8B8D),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  void _showReviewBottomSheet(BuildContext context) {
-    double selectedRating = 5.0;
-    final TextEditingController commentController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Beri Ulasan & Rating ⭐',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1F2937)),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Bagaimana pengalaman Anda saat mengikuti ${booking.packageDetails?.name ?? "trip ini"}?',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 20),
-                  // Bintang Rating Selector
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      final starVal = (index + 1).toDouble();
-                      return IconButton(
-                        iconSize: 36,
-                        icon: Icon(
-                          starVal <= selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
-                          color: Colors.amber.shade600,
-                        ),
-                        onPressed: () {
-                          setModalState(() {
-                            selectedRating = starVal;
-                          });
-                        },
-                      );
-                    }),
-                  ),
-                  Center(
-                    child: Text(
-                      'Rating: $selectedRating / 5.0',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F8B8D)),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Comment TextField
-                  TextField(
-                    controller: commentController,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      hintText: 'Tuliskan ulasan jujur Anda tentang pelayanan, fasilitas, dan kebersihan...',
-                      hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF0F8B8D), width: 1.5),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          booking.hasReviewed = true;
-                          booking.reviewRating = selectedRating;
-                          booking.reviewComment = commentController.text.trim();
-
-                          // Add new ReviewItem to packageDetails if present
-                          if (booking.packageDetails != null) {
-                            booking.packageDetails!.reviews.insert(
-                              0,
-                              ReviewItem(
-                                id: DateTime.now().millisecondsSinceEpoch,
-                                packageId: booking.packageDetails!.id,
-                                customerName: booking.customerName,
-                                customerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
-                                rating: selectedRating,
-                                comment: commentController.text.trim().isNotEmpty
-                                    ? commentController.text.trim()
-                                    : 'Pengalaman trip yang luar biasa!',
-                                date: DateFormat('dd MMM yyyy').format(DateTime.now()),
-                              ),
-                            );
-                          }
-                        });
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Ulasan berhasil dikirim! Terima kasih.'),
-                            backgroundColor: Color(0xFF0F8B8D),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F8B8D),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      child: const Text('Kirim Ulasan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+  Widget _summary(BookingDraft? draft) {
+    final rows = draft == null ? <(String, String)>[] : priceRows(draft);
+    if (draft != null) {
+      final base =
+          draft.package.basePrice(draft.guests) + draft.addOns.fold<int>(0, (s, a) => s + a.subtotalFor(draft.guests));
+      final fee = _b.totalPrice - base;
+      if (fee > 0) rows.add(('Biaya Layanan', formatPrice(fee)));
+    }
+    return PaymentSummaryCard(
+      rows: rows.isEmpty ? [('Total Harga', formatPrice(_b.totalPrice))] : rows,
+      totalLabel: 'Total Penjualan',
+      total: formatPrice(_b.totalPrice),
+      radius: 12,
     );
   }
 }
 
-// Custom Painter to draw a high-fidelity digital ticket QR code pattern
-class TicketQrPainter extends CustomPainter {
+/// Kartu rincian trip tanpa potongan tiket: foto, tipe, nama, tanggal,
+/// jumlah peserta.
+class _TripCard extends StatelessWidget {
+  final String photo;
+  final String meta;
+  final String name;
+  final String date;
+  final int guests;
+
+  const _TripCard(
+      {required this.photo, required this.meta, required this.name, required this.date, required this.guests});
+
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF1F2937)
-      ..style = PaintingStyle.fill;
-
-    // Corner Anchor 1 (Top-Left)
-    canvas.drawRect(const Rect.fromLTWH(0, 0, 18, 18), paint);
-    canvas.drawRect(const Rect.fromLTWH(3.5, 3.5, 11, 11), Paint()..color = Colors.white);
-    canvas.drawRect(const Rect.fromLTWH(6, 6, 6, 6), paint);
-
-    // Corner Anchor 2 (Top-Right)
-    canvas.drawRect(Rect.fromLTWH(size.width - 18, 0, 18, 18), paint);
-    canvas.drawRect(Rect.fromLTWH(size.width - 14.5, 3.5, 11, 11), Paint()..color = Colors.white);
-    canvas.drawRect(Rect.fromLTWH(size.width - 12, 6, 6, 6), paint);
-
-    // Corner Anchor 3 (Bottom-Left)
-    canvas.drawRect(Rect.fromLTWH(0, size.height - 18, 18, 18), paint);
-    canvas.drawRect(Rect.fromLTWH(3.5, size.height - 14.5, 11, 11), Paint()..color = Colors.white);
-    canvas.drawRect(Rect.fromLTWH(6, size.height - 12, 6, 6), paint);
-
-    // Draw ticket signature bits
-    final bitPaint = Paint()..color = const Color(0xFF1F2937);
-    const double bitSize = 3.6;
-
-    for (double y = 22; y < size.height - 22; y += bitSize * 1.5) {
-      for (double x = 4; x < size.width - 4; x += bitSize * 1.5) {
-        if ((x + y).toInt() % 4 == 0 || (x * y).toInt() % 9 == 3) {
-          canvas.drawRect(Rect.fromLTWH(x, y, bitSize, bitSize), bitPaint);
-        }
-      }
-    }
+  Widget build(BuildContext context) {
+    Widget labelValue(String label, String value) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMuted)),
+          const SizedBox(height: 3.5),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, color: AppColors.textMedium)),
+        ]);
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ClipRRect(borderRadius: BorderRadius.circular(8), child: NetworkPhoto(photo, width: 64, height: 64)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (meta.isNotEmpty)
+                Text(meta,
+                    style: const TextStyle(
+                        fontSize: 12, height: 18 / 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
+              const SizedBox(height: 3),
+              Text(name,
+                  style: const TextStyle(
+                      fontSize: 16, height: 22 / 16, fontWeight: FontWeight.w500, color: AppColors.textDark)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 13.4),
+        labelValue('Tanggal Keberangkatan', date),
+        const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+        labelValue('Jumlah Peserta', '$guests orang'),
+      ]),
+    );
   }
+}
+
+/// Kartu peserta (radius 16): nomor, nama, kontak, titik jemput, riwayat.
+class _ParticipantCard extends StatelessWidget {
+  final int index;
+  final Participant participant;
+  final bool showPickup;
+
+  const _ParticipantCard({required this.index, required this.participant, required this.showPickup});
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) {
+    final p = participant;
+    const small = TextStyle(fontSize: 12, height: 16 / 12, color: AppColors.textMedium);
+    final medical = p.medicalHistory.trim();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(15, 14, 15, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Peserta ${index + 1}', style: small.copyWith(color: AppColors.textMuted)),
+        const SizedBox(height: 10),
+        Text(p.name.trim().isEmpty ? '-' : p.name.trim(),
+            style: const TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+        if (p.phone.isNotEmpty) ...[const SizedBox(height: 4), Text(displayPhone(p.phone), style: small)],
+        if (showPickup) ...[
+          const SizedBox(height: 8),
+          Text('Titik jemput: ${p.pickupPoint.trim().isEmpty ? '-' : p.pickupPoint.trim()}', style: small),
+        ],
+        const SizedBox(height: 6),
+        Text('Riwayat penyakit & alergi: ${medical.isEmpty ? '-' : medical}', style: small),
+      ]),
+    );
+  }
 }
