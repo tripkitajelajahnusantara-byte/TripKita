@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft, ArrowRight, Backpack, CalendarDays, ChevronLeft, ChevronRight, Ghost, Landmark, LayoutGrid, Mail,
+  ArrowLeft, ArrowRight, Backpack, CalendarDays, ChevronLeft, ChevronRight, Clock, Ghost, Landmark, LayoutGrid, Mail,
   MountainSnow, Newspaper, SquarePen, UtensilsCrossed, type LucideIcon,
 } from 'lucide-react';
 import { ApiError, request } from '../utils/api';
@@ -107,6 +107,7 @@ function NewsIndex({ category }: { category: NewsCategory | null }) {
   return (
     <div className="news-container news-layout">
       <div className="news-main">
+        <TopicStrip active={category} />
         {category ? (
           <CategoryArticles key={category} category={category} />
         ) : (
@@ -120,12 +121,37 @@ function NewsIndex({ category }: { category: NewsCategory | null }) {
           </>
         )}
       </div>
-      <aside className="news-side">
-        <StoryInvite />
-        <TopicPicker active={active} onSelect={choose} />
-        <CategoryLatest key={active} category={active} />
-      </aside>
+      <NewsSidebar active={active} onSelect={choose} />
     </div>
+  );
+}
+
+function NewsSidebar({ active, onSelect, excludeId }: { active: NewsCategory; onSelect: (slug: NewsCategory) => void; excludeId?: number }) {
+  return (
+    <aside className="news-side">
+      <StoryInvite />
+      <TopicPicker active={active} onSelect={onSelect} />
+      <CategoryLatest key={active} category={active} excludeId={excludeId} />
+    </aside>
+  );
+}
+
+// Di layar sempit sidebar turun ke bawah halaman; strip ini menjaga topik
+// tetap terjangkau di atas konten. Disembunyikan di desktop lewat CSS.
+function TopicStrip({ active }: { active: NewsCategory | null }) {
+  const { t, lang } = useI18n();
+  return (
+    <nav className="news-topic-strip" aria-label={t('Topik berita', 'News topics')}>
+      <a href={newsHash()} aria-current={active ? undefined : 'page'}>{t('Semua', 'All')}</a>
+      {NEWS_CATEGORIES.map(({ slug }) => {
+        const Icon = CATEGORY_ICONS[slug];
+        return (
+          <a key={slug} href={newsCategoryHash(slug)} aria-current={active === slug ? 'page' : undefined}>
+            <Icon size={16} aria-hidden="true" /> {newsCategoryLabel(slug, lang)}
+          </a>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -403,7 +429,7 @@ function TopicPicker({ active, onSelect }: { active: NewsCategory; onSelect: (sl
   );
 }
 
-function CategoryLatest({ category }: { category: NewsCategory }) {
+function CategoryLatest({ category, excludeId }: { category: NewsCategory; excludeId?: number }) {
   const { t, lang } = useI18n();
   const [items, setItems] = useState<NewsItem[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -412,10 +438,10 @@ function CategoryLatest({ category }: { category: NewsCategory }) {
   useEffect(() => {
     let cancelled = false;
     fetchNewsPage(1, category)
-      .then((data) => { if (!cancelled) setItems(data.items.slice(0, 3)); })
+      .then((data) => { if (!cancelled) setItems(data.items.filter((item) => item.id !== excludeId).slice(0, 3)); })
       .catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
-  }, [category]);
+  }, [category, excludeId]);
 
   return (
     <section className="news-side-card" aria-labelledby="news-category-latest" aria-live="polite">
@@ -478,20 +504,12 @@ function ArticlePager({ id, page, total }: { id: number; page: number; total: nu
 function NewsArticle({ id, page }: { id: number; page: number }) {
   const { t, lang } = useI18n();
   const [article, setArticle] = useState<NewsItem | null>(null);
-  const [related, setRelated] = useState<NewsItem[]>([]);
   const [error, setError] = useState<{ notFound: boolean; message: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     request(`/public/news/${id}`)
-      .then((data: NewsItem) => {
-        if (cancelled) return;
-        setArticle(data);
-        // Berita lain hanya pelengkap; kegagalannya tidak perlu ditampilkan.
-        fetchNewsPage(1, data.category)
-          .then((list) => { if (!cancelled) setRelated(list.items.filter((item) => item.id !== id).slice(0, 3)); })
-          .catch(() => undefined);
-      })
+      .then((data: NewsItem) => { if (!cancelled) setArticle(data); })
       .catch((err) => {
         if (cancelled) return;
         setError({
@@ -504,9 +522,12 @@ function NewsArticle({ id, page }: { id: number; page: number }) {
 
   const pages = useMemo(() => splitNewsPages(toDisplayHtml(article?.content ?? '')), [article]);
   const backLink = <a className="news-back" href={newsHash()}><ArrowLeft size={16} /> {t('Semua berita', 'All news')}</a>;
+  // Sidebar artikel: memilih topik langsung membuka daftar kategori tersebut.
+  const openCategory = (slug: NewsCategory) => { window.location.hash = newsCategoryHash(slug); };
 
+  let body: React.ReactNode;
   if (error) {
-    return (
+    body = (
       <div className="news-article">
         {backLink}
         <div className="news-state">
@@ -515,37 +536,32 @@ function NewsArticle({ id, page }: { id: number; page: number }) {
         </div>
       </div>
     );
-  }
-
-  if (!article) {
-    return (
+  } else if (!article) {
+    body = (
       <div className="news-article" aria-busy="true" aria-label={t('Memuat berita', 'Loading news')}>
         {backLink}
-        <Skeleton width={180} height={14} />
+        <Skeleton width={120} height={22} radius={999} />
         <Skeleton height={36} style={{ marginTop: 16 }} />
         <Skeleton width="65%" height={36} style={{ marginTop: 10 }} />
-        <Skeleton height={340} radius={12} style={{ marginTop: 28 }} />
+        <Skeleton height={340} radius={14} style={{ marginTop: 28 }} />
       </div>
     );
-  }
-
-  const minutes = readingMinutes(countWords(htmlToText(article.content ?? '')));
-  const cover = resolveMediaUrl(article.coverImage);
-  const credit = coverCredit(article.coverCaption ?? '', article.coverSource ?? '');
-  const current = Math.min(page, pages.length);
-  const isLastPage = current === pages.length;
-
-  return (
-    <>
+  } else {
+    const minutes = readingMinutes(countWords(htmlToText(article.content ?? '')));
+    const cover = resolveMediaUrl(article.coverImage);
+    const credit = coverCredit(article.coverCaption ?? '', article.coverSource ?? '');
+    const current = Math.min(page, pages.length);
+    body = (
       <article className="news-article">
         {backLink}
         <header className="news-article-head">
           <a className="news-chip news-chip-link" href={newsCategoryHash(article.category)}>{newsCategoryLabel(article.category, lang)}</a>
-          <p className="news-article-meta">
-            <time dateTime={article.publishedAt ?? undefined}>{formatNewsDate(article.publishedAt)}</time> · {t(`${minutes} menit baca`, `${minutes} min read`)}
-            {pages.length > 1 && t(` · Halaman ${current} dari ${pages.length}`, ` · Page ${current} of ${pages.length}`)}
-          </p>
           <h1>{article.title}</h1>
+          <p className="news-article-meta">
+            <span><CalendarDays size={15} aria-hidden="true" /><time dateTime={article.publishedAt ?? undefined}>{formatNewsDate(article.publishedAt)}</time></span>
+            <span><Clock size={15} aria-hidden="true" />{t(`${minutes} menit baca`, `${minutes} min read`)}</span>
+            {pages.length > 1 && <span>{t(`Halaman ${current} dari ${pages.length}`, `Page ${current} of ${pages.length}`)}</span>}
+          </p>
         </header>
         {cover && current === 1 && (
           <figure className="news-article-figure">
@@ -558,24 +574,14 @@ function NewsArticle({ id, page }: { id: number; page: number }) {
         {pages.length > 1 && <ArticlePager id={id} page={current} total={pages.length} />}
         <NewsComments newsId={id} />
       </article>
+    );
+  }
 
-      {isLastPage && related.length > 0 && (
-        <section className="news-container news-related" aria-labelledby="news-related-title">
-          <SectionTitle id="news-related-title">{t(`Artikel ${newsCategoryLabel(article.category, 'id')} lainnya`, `More in ${newsCategoryLabel(article.category, 'en')}`)}</SectionTitle>
-          <ul className="news-related-grid">
-            {related.map((item) => (
-              <li key={item.id}>
-                <a className="news-pick" href={newsHash(item.id)}>
-                  <div className="news-pick-media"><Cover src={item.coverImage} className="news-pick-cover" /></div>
-                  <h3>{item.title}</h3>
-                  <NewsDate value={item.publishedAt} />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </>
+  return (
+    <div className="news-container news-layout">
+      <div className="news-main">{body}</div>
+      <NewsSidebar active={article?.category ?? NEWS_CATEGORIES[0].slug} onSelect={openCategory} excludeId={id} />
+    </div>
   );
 }
 
@@ -586,7 +592,7 @@ const NEWS_PAGE_CSS = `
   }
   .news-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
   .news-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .news-page ul, .news-page ol { list-style: none; }
+  .news-support, .news-carousel-track, .news-rows, .news-mini-list, .news-pager ol { list-style: none; }
   .news-page a:focus-visible, .news-page button:focus-visible, .news-carousel-track:focus-visible {
     outline: 2px solid var(--nw-teal); outline-offset: 3px; border-radius: 12px;
   }
@@ -749,13 +755,14 @@ const NEWS_PAGE_CSS = `
 
   .news-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 20px; }
   .news-back:hover { color: var(--nw-teal-ink); }
-  .news-article { max-width: 760px; margin: 0 auto; padding: 0 24px; }
-  .news-article .news-back { margin-bottom: 28px; }
-  .news-article-head { display: flex; flex-direction: column; gap: 10px; }
+  .news-article { min-width: 0; }
+  .news-article .news-back { margin-bottom: 24px; }
+  .news-article-head { display: flex; flex-direction: column; gap: 14px; }
   .news-chip-link:hover { background: var(--nw-teal-ink); }
-  .news-article-meta { font-size: 13px; color: #64748b; }
-  .news-article-head h1 { font-size: 40px; line-height: 1.18; letter-spacing: -0.02em; }
-  .news-article-figure { margin: 32px 0 36px; }
+  .news-article-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: #64748b; }
+  .news-article-meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .news-article-head h1 { font-size: 38px; line-height: 1.2; letter-spacing: -0.02em; color: var(--nw-ink); text-wrap: balance; }
+  .news-article-figure { margin: 28px 0 32px; }
   .news-article-cover { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 14px; }
   .news-article-figure figcaption { margin-top: 8px; font-size: 13px; line-height: 1.5; color: #64748b; }
   .news-article-head + .news-prose { margin-top: 32px; }
@@ -773,17 +780,31 @@ const NEWS_PAGE_CSS = `
   .news-pager-step { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--nw-teal-ink); }
   .news-pager-step:hover { text-decoration: underline; }
   .news-pager-step.is-disabled { color: #cbd5e1; pointer-events: none; }
-  .news-related { margin-top: 72px; padding-top: 40px; border-top: 1px solid var(--color-border); max-width: 1000px; }
-  .news-related-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+
+  .news-topic-strip { display: none; }
 
   @media (max-width: 1080px) {
     .news-layout { grid-template-columns: minmax(0, 1fr); }
     .news-side { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .news-main { gap: 32px; }
+    .news-topic-strip {
+      display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: -4px -24px 0; padding: 4px 24px;
+      scroll-snap-type: x proximity;
+    }
+    .news-topic-strip::-webkit-scrollbar { display: none; }
+    .news-topic-strip a {
+      flex: none; scroll-snap-align: start; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px;
+      border-radius: 999px; border: 1px solid #e2e8f0; background: #fff; color: #334155; font-size: 14px; font-weight: 600;
+    }
+    .news-topic-strip a svg { color: var(--nw-teal); }
+    .news-topic-strip a[aria-current="page"] { background: var(--nw-teal); border-color: var(--nw-teal); color: #fff; }
+    .news-topic-strip a[aria-current="page"] svg { color: #fff; }
     .news-side .news-story { grid-row: span 2; }
   }
   @media (max-width: 760px) {
     .news-page { padding: 24px 0 64px; }
-    .news-container, .news-article { padding: 0 16px; }
+    .news-container { padding: 0 16px; }
+    .news-topic-strip { margin: -4px -16px 0; padding: 4px 16px; }
     .news-main { gap: 40px; }
     .news-side { display: flex; }
     .news-section-title { font-size: 22px; }
@@ -805,6 +826,5 @@ const NEWS_PAGE_CSS = `
     .news-pager-step { flex: 1 1 40%; }
     .news-pager-step:last-child { justify-content: flex-end; }
     .news-pager ol { order: 3; flex-basis: 100%; }
-    .news-related-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   }
 `;

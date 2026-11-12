@@ -80,6 +80,8 @@ export function resolveMediaUrl(raw: unknown): string {
     return trimmed;
   }
   if (trimmed.startsWith('//')) return '';
+  // Foto bawaan seed berita disajikan web app sendiri (public/news-covers), bukan backend.
+  if (/^\/news-covers\/[a-z0-9-]+\.webp$/.test(trimmed)) return trimmed;
   if (trimmed.startsWith('/') || trimmed.startsWith('uploads/') || trimmed.startsWith('storage/') || /\.(jpe?g|png|webp|gif)$/i.test(trimmed)) {
     return trimmed.startsWith('/') ? `${BACKEND_ORIGIN}${trimmed}` : `${BACKEND_ORIGIN}/${trimmed}`;
   }

@@ -22,6 +22,8 @@ func TestSanitizeNewsHTML(t *testing.T) {
 		{"drops data image", `<img src="data:image/png;base64,AAA" onerror="x()">`, ``},
 		{"keeps uploaded image", `<img src="/uploads/pkg_0123456789abcdef0123456789abcdef.jpg" alt="Pantai">`, `<img src="/uploads/pkg_0123456789abcdef0123456789abcdef.jpg" alt="Pantai" loading="lazy">`},
 		{"rejects private document path", `<img src="/uploads/doc_0123456789abcdef0123456789abcdef.jpg">`, ``},
+		{"keeps bundled seed cover", `<img src="/news-covers/raja-ampat.webp">`, `<img src="/news-covers/raja-ampat.webp" alt="" loading="lazy">`},
+		{"rejects bundled path traversal", `<img src="/news-covers/../index.html">`, ``},
 		{"escapes text", `<p>&lt;script&gt;</p>`, `<p>&lt;script&gt;</p>`},
 		{"drops iframe", `<iframe src="https://evil.test"></iframe><p>a</p>`, `<p>a</p>`},
 	}

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/url"
+	"regexp"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -125,6 +126,8 @@ func newsAttributes(tag string, attrs []html.Attribute) (string, bool) {
 // safeNewsURL hanya menerima http(s), mailto (tautan), anchor halaman
 // ("#/cari-trip"), dan foto unggahan publik "/uploads/pkg_...". Skema lain,
 // termasuk javascript: dan data:, ditolak.
+var newsCoverAsset = regexp.MustCompile(`^/news-covers/[a-z0-9-]+\.webp$`)
+
 func safeNewsURL(raw string, image bool) (string, bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" || strings.ContainsAny(raw, "\\\x00") {
@@ -132,6 +135,11 @@ func safeNewsURL(raw string, image bool) (string, bool) {
 	}
 	if image && strings.HasPrefix(raw, "/uploads/") {
 		return raw, models.IsPackagePhotoName(strings.TrimPrefix(raw, "/uploads/"))
+	}
+	// Foto bawaan seed berita (database/seed_news.sql) disajikan web app dari
+	// provider-web/public/news-covers, bukan dari direktori unggahan backend.
+	if image && strings.HasPrefix(raw, "/news-covers/") {
+		return raw, newsCoverAsset.MatchString(raw)
 	}
 	if !image && strings.HasPrefix(raw, "#") {
 		return raw, true
