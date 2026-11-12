@@ -486,11 +486,17 @@ export const CustomerHelpPage: React.FC = () => {
           font-weight: 600;
         }
 
+        .contact-method-item > div:last-child {
+          min-width: 0;
+        }
+
         .method-value {
           font-size: 14.5px;
           font-weight: 700;
           color: #0284c7;
           text-decoration: underline;
+          /* Alamat email panjang dipatah agar tidak meluber di layar sempit. */
+          overflow-wrap: anywhere;
         }
 
         .method-value-text {

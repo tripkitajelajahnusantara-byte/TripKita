@@ -57,7 +57,7 @@ func (ctrl *NewsCommentController) requirePublishedNews(c *gin.Context, newsID u
 		return false
 	}
 	if count == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Berita tidak ditemukan"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cerita tidak ditemukan"})
 		return false
 	}
 	return true

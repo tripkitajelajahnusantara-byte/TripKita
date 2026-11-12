@@ -7,6 +7,7 @@ import { getWishlistStorage, toggleWishlistStorage } from '../utils/wishlist';
 import { ShareModal } from '../components/ShareModal';
 import { TripImage } from '../components/TripImage';
 import { SkeletonCards } from '../components/Skeleton';
+import { HomeTravelStories } from '../components/HomeTravelStories';
 
 import heroImage from '../assets/hero.jpg';
 
@@ -743,6 +744,8 @@ export const CustomerLandingPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        <HomeTravelStories />
 
         {/* Feature Grid Ribbon */}
         <div 

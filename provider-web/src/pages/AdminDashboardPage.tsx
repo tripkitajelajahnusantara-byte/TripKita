@@ -1042,7 +1042,7 @@ export const AdminDashboardPage: React.FC = () => {
               className={`menu-btn ${activeView === 'berita' ? 'active' : ''}`}
               onClick={() => { setActiveView('berita'); setSelectedProvider(null); }}
             >
-              <Newspaper size={18} /> Berita
+              <Newspaper size={18} /> Cerita Travel
             </button>
             <button
               className={`menu-btn ${activeView === 'pengaturan-beranda' ? 'active' : ''}`}
@@ -1109,7 +1109,7 @@ export const AdminDashboardPage: React.FC = () => {
                   : activeView === 'penghasilan-platform'
                   ? 'Penghasilan TemenTrip'
                   : activeView === 'berita'
-                  ? 'Berita'
+                  ? 'Cerita Travel'
                   : activeView === 'pengaturan-beranda'
                   ? 'Pengaturan Beranda'
                   : activeView === 'kelola-komentar'
@@ -1128,9 +1128,9 @@ export const AdminDashboardPage: React.FC = () => {
                   : activeView === 'penghasilan-platform'
                   ? 'Biaya layanan dan komisi TemenTrip dari setiap booking berbayar. Booking yang direfund penuh tidak dihitung.'
                   : activeView === 'berita'
-                  ? 'Tulis dan kelola berita yang tampil di menu Berita pada situs customer.'
+                  ? 'Tulis dan kelola berita yang tampil di menu Cerita Travel pada situs customer.'
                   : activeView === 'pengaturan-beranda'
-                  ? 'Pilih dan urutkan Berita Utama serta Pilihan Redaksi di halaman Berita customer. Hanya berita yang sudah terbit yang bisa dipilih.'
+                  ? 'Pilih dan urutkan Berita Utama serta Pilihan Redaksi di halaman Cerita Travel customer. Hanya berita yang sudah terbit yang bisa dipilih.'
                   : activeView === 'kelola-komentar'
                   ? 'Pantau komentar pembaca. Komentar yang disembunyikan atau dihapus tidak tampil di situs customer.'
                   : 'Kelola dan verifikasi semua mitra yang terdaftar di TemenTrip.'}

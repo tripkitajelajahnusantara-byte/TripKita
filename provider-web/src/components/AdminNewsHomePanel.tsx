@@ -11,7 +11,7 @@ const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ?
 const layoutKey = (value: NewsHighlights) => JSON.stringify([value.featured.map((item) => item.id), value.editorPicks.map((item) => item.id)]);
 
 // Pengaturan Beranda: admin menyusun 5 Berita Utama dan 5 Pilihan Redaksi
-// untuk halaman Berita customer. Perubahan langsung tayang setelah disimpan.
+// untuk halaman Cerita Travel customer. Perubahan langsung tayang setelah disimpan.
 export function AdminNewsHomePanel() {
   const [published, setPublished] = useState<NewsItem[] | null>(null);
   const [layout, setLayout] = useState<NewsHighlights | null>(null);
@@ -53,7 +53,7 @@ export function AdminNewsHomePanel() {
       });
       setLayout(saved);
       setBaseline(layoutKey(saved));
-      setNotice('Susunan tersimpan dan sudah tampil di halaman Berita.');
+      setNotice('Susunan tersimpan dan sudah tampil di halaman Cerita Travel.');
     } catch (err) {
       setError(errorMessage(err, 'Susunan gagal disimpan.'));
     } finally {
@@ -77,12 +77,12 @@ export function AdminNewsHomePanel() {
           {error && <div className="alert-message error-alert" role="alert">{error}</div>}
           {notice && <div className="alert-message success-alert">{notice}</div>}
           {published.length === 0 && (
-            <div className="alert-message">Belum ada berita yang terbit. Terbitkan berita di menu Berita agar bisa dipilih di sini.</div>
+            <div className="alert-message">Belum ada berita yang terbit. Terbitkan berita di menu Cerita Travel agar bisa dipilih di sini.</div>
           )}
           <div className="nh-grid">
             <SlotEditor
               title="Berita Utama"
-              hint="Tampil paling atas di halaman Berita. Artikel #1 menjadi berita utama berukuran besar, #2–5 menjadi berita pendukung. Kosongkan bila bagian ini tidak ingin ditampilkan."
+              hint="Tampil paling atas di halaman Cerita Travel. Artikel #1 menjadi berita utama berukuran besar, #2–5 menjadi berita pendukung. Kosongkan bila bagian ini tidak ingin ditampilkan."
               slotLabel={(index) => (index === 0 ? 'Berita utama' : 'Berita pendukung')}
               items={layout.featured}
               published={published}
@@ -101,7 +101,7 @@ export function AdminNewsHomePanel() {
             <span className={`nw-save-state ${dirty ? 'is-dirty' : ''}`} aria-live="polite">
               {saving ? 'Menyimpan…' : dirty ? 'Ada perubahan yang belum disimpan' : 'Semua perubahan tersimpan'}
             </span>
-            <a className="nw-inline-link" href={newsHash()} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Lihat halaman Berita</a>
+            <a className="nw-inline-link" href={newsHash()} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Lihat halaman Cerita Travel</a>
             <button type="button" className="nw-btn nw-btn-primary" disabled={!dirty || saving} onClick={save}>
               {saving && <LoaderCircle size={16} className="nw-spin" />} Simpan susunan
             </button>
