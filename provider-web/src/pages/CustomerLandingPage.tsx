@@ -485,6 +485,11 @@ export const CustomerLandingPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Cuplikan Cerita Travel: strip ringkas agar daftar trip tidak terdorong jauh */}
+      <div className="container" style={{ maxWidth: '1120px', margin: '0 auto 30px auto', padding: '0 20px' }}>
+        <HomeTravelStories />
+      </div>
+
       {/* Rencana Trip: tampil untuk semua pengunjung; tamu diminta masuk/daftar dulu */}
       <div className="container" style={{ maxWidth: '1120px', margin: '0 auto 30px auto', padding: '0 20px' }}>
         <div
@@ -744,8 +749,6 @@ export const CustomerLandingPage: React.FC = () => {
             </div>
           </div>
         )}
-
-        <HomeTravelStories />
 
         {/* Feature Grid Ribbon */}
         <div 
