@@ -41,7 +41,7 @@ function readNewsLocation() {
 
 // Dipakai di dalam efek fetch; getLang() dibaca saat gagal agar efek tidak
 // perlu bergantung pada t (ganti bahasa tidak boleh memuat ulang berita).
-const loadFailed = () => (getLang() === 'en' ? 'Could not load news.' : 'Berita gagal dimuat.');
+const loadFailed = () => (getLang() === 'en' ? 'Could not load stories.' : 'Cerita gagal dimuat.');
 
 const fetchNewsPage = (page: number, category?: NewsCategory | null): Promise<NewsPageData> =>
   request(`/public/news?page=${page}${category ? `&category=${category}` : ''}`);
@@ -112,10 +112,10 @@ function NewsIndex({ category }: { category: NewsCategory | null }) {
           <CategoryArticles key={category} category={category} />
         ) : (
           <>
-            <h1 className="news-visually-hidden">{t('Berita', 'News')}</h1>
+            <h1 className="news-visually-hidden">{t('Cerita Travel', 'Travel Stories')}</h1>
             <Highlights />
             <section aria-labelledby="news-latest-title">
-              <SectionTitle id="news-latest-title">{t('Berita Terbaru', 'Latest News')}</SectionTitle>
+              <SectionTitle id="news-latest-title">{t('Cerita Terbaru', 'Latest Stories')}</SectionTitle>
               <NewsFeed />
             </section>
           </>
@@ -141,7 +141,7 @@ function NewsSidebar({ active, onSelect, excludeId }: { active: NewsCategory; on
 function TopicStrip({ active }: { active: NewsCategory | null }) {
   const { t, lang } = useI18n();
   return (
-    <nav className="news-topic-strip" aria-label={t('Topik berita', 'News topics')}>
+    <nav className="news-topic-strip" aria-label={t('Topik cerita', 'Story topics')}>
       <a href={newsHash()} aria-current={active ? undefined : 'page'}>{t('Semua', 'All')}</a>
       {NEWS_CATEGORIES.map(({ slug }) => {
         const Icon = CATEGORY_ICONS[slug];
@@ -170,7 +170,7 @@ function Highlights() {
 
   if (!data) {
     return (
-      <div className="news-highlight-loading" aria-busy="true" aria-label={t('Memuat berita utama', 'Loading top stories')}>
+      <div className="news-highlight-loading" aria-busy="true" aria-label={t('Memuat cerita utama', 'Loading top stories')}>
         <Skeleton height={360} radius={18} />
         <div className="news-support">
           {[0, 1, 2, 3].map((key) => <Skeleton key={key} height={150} radius={12} />)}
@@ -183,7 +183,7 @@ function Highlights() {
   return (
     <>
       {lead && (
-        <section className="news-top" aria-label={t('Berita utama', 'Top stories')}>
+        <section className="news-top" aria-label={t('Cerita utama', 'Top stories')}>
           <a className="news-hero" href={newsHash(lead.id)}>
             <Cover src={lead.coverImage} className="news-hero-cover" />
             <div className="news-hero-body">
@@ -310,7 +310,7 @@ function NewsFeed({ category, onTotal }: { category?: NewsCategory; onTotal?: (t
   }
   if (!items) {
     return (
-      <div className="news-rows" aria-busy="true" aria-label={t('Memuat berita', 'Loading news')}>
+      <div className="news-rows" aria-busy="true" aria-label={t('Memuat cerita', 'Loading stories')}>
         {[0, 1, 2, 3].map((key) => (
           <div key={key} className="news-row">
             <Skeleton height={100} radius={12} />
@@ -324,7 +324,7 @@ function NewsFeed({ category, onTotal }: { category?: NewsCategory; onTotal?: (t
     return (
       <div className="news-state">
         <Newspaper size={32} strokeWidth={1.4} aria-hidden="true" />
-        <p>{category ? t('Belum ada artikel dalam kategori ini.', 'No articles in this category yet.') : t('Belum ada berita. Kabar terbaru akan muncul di sini.', 'No news yet. The latest updates will appear here.')}</p>
+        <p>{category ? t('Belum ada artikel dalam kategori ini.', 'No articles in this category yet.') : t('Belum ada cerita. Cerita terbaru akan muncul di sini.', 'No stories yet. The latest stories will appear here.')}</p>
       </div>
     );
   }
@@ -363,7 +363,7 @@ function CategoryArticles({ category }: { category: NewsCategory }) {
   const label = newsCategoryLabel(category, lang);
   return (
     <section aria-labelledby="news-category-title">
-      <a className="news-back" href={newsHash()}><ArrowLeft size={16} /> {t('Semua berita', 'All news')}</a>
+      <a className="news-back" href={newsHash()}><ArrowLeft size={16} /> {t('Semua cerita', 'All stories')}</a>
       <header className="news-category-head">
         <span className="news-category-icon" aria-hidden="true"><Icon size={26} strokeWidth={1.8} /></span>
         <div>
@@ -521,7 +521,7 @@ function NewsArticle({ id, page }: { id: number; page: number }) {
   }, [id]);
 
   const pages = useMemo(() => splitNewsPages(toDisplayHtml(article?.content ?? '')), [article]);
-  const backLink = <a className="news-back" href={newsHash()}><ArrowLeft size={16} /> {t('Semua berita', 'All news')}</a>;
+  const backLink = <a className="news-back" href={newsHash()}><ArrowLeft size={16} /> {t('Semua cerita', 'All stories')}</a>;
   // Sidebar artikel: memilih topik langsung membuka daftar kategori tersebut.
   const openCategory = (slug: NewsCategory) => { window.location.hash = newsCategoryHash(slug); };
 
@@ -531,14 +531,14 @@ function NewsArticle({ id, page }: { id: number; page: number }) {
       <div className="news-article">
         {backLink}
         <div className="news-state">
-          <h2>{error.notFound ? t('Berita tidak ditemukan', 'News not found') : t('Berita gagal dimuat', 'Could not load news')}</h2>
-          <p>{error.notFound ? t('Berita ini mungkin sudah dihapus atau belum diterbitkan.', 'This article may have been removed or not published yet.') : error.message}</p>
+          <h2>{error.notFound ? t('Cerita tidak ditemukan', 'Story not found') : t('Cerita gagal dimuat', 'Could not load story')}</h2>
+          <p>{error.notFound ? t('Cerita ini mungkin sudah dihapus atau belum diterbitkan.', 'This story may have been removed or not published yet.') : error.message}</p>
         </div>
       </div>
     );
   } else if (!article) {
     body = (
-      <div className="news-article" aria-busy="true" aria-label={t('Memuat berita', 'Loading news')}>
+      <div className="news-article" aria-busy="true" aria-label={t('Memuat cerita', 'Loading stories')}>
         {backLink}
         <Skeleton width={120} height={22} radius={999} />
         <Skeleton height={36} style={{ marginTop: 16 }} />
@@ -789,7 +789,7 @@ const NEWS_PAGE_CSS = `
     .news-main { gap: 32px; }
     .news-topic-strip {
       display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: -4px -24px 0; padding: 4px 24px;
-      scroll-snap-type: x proximity;
+      scroll-snap-type: x proximity; scroll-padding: 0 24px;
     }
     .news-topic-strip::-webkit-scrollbar { display: none; }
     .news-topic-strip a {
@@ -804,7 +804,7 @@ const NEWS_PAGE_CSS = `
   @media (max-width: 760px) {
     .news-page { padding: 24px 0 64px; }
     .news-container { padding: 0 16px; }
-    .news-topic-strip { margin: -4px -16px 0; padding: 4px 16px; }
+    .news-topic-strip { margin: -4px -16px 0; padding: 4px 16px; scroll-padding: 0 16px; }
     .news-main { gap: 40px; }
     .news-side { display: flex; }
     .news-section-title { font-size: 22px; }

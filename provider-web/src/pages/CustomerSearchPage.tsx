@@ -205,7 +205,7 @@ export const CustomerSearchPage: React.FC = () => {
     : t('Wisata', 'Trip');
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '24px 20px 80px 20px', fontFamily: 'Inter, sans-serif' }}>
+    <div className="search-page" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '24px 20px 80px 20px', fontFamily: 'Inter, sans-serif' }}>
       <div className="container" style={{ maxWidth: '1080px', margin: '0 auto' }}>
         
         {/* Back Button */}
@@ -228,7 +228,7 @@ export const CustomerSearchPage: React.FC = () => {
         </button>
 
         {/* Top Header Result Bar with Single Sort Dropdown */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', flexWrap: 'wrap', gap: '14px' }}>
+        <div className="search-result-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', flexWrap: 'wrap', gap: '14px' }}>
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
               {t(`Daftar Paket ${listLabel}`, `${listLabel} Packages`)}
@@ -241,11 +241,12 @@ export const CustomerSearchPage: React.FC = () => {
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', whiteSpace: 'nowrap' }}>
+          <div className="search-sort" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <label htmlFor="search-sort-select" style={{ fontSize: '13px', fontWeight: '700', color: '#475569', whiteSpace: 'nowrap' }}>
               {t('Urutkan berdasarkan:', 'Sort by:')}
             </label>
             <select 
+              id="search-sort-select"
               value={sortBy} 
               onChange={(e) => setSortBy(e.target.value)}
               style={{
@@ -299,7 +300,7 @@ export const CustomerSearchPage: React.FC = () => {
                 key={i}
                 aria-hidden="true"
                 className="search-card-skeleton"
-                style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '270px 1fr', gap: '24px', alignItems: 'center' }}
+                style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '270px minmax(0, 1fr)', gap: '24px', alignItems: 'center' }}
               >
                 <Skeleton height={180} radius={12} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -359,7 +360,7 @@ export const CustomerSearchPage: React.FC = () => {
                     border: '1px solid #e2e8f0',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                     display: 'grid',
-                    gridTemplateColumns: '270px 1fr',
+                    gridTemplateColumns: '270px minmax(0, 1fr)',
                     gap: '24px',
                     alignItems: 'center',
                     transition: 'all 0.2s'
@@ -367,7 +368,7 @@ export const CustomerSearchPage: React.FC = () => {
                   className="search-card-item"
                 >
                   {/* Image Left */}
-                  <div style={{ height: '180px', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+                  <div className="search-card-media" style={{ height: '180px', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
                     <TripImage 
                       src={getImageUrl(pkg.id, pkg.name, pkg.category, pkg.images || pkg.image)} 
                       alt={pkg.name} 
@@ -402,10 +403,10 @@ export const CustomerSearchPage: React.FC = () => {
                   </div>
 
                   {/* Content Right */}
-                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', minWidth: 0 }}>
                     <div>
                       {/* Top Row: Category + Price */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
                         <span 
                           style={{ 
                             backgroundColor: expired ? '#64748b' : badge.bg, 
@@ -419,7 +420,7 @@ export const CustomerSearchPage: React.FC = () => {
                           {pkg.tripType ? `${pkg.tripType} • ${term(pkg.category)}` : term(pkg.category)}
                         </span>
 
-                        <div style={{ textAlign: 'right' }}>
+                        <div className="search-card-price" style={{ textAlign: 'right' }}>
                           <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{t('Mulai dari', 'From')}</span>
                           <span style={{ fontSize: '19px', fontWeight: '800', color: '#007bff' }}>
                             {formatIDR(pkg.price)} <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>{priceUnitLabel(pkg)}</span>
@@ -458,7 +459,10 @@ export const CustomerSearchPage: React.FC = () => {
                               backgroundColor: '#e0f2fe',
                               padding: '2px 8px',
                               borderRadius: '4px',
-                              whiteSpace: 'nowrap'
+                              whiteSpace: 'nowrap',
+                              maxWidth: '100%',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
                             }}
                           >
                             {hl}
@@ -468,7 +472,7 @@ export const CustomerSearchPage: React.FC = () => {
 
                       {/* Description */}
                       {pkg.description && pkg.description.trim() && (
-                        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 12px 0', lineHeight: '1.4' }}>
+                        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 12px 0', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                           {pkg.description}
                         </p>
                       )}
@@ -476,7 +480,7 @@ export const CustomerSearchPage: React.FC = () => {
                       {/* Schedule */}
                       {scheduleText && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: '500' }}>
-                          <Calendar size={14} color="#94a3b8" />
+                          <Calendar size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
                           <span>{expired ? t('Jadwal', 'Schedule') : t('Jadwal tersedia', 'Available dates')}: <strong>{scheduleText}</strong></span>
                         </div>
                       )}
@@ -498,7 +502,7 @@ export const CustomerSearchPage: React.FC = () => {
                         )}
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div className="search-card-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {/* Share Button (Gambar 3) */}
                         <button
                           onClick={(e) => handleSharePackage(e, pkg)}
@@ -572,9 +576,47 @@ export const CustomerSearchPage: React.FC = () => {
           border-color: #007bff !important;
         }
         @media (max-width: 768px) {
+          .search-page {
+            padding: 16px 16px 64px !important;
+          }
+          .search-result-bar {
+            padding: 14px 16px !important;
+            margin-bottom: 16px !important;
+          }
+          .search-sort {
+            width: 100%;
+          }
+          .search-sort select {
+            flex: 1 1 160px;
+            min-width: 0;
+          }
           .search-card-item,
           .search-card-skeleton {
-            grid-template-columns: 1fr !important;
+            grid-template-columns: minmax(0, 1fr) !important;
+            padding: 14px !important;
+            gap: 14px !important;
+          }
+          .search-card-media {
+            height: 190px !important;
+          }
+          .search-card-item h3 {
+            font-size: 16px !important;
+          }
+          /* Harga selalu satu baris sendiri di bawah badge agar posisinya seragam. */
+          .search-card-price {
+            width: 100%;
+            text-align: left !important;
+          }
+          .search-card-price > span:first-child {
+            display: inline !important;
+            margin-right: 6px;
+          }
+          .search-card-actions {
+            width: 100%;
+          }
+          .search-card-actions > button {
+            flex: 1;
+            justify-content: center;
           }
         }
       `}</style>

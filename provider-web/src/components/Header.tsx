@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { Menu, X, User, Settings, LogOut, ChevronDown, Target, House, Ticket, Newspaper, Handshake, Info, LifeBuoy, type LucideIcon } from 'lucide-react';
+import { Menu, X, User, Settings, LogOut, ChevronDown, Target, House, Ticket, BookOpen, Handshake, Info, LifeBuoy, type LucideIcon } from 'lucide-react';
 import type { Route } from '../types';
 import { NotificationCenter } from './NotificationCenter';
 import { LanguageSwitch } from './LanguageSwitch';
@@ -63,7 +63,7 @@ export const Header: React.FC = () => {
     { route: 'beranda', label: 'Home', icon: House },
     { route: 'rencana-trip', label: t('Rencana Trip', 'Trip Planner'), icon: Target, onClick: openTripPlanner },
     { route: 'riwayat-booking', label: t('Cek Booking', 'My Bookings'), icon: Ticket },
-    { route: 'berita', label: t('Berita', 'News'), icon: Newspaper },
+    { route: 'berita', label: t('Cerita Travel', 'Travel Stories'), icon: BookOpen },
     { route: 'tentang-kami', label: t('Tentang Kami', 'About Us'), icon: Info },
     { route: 'bantuan', label: t('Bantuan', 'Help'), icon: LifeBuoy },
   ];
@@ -720,7 +720,7 @@ export const Header: React.FC = () => {
         }
 
         /* Menu traveler pindah ke tombol menu sebelum mulai berdesakan. */
-        @media (max-width: 1140px) {
+        @media (max-width: 1200px) {
           .site-header--traveler .main-nav,
           .site-header--traveler .traveler-desktop-only {
             display: none !important;

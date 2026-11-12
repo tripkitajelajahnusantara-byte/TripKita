@@ -33,7 +33,7 @@ func NewNewsController(db *gorm.DB) *NewsController {
 func newsIDParam(c *gin.Context) (uint, bool) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil || id == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Berita tidak ditemukan"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cerita tidak ditemukan"})
 		return 0, false
 	}
 	return uint(id), true
@@ -257,7 +257,7 @@ func (ctrl *NewsController) Delete(c *gin.Context) {
 		return
 	}
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Berita tidak ditemukan"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cerita tidak ditemukan"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Berita dihapus"})
@@ -265,7 +265,7 @@ func (ctrl *NewsController) Delete(c *gin.Context) {
 
 func (ctrl *NewsController) respondFindError(c *gin.Context, err error) {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Berita tidak ditemukan"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cerita tidak ditemukan"})
 		return
 	}
 	respondInternalError(c, "memuat berita", err)

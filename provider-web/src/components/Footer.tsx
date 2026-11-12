@@ -113,7 +113,7 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <button type="button" onClick={() => navigateTo('berita')} className="footer-nav-btn">
-                  <ChevronRight size={14} /> {t('Berita TemenTrip', 'News')}
+                  <ChevronRight size={14} /> {t('Cerita Travel', 'Travel Stories')}
                 </button>
               </li>
               <li>

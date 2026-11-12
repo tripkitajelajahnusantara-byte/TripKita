@@ -98,7 +98,7 @@ function NewsList({ onOpen }: { onOpen: (id: number | 'new') => void }) {
       <div className="nw-empty">
         <Newspaper size={36} strokeWidth={1.5} />
         <h3>Belum ada berita</h3>
-        <p>Berita yang Anda terbitkan akan tampil di menu Berita pada situs customer.</p>
+        <p>Berita yang Anda terbitkan akan tampil di menu Cerita Travel pada situs customer.</p>
         <button type="button" className="nw-btn nw-btn-primary" onClick={() => onOpen('new')}><Plus size={16} /> Tulis berita pertama</button>
       </div>
     );
@@ -268,7 +268,7 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
       setPublishedAt(saved.publishedAt);
       setSavedAt(new Date());
       if (nextStatus !== status) {
-        setNotice(nextStatus === 'PUBLISHED' ? 'Berita sudah tayang di menu Berita.' : 'Berita ditarik dari situs dan disimpan sebagai draf.');
+        setNotice(nextStatus === 'PUBLISHED' ? 'Berita sudah tayang di menu Cerita Travel.' : 'Berita ditarik dari situs dan disimpan sebagai draf.');
       }
     } catch (err) {
       setError(errorMessage(err, 'Berita gagal disimpan.'));
@@ -410,7 +410,7 @@ function NewsEditor({ initialId, onClose }: { initialId: number | null; onClose:
                 <option value="" disabled>Pilih kategori</option>
                 {NEWS_CATEGORIES.map((item) => <option key={item.slug} value={item.slug}>{item.id}</option>)}
               </select>
-              <p className="nw-help">Satu kategori utama. Dipakai untuk Topik Pilihan di halaman Berita.</p>
+              <p className="nw-help">Satu kategori utama. Dipakai untuk Topik Pilihan di halaman Cerita Travel.</p>
             </section>
 
             <section className="nw-card nw-side-card">
